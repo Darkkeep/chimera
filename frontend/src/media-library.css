@@ -1,0 +1,152 @@
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  padding-top: 20px;
+}
+
+.media-item {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.media-preview {
+  display: grid;
+  aspect-ratio: 16 / 10;
+  place-items: center;
+  overflow: hidden;
+  background: #e7ebe5;
+}
+
+.media-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.media-preview audio {
+  width: calc(100% - 20px);
+}
+
+.media-item-info {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.media-item-info strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-item-info small {
+  color: var(--muted);
+  font: 10px 'DM Mono', monospace;
+  text-transform: uppercase;
+}
+
+.media-attribution-editor {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.media-attribution-editor > label,
+.media-attribution-actions > label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.media-attribution-editor textarea,
+.media-attribution-editor select {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: #fff;
+  color: var(--ink);
+  font: 11px Manrope, sans-serif;
+}
+
+.media-attribution-editor textarea {
+  resize: vertical;
+}
+
+.media-attribution-actions {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.media-attribution-actions > label {
+  flex: 1;
+}
+
+.media-attribution-actions .button {
+  min-height: 32px;
+  padding: 6px 9px;
+  font-size: 10px;
+}
+
+.media-attribution-error {
+  color: #a14337;
+  font-size: 10px;
+}
+
+.media-item > .button {
+  justify-content: center;
+}
+
+.scene-media-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  max-width: 920px;
+  margin: 16px auto 0;
+}
+
+.scene-media-strip > img {
+  width: 76px;
+  height: 54px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.scene-audio {
+  display: grid;
+  gap: 4px;
+  width: min(260px, 100%);
+}
+
+.scene-audio span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-audio audio {
+  width: 100%;
+  height: 34px;
+}
+
+@media (max-width: 680px) {
+  .media-grid {
+    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+    gap: 12px;
+  }
+}
