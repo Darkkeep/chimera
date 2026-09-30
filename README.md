@@ -2,6 +2,12 @@
 
 Chimera is a local authoring tool for turning PowerPoint decks into editable storyboards and portable SCORM packages.
 
+**Distinct parts. Deliberate design. Powerful learning.** The integrated Chimera mark brings a wing, body, and tail into one identity. See the [brand guide](docs/brand-identity.md) for assets and usage.
+
+The authoring workspace keeps scenes beside the canvas. Use a scene's pencil button to edit it directly, or **Edit scene** above the preview. Project selection and libraries live in the sidebar; **Review tools** groups validation, accessibility, completion rules, and guided review. **Export** opens SCORM packages, build reports, JSON backup/restore, and available QTI test export. Editing dialogs support Tab, Shift+Tab, and Escape.
+
+Choose **Light**, **Dark**, or **System** under **Appearance** in the sidebar. The preference is remembered in this browser and shared across its tabs. System is the default and follows changes to your device's color scheme. Slide images and uploaded media retain their original colors.
+
 ## Start locally
 
 ### Backend

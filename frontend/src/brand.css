@@ -1,0 +1,38 @@
+/* Brand accents identify Chimera; blue remains reserved for interface actions. */
+:root {
+  --brand-midnight: #101d30;
+  --brand-silver: #dce5ef;
+  --brand-copper: #c77d54;
+  --brand-copper-light: #e1a580;
+}
+.sidebar { background: linear-gradient(155deg, var(--brand-midnight), #1b304a); }
+.brand { gap: 11px; padding-inline: 4px; letter-spacing: 2px; }
+.brand .brand-mark { flex: 0 0 44px; width: 44px; height: 48px; }
+.brand-wordmark { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.brand-wordmark > span { color: var(--brand-silver); font-size: 15px; font-weight: 700; }
+.sidebar-project { border-top: 1px solid #c77d5459; padding-top: 20px; }
+.brand-emblem { width: 104px; height: 104px; display: grid; place-items: center; border: 1px solid #c77d5466; border-radius: 20px; background: var(--brand-midnight); margin-bottom: 7px; }
+.brand-emblem .brand-mark { width: 78px; height: 84px; }
+.canvas-empty > .brand-signature { font-size: 10px; line-height: 1.6; font-weight: 600; letter-spacing: 1.4px; text-transform: uppercase; color: #93522f; max-width: 410px; }
+:root[data-theme="dark"] .canvas-empty > .brand-signature { color: var(--brand-copper-light); }
+.preview-brand-lockup { display: flex; min-width: 0; align-items: center; gap: 12px; }
+.preview-brand-lockup > .brand-mark { flex: 0 0 32px; width: 32px; height: 36px; }
+.course-preview-header { background: var(--brand-midnight); border-bottom: 1px solid #c77d5466; }
+:root[data-theme="dark"] .course-preview-header { background: var(--brand-midnight); }
+.course-preview-brand > span { color: var(--brand-copper-light); }
+@media (max-width: 1180px) and (min-width: 901px) {
+  .brand { gap: 8px; padding-inline: 0; }
+  .brand .brand-mark { flex-basis: 36px; width: 36px; height: 42px; }
+  .brand-wordmark > span { font-size: 14px; }
+}
+@media (max-width: 900px) {
+  .sidebar-project { border-top: 0; padding-top: 0; }
+  .brand .brand-mark { flex-basis: 38px; width: 38px; height: 42px; }
+}
+@media (max-width: 600px) {
+  .brand { gap: 8px; }
+  .brand-wordmark > span { font-size: 14px; }
+  .brand-emblem { width: 88px; height: 88px; border-radius: 16px; }
+  .brand-emblem .brand-mark { width: 66px; height: 72px; }
+  .canvas-empty > .brand-signature { font-size: 9px; letter-spacing: 1px; }
+}

@@ -1,0 +1,73 @@
+.sidebar-bottom { margin-top: auto; padding-top: 24px; }
+.appearance-selector { padding: 0; margin: 0 0 18px; border: 0; min-width: 0; }
+.appearance-selector legend { margin-bottom: 10px; color: #b2c3d8; font-size: 11px; }
+.appearance-options { display: flex; padding: 3px; border: 1px solid #49617e; border-radius: 6px; background: #10243e; }
+.appearance-options label { position: relative; display: flex; flex: 1; min-width: 0; align-items: center; justify-content: center; flex-direction: column; gap: 6px; padding: 9px 3px; border-radius: 4px; color: #c5d5e8; font-size: 10px; cursor: pointer; }
+.appearance-options label:hover { background: #244361; }
+.appearance-options label.is-active { background: #315b8e; color: #fff; }
+.appearance-options input { position: absolute; width: 100%; height: 100%; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.appearance-options label:focus-within { outline: 2px solid #9ccaff; outline-offset: 2px; }
+@media (max-width: 900px) {
+  .sidebar-bottom { grid-column: 1 / -1; padding-top: 0; margin: 0; }
+  .appearance-selector { display: flex; align-items: center; gap: 12px; margin: 0; }
+  .appearance-selector legend { float: left; margin: 0 12px 0 0; padding-block: 10px; }
+  .appearance-options { flex: 1; max-width: 300px; }
+  .appearance-options label { flex-direction: row; padding: 8px 6px; }
+}
+
+:root[data-theme="dark"] {
+  --ink: #e0e9f5;
+  --muted: #a7b9ce;
+  --line: #35475d;
+  --surface: #0e1826;
+  --deep: #213f62;
+  --accent: #236ed5;
+  --accent-hover: #337fe6;
+  --ui-button-color-253f62: #d6e6fc;
+  --theme-panel: #172436;
+  --theme-raised: #203149;
+  --theme-input: #101c2c;
+  --theme-selected: #234269;
+  --theme-success: #b1dfba;
+  --theme-danger: #ffb5ad;
+  color-scheme: dark;
+}
+:root[data-theme="dark"] body { background: var(--surface); color: var(--ink); }
+:root[data-theme="dark"] :is(.topbar, .scene-list, .canvas-panel, .modal, .validation-dialog, .accessibility-dialog, .accessibility-header, .golden-path-dialog, .golden-path-header, .assessment-editor-dialog, .enhancement-review-dialog, .enhancement-proposal, .course-preview-content) {
+  background: var(--theme-panel); color: var(--ink); border-color: var(--line);
+}
+:root[data-theme="dark"] :is(.canvas-empty, .media-preview, .empty-icon, .count, .assessment-editor-footer, .accessibility-footer, .golden-path-intro, .golden-path-footer, .assessment-qti-note, .assessment-settings, .audio-requirement-setting, .enhancement-proposal-values > div, .course-preview-assessment, .course-preview-audio.required-audio) {
+  background: var(--theme-raised); color: var(--muted); border-color: var(--line);
+}
+:root[data-theme="dark"] :is(.scene-row-wrap, .scene-list-tools, .scene-context-header, .canvas-footer, .sequence-hint, .export-section, .template-toolbar, .template-row, .media-item, .media-attribution-editor, .validation-header, .validation-issue, .accessibility-scene, .accessibility-image, .golden-path-step, .assessment-editor-header, .assessment-choices, .assessment-choice-row, .course-preview-transcript, .course-preview-audio) { border-color: var(--line); }
+:root[data-theme="dark"] :is(.button-outline, .skip-link, .golden-path-number, .course-preview-nav-button, .course-preview-answer) {
+  background: var(--theme-panel); color: var(--ink); border-color: #536a86;
+}
+:root[data-theme="dark"] :is(.button-outline:hover:not(:disabled):not(.disabled), .icon-button:hover:not(:disabled), .scene-row-wrap:hover) { background: var(--theme-raised); color: #acd0ff; }
+:root[data-theme="dark"] :is(.scene-row-wrap.is-selected, .scene-row-wrap.is-selected:hover, .course-preview-answer.selected) { background: var(--theme-selected); border-color: #77b2ff; }
+:root[data-theme="dark"] .scene-row { background: transparent; }
+:root[data-theme="dark"] :is(.scene-list-title .icon-button, .scene-edit-button:hover) { background: var(--theme-selected); color: #c4ddff; }
+:root[data-theme="dark"] :is(.eyebrow, .save-state, .scene-context-title > span, .canvas-meta, .canvas-footer span, .scene-number, .scene-signifier, .sequence-hint, .scene-drag-handle, .scene-order-actions .icon-button, .export-project-name, .package-threshold) { color: var(--muted); }
+:root[data-theme="dark"] :is(.scene-copy strong, .canvas-empty strong, .template-toolbar h2, .assessment-authoring-launch strong) { color: var(--ink); }
+:root[data-theme="dark"] .scene-order-actions .scene-edit-button { color: #8cbfff; }
+:root[data-theme="dark"] :is(input:not([type="radio"]):not([type="checkbox"]):not([type="file"]), textarea, select) { background: var(--theme-input); color: var(--ink); border-color: #536a86; }
+:root[data-theme="dark"] :is(input, textarea)::placeholder { color: #96a9c0; }
+:root[data-theme="dark"] :is(input[type="checkbox"], input[type="radio"]) { accent-color: #81b7ff; }
+:root[data-theme="dark"] :is(.validation-dialog, .accessibility-dialog, .golden-path-dialog, .assessment-editor-dialog, .enhancement-review-dialog, .course-preview-content) :is(h1, h2, h3, strong, label, legend, dd, .icon-button) { color: var(--ink); }
+:root[data-theme="dark"] :is(.validation-issue-copy span, .validation-issue-copy small, .validation-summary span, .validation-message, .accessibility-scene-heading, .accessibility-scene-heading small, .accessibility-empty, .accessibility-alt-label, .golden-path-step-copy p, .golden-path-step-heading > span, .enhancement-review-empty, .enhancement-review-empty span, .enhancement-proposal-rationale, .enhancement-proposal-field, .enhancement-proposal-origin, .enhancement-proposal-status, .enhancement-proposal-values dt, .assessment-choice-id, .assessment-choice-head, .course-preview-scene-meta, .course-preview-empty, .course-preview-text, .course-preview-transcript, .course-preview-transcript div, .course-preview-image figcaption, .course-preview-audio span, .course-preview-assessment-kicker, .course-preview-assessment legend, .course-preview-no-scenes p) { color: var(--muted); }
+:root[data-theme="dark"] :is(.validation-open, .golden-path-action, .assessment-add-choice, .assessment-saved) { color: #a1c8ff; }
+:root[data-theme="dark"] :is(.notice, .golden-path-step.review .golden-path-number, .validation-issue.warning .validation-issue-icon) { background: #3b3020; color: #f5d496; border-color: #806a3b; }
+:root[data-theme="dark"] :is(.success-notice, .validation-summary.is-valid, .golden-path-step.done .golden-path-number, .golden-path-step.next .golden-path-number, .enhancement-proposal.accepted, .course-preview-assessment-feedback.correct) { background: #1d382c; color: var(--theme-success); border-color: #487356; }
+:root[data-theme="dark"] :is(.validation-summary:not(.is-valid), .validation-issue-icon, .course-preview-assessment-feedback.incorrect) { background: #3c272c; color: var(--theme-danger); border-color: #8b5155; }
+:root[data-theme="dark"] :is(.export-error, .assessment-editor-error, .accessibility-error, .validation-error, .assessment-delete, .course-preview-assessment-score.incorrect) { color: var(--theme-danger); }
+:root[data-theme="dark"] :is(.export-feedback, .validation-empty, .course-preview-assessment-score.correct) { color: var(--theme-success); }
+:root[data-theme="dark"] .canvas-footer .render-warning { color: #f5d496; }
+:root[data-theme="dark"] :is(.enhancement-proposal.rejected, .enhancement-proposal.stale) { background: var(--theme-input); }
+:root[data-theme="dark"] .course-preview-shell { background: var(--surface); color: var(--ink); }
+:root[data-theme="dark"] .course-preview-header { background: #10243e; }
+:root[data-theme="dark"] :is(.course-preview-slide, .course-preview-image img, .accessibility-image > img) { background: var(--theme-input); border-color: var(--line); }
+:root[data-theme="dark"] .course-preview-nav-button.next { background: var(--accent); color: white; }
+:root[data-theme="dark"] :is(.course-preview-drag-chip, .course-preview-drop-target) { background: var(--theme-raised); color: var(--ink); border-color: #536a86; }
+:root[data-theme="dark"] :is(.course-preview-match-row, .course-preview-short-answer, .assessment-pair-row, .assessment-toggle, .audio-requirement-setting strong) { color: var(--ink); }
+:root[data-theme="dark"] :is(.course-preview-drop-target span, .course-preview-order-row > span, .audio-requirement-setting small) { color: var(--muted); }
+/* Slide images and uploaded media keep their authored colors in every mode. */

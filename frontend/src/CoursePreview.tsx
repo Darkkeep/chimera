@@ -1,3 +1,4 @@
+import { BrandMark } from "./BrandMark";
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, X } from "lucide-react";
 import type { AssessmentItem, AssessmentSettings, Project, Scene } from "./App";
@@ -234,7 +235,7 @@ export function CoursePreview({ project, onClose }: CoursePreviewProps) {
 
   return <section className="course-preview-shell" role="dialog" aria-modal="true" aria-label={`${project.title} course preview`}>
     <header className="course-preview-header">
-      <div className="course-preview-brand"><span>CHIMERA PREVIEW</span><strong>{project.title}</strong></div>
+      <div className="preview-brand-lockup"><BrandMark /><div className="course-preview-brand"><span>CHIMERA PREVIEW</span><strong>{project.title}</strong></div></div>
       <div className={`course-preview-progress ${coursePassed ? "course-complete" : ""}`}><span>{courseComplete ? coursePassed ? `Course passed · Score ${weightedScore ?? 100}%` : `Course complete · Score ${weightedScore ?? 0}% · Pass ${project.storyboard.completionSettings.passingScore}%` : requiredAudioSetupMissingCount ? `${requiredAudioSetupMissingCount} required-audio ${requiredAudioSetupMissingCount === 1 ? "scene has" : "scenes have"} no audio attached` : `${completedRequiredSceneCount} of ${requiredSceneCount} required scenes · ${completedRequiredAudioCount} of ${requiredAudioTrackCount} required audio tracks`}</span><div className="course-preview-progress-track" role="progressbar" aria-label="Required scenes completed" aria-valuemin={0} aria-valuemax={Math.max(requiredSceneCount, 1)} aria-valuenow={completedRequiredSceneCount}><span style={{ width: `${requiredSceneCount ? Math.round(completedRequiredSceneCount / requiredSceneCount * 100) : 0}%` }} /></div></div>
       <button type="button" className="course-preview-close" onClick={onClose} aria-label="Close course preview"><X size={18} /><span>Exit preview</span></button>
     </header>
