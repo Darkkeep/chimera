@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Download, Minus, Plus, Save, X } from "lucide-react";
 import type { AssessmentChoice, AssessmentItem, AssessmentPair, AssessmentSettings, AssessmentType, Project, Scene } from "./App";
+import { revisionConflictMessage, storyboardWriteHeaders } from "./revision";
 import "./assessment-editor.css";
 import "./assessment-settings.css";
 import "./assessment-types.css";
@@ -8,6 +9,7 @@ import "./assessment-types.css";
 type AssessmentEditorProps = {
   projectId: string;
   projectTitle: string;
+  revision: number;
   scene: Scene;
   scenes: Scene[];
   onClose: () => void;
@@ -88,7 +90,7 @@ function questionTypeName(type: AssessmentType): string {
   })[type];
 }
 
-export function AssessmentEditor({ projectId, projectTitle, scene, scenes, onClose, onProjectUpdated }: AssessmentEditorProps) {
+export function AssessmentEditor({ projectId, projectTitle, revision, scene, scenes, onClose, onProjectUpdated }: AssessmentEditorProps) {
   const [item, setItem] = useState<AssessmentItem>(() => scene.assessmentItem ?? createDefaultItem("single-choice", scene));
   const [settings, setSettings] = useState<AssessmentSettings>(() => scene.assessmentSettings ?? { maxAttempts: 2, passingScore: 100, scoreWeight: 1, remediationSceneId: null });
   const [busy, setBusy] = useState(false);
@@ -177,7 +179,7 @@ export function AssessmentEditor({ projectId, projectTitle, scene, scenes, onClo
     try {
       const response = await fetch(`/api/projects/${projectId}/scenes/${scene.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: storyboardWriteHeaders(revision),
         body: JSON.stringify({
           assessmentSettings: settings,
           assessmentItem: {
@@ -191,6 +193,8 @@ export function AssessmentEditor({ projectId, projectTitle, scene, scenes, onClo
       });
       if (!response.ok) {
         const detail = await response.json().catch(() => null) as { detail?: unknown } | null;
+        const conflictMessage = revisionConflictMessage(response.status);
+        if (conflictMessage) throw new Error(conflictMessage);
         throw new Error(typeof detail?.detail === "string" ? detail.detail : "Question could not be saved.");
       }
       onProjectUpdated(await response.json() as Project);
@@ -231,10 +235,10 @@ export function AssessmentEditor({ projectId, projectTitle, scene, scenes, onClo
     try {
       const response = await fetch(`/api/projects/${projectId}/scenes/${scene.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ assessmentItem: null }),
+        headers: storyboardWriteHeaders(revision),
       });
-      if (!response.ok) throw new Error("Question could not be removed.");
+      if (!response.ok) throw new Error(revisionConflictMessage(response.status) || "Question could not be removed.");
       onProjectUpdated(await response.json() as Project);
       onClose();
     } catch (removeError) {

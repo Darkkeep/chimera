@@ -1,6 +1,9 @@
 import base64
+from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import io
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -11,14 +14,15 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import HTTPException, UploadFile
 from PIL import Image
+from docx import Document
 from pydantic import ValidationError
 from pptx import Presentation
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.util import Inches
 from unittest.mock import patch
 
-from backend.app import main, storage
-from backend.app.models import AssessmentChoice, AssessmentPair, AssessmentSettings, AssetAttributionUpdate, CourseCompletionSettings, DragDropAssessment, EnhancementProposalCreate, ExportSettings, MatchingAssessment, MultipleResponseAssessment, OrderingAssessment, ProjectCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, ShortAnswerAssessment, SingleChoiceAssessment, Storyboard, TemplateUpdate, TrueFalseAssessment
+from backend.app import backup, enhancement_jobs, main, media_generation, references, storage
+from backend.app.models import AssessmentChoice, AssessmentPair, AssessmentSettings, AssetAttributionUpdate, CourseCompletionSettings, DragDropAssessment, EnhancementJobCreate, EnhancementProposalCreate, ExportSettings, MatchingAssessment, MediaGenerationJobCreate, MultipleResponseAssessment, OrderingAssessment, ProjectCreate, ReviewCommentCreate, ReviewCommentDecision, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, ShortAnswerAssessment, SingleChoiceAssessment, Storyboard, TemplateUpdate, TrueFalseAssessment
 from backend.app.render import render_slides
 from backend.app.scorm import _compatibility_checks
 
@@ -94,6 +98,81 @@ class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
             {"http://localhost:5173", "http://127.0.0.1:5173"},
         )
 
+    def test_storyboard_revision_increments_and_defaults_for_legacy_files(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Revision course"))
+        initial_revision = project.storyboard.revision
+
+        project = storage.create_scene(project.id, SceneCreate(title="First scene"))
+        self.assertEqual(project.storyboard.revision, initial_revision + 1)
+        scene = project.storyboard.scenes[0]
+        project = storage.update_scene(project.id, scene.id, SceneUpdate(title="Updated scene"))
+        self.assertEqual(project.storyboard.revision, initial_revision + 2)
+
+        storyboard_path = storage.project_path(project.id) / "storyboard.json"
+        legacy_storyboard = json.loads(storyboard_path.read_text(encoding="utf-8"))
+        legacy_storyboard.pop("revision")
+        storyboard_path.write_text(json.dumps(legacy_storyboard), encoding="utf-8")
+        migrated = storage.read_project(project.id)
+        self.assertEqual(migrated.storyboard.revision, 1)
+
+        saved = storage.update_project_completion_settings(
+            project.id,
+            migrated.storyboard.completionSettings,
+        )
+        self.assertEqual(saved.storyboard.revision, 2)
+
+    def test_stale_storyboard_write_does_not_change_storyboard_or_history(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Concurrent edit course"))
+        stale_revision = project.storyboard.revision
+        updated = storage.create_scene(project.id, SceneCreate(title="Saved by another editor"))
+        path = storage.project_path(project.id)
+        history_before = sorted((path / "history").glob("storyboard-*.json"))
+
+        with self.assertRaises(storage.StoryboardRevisionConflict):
+            storage.write_storyboard(path, project.storyboard, expected_revision=stale_revision)
+
+        current = storage.read_project(project.id)
+        self.assertEqual(current.storyboard.revision, updated.storyboard.revision)
+        self.assertEqual(current.storyboard.scenes[0].title, "Saved by another editor")
+        self.assertEqual(sorted((path / "history").glob("storyboard-*.json")), history_before)
+
+    def test_stale_if_match_returns_precondition_failed(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Stale request course"))
+        stale_etag = f'"{project.storyboard.revision}"'
+        current = main.post_scene(project.id, SceneCreate(title="New scene"), if_match=stale_etag)
+
+        with self.assertRaises(HTTPException) as raised:
+            main.patch_project_completion_settings(
+                project.id,
+                current.storyboard.completionSettings,
+                if_match=stale_etag,
+            )
+
+        self.assertEqual(raised.exception.status_code, 412)
+        self.assertEqual(raised.exception.headers["ETag"], f'"{current.storyboard.revision}"')
+
+    def test_project_mutation_routes_expose_if_match_header(self) -> None:
+        operation = main.app.openapi()["paths"]["/api/projects/{project_id}/scenes/{scene_id}"]["patch"]
+        headers = [parameter["name"] for parameter in operation.get("parameters", []) if parameter["in"] == "header"]
+        self.assertIn("if-match", headers)
+
+    async def test_stale_media_upload_is_rejected_before_persisting_file(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Stale media course"))
+        stale_etag = f'"{project.storyboard.revision}"'
+        current = storage.create_scene(project.id, SceneCreate(title="Newer scene"))
+        assets_before = list((storage.project_path(project.id) / "assets").rglob("*"))
+
+        with self.assertRaises(HTTPException) as raised:
+            await main.post_project_asset(
+                project.id,
+                UploadFile(filename="unused.png", file=io.BytesIO(b"stale upload")),
+                if_match=stale_etag,
+            )
+
+        self.assertEqual(raised.exception.status_code, 412)
+        self.assertEqual(list((storage.project_path(project.id) / "assets").rglob("*")), assets_before)
+        self.assertEqual(storage.read_project(project.id).storyboard.revision, current.storyboard.revision)
+
     async def test_import_separates_text_and_failed_replacement_preserves_deck(self) -> None:
         project = storage.create_project(ProjectCreate(title="Inspection course"))
         with patch("backend.app.main.render_slides", return_value=({}, "Slide preview unavailable: LibreOffice was not found.")):
@@ -129,6 +208,126 @@ class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(raised.exception.status_code, 422)
         self.assertEqual(deck_path.read_bytes(), original_bytes)
         self.assertEqual(storage.read_project(project.id).storyboard.scenes[0].title, "Inspection basics")
+
+    async def test_representative_storyboard_exports_same_learner_content_to_both_scorm_profiles(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Representative export course"))
+        def render_fixture(_source: Path, staging_root: Path) -> tuple[dict[int, str], None]:
+            preview_path = staging_root / "renders" / "slide-1.png"
+            preview_path.parent.mkdir(parents=True, exist_ok=True)
+            preview_path.write_bytes(b"representative-slide-preview")
+            return {1: "renders/slide-1.png"}, None
+
+        with patch("backend.app.main.render_slides", side_effect=render_fixture):
+            project = await main.upload_source(
+                project.id,
+                UploadFile(filename="inspection.pptx", file=io.BytesIO(make_presentation())),
+            )
+
+        imported_scene = project.storyboard.scenes[0]
+        image_id = imported_scene.imageAssets[0]
+        project = storage.update_scene(
+            project.id,
+            imported_scene.id,
+            SceneUpdate(
+                actionDescription="Author-only direction for the inspection image.",
+                imageAltText={image_id: "Technician checks the inspection equipment."},
+            ),
+        )
+        native_scene = storage.create_scene(
+            project.id,
+            SceneCreate(title="Knowledge check", sceneType="assessment", required=False),
+        ).storyboard.scenes[-1]
+        assessment = SingleChoiceAssessment(
+            identifier="ITEM_INSPECTION",
+            prompt="What should be checked before use?",
+            choices=[
+                AssessmentChoice(identifier="EQUIPMENT", text="The equipment"),
+                AssessmentChoice(identifier="ROOM", text="The room temperature"),
+            ],
+            correctResponse="EQUIPMENT",
+        )
+        project = storage.update_scene(
+            project.id,
+            native_scene.id,
+            SceneUpdate(assessmentItem=assessment),
+        )
+        for asset in project.storyboard.assets:
+            storage.update_project_asset_attribution(
+                project.id,
+                asset.id,
+                AssetAttributionUpdate(attributionText="Chimera test fixture", attributionStatus="complete"),
+            )
+
+        exports = [main.export_scorm_2004(project.id), main.export_scorm_12(project.id)]
+        snapshots = []
+        for response in exports:
+            with ZipFile(io.BytesIO(response.body)) as package:
+                snapshot = json.loads(package.read("storyboard.json"))
+                snapshots.append(snapshot)
+                self.assertEqual(len(snapshot["scenes"]), 2)
+                self.assertEqual(snapshot["scenes"][0]["extractedText"], ["Check the equipment before use"])
+                self.assertNotIn("actionDescription", snapshot["scenes"][0])
+                self.assertNotIn("notes", snapshot["scenes"][0])
+                self.assertFalse(snapshot["scenes"][1]["required"])
+                self.assertEqual(snapshot["scenes"][1]["assessmentItem"]["identifier"], "ITEM_INSPECTION")
+                self.assertEqual(snapshot["scenes"][0]["previewImage"], "renders/slide-1.png")
+                self.assertIn("renders/slide-1.png", package.namelist())
+                self.assertTrue(any(name.endswith(".png") for name in package.namelist()))
+                self.assertTrue(any(name.endswith(".mp3") for name in package.namelist()))
+                player = package.read("player.js").decode("utf-8")
+                self.assertIn("scene.previewImage", player)
+                self.assertIn("Read slide text", player)
+
+        self.assertEqual(snapshots[0], snapshots[1])
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is required for generated runtime behavior tests")
+    def test_optional_only_course_completion_matches_preview_in_both_scorm_profiles(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Optional-only course"))
+        storage.create_scene(project.id, SceneCreate(title="Optional scene", required=False))
+        harness = r'''const vm = require("node:vm");
+const calls = [];
+const api = {
+  Initialize: () => "true", GetValue: () => "",
+  SetValue: (key, value) => { calls.push([key, value]); return "true"; },
+  Commit: () => "true", Terminate: () => "true",
+  LMSInitialize: () => "true", LMSGetValue: () => "",
+  LMSSetValue: (key, value) => { calls.push([key, value]); return "true"; },
+  LMSCommit: () => "true", LMSFinish: () => "true"
+};
+const window = { API_1484_11: api, API: api, addEventListener: () => {} };
+const nodes = new Map();
+const document = {
+  querySelector(selector) {
+    if (selector === "#assessment-form" || selector === "[data-return-assessment]") return null;
+    if (!nodes.has(selector)) nodes.set(selector, { textContent: "", innerHTML: "", disabled: false, addEventListener: () => {} });
+    return nodes.get(selector);
+  },
+  createElement: () => ({ addEventListener: () => {}, style: {}, remove: () => {} })
+};
+const fetch = async () => ({ json: async () => JSON.parse(process.env.CHIMERA_STORYBOARD) });
+vm.runInNewContext(process.env.CHIMERA_PLAYER, { window, document, fetch });
+setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
+
+        responses = [main.export_scorm_2004(project.id), main.export_scorm_12(project.id)]
+        for response in responses:
+            with ZipFile(io.BytesIO(response.body)) as package:
+                environment = os.environ.copy()
+                environment["CHIMERA_PLAYER"] = package.read("player.js").decode("utf-8")
+                environment["CHIMERA_STORYBOARD"] = package.read("storyboard.json").decode("utf-8")
+                result = subprocess.run(
+                    [shutil.which("node") or "node", "-e", harness],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env=environment,
+                )
+            writes = json.loads(result.stdout.strip().splitlines()[-1])
+            status_values = {key: value for key, value in writes if key in {"cmi.completion_status", "cmi.success_status", "cmi.core.lesson_status"}}
+            if "cmi.completion_status" in status_values:
+                self.assertEqual(status_values["cmi.completion_status"], "completed")
+                self.assertEqual(status_values["cmi.success_status"], "passed")
+            else:
+                self.assertEqual(status_values["cmi.core.lesson_status"], "passed")
 
     def test_renderer_falls_back_when_libreoffice_is_missing(self) -> None:
         with patch("backend.app.render.find_libreoffice", return_value=None):
@@ -311,6 +510,7 @@ class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
             project.id,
             proposal.id,
             main.EnhancementProposalDecision(decision="reject"),
+            if_match=f'"{project.storyboard.revision}"',
         )
         self.assertEqual(rejected.proposal.status, "rejected")
         self.assertIsNone(rejected.project)
@@ -325,6 +525,7 @@ class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
             project.id,
             accepted_proposal.id,
             main.EnhancementProposalDecision(decision="accept"),
+            if_match=f'"{storage.read_project(project.id).storyboard.revision}"',
         )
         self.assertEqual(accepted.proposal.status, "accepted")
         self.assertEqual(accepted.project.storyboard.scenes[0].actionDescription, accepted_proposal.proposedValue)
@@ -341,10 +542,391 @@ class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
                 project.id,
                 stale_proposal.id,
                 main.EnhancementProposalDecision(decision="accept"),
+                if_match=f'"{storage.read_project(project.id).storyboard.revision}"',
             )
         self.assertEqual(raised.exception.status_code, 409)
         self.assertEqual(storage.list_enhancement_proposals(project.id)[-1].status, "stale")
         self.assertEqual(storage.read_project(project.id).storyboard.scenes[0].actionDescription, "Author edited this after the proposal.")
+
+    def test_enhancement_proposal_acceptance_is_atomic_and_revision_bound(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Atomic proposal"))
+        project = storage.create_scene(project.id, SceneCreate(title="Scene one", actionDescription="Current direction"))
+        scene = project.storyboard.scenes[0]
+        proposal = main.post_enhancement_proposal(project.id, EnhancementProposalCreate(
+            changes=[
+                {"targetSceneId": scene.id, "field": "actionDescription", "proposedValue": "Updated direction"},
+                {"targetSceneId": scene.id, "field": "narration", "proposedValue": "Narrate the updated direction."},
+            ],
+            rationale="Align the narration and production direction.",
+            referenceCitations=[{"resourceId": "guide-1", "version": "2", "locator": "p. 4"}],
+        ))
+        self.assertEqual(proposal.sourceRevision, project.storyboard.revision)
+        self.assertEqual(proposal.affectedIds, [scene.id])
+        self.assertEqual(len(proposal.changes), 2)
+        overlapping = main.post_enhancement_proposal(project.id, EnhancementProposalCreate(
+            targetSceneId=scene.id,
+            proposedValue="An alternative direction.",
+            rationale="A competing alternative.",
+        ))
+
+        with self.assertRaises(HTTPException) as missing_header:
+            main.post_enhancement_proposal_decision(
+                project.id,
+                proposal.id,
+                main.EnhancementProposalDecision(decision="accept"),
+            )
+        self.assertEqual(missing_header.exception.status_code, 428)
+
+        accepted = main.post_enhancement_proposal_decision(
+            project.id,
+            proposal.id,
+            main.EnhancementProposalDecision(decision="accept", changes=[
+                {"targetSceneId": scene.id, "field": "actionDescription", "proposedValue": "Author-edited direction"},
+                {"targetSceneId": scene.id, "field": "narration", "proposedValue": "Author-edited narration."},
+            ]),
+            if_match=f'"{project.storyboard.revision}"',
+        )
+        self.assertEqual(accepted.proposal.status, "accepted")
+        self.assertEqual(accepted.project.storyboard.revision, project.storyboard.revision + 1)
+        updated_scene = accepted.project.storyboard.scenes[0]
+        self.assertEqual(updated_scene.actionDescription, "Author-edited direction")
+        self.assertEqual(updated_scene.narration, "Author-edited narration.")
+        self.assertEqual(accepted.proposal.changes[0].proposedValue, "Author-edited direction")
+        self.assertEqual(accepted.proposal.decisionHistory[-1].expectedRevision, project.storyboard.revision)
+        self.assertEqual(storage.list_enhancement_proposals(project.id)[-1].id, overlapping.id)
+        self.assertEqual(storage.list_enhancement_proposals(project.id)[-1].status, "superseded")
+
+        stale = main.post_enhancement_proposal(project.id, EnhancementProposalCreate(
+            targetSceneId=scene.id,
+            proposedValue="A different direction",
+            rationale="Check the expected revision.",
+        ))
+        stale_revision = storage.read_project(project.id).storyboard.revision
+        storage.update_scene(project.id, scene.id, SceneUpdate(notes="An intervening author edit."))
+        with self.assertRaises(HTTPException) as revision_mismatch:
+            main.post_enhancement_proposal_decision(
+                project.id,
+                stale.id,
+                main.EnhancementProposalDecision(decision="accept"),
+                if_match=f'"{stale_revision}"',
+            )
+        self.assertEqual(revision_mismatch.exception.status_code, 412)
+        self.assertEqual(storage.list_enhancement_proposals(project.id)[-1].status, "pending")
+
+    def test_enhancement_proposal_reversal_preserves_later_edits(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Proposal reversal"))
+        project = storage.create_scene(project.id, SceneCreate(title="Scene one", actionDescription="Original"))
+        scene = project.storyboard.scenes[0]
+        proposal = main.post_enhancement_proposal(project.id, EnhancementProposalCreate(
+            targetSceneId=scene.id,
+            proposedValue="Accepted value",
+            rationale="Test reversible acceptance.",
+        ))
+        accepted = main.post_enhancement_proposal_decision(
+            project.id,
+            proposal.id,
+            main.EnhancementProposalDecision(decision="accept"),
+            if_match=f'"{project.storyboard.revision}"',
+        )
+        reversed_result = main.post_enhancement_proposal_decision(
+            project.id,
+            proposal.id,
+            main.EnhancementProposalDecision(decision="reverse"),
+            if_match=f'"{accepted.project.storyboard.revision}"',
+        )
+        self.assertEqual(reversed_result.proposal.status, "reversed")
+        self.assertEqual(reversed_result.project.storyboard.scenes[0].actionDescription, "Original")
+        self.assertEqual(reversed_result.proposal.decisionHistory[-1].decision, "reverse")
+
+        next_proposal = main.post_enhancement_proposal(project.id, EnhancementProposalCreate(
+            targetSceneId=scene.id,
+            proposedValue="Another accepted value",
+            rationale="Check reversal conflict handling.",
+        ))
+        current = storage.read_project(project.id)
+        next_accepted = main.post_enhancement_proposal_decision(
+            project.id,
+            next_proposal.id,
+            main.EnhancementProposalDecision(decision="accept"),
+            if_match=f'"{current.storyboard.revision}"',
+        )
+        edited = storage.update_scene(project.id, scene.id, SceneUpdate(actionDescription="Later author edit"))
+        with self.assertRaises(HTTPException) as conflict:
+            main.post_enhancement_proposal_decision(
+                project.id,
+                next_proposal.id,
+                main.EnhancementProposalDecision(decision="reverse"),
+                if_match=f'"{edited.storyboard.revision}"',
+            )
+        self.assertEqual(conflict.exception.status_code, 409)
+        self.assertEqual(storage.read_project(project.id).storyboard.scenes[0].actionDescription, "Later author edit")
+        self.assertEqual(storage.list_enhancement_proposals(project.id)[-1].status, "accepted")
+
+    def test_enhancement_proposal_concurrent_decisions_apply_once(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Concurrent proposal"))
+        project = storage.create_scene(project.id, SceneCreate(title="Scene one", actionDescription="Original"))
+        scene = project.storyboard.scenes[0]
+        proposal = main.post_enhancement_proposal(project.id, EnhancementProposalCreate(
+            targetSceneId=scene.id,
+            proposedValue="Accepted once",
+            rationale="Check concurrent approval.",
+        ))
+
+        def accept_proposal() -> EnhancementProposalResult | HTTPException:
+            try:
+                return main.post_enhancement_proposal_decision(
+                    project.id,
+                    proposal.id,
+                    main.EnhancementProposalDecision(decision="accept"),
+                    if_match=f'"{project.storyboard.revision}"',
+                )
+            except HTTPException as error:
+                return error
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(lambda _: accept_proposal(), range(2)))
+        self.assertEqual(sum(isinstance(result, main.EnhancementProposalResult) for result in results), 1)
+        self.assertEqual(storage.read_project(project.id).storyboard.revision, project.storyboard.revision + 1)
+        self.assertEqual(storage.read_project(project.id).storyboard.scenes[0].actionDescription, "Accepted once")
+
+    def test_enhancement_proposal_commit_failure_rolls_back_storyboard(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Proposal commit rollback"))
+        project = storage.create_scene(project.id, SceneCreate(title="Scene one", actionDescription="Original"))
+        scene = project.storyboard.scenes[0]
+        proposal = main.post_enhancement_proposal(project.id, EnhancementProposalCreate(
+            targetSceneId=scene.id,
+            proposedValue="Should roll back",
+            rationale="Exercise the second-file failure path.",
+        ))
+
+        with patch.object(storage, "_write_enhancement_proposals", side_effect=OSError("proposal disk failure")):
+            with self.assertRaises(OSError):
+                storage.decide_enhancement_proposal(
+                    project.id,
+                    proposal.id,
+                    "accept",
+                    project.storyboard.revision,
+                )
+
+        restored = storage.read_project(project.id)
+        self.assertEqual(restored.storyboard.revision, project.storyboard.revision)
+        self.assertEqual(restored.storyboard.scenes[0].actionDescription, "Original")
+        self.assertEqual(storage.list_enhancement_proposals(project.id)[0].status, "pending")
+
+    def test_enhancement_job_generates_grounded_pending_proposal_without_mutating_storyboard(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Grounded enhancement"))
+        project = storage.create_scene(project.id, SceneCreate(title="Inspection", actionDescription="Original action"))
+        scene = project.storyboard.scenes[0]
+        content = b"Always inspect the pressure gauge before opening the valve.\nDo not inspect the pressure gauge before opening the valve."
+        passages, status, message = references.extract_reference_passages("guide.txt", content)
+        self.assertEqual(status, "complete")
+        self.assertIsNone(message)
+        resource = storage.save_reference_resource(
+            project.id, "guide.txt", "Safety guide", "study-guide", True, [scene.id], content,
+            "text/plain", passages, status, message,
+        )
+        first_version = resource.currentVersion
+        data = EnhancementJobCreate(scope="selected-scenes", sceneIds=[scene.id], goal="Improve the action description.", resourceIds=[resource.id])
+        preview = enhancement_jobs.preview_enhancement_submission(project.id, data)
+        self.assertEqual(preview["resourceCount"], 1)
+        self.assertEqual(preview["payload"]["references"][0]["version"], first_version)
+        job = storage.create_enhancement_job(project.id, data)
+        self.assertEqual(job.resourceVersions[resource.id], first_version)
+
+        updated_resource = storage.save_reference_resource(
+            project.id, "guide.txt", "Safety guide", "study-guide", True, [scene.id], content + b" Updated.",
+            "text/plain", passages + [references.ReferencePassage(locator="line:3", text="Updated.")], status, message,
+            resource_id=resource.id,
+        )
+        self.assertEqual(updated_resource.currentVersion, "2")
+
+        class FakeProvider:
+            name = "fake"
+            model = "fake-test"
+
+            def generate(self, payload: dict[str, object]) -> dict[str, object]:
+                return {"proposals": [{
+                    "changes": [{"targetSceneId": scene.id, "field": "actionDescription", "proposedValue": "Inspect the gauge before opening the valve."}],
+                    "rationale": "Makes the required order explicit.",
+                    "referenceCitations": [{
+                        "resourceId": resource.id,
+                        "version": "1",
+                        "locator": "line:1",
+                        "excerpt": "Always inspect the pressure gauge before opening the valve.",
+                    }],
+                }], "resourceConflicts": [{
+                    "explanation": "The same guide gives opposite instructions about inspection order.",
+                    "citations": [
+                        {"resourceId": resource.id, "version": "1", "locator": "line:1", "excerpt": "Always inspect the pressure gauge before opening the valve."},
+                        {"resourceId": resource.id, "version": "1", "locator": "line:2", "excerpt": "Do not inspect the pressure gauge before opening the valve."},
+                    ],
+                }]}
+
+        with patch.object(enhancement_jobs, "_provider_factory", return_value=FakeProvider()):
+            enhancement_jobs._run_job(project.id, job.id)
+
+        finished_job = storage.read_enhancement_job(project.id, job.id)
+        self.assertEqual(finished_job.status, "completed")
+        self.assertEqual(len(finished_job.proposalIds), 1)
+        proposal = storage.list_enhancement_proposals(project.id)[0]
+        self.assertEqual(proposal.status, "pending")
+        self.assertEqual(proposal.referenceCitations[0].version, "1")
+        self.assertEqual(proposal.referenceCitations[0].locator, "line:1")
+        self.assertEqual(len(finished_job.resourceConflicts), 1)
+        self.assertEqual(len(finished_job.resourceConflicts[0].citations), 2)
+        self.assertEqual(storage.read_project(project.id).storyboard.scenes[0].actionDescription, "Original action")
+
+    def test_enhancement_job_rejects_unverified_citations_and_allows_retry(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Invalid grounding"))
+        project = storage.create_scene(project.id, SceneCreate(title="Inspection", actionDescription="Original"))
+        scene = project.storyboard.scenes[0]
+        passages, status, message = references.extract_reference_passages("guide.txt", b"Use approved equipment.")
+        resource = storage.save_reference_resource(project.id, "guide.txt", "Guide", "supporting-document", False, [], b"Use approved equipment.", "text/plain", passages, status, message)
+        job = storage.create_enhancement_job(project.id, EnhancementJobCreate(scope="selected-scenes", sceneIds=[scene.id], goal="Improve", resourceIds=[resource.id]))
+
+        class InvalidCitationProvider:
+            name = "fake"
+            model = "bad-citation"
+
+            def generate(self, payload: dict[str, object]) -> list[dict[str, object]]:
+                return [{
+                    "changes": [{"targetSceneId": scene.id, "field": "actionDescription", "proposedValue": "A suggestion."}],
+                    "rationale": "A factual claim.",
+                    "referenceCitations": [{"resourceId": resource.id, "version": "1", "locator": "page:99", "excerpt": "Not submitted."}],
+                }]
+
+        with patch.object(enhancement_jobs, "_provider_factory", return_value=InvalidCitationProvider()):
+            enhancement_jobs._run_job(project.id, job.id)
+        failed = storage.read_enhancement_job(project.id, job.id)
+        self.assertEqual(failed.status, "failed")
+        self.assertIn("locator", failed.error)
+        self.assertEqual(storage.list_enhancement_proposals(project.id), [])
+        self.assertEqual(storage.read_project(project.id).storyboard.scenes[0].actionDescription, "Original")
+
+        updated_passages, updated_status, updated_message = references.extract_reference_passages("guide.txt", b"A replacement reference.")
+        storage.save_reference_resource(project.id, "guide.txt", "Guide", "supporting-document", False, [], b"A replacement reference.", "text/plain", updated_passages, updated_status, updated_message, resource_id=resource.id)
+        cancelled = storage.create_enhancement_job(project.id, EnhancementJobCreate(scope="selected-scenes", sceneIds=[scene.id], goal="Retry safely."))
+        cancelled = storage.update_enhancement_job(project.id, cancelled.id, resourceIds=[resource.id], resourceVersions={resource.id: "1"})
+        cancelled = enhancement_jobs.cancel_enhancement_job(project.id, cancelled.id)
+        self.assertEqual(cancelled.status, "cancelled")
+        with patch.object(enhancement_jobs, "start_enhancement_job") as start_job:
+            retried = enhancement_jobs.retry_enhancement_job(project.id, cancelled.id)
+        self.assertEqual(retried.status, "queued")
+        self.assertEqual(retried.retryOf, cancelled.id)
+        self.assertEqual(retried.resourceVersions[resource.id], "1")
+        start_job.assert_called_once_with(project.id, retried.id)
+        self.assertEqual(storage.read_project(project.id).storyboard.scenes[0].actionDescription, "Original")
+
+    def test_enhancement_job_discards_output_if_storyboard_changes_during_provider_call(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Stale enhancement run"))
+        project = storage.create_scene(project.id, SceneCreate(title="Inspection", actionDescription="Original"))
+        scene = project.storyboard.scenes[0]
+        job = storage.create_enhancement_job(project.id, EnhancementJobCreate(
+            scope="selected-scenes", sceneIds=[scene.id], goal="Improve clarity.",
+        ))
+
+        class EditingProvider:
+            name = "fake"
+            model = "revision-race"
+
+            def generate(self, payload: dict[str, object]) -> list[dict[str, object]]:
+                storage.update_scene(project.id, scene.id, SceneUpdate(actionDescription="Author edit during provider call"))
+                return [{
+                    "changes": [{"targetSceneId": scene.id, "field": "actionDescription", "proposedValue": "Stale suggestion"}],
+                    "rationale": "Should be discarded after the revision changes.",
+                }]
+
+        with patch.object(enhancement_jobs, "_provider_factory", return_value=EditingProvider()):
+            enhancement_jobs._run_job(project.id, job.id)
+        failed = storage.read_enhancement_job(project.id, job.id)
+        self.assertEqual(failed.status, "failed")
+        self.assertIn("No proposals were saved", failed.error)
+        self.assertEqual(storage.list_enhancement_proposals(project.id), [])
+        self.assertEqual(storage.read_project(project.id).storyboard.scenes[0].actionDescription, "Author edit during provider call")
+
+    def test_media_generation_stores_candidate_before_explicit_placement_approval(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Generated media"))
+        project = storage.create_scene(project.id, SceneCreate(title="Inspection"))
+        scene = project.storyboard.scenes[0]
+        job = storage.create_media_generation_job(project.id, MediaGenerationJobCreate(
+            kind="image", sceneId=scene.id, purpose="Show the inspection", prompt="A clear inspection diagram", altText="Inspection diagram",
+        ))
+
+        class FakeMediaProvider:
+            name = "fake-media"
+            image_model = "image-test"
+            audio_model = "audio-test"
+
+            def generate_image(self, _job):
+                return b"generated-image", "image/png", self.image_model
+
+            def generate_narration(self, _job):
+                return b"generated-audio", "audio/mpeg", self.audio_model
+
+        with patch.object(media_generation, "_provider_factory", return_value=FakeMediaProvider()):
+            media_generation._run_job(project.id, job.id)
+
+        finished = storage.read_media_generation_job(project.id, job.id)
+        self.assertEqual(finished.status, "completed")
+        candidate = storage.list_generated_candidates(project.id)[0]
+        self.assertEqual(candidate.status, "pending")
+        unchanged = storage.read_project(project.id)
+        self.assertEqual(unchanged.storyboard.revision, project.storyboard.revision)
+        self.assertEqual(unchanged.storyboard.scenes[0].imageAssets, [])
+
+        approved = main.post_generated_candidate_approval(project.id, candidate.id, if_match=f'"{unchanged.storyboard.revision}"')
+        self.assertEqual(approved.proposal.status, "pending")
+        self.assertEqual(storage.read_generated_candidate(project.id, candidate.id).status, "approved")
+        after_asset_approval = storage.read_project(project.id)
+        self.assertEqual(after_asset_approval.storyboard.scenes[0].imageAssets, [])
+        self.assertEqual(len(after_asset_approval.storyboard.assets), 1)
+
+    def test_review_threads_survive_replies_resolution_reorder_and_scene_deletion(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Playback review"))
+        project = storage.create_scene(project.id, SceneCreate(title="First scene"))
+        first_scene = project.storyboard.scenes[0]
+        project = storage.create_scene(project.id, SceneCreate(title="Second scene"))
+        second_scene = project.storyboard.scenes[1]
+        comment = main.post_review_comment(project.id, ReviewCommentCreate(sceneId=first_scene.id, authorLabel="Reviewer", body="The opening needs a clearer example."))
+        reply = main.post_review_reply(project.id, comment.id, ReviewReplyCreate(authorLabel="Author", body="I will revise this in the next pass."))
+        self.assertEqual(len(reply.replies), 1)
+        resolved = main.post_review_comment_decision(project.id, comment.id, ReviewCommentDecision(resolved=True))
+        self.assertTrue(resolved.resolved)
+        reopened = main.post_review_comment_decision(project.id, comment.id, ReviewCommentDecision(resolved=False))
+        self.assertFalse(reopened.resolved)
+
+        reordered = storage.reorder_scenes(project.id, [second_scene.id, first_scene.id])
+        after_reorder = main.get_review_comments(project.id)[0]
+        self.assertEqual(after_reorder.sceneId, first_scene.id)
+        self.assertTrue(after_reorder.outdated)
+        self.assertFalse(after_reorder.sceneDeleted)
+        self.assertEqual(reordered.storyboard.scenes[0].id, second_scene.id)
+
+        storage.delete_scene(project.id, first_scene.id)
+        after_delete = main.get_review_comments(project.id)[0]
+        self.assertTrue(after_delete.sceneDeleted)
+        self.assertEqual(after_delete.sceneTitle, "First scene")
+        self.assertEqual(after_delete.replies[0].body, "I will revise this in the next pass.")
+
+    def test_project_backup_round_trip_and_invalid_restore_are_safe(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Portable course"))
+        project = storage.create_scene(project.id, SceneCreate(title="Original scene"))
+        storage.add_project_asset(project.id, "diagram.png", b"image-bytes", "image")
+        archive = backup.build_project_archive(project.id)
+        with ZipFile(io.BytesIO(archive)) as packaged:
+            manifest = json.loads(packaged.read("manifest.json"))
+            self.assertEqual(manifest["schema"], "chimera-project-1")
+            self.assertIn("storyboard.json", {item["path"] for item in manifest["files"]})
+            self.assertIn("assets/images/image-" + hashlib.sha256(b"image-bytes").hexdigest() + ".png", {item["path"] for item in manifest["files"]})
+
+        storage.update_scene(project.id, project.storyboard.scenes[0].id, SceneUpdate(title="Changed after backup"))
+        restored = backup.restore_project_archive(project.id, archive)
+        self.assertEqual(restored.storyboard.scenes[0].title, "Original scene")
+        self.assertEqual(len(restored.storyboard.assets), 1)
+        current = storage.read_project(project.id)
+        with self.assertRaises(ValueError):
+            backup.restore_project_archive(project.id, b"not a zip archive")
+        self.assertEqual(storage.read_project(project.id).storyboard.scenes[0].title, current.storyboard.scenes[0].title)
 
     def test_assessment_question_types_validate_and_legacy_items_migrate(self) -> None:
         choices = [AssessmentChoice(identifier="A", text="First"), AssessmentChoice(identifier="B", text="Second")]
@@ -478,7 +1060,12 @@ class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
 
     def test_scorm_2004_export_contains_manifest_player_and_build_report(self) -> None:
         project = storage.create_project(ProjectCreate(title="SCORM course"))
-        storage.create_scene(project.id, SceneCreate(title="Welcome"))
+        project = storage.create_scene(project.id, SceneCreate(
+            title="Welcome",
+            extractedText=["Learner-facing content"],
+            actionDescription="Author-only production direction",
+            notes="Author-only speaker notes",
+        ))
 
         response = main.export_scorm_2004(project.id)
 
@@ -486,6 +1073,11 @@ class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
         with ZipFile(io.BytesIO(response.body)) as package:
             self.assertEqual(package.namelist()[:3], ["imsmanifest.xml", "index.html", "player.js"])
             self.assertIn("storyboard.json", package.namelist())
+            exported_storyboard = json.loads(package.read("storyboard.json"))
+            exported_scene = exported_storyboard["scenes"][0]
+            self.assertEqual(exported_scene["extractedText"], ["Learner-facing content"])
+            self.assertNotIn("actionDescription", exported_scene)
+            self.assertNotIn("notes", exported_scene)
             manifest = ET.fromstring(package.read("imsmanifest.xml"))
             namespace = "{http://www.imsproject.org/xsd/imscp_rootv1p1p2}"
             resource = manifest.find(f".//{namespace}resource")
@@ -497,10 +1089,17 @@ class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("assessmentCorrect", player)
             self.assertIn("completedAudio", player)
             self.assertIn("cmi.success_status", player)
+            self.assertNotIn("scene.actionDescription", player)
+            self.assertNotIn("scene.notes", player)
             self.assertIn("runtime-status", package.read("index.html").decode("utf-8"))
             self.assertIn("Media could not be loaded", player)
+        saved_scene = storage.read_project(project.id).storyboard.scenes[0]
+        self.assertEqual(saved_scene.id, project.storyboard.scenes[0].id)
+        self.assertEqual(saved_scene.actionDescription, "Author-only production direction")
+        self.assertEqual(saved_scene.notes, "Author-only speaker notes")
         report = json.loads((storage.project_path(project.id) / "reports" / "build-scorm2004.json").read_text(encoding="utf-8"))
         self.assertEqual(report["exportProfile"], "SCORM 2004 4th Edition")
+        self.assertEqual(report["sourceRevision"], exported_storyboard["revision"])
         self.assertEqual(report["buildStatus"], "passed")
         self.assertEqual(report["packageWarningThresholdMB"], 200)
         self.assertGreater(report["uncompressedSizeBytes"], report["packageSizeBytes"])
@@ -537,9 +1136,107 @@ class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(raised.exception.status_code, 422)
 
+    def test_docx_export_is_editable_and_answer_key_is_explicit(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Editable storyboard"))
+        project = storage.create_scene(project.id, SceneCreate(
+            title="Inspection: café",
+            extractedText=["Learner text with Unicode: naïve façade.\x00 Safe continuation."],
+            actionDescription="Production direction for the author.",
+            notes="Speaker notes for the author.",
+        ))
+        scene = project.storyboard.scenes[0]
+        image_buffer = io.BytesIO()
+        Image.new("RGB", (12, 8), color=(25, 100, 180)).save(image_buffer, format="PNG")
+        project = storage.add_project_asset(project.id, "inspection.png", image_buffer.getvalue(), "image")
+        image = project.storyboard.assets[0]
+        project = storage.add_project_asset(project.id, "narration.mp3", b"audio-reference", "audio")
+        for asset in project.storyboard.assets:
+            project = storage.update_project_asset_attribution(
+                project.id,
+                asset.id,
+                AssetAttributionUpdate(attributionText="Test fixture credit", attributionStatus="complete"),
+            )
+        project = storage.update_scene(
+            project.id,
+            scene.id,
+            SceneUpdate(
+                imageAssets=[image.id],
+                imageAltText={image.id: "Inspection equipment in use."},
+                audioAssets=[project.storyboard.assets[-1].id],
+                assessmentItem=SingleChoiceAssessment(
+                    identifier="ITEM_CHECK",
+                    prompt="What is inspected?",
+                    choices=[
+                        AssessmentChoice(identifier="EQUIPMENT", text="The equipment"),
+                        AssessmentChoice(identifier="WEATHER", text="The weather"),
+                    ],
+                    correctResponse="EQUIPMENT",
+                    correctFeedback="Correct: inspect the equipment.",
+                ),
+            ),
+        )
+
+        response = main.export_storyboard_docx(project.id)
+        self.assertEqual(response.media_type, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        self.assertIn("editable-storyboard-storyboard.docx", response.headers["content-disposition"])
+        document = Document(io.BytesIO(response.body))
+        paragraphs = [paragraph.text for paragraph in document.paragraphs]
+        all_text = "\n".join(paragraphs + [cell.text for table in document.tables for row in table.rows for cell in row.cells])
+        self.assertTrue(any("revision" in text.lower() and str(project.storyboard.revision) in text for text in paragraphs))
+        self.assertIn("Inspection: café", all_text)
+        self.assertIn("Learner text with Unicode: naïve façade. Safe continuation.", all_text)
+        self.assertIn("Production direction for the author.", all_text)
+        self.assertIn("Speaker notes for the author.", all_text)
+        self.assertIn("Inspection equipment in use.", all_text)
+        self.assertIn("Test fixture credit", all_text)
+        self.assertIn("narration.mp3", all_text)
+        self.assertIn("What is inspected?", all_text)
+        self.assertIn("The equipment", all_text)
+        self.assertNotIn("Answer key", all_text)
+        self.assertTrue(any("Scene ID" in cell.text for table in document.tables for row in table.rows for cell in row.cells))
+        with ZipFile(io.BytesIO(response.body)) as package:
+            self.assertTrue(any(name.startswith("word/media/") for name in package.namelist()))
+
+        answer_key_response = main.export_storyboard_docx(project.id, include_answer_key=True)
+        answer_key_document = Document(io.BytesIO(answer_key_response.body))
+        answer_key_text = "\n".join(paragraph.text for paragraph in answer_key_document.paragraphs)
+        self.assertIn("Answer key", answer_key_text)
+        self.assertIn("The equipment", answer_key_text)
+        saved_text = storage.read_project(project.id).storyboard.scenes[0].extractedText[0]
+        self.assertIn("\x00", saved_text)
+
+        with self.assertRaises(HTTPException) as missing:
+            main.export_storyboard_docx("missing-project")
+        self.assertEqual(missing.exception.status_code, 404)
+
+    def test_scorm_build_aborts_if_storyboard_changes_during_package_assembly(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Changing SCORM course"))
+        project = storage.create_scene(project.id, SceneCreate(title="Welcome"))
+        scene = project.storyboard.scenes[0]
+        from backend.app import scorm
+
+        serialize_storyboard = scorm._published_storyboard_json
+
+        def serialize_then_edit(snapshot) -> bytes:
+            content = serialize_storyboard(snapshot)
+            storage.update_scene(snapshot.id, scene.id, SceneUpdate(title="Changed during build"))
+            return content
+
+        with patch("backend.app.scorm._published_storyboard_json", side_effect=serialize_then_edit):
+            with self.assertRaises(HTTPException) as raised:
+                main.export_scorm_2004(project.id)
+
+        self.assertEqual(raised.exception.status_code, 422)
+        self.assertFalse((storage.project_path(project.id) / "reports" / "build-scorm2004.json").exists())
+
     def test_scorm_12_export_uses_legacy_runtime_and_manifest(self) -> None:
         project = storage.create_project(ProjectCreate(title="Compatibility course"))
-        storage.create_scene(project.id, SceneCreate(title="Welcome"))
+        storage.create_scene(project.id, SceneCreate(
+            title="Welcome",
+            extractedText=["Learner-facing content"],
+            actionDescription="Author-only production direction",
+            notes="Author-only speaker notes",
+        ))
 
         response = main.export_scorm_12(project.id)
 
@@ -552,6 +1249,11 @@ class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNotNone(resource)
             assert resource is not None
             self.assertEqual(resource.attrib["{http://www.adlnet.org/xsd/adlcp_rootv1p2}scormtype"], "sco")
+            exported_storyboard = json.loads(package.read("storyboard.json"))
+            exported_scene = exported_storyboard["scenes"][0]
+            self.assertEqual(exported_scene["extractedText"], ["Learner-facing content"])
+            self.assertNotIn("actionDescription", exported_scene)
+            self.assertNotIn("notes", exported_scene)
             player = package.read("player.js").decode("utf-8")
             self.assertIn("window.API || null", player)
             self.assertIn("LMSInitialize", player)
@@ -560,8 +1262,11 @@ class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("cmi.core.lesson_status", player)
             self.assertIn("cmi.core.lesson_location", player)
             self.assertNotIn("cmi.success_status", player)
+            self.assertNotIn("scene.actionDescription", player)
+            self.assertNotIn("scene.notes", player)
         report = json.loads((storage.project_path(project.id) / "reports" / "build-scorm12.json").read_text(encoding="utf-8"))
         self.assertEqual(report["exportProfile"], "SCORM 1.2")
+        self.assertEqual(report["sourceRevision"], exported_storyboard["revision"])
         self.assertTrue(all(check["passed"] for check in report["compatibilityChecks"]))
 
     def test_scorm_qualification_detects_missing_manifest_target(self) -> None:
@@ -773,6 +1478,50 @@ class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(snapshots)
         with self.assertRaises(ValueError):
             storage.reorder_scenes(project.id, [second.id, second.id])
+
+    def test_scene_delete_archives_revision_and_clears_remediation_target(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Delete scene course"))
+        project = storage.create_scene(project.id, SceneCreate(title="Remediation lesson"))
+        remediation_scene, = project.storyboard.scenes
+        project = storage.create_scene(project.id, SceneCreate(title="Assessment"))
+        assessment_scene = project.storyboard.scenes[1]
+        project = storage.update_scene(
+            project.id,
+            assessment_scene.id,
+            SceneUpdate(assessmentSettings=AssessmentSettings(remediationSceneId=remediation_scene.id)),
+        )
+        starting_revision = project.storyboard.revision
+        history_before = len(list((storage.project_path(project.id) / "history").glob("storyboard-*.json")))
+
+        deleted = main.delete_project_scene(project.id, remediation_scene.id, if_match=f'"{starting_revision}"')
+
+        self.assertEqual([scene.id for scene in deleted.storyboard.scenes], [assessment_scene.id])
+        self.assertIsNone(deleted.storyboard.scenes[0].assessmentSettings.remediationSceneId)
+        self.assertEqual(deleted.storyboard.revision, starting_revision + 1)
+        history = sorted((storage.project_path(project.id) / "history").glob("storyboard-*.json"))
+        self.assertEqual(len(history), history_before + 1)
+        previous = json.loads(history[-1].read_text(encoding="utf-8"))
+        self.assertEqual(len(previous["scenes"]), 2)
+
+        with self.assertRaises(HTTPException) as missing:
+            main.delete_project_scene(project.id, remediation_scene.id, if_match=f'"{deleted.storyboard.revision}"')
+        self.assertEqual(missing.exception.status_code, 404)
+
+        with self.assertRaises(HTTPException) as stale:
+            main.delete_project_scene(project.id, assessment_scene.id, if_match=f'"{starting_revision}"')
+        self.assertEqual(stale.exception.status_code, 412)
+
+        final_delete = main.delete_project_scene(
+            project.id,
+            assessment_scene.id,
+            if_match=f'"{deleted.storyboard.revision}"',
+        )
+        self.assertEqual(final_delete.storyboard.scenes, [])
+        self.assertEqual(final_delete.sceneCount, 0)
+
+        delete_operation = main.app.openapi()["paths"]["/api/projects/{project_id}/scenes/{scene_id}"]["delete"]
+        headers = [parameter["name"] for parameter in delete_operation.get("parameters", []) if parameter["in"] == "header"]
+        self.assertIn("if-match", headers)
 
     async def test_template_upload_and_metadata_edit(self) -> None:
         template = await main.post_template(

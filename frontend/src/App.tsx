@@ -1,16 +1,20 @@
-import { ChangeEvent, useEffect, useState } from "react";
-import { Accessibility, ArrowDown, ArrowUp, BookOpen, Check, ChevronDown, ChevronRight, ClipboardList, Download, FileUp, GripVertical, Layers3, Pencil, Play, Plus, Route, Settings2, ShieldCheck, Sparkles, Upload, X } from "lucide-react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { Accessibility, ArrowDown, ArrowUp, BookOpen, Check, ChevronDown, ChevronRight, ClipboardList, Download, FileText, FileUp, GripVertical, Layers3, Pencil, Play, Plus, Route, Settings2, ShieldCheck, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { ValidationView } from "./ValidationView";
 import { AccessibilityView } from "./AccessibilityView";
 import { GoldenPathView } from "./GoldenPathView";
 import { CoursePreview } from "./CoursePreview";
 import { AssessmentEditor } from "./AssessmentEditor";
 import { MediaAttributionEditor } from "./MediaAttributionEditor";
+import { GeneratedMediaPanel } from "./GeneratedMediaPanel";
+import { ManagementView } from "./ManagementView";
+import "./readiness.css";
 import { CompletionSettingsEditor } from "./CompletionSettingsEditor";
 import { EnhancementReviewView } from "./EnhancementReviewView";
 import { EditorDialog } from "./EditorDialog";
 import { AppearanceSelector } from "./AppearanceSelector";
 import { BrandMark } from "./BrandMark";
+import { revisionConflictMessage, storyboardWriteHeaders } from "./revision";
 import restoreIcon from "./assets/cutout-56-a86a43163042.png";
 import "./audio-requirement.css";
 import "./assessment-editor.css";
@@ -32,15 +36,16 @@ export type AssessmentType = AssessmentItem["type"];
 export type AssessmentSettings = { maxAttempts: number; passingScore: number; scoreWeight: number; remediationSceneId: string | null };
 export type CourseCompletionSettings = { passingScore: number; includeOptionalAssessments: boolean };
 export type ExportSettings = { packageWarningThresholdMB: number };
-export type Scene = { id: string; sourceSlide: number | null; title: string; sceneType: SceneType; layoutMode: LayoutMode; templateId: string | null; required: boolean; audioRequired: boolean; assessmentItem: AssessmentItem | null; assessmentSettings: AssessmentSettings | null; extractedText: string[]; actionDescription: string; imageAssets: string[]; imageAltText: Record<string, string>; decorativeImages: string[]; audioAssets: string[]; previewImage: string | null; renderWarning: string | null; sourceAnimationXml: string | null; sourceTransitionXml: string | null; notes: string };
+export type Scene = { id: string; sourceSlide: number | null; title: string; sceneType: SceneType; layoutMode: LayoutMode; templateId: string | null; required: boolean; audioRequired: boolean; assessmentItem: AssessmentItem | null; assessmentSettings: AssessmentSettings | null; extractedText: string[]; actionDescription: string; narration: string; imageAssets: string[]; imageAltText: Record<string, string>; decorativeImages: string[]; audioAssets: string[]; previewImage: string | null; renderWarning: string | null; sourceAnimationXml: string | null; sourceTransitionXml: string | null; notes: string };
 export type Asset = { id: string; kind: "image" | "audio"; filename: string; contentType: string; sizeBytes: number; sha256: string; path: string; attributionText: string; attributionStatus: "draft" | "complete" };
 export type ProjectSummary = { id: string; title: string; sceneCount: number; updatedAt: string; hasSourceDeck: boolean };
-export type Project = ProjectSummary & { storyboard: { scenes: Scene[]; assets: Asset[]; completionSettings: CourseCompletionSettings; exportSettings: ExportSettings } };
+export type Project = ProjectSummary & { storyboard: { revision: number; scenes: Scene[]; assets: Asset[]; completionSettings: CourseCompletionSettings; exportSettings: ExportSettings } };
 type SceneDraft = { id: string | null; title: string; screenText: string; actionDescription: string; notes: string; required: boolean; audioRequired: boolean; sceneType: SceneType; layoutMode: LayoutMode; templateId: string };
 type Template = { id: string; title: string; description: string; filename: string; sizeBytes: number; updatedAt: string };
 type TemplateDraft = { id: string; title: string; description: string };
+type Readiness = { pendingProposals: number; unresolvedComments: number; outdatedComments: number; missingMedia: number; publicationBlockers: number };
 
-const emptyProject: Project = { id: "", title: "", sceneCount: 0, updatedAt: "", hasSourceDeck: false, storyboard: { scenes: [], assets: [], completionSettings: { passingScore: 80, includeOptionalAssessments: false }, exportSettings: { packageWarningThresholdMB: 200 } } };
+const emptyProject: Project = { id: "", title: "", sceneCount: 0, updatedAt: "", hasSourceDeck: false, storyboard: { revision: 1, scenes: [], assets: [], completionSettings: { passingScore: 80, includeOptionalAssessments: false }, exportSettings: { packageWarningThresholdMB: 200 } } };
 const MAX_STORYBOARD_JSON_BYTES = 25 * 1024 * 1024;
 
 export function App() {
@@ -61,11 +66,16 @@ export function App() {
   const [showCompletionSettings, setShowCompletionSettings] = useState(false);
   const [showEnhancementReview, setShowEnhancementReview] = useState(false);
   const [showReviewTools, setShowReviewTools] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showManagement, setShowManagement] = useState(false);
+  const managementButtonRef = useRef<HTMLButtonElement>(null);
+  const [includeWordAnswerKey, setIncludeWordAnswerKey] = useState(false);
   const [draggingSceneId, setDraggingSceneId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [readiness, setReadiness] = useState<Readiness | null>(null);
 
   function applyProject(updatedProject: Project) {
     setProject(updatedProject);
@@ -97,6 +107,11 @@ export function App() {
     }).catch(() => setError("Start the API to connect project storage."));
     fetch("/api/templates").then((response) => response.ok ? response.json() : []).then(setTemplates).catch(() => setError("Template library could not be loaded."));
   }, []);
+
+  useEffect(() => {
+    if (!project.id) { setReadiness(null); return; }
+    fetch(`/api/projects/${project.id}/readiness`).then((response) => response.ok ? response.json() as Promise<Readiness> : Promise.reject(new Error("Readiness unavailable"))).then(setReadiness).catch(() => setReadiness(null));
+  }, [project.id, project.storyboard.revision]);
 
   async function switchProject(projectId: string) {
     if (!projectId || projectId === project.id || busy) return;
@@ -226,16 +241,16 @@ export function App() {
     try {
       const response = await fetch(`/api/projects/${project.id}/scenes/order`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: storyboardWriteHeaders(project.storyboard.revision),
         body: JSON.stringify({ sceneIds }),
       });
-      if (!response.ok) throw new Error("Scene order could not be saved.");
+      if (!response.ok) throw new Error(revisionConflictMessage(response.status) || "Scene order could not be saved.");
       const updatedProject: Project = await response.json();
       const selectedId = scene?.id;
       applyProject(updatedProject);
       setSelectedScene(Math.max(0, updatedProject.storyboard.scenes.findIndex((item) => item.id === selectedId)));
-    } catch {
-      setError("Scene order could not be saved. Check that the API is running and try again.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Scene order could not be saved. Check that the API is running and try again.");
     } finally {
       setDraggingSceneId(null);
       setBusy(false);
@@ -251,7 +266,7 @@ export function App() {
     const form = new FormData();
     form.append("file", file);
     try {
-      const response = await fetch(`/api/projects/${project.id}/source`, { method: "POST", body: form });
+      const response = await fetch(`/api/projects/${project.id}/source`, { method: "POST", headers: storyboardWriteHeaders(project.storyboard.revision, false), body: form });
       if (!response.ok) {
         const detail = await response.json().catch(() => null) as { detail?: string } | null;
         throw new Error(detail?.detail || "This presentation could not be read.");
@@ -285,6 +300,47 @@ export function App() {
       setFeedback("Storyboard JSON downloaded. Media files are stored separately.");
     } catch {
       setError("Storyboard JSON could not be exported. Check that the API is running and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function exportProjectBackup() {
+    if (!project.id || busy) return;
+    setBusy(true); setError(""); setFeedback("");
+    try {
+      const response = await fetch(`/api/projects/${project.id}/backup.zip`);
+      if (!response.ok) throw new Error("Project backup could not be exported.");
+      const downloadUrl = window.URL.createObjectURL(await response.blob());
+      const link = document.createElement("a"); link.href = downloadUrl; link.download = `${project.id}-backup.zip`; document.body.appendChild(link); link.click(); link.remove(); window.URL.revokeObjectURL(downloadUrl);
+      setFeedback("Portable project backup downloaded.");
+    } catch (backupError) { setError(backupError instanceof Error ? backupError.message : "Project backup could not be exported."); }
+    finally { setBusy(false); }
+  }
+
+  async function exportWordStoryboard() {
+    if (!project.id || busy) return;
+    setBusy(true);
+    setError("");
+    setFeedback("");
+    try {
+      const query = includeWordAnswerKey ? "?include_answer_key=true" : "";
+      const response = await fetch(`/api/projects/${project.id}/storyboard.docx${query}`);
+      if (!response.ok) {
+        const detail = await response.json().catch(() => null) as { detail?: string } | null;
+        throw new Error(detail?.detail || "Editable Word storyboard could not be exported.");
+      }
+      const downloadUrl = window.URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `${project.id}-storyboard.docx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      setFeedback("Editable Word storyboard downloaded.");
+    } catch (exportError) {
+      setError(exportError instanceof Error ? exportError.message : "Editable Word storyboard could not be exported.");
     } finally {
       setBusy(false);
     }
@@ -399,12 +455,12 @@ export function App() {
     setBusy(true);
     setError("");
     try {
-      const response = await fetch(`/api/projects/${project.id}/export-settings`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ packageWarningThresholdMB: threshold }) });
-      if (!response.ok) throw new Error("Export settings could not be saved.");
+      const response = await fetch(`/api/projects/${project.id}/export-settings`, { method: "PATCH", headers: storyboardWriteHeaders(project.storyboard.revision), body: JSON.stringify({ packageWarningThresholdMB: threshold }) });
+      if (!response.ok) throw new Error(revisionConflictMessage(response.status) || "Export settings could not be saved.");
       applyProject(await response.json() as Project);
       setFeedback("Package warning threshold saved.");
-    } catch {
-      setError("Export settings could not be saved. Check that the API is running and try again.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Export settings could not be saved. Check that the API is running and try again.");
     } finally {
       setBusy(false);
     }
@@ -436,11 +492,13 @@ export function App() {
       }
       const response = await fetch(`/api/projects/${project.id}/storyboard/import`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: storyboardWriteHeaders(project.storyboard.revision),
         body: JSON.stringify(storyboard),
       });
       if (!response.ok) {
         const detail = await response.json().catch(() => null) as { detail?: unknown } | null;
+        const conflictMessage = revisionConflictMessage(response.status);
+        if (conflictMessage) throw new Error(conflictMessage);
         throw new Error(typeof detail?.detail === "string" ? detail.detail : "Import failed. Check the storyboard schema and referenced assets.");
       }
       const updatedProject: Project = await response.json();
@@ -456,6 +514,22 @@ export function App() {
     }
   }
 
+  async function importProjectBackup(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file || !project.id || busy) return;
+    if (!window.confirm(`Restore the portable backup into "${project.title}"? The current project is preserved only after the archive passes validation.`)) { input.value = ""; return; }
+    setBusy(true); setError(""); setFeedback("");
+    try {
+      const form = new FormData(); form.append("file", file);
+      const response = await fetch(`/api/projects/${project.id}/backup/restore`, { method: "POST", body: form });
+      const detail = await response.json().catch(() => null) as Project & { detail?: string } | null;
+      if (!response.ok) throw new Error(detail?.detail || "Project backup could not be restored.");
+      applyProject(detail as Project); setFeedback("Portable project backup restored.");
+    } catch (restoreError) { setError(restoreError instanceof Error ? restoreError.message : "Project backup could not be restored."); }
+    finally { input.value = ""; setBusy(false); }
+  }
+
   async function uploadMedia(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget;
     const file = input.files?.[0];
@@ -465,14 +539,14 @@ export function App() {
     const form = new FormData();
     form.append("file", file);
     try {
-      const response = await fetch(`/api/projects/${project.id}/assets`, { method: "POST", body: form });
+      const response = await fetch(`/api/projects/${project.id}/assets`, { method: "POST", headers: storyboardWriteHeaders(project.storyboard.revision, false), body: form });
       if (!response.ok) {
         const detail = await response.json().catch(() => null) as { detail?: string } | null;
         throw new Error(detail?.detail || "Media could not be uploaded.");
       }
       applyProject(await response.json() as Project);
-    } catch {
-      setError("Media could not be uploaded. Use a supported image or audio format and try again.");
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Media could not be uploaded. Use a supported image or audio format and try again.");
     } finally {
       input.value = "";
       setBusy(false);
@@ -489,13 +563,13 @@ export function App() {
     try {
       const response = await fetch(`/api/projects/${project.id}/scenes/${scene.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: storyboardWriteHeaders(project.storyboard.revision),
         body: JSON.stringify({ [field]: updatedAssetIds }),
       });
-      if (!response.ok) throw new Error("Media assignment could not be saved.");
+      if (!response.ok) throw new Error(revisionConflictMessage(response.status) || "Media assignment could not be saved.");
       applyProject(await response.json() as Project);
-    } catch {
-      setError("Media assignment could not be saved. Check that the API is running and try again.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Media assignment could not be saved. Check that the API is running and try again.");
     } finally {
       setBusy(false);
     }
@@ -508,13 +582,13 @@ export function App() {
     try {
       const response = await fetch(`/api/projects/${project.id}/scenes/${scene.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: storyboardWriteHeaders(project.storyboard.revision),
         body: JSON.stringify({ audioRequired }),
       });
-      if (!response.ok) throw new Error("Audio completion setting could not be saved.");
+      if (!response.ok) throw new Error(revisionConflictMessage(response.status) || "Audio completion setting could not be saved.");
       applyProject(await response.json() as Project);
-    } catch {
-      setError("Audio completion setting could not be saved. Check that the API is running and try again.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Audio completion setting could not be saved. Check that the API is running and try again.");
     } finally {
       setBusy(false);
     }
@@ -534,7 +608,7 @@ export function App() {
     try {
       const response = await fetch(sceneDraft.id ? `/api/projects/${project.id}/scenes/${sceneDraft.id}` : `/api/projects/${project.id}/scenes`, {
         method: sceneDraft.id ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: storyboardWriteHeaders(project.storyboard.revision),
         body: JSON.stringify({
           title: sceneDraft.title.trim(),
           sceneType: sceneDraft.sceneType,
@@ -547,13 +621,47 @@ export function App() {
           templateId: sceneDraft.templateId || null,
         }),
       });
-      if (!response.ok) throw new Error("Scene changes could not be saved.");
+      if (!response.ok) throw new Error(revisionConflictMessage(response.status) || "Scene changes could not be saved.");
       const updatedProject: Project = await response.json();
       applyProject(updatedProject);
       if (!sceneDraft.id) setSelectedScene(updatedProject.storyboard.scenes.length - 1);
       setSceneDraft(null);
-    } catch {
-      setError("Scene changes could not be saved. Check that the API is running and try again.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Scene changes could not be saved. Check that the API is running and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteScene(sceneToDelete: Scene, index: number) {
+    if (!project.id || busy) return;
+    const clearsRemediation = scenes.some((item) => item.assessmentSettings?.remediationSceneId === sceneToDelete.id);
+    const consequence = clearsRemediation ? " Any assessment remediation links to this scene will also be cleared." : "";
+    if (!window.confirm(`Delete scene "${sceneToDelete.title}"? The previous storyboard will be saved to history.${consequence}`)) return;
+
+    const selectedSceneId = scenes[selectedScene]?.id;
+    setBusy(true);
+    setError("");
+    setFeedback("");
+    try {
+      const response = await fetch(`/api/projects/${project.id}/scenes/${sceneToDelete.id}`, {
+        method: "DELETE",
+        headers: storyboardWriteHeaders(project.storyboard.revision, false),
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => null) as { detail?: string } | null;
+        const conflictMessage = revisionConflictMessage(response.status);
+        if (conflictMessage) throw new Error(conflictMessage);
+        throw new Error(detail?.detail || "Scene could not be deleted.");
+      }
+      const updatedProject = await response.json() as Project;
+      applyProject(updatedProject);
+      if (sceneDraft?.id === sceneToDelete.id) setSceneDraft(null);
+      const retainedSelection = updatedProject.storyboard.scenes.findIndex((item) => item.id === selectedSceneId);
+      setSelectedScene(retainedSelection >= 0 ? retainedSelection : Math.max(0, Math.min(index, updatedProject.storyboard.scenes.length - 1)));
+      setFeedback(`Scene "${sceneToDelete.title}" deleted. The previous storyboard was saved to history.`);
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Scene could not be deleted.");
     } finally {
       setBusy(false);
     }
@@ -573,11 +681,12 @@ export function App() {
       </div>
       <div className="workspace-label">WORKSPACE</div>
       <nav aria-label="Authoring">
-        <button className={`nav-item ${activeView === "storyboard" ? "active" : ""}`} aria-current={activeView === "storyboard" ? "page" : undefined} onClick={() => setActiveView("storyboard")}><Layers3 size={18} /><span>Storyboard</span></button>
-        <button className={`nav-item ${activeView === "media" ? "active" : ""}`} aria-current={activeView === "media" ? "page" : undefined} onClick={() => setActiveView("media")}><FileUp size={18} /><span>Media library</span></button>
-        <button className={`nav-item ${activeView === "templates" ? "active" : ""}`} aria-current={activeView === "templates" ? "page" : undefined} onClick={() => setActiveView("templates")}><BookOpen size={18} /><span>Templates</span></button>
+        <button className={`nav-item ${!showManagement && activeView === "storyboard" ? "active" : ""}`} aria-current={!showManagement && activeView === "storyboard" ? "page" : undefined} onClick={() => { setShowManagement(false); setActiveView("storyboard"); }}><Layers3 size={18} /><span>Storyboard</span></button>
+        <button className={`nav-item ${!showManagement && activeView === "media" ? "active" : ""}`} aria-current={!showManagement && activeView === "media" ? "page" : undefined} onClick={() => { setShowManagement(false); setActiveView("media"); }}><FileUp size={18} /><span>Media library</span></button>
+        <button className={`nav-item ${!showManagement && activeView === "templates" ? "active" : ""}`} aria-current={!showManagement && activeView === "templates" ? "page" : undefined} onClick={() => { setShowManagement(false); setActiveView("templates"); }}><BookOpen size={18} /><span>Templates</span></button>
       </nav>
       <div className="sidebar-review">
+        <button ref={managementButtonRef} className={`nav-item management-nav-item ${showManagement ? "active" : ""}`} aria-current={showManagement ? "page" : undefined} onClick={() => setShowManagement(true)}><ClipboardList size={18} /><span>My Work</span></button>
         <button className="nav-item review-toggle" aria-expanded={showReviewTools} aria-controls="review-tools" onClick={() => setShowReviewTools(!showReviewTools)}><ShieldCheck size={18} /><span>Review tools</span><ChevronDown size={15} className={showReviewTools ? "expanded" : ""} /></button>
         {showReviewTools && <div id="review-tools" className="review-tools">
           <button onClick={() => setShowGoldenPath(true)}><Route size={16} /> Guided review</button>
@@ -587,15 +696,22 @@ export function App() {
           <button onClick={() => setShowEnhancementReview(true)} disabled={!project.id || busy}><Sparkles size={16} /> Review suggestions</button>
         </div>}
       </div>
-      <div className="sidebar-bottom"><AppearanceSelector /><div className="sidebar-footer"><span className="status-dot" />Local workspace</div></div>
+      <div className="sidebar-bottom">
+        <button className="nav-item settings-toggle" aria-expanded={showSettings} aria-controls="workspace-settings" onClick={() => setShowSettings((open) => !open)}><Settings2 size={18} /><span>Settings</span><ChevronDown size={15} className={showSettings ? "expanded" : ""} /></button>
+        {showSettings && <div id="workspace-settings" className="workspace-settings"><AppearanceSelector /></div>}
+        <div className="sidebar-footer"><span className="status-dot" />Local workspace</div>
+      </div>
     </aside>
     <main className="main-content" id="workspace-content" tabIndex={-1}>
+      {showManagement ? <ManagementView onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} /> : <>
       <header className="topbar">
         <div className="project-heading"><p className="eyebrow">COURSE AUTHORING / {activeView === "storyboard" ? "STORYBOARD" : activeView === "media" ? "MEDIA LIBRARY" : "TEMPLATES"}</p><h1 title={project.title}>{project.title || "Your workspace"}</h1></div>
         <div className="top-actions"><span className="save-state" role="status">{busy ? "Working…" : project.id ? <><Check size={14} /> Saved locally</> : "Local authoring"}</span><button className="button button-outline" onClick={() => setShowPreview(true)} disabled={!project.id || !scenes.length || busy}><Play size={15} /> Preview course</button><button className="button button-accent" onClick={() => setShowExport(true)} disabled={!project.id || busy}><Download size={15} /> Export</button></div>
       </header>
       {error && <div className="notice" role="alert"><span>{error}</span><button className="icon-button" onClick={() => setError("")} aria-label="Dismiss error"><X size={16} /></button></div>}
       {feedback && <div className="notice success-notice" role="status"><span>{feedback}</span><button className="icon-button" onClick={() => setFeedback("")} aria-label="Dismiss message"><X size={16} /></button></div>}
+      {readiness && <div className="readiness-strip" aria-label="Project readiness"><span className={readiness.publicationBlockers ? "blocked" : "clear"}>{readiness.publicationBlockers ? `${readiness.publicationBlockers} publication blocker${readiness.publicationBlockers === 1 ? "" : "s"}` : "Ready for publication checks"}</span><span>{readiness.pendingProposals} pending suggestion{readiness.pendingProposals === 1 ? "" : "s"}</span><span>{readiness.unresolvedComments} unresolved comment{readiness.unresolvedComments === 1 ? "" : "s"}</span>{readiness.outdatedComments > 0 && <span>{readiness.outdatedComments} outdated thread{readiness.outdatedComments === 1 ? "" : "s"}</span>}{readiness.missingMedia > 0 && <span>{readiness.missingMedia} missing media reference{readiness.missingMedia === 1 ? "" : "s"}</span>}</div>}
+      {activeView === "media" && <GeneratedMediaPanel project={project} scene={scene} busy={busy} onProjectUpdated={applyProject} />}
       {activeView === "storyboard" ? <><div className="work-area">
         <section className="scene-list" aria-label="Scene sequence">
           <div className="scene-list-tools"><div className="scene-list-title"><h2>Scenes <span className="count">{scenes.length}</span></h2><button className="icon-button" title="Add scene" aria-label="Add scene" onClick={beginSceneCreate} disabled={!project.id || busy}><Plus size={19} /></button></div>
@@ -607,7 +723,7 @@ export function App() {
               <button className={`scene-row ${selectedScene === index ? "selected" : ""}`} aria-current={selectedScene === index ? "true" : undefined} onClick={() => setSelectedScene(index)}>
                 <span className="scene-number">{String(index + 1).padStart(2, "0")}</span><span className="scene-copy"><strong>{item.title}</strong><small><span className="scene-signifier">{item.sceneType}</span><span className="scene-signifier">{item.required ? "Required" : "Optional"}</span></small></span>
               </button>
-              <div className="scene-order-actions"><button className="icon-button scene-edit-button" title={`Edit ${item.title}`} aria-label={`Edit ${item.title}`} onClick={() => beginSceneEdit(item)} disabled={busy}><Pencil size={15} /></button><div><button className="icon-button" title="Move scene up" aria-label={`Move ${item.title} up`} disabled={busy || index === 0} onClick={() => void reorderScenes(item.id, scenes[index - 1]?.id || item.id)}><ArrowUp size={13} /></button><button className="icon-button" title="Move scene down" aria-label={`Move ${item.title} down`} disabled={busy || index === scenes.length - 1} onClick={() => void reorderScenes(item.id, scenes[index + 1]?.id || item.id)}><ArrowDown size={13} /></button></div></div>
+              <div className="scene-order-actions"><div className="scene-row-primary-actions"><button className="icon-button scene-edit-button" title={`Edit ${item.title}`} aria-label={`Edit ${item.title}`} onClick={() => beginSceneEdit(item)} disabled={busy}><Pencil size={15} /></button><button className="icon-button scene-delete-button" title={`Delete ${item.title}`} aria-label={`Delete ${item.title}`} onClick={() => void deleteScene(item, index)} disabled={busy}><Trash2 size={14} /></button></div><div><button className="icon-button" title="Move scene up" aria-label={`Move ${item.title} up`} disabled={busy || index === 0} onClick={() => void reorderScenes(item.id, scenes[index - 1]?.id || item.id)}><ArrowUp size={13} /></button><button className="icon-button" title="Move scene down" aria-label={`Move ${item.title} down`} disabled={busy || index === scenes.length - 1} onClick={() => void reorderScenes(item.id, scenes[index + 1]?.id || item.id)}><ArrowDown size={13} /></button></div></div>
             </div>)}
           </div>
           <div className="sequence-hint"><GripVertical size={14} /> Drag scenes to reorder</div>
@@ -624,8 +740,9 @@ export function App() {
           {scene.audioAssets.length > 0 && <section className="audio-requirement-setting"><label><input type="checkbox" checked={scene.audioRequired} onChange={(event) => void setSceneAudioRequired(event.target.checked)} disabled={busy} /><span><strong>Require attached audio to finish</strong><small>Learners must play every attached track to the end.</small></span></label></section>}
           </div></> : <div className="canvas-empty"><div className="brand-emblem"><BrandMark /></div><span className="brand-signature">Distinct parts. Deliberate design. Powerful learning.</span><strong>{project.id ? "Your storyboard starts here" : "Build your next learning experience"}</strong><span>{project.id ? "Bring in a PowerPoint or start with a blank scene." : "Create a project to organize scenes, media, and assessments."}</span>
           <div className="empty-start-actions">{project.id ? <><label className={`button button-accent upload-control ${busy ? "disabled" : ""}`}><FileUp size={16} /> Import PowerPoint<input type="file" aria-label="Import PowerPoint" accept=".pptx" onChange={uploadDeck} disabled={busy} /></label><button className="button button-outline" onClick={beginSceneCreate} disabled={busy}><Plus size={16} /> Add scene</button></> : <button className="button button-accent" onClick={() => setIsCreating(true)}><Plus size={16} /> Create project</button>}</div></div>}</section>
-      </div></> : activeView === "media" ? <section className="template-library media-library"><div className="template-toolbar"><div><p className="eyebrow">PROJECT ASSETS</p><h2>Media library</h2><span className="field-hint">{scene ? `Selected scene: ${scene.title}` : "Select a scene to attach media"}</span></div><label className={`button button-accent upload-control ${!project.id || busy ? "disabled" : ""}`} title="Upload an image or audio file to this project."><Upload size={15} /> Upload media<input type="file" accept="image/jpeg,image/png,image/gif,image/webp,audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/ogg,.jpg,.jpeg,.png,.gif,.webp,.mp3,.m4a,.aac,.wav,.ogg" aria-label="Upload media" onChange={uploadMedia} disabled={!project.id || busy} /></label></div>{project.storyboard.assets.length ? <div className="media-grid">{project.storyboard.assets.map((asset) => { const attached = scene ? (asset.kind === "image" ? scene.imageAssets : scene.audioAssets).includes(asset.id) : false; return <article className="media-item" key={asset.id}><div className="media-preview">{asset.kind === "image" ? <img src={`/api/projects/${project.id}/assets/${asset.id}`} alt={asset.filename} loading="lazy" /> : <audio controls preload="metadata" src={`/api/projects/${project.id}/assets/${asset.id}`} />}</div><div className="media-item-info"><strong title={asset.filename}>{asset.filename}</strong><small>{asset.kind} · {(asset.sizeBytes / 1024 / 1024).toFixed(2)} MB</small></div><MediaAttributionEditor projectId={project.id} asset={asset} onProjectUpdated={applyProject} /><button className={`button ${attached ? "button-dark" : "button-outline"}`} onClick={() => void attachAsset(asset)} disabled={!scene || busy}>{attached ? "Detach media" : "Attach to scene"}</button></article>; })}</div> : <div className="template-empty"><strong>No media in this project</strong><span>Upload images or audio, then attach them to the selected scene.</span></div>}</section> : <section className="template-library"><div className="template-toolbar"><div><p className="eyebrow">AUTHORING LIBRARY</p><h2>Scene templates</h2></div><label className={`button button-accent upload-control ${busy ? "disabled" : ""}`} title="Upload a PowerPoint template."><Upload size={15} /> Upload PPTX template<input type="file" accept=".pptx" aria-label="Upload PPTX template" onChange={uploadTemplate} disabled={busy} /></label></div>{templates.length ? <div className="template-list">{templates.map((template) => <article className="template-row" key={template.id}><div className="template-info"><strong>{template.title}</strong><span>{template.description || "No description"}</span><small>{template.filename} · {(template.sizeBytes / 1024 / 1024).toFixed(1)} MB</small></div><div className="template-actions"><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`} title="Replace this template from a PPTX file."><FileUp size={14} /> Replace PPTX<input type="file" accept=".pptx" aria-label="Replace template PowerPoint" onChange={(event) => replaceTemplateSource(event, template.id)} disabled={busy} /></label><button className="button button-outline" onClick={() => setTemplateDraft({ id: template.id, title: template.title, description: template.description })} disabled={busy}>Edit details</button></div></article>)}</div> : <div className="template-empty"><strong>No templates yet</strong><span>Upload a PowerPoint template to use it when creating scenes.</span></div>}</section>}
+      </div></> : activeView === "media" ? <section className="template-library media-library"><div className="template-toolbar"><div><p className="eyebrow">PROJECT ASSETS</p><h2>Media library</h2><span className="field-hint">{scene ? `Selected scene: ${scene.title}` : "Select a scene to attach media"}</span></div><label className={`button button-accent upload-control ${!project.id || busy ? "disabled" : ""}`} title="Upload an image or audio file to this project."><Upload size={15} /> Upload media<input type="file" accept="image/jpeg,image/png,image/gif,image/webp,audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/ogg,.jpg,.jpeg,.png,.gif,.webp,.mp3,.m4a,.aac,.wav,.ogg" aria-label="Upload media" onChange={uploadMedia} disabled={!project.id || busy} /></label></div>{project.storyboard.assets.length ? <div className="media-grid">{project.storyboard.assets.map((asset) => { const attached = scene ? (asset.kind === "image" ? scene.imageAssets : scene.audioAssets).includes(asset.id) : false; return <article className="media-item" key={asset.id}><div className="media-preview">{asset.kind === "image" ? <img src={`/api/projects/${project.id}/assets/${asset.id}`} alt={asset.filename} loading="lazy" /> : <audio controls preload="metadata" src={`/api/projects/${project.id}/assets/${asset.id}`} />}</div><div className="media-item-info"><strong title={asset.filename}>{asset.filename}</strong><small>{asset.kind} · {(asset.sizeBytes / 1024 / 1024).toFixed(2)} MB</small></div><MediaAttributionEditor projectId={project.id} revision={project.storyboard.revision} asset={asset} onProjectUpdated={applyProject} /><button className={`button ${attached ? "button-dark" : "button-outline"}`} onClick={() => void attachAsset(asset)} disabled={!scene || busy}>{attached ? "Detach media" : "Attach to scene"}</button></article>; })}</div> : <div className="template-empty"><strong>No media in this project</strong><span>Upload images or audio, then attach them to the selected scene.</span></div>}</section> : <section className="template-library"><div className="template-toolbar"><div><p className="eyebrow">AUTHORING LIBRARY</p><h2>Scene templates</h2></div><label className={`button button-accent upload-control ${busy ? "disabled" : ""}`} title="Upload a PowerPoint template."><Upload size={15} /> Upload PPTX template<input type="file" accept=".pptx" aria-label="Upload PPTX template" onChange={uploadTemplate} disabled={busy} /></label></div>{templates.length ? <div className="template-list">{templates.map((template) => <article className="template-row" key={template.id}><div className="template-info"><strong>{template.title}</strong><span>{template.description || "No description"}</span><small>{template.filename} · {(template.sizeBytes / 1024 / 1024).toFixed(1)} MB</small></div><div className="template-actions"><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`} title="Replace this template from a PPTX file."><FileUp size={14} /> Replace PPTX<input type="file" accept=".pptx" aria-label="Replace template PowerPoint" onChange={(event) => replaceTemplateSource(event, template.id)} disabled={busy} /></label><button className="button button-outline" onClick={() => setTemplateDraft({ id: template.id, title: template.title, description: template.description })} disabled={busy}>Edit details</button></div></article>)}</div> : <div className="template-empty"><strong>No templates yet</strong><span>Upload a PowerPoint template to use it when creating scenes.</span></div>}</section>}
 
+      </>}
     </main>
 
     {showExport && <EditorDialog labelledBy="export-title" className="export-dialog" onClose={() => setShowExport(false)} busy={busy}>
@@ -635,17 +752,18 @@ export function App() {
         <label className="package-threshold"><span>Warn when a package exceeds</span><input aria-label="Package warning threshold in MB" type="number" min="1" max="4096" key={`${project.id}-${project.storyboard.exportSettings.packageWarningThresholdMB}`} defaultValue={project.storyboard.exportSettings.packageWarningThresholdMB} onBlur={(event) => { if (event.currentTarget.validity.valid && event.currentTarget.value !== "") void updatePackageWarningThreshold(Number(event.currentTarget.value)); else event.currentTarget.value = String(project.storyboard.exportSettings.packageWarningThresholdMB); }} disabled={busy} /><span>MB</span></label>
         <div className="export-actions report-actions"><button className="button button-outline" onClick={() => void downloadScormReport("scorm2004")} disabled={busy}>Report 2004 <Download size={14} /></button><button className="button button-outline" onClick={() => void downloadScormReport("scorm12")} disabled={busy}>Report 1.2 <Download size={14} /></button></div>
       </section>
-      <section className="export-section"><h3>Storyboard backup</h3><p>Save or restore storyboard data and asset references. Media files are stored separately.</p><div className="export-actions"><button className="button button-outline" onClick={() => void exportStoryboard()} disabled={busy}><Download size={15} /> Download JSON</button><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`}><img src={restoreIcon} alt="" width="16" height="16" /> Restore JSON<input type="file" aria-label="Restore JSON" accept="application/json,.json" onChange={importStoryboard} disabled={busy} /></label></div></section>
+      <section className="export-section"><h3>Storyboard backup</h3><p>Save or restore storyboard data and asset references. Media files are stored separately.</p><div className="export-actions"><button className="button button-outline" onClick={() => void exportStoryboard()} disabled={busy}><Download size={15} /> Download JSON</button><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`}><img src={restoreIcon} alt="" width="16" height="16" /> Restore JSON<input type="file" aria-label="Restore JSON" accept="application/json,.json" onChange={importStoryboard} disabled={busy} /></label></div><div className="export-actions"><button className="button button-accent" onClick={() => void exportProjectBackup()} disabled={busy}><Download size={15} /> Download portable backup</button><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`}><Upload size={15} /> Restore portable backup<input type="file" aria-label="Restore portable backup" accept="application/zip,.zip" onChange={importProjectBackup} disabled={busy} /></label></div></section>
+      <section className="export-section"><h3>Editable Word storyboard</h3><p>Download editable scene text, production notes, media references, and assessment specifications.</p><label className="word-answer-key"><input type="checkbox" checked={includeWordAnswerKey} onChange={(event) => setIncludeWordAnswerKey(event.target.checked)} disabled={busy} /><span>Include answer keys (authoring material)</span></label><button className="button button-outline" onClick={() => void exportWordStoryboard()} disabled={busy}><FileText size={15} /> Download Word document</button></section>
       {assessmentItemCount >= 2 && <section className="export-section"><h3>Assessment test</h3><p>Export all authored questions together as a QTI 2.1 test.</p><button className="button button-outline" onClick={() => void exportAssessmentTest()} disabled={busy}><ClipboardList size={15} /> Download QTI test</button></section>}
       {error && <p className="export-error" role="alert">{error}</p>}{feedback && <p className="export-feedback" role="status">{feedback}</p>}{busy && <p role="status">Working…</p>}
     </EditorDialog>}
     {showCompletionSettings && <CompletionSettingsEditor project={project} onClose={() => setShowCompletionSettings(false)} onProjectUpdated={applyProject} />}
     {showEnhancementReview && <EnhancementReviewView project={project} onClose={() => setShowEnhancementReview(false)} onProjectUpdated={applyProject} />}
     {showValidation && <ValidationView projectId={project.id} onClose={() => setShowValidation(false)} onOpenScene={(sceneId, issueCode) => { const index = scenes.findIndex((item) => item.id === sceneId); setShowValidation(false); if (index >= 0) setSelectedScene(index); if (issueCode === "missing-image-alt-text") setShowAccessibility(true); else if (issueCode === "missing-assessment-item") setShowAssessmentEditor(true); else setActiveView("storyboard"); }} />}
-    {showAccessibility && <AccessibilityView projectId={project.id} scenes={scenes} assets={project.storyboard.assets} onClose={() => setShowAccessibility(false)} onProjectUpdated={applyProject} />}
+    {showAccessibility && <AccessibilityView projectId={project.id} revision={project.storyboard.revision} scenes={scenes} assets={project.storyboard.assets} onClose={() => setShowAccessibility(false)} onProjectUpdated={applyProject} />}
     {showGoldenPath && <GoldenPathView project={project} onClose={() => setShowGoldenPath(false)} onCreateProject={() => { setShowGoldenPath(false); setIsCreating(true); }} onOpenStoryboard={() => { setShowGoldenPath(false); setActiveView("storyboard"); }} onOpenMedia={() => { setShowGoldenPath(false); setActiveView("media"); }} onOpenAccessibility={() => { setShowGoldenPath(false); setShowAccessibility(true); }} onOpenPreview={() => { setShowGoldenPath(false); if (project.id) setShowPreview(true); }} onRunValidation={() => { setShowGoldenPath(false); setShowValidation(true); }} />}
     {showPreview && project.id && <CoursePreview project={project} onClose={() => setShowPreview(false)} />}
-    {showAssessmentEditor && project.id && scene?.sceneType === "assessment" && <AssessmentEditor projectId={project.id} projectTitle={project.title} scene={scene} scenes={scenes}
+    {showAssessmentEditor && project.id && scene?.sceneType === "assessment" && <AssessmentEditor projectId={project.id} projectTitle={project.title} revision={project.storyboard.revision} scene={scene} scenes={scenes}
       onClose={() => setShowAssessmentEditor(false)}
       onProjectUpdated={applyProject}
     />}

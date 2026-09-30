@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import type { Asset, Project } from "./App";
+import { revisionConflictMessage, storyboardWriteHeaders } from "./revision";
 
 type MediaAttributionEditorProps = {
   projectId: string;
+  revision: number;
   asset: Asset;
   onProjectUpdated: (project: Project) => void;
 };
 
-export function MediaAttributionEditor({ projectId, asset, onProjectUpdated }: MediaAttributionEditorProps) {
+export function MediaAttributionEditor({ projectId, revision, asset, onProjectUpdated }: MediaAttributionEditorProps) {
   const [attributionText, setAttributionText] = useState(asset.attributionText);
   const [attributionStatus, setAttributionStatus] = useState<"draft" | "complete">(asset.attributionStatus);
   const [busy, setBusy] = useState(false);
@@ -26,11 +28,13 @@ export function MediaAttributionEditor({ projectId, asset, onProjectUpdated }: M
     try {
       const response = await fetch(`/api/projects/${projectId}/assets/${asset.id}/attribution`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: storyboardWriteHeaders(revision),
         body: JSON.stringify({ attributionText: attributionText.trim(), attributionStatus }),
       });
       if (!response.ok) {
         const detail = await response.json().catch(() => null) as { detail?: string } | null;
+        const conflictMessage = revisionConflictMessage(response.status);
+        if (conflictMessage) throw new Error(conflictMessage);
         throw new Error(detail?.detail || "Media attribution could not be saved.");
       }
       onProjectUpdated(await response.json() as Project);

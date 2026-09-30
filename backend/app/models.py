@@ -1,4 +1,4 @@
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -14,6 +14,7 @@ class SceneCreate(BaseModel):
     templateId: str | None = None
     extractedText: list[str] = Field(default_factory=list)
     actionDescription: str = Field(default="", max_length=5000)
+    narration: str = Field(default="", max_length=10000)
     notes: str = ""
     required: bool = True
     audioRequired: bool = False
@@ -33,6 +34,7 @@ class SceneUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=120)
     extractedText: list[str] | None = None
     actionDescription: str | None = Field(default=None, max_length=5000)
+    narration: str | None = Field(default=None, max_length=10000)
     sceneType: Literal["content", "title", "assessment", "media", "interaction", "summary"] | None = None
     layoutMode: Literal["fidelity", "hybrid", "native", "template"] | None = None
     templateId: str | None = None
@@ -207,33 +209,291 @@ class ExportSettings(BaseModel):
     packageWarningThresholdMB: int = Field(default=200, ge=1, le=4096)
 
 
+EnhancementField = Literal[
+    "title", "extractedText", "actionDescription", "narration", "assessmentItem",
+    "assessmentSettings", "imageAssets", "imageAltText", "decorativeImages", "audioAssets",
+    "required", "audioRequired", "sceneType", "layoutMode", "templateId", "notes",
+    "sceneOrder", "storyboardTitle", "completionSettings",
+]
+
+
+class EnhancementProposalChangeCreate(BaseModel):
+    targetSceneId: str | None = None
+    field: EnhancementField
+    proposedValue: Any
+
+
+class EnhancementProposalChange(EnhancementProposalChangeCreate):
+    beforeValue: Any
+
+
+class EnhancementReferenceCitation(BaseModel):
+    resourceId: str
+    version: str | None = None
+    locator: str | None = None
+    excerpt: str | None = Field(default=None, max_length=2000)
+
+
 class EnhancementProposalCreate(BaseModel):
-    targetSceneId: str
-    field: Literal["actionDescription"] = "actionDescription"
-    proposedValue: str = Field(max_length=5000)
+    targetSceneId: str | None = None
+    field: EnhancementField = "actionDescription"
+    proposedValue: Any = None
+    changes: list[EnhancementProposalChangeCreate] = Field(default_factory=list, min_length=0, max_length=100)
     rationale: str = Field(min_length=1, max_length=2000)
     origin: Literal["ai", "author"] = "ai"
     provider: str | None = Field(default=None, max_length=120)
     model: str | None = Field(default=None, max_length=120)
+    affectedIds: list[str] = Field(default_factory=list, max_length=100)
+    dependencyGroupId: str | None = None
+    referenceCitations: list[EnhancementReferenceCitation] = Field(default_factory=list, max_length=100)
+    jobId: str | None = None
+
+    @model_validator(mode="after")
+    def validate_changes(self) -> "EnhancementProposalCreate":
+        if not self.changes and (self.targetSceneId is None or self.proposedValue is None):
+            raise ValueError("Provide a target scene and proposed value, or one or more changes")
+        return self
 
 
 class EnhancementProposal(BaseModel):
     id: str
-    targetSceneId: str
-    field: Literal["actionDescription"]
-    beforeValue: str
-    proposedValue: str
+    targetSceneId: str | None = None
+    field: EnhancementField = "actionDescription"
+    beforeValue: Any = None
+    proposedValue: Any = None
+    changes: list[EnhancementProposalChange] = Field(default_factory=list)
+    sourceRevision: int = 1
+    affectedIds: list[str] = Field(default_factory=list)
+    dependencyGroupId: str | None = None
+    referenceCitations: list[EnhancementReferenceCitation] = Field(default_factory=list)
+    jobId: str | None = None
     rationale: str
     origin: Literal["ai", "author"]
     provider: str | None = None
     model: str | None = None
-    status: Literal["pending", "accepted", "rejected", "stale"] = "pending"
+    status: Literal["pending", "accepted", "rejected", "stale", "superseded", "reversed"] = "pending"
     createdAt: str
     decidedAt: str | None = None
+    decisionHistory: list["EnhancementProposalDecisionRecord"] = Field(default_factory=list)
+
+
+class EnhancementProposalDecisionRecord(BaseModel):
+    decision: Literal["accept", "reject", "superseded", "reverse"]
+    decidedAt: str
+    expectedRevision: int
+    originalChanges: list[EnhancementProposalChange] = Field(default_factory=list)
+    appliedChanges: list[EnhancementProposalChange] = Field(default_factory=list)
 
 
 class EnhancementProposalDecision(BaseModel):
-    decision: Literal["accept", "reject"]
+    decision: Literal["accept", "reject", "reverse"]
+    changes: list[EnhancementProposalChangeCreate] | None = None
+
+
+class ReferencePassage(BaseModel):
+    locator: str
+    text: str = Field(min_length=1, max_length=50000)
+
+
+class ReferenceResourceVersion(BaseModel):
+    version: str
+    filename: str
+    contentType: str
+    sizeBytes: int
+    sha256: str
+    originalPath: str
+    passages: list[ReferencePassage] = Field(default_factory=list)
+    extractionStatus: Literal["complete", "partial", "failed"] = "complete"
+    extractionMessage: str | None = None
+    createdAt: str
+
+
+class ReferenceResource(BaseModel):
+    id: str
+    title: str
+    classification: Literal["study-guide", "supporting-document", "policy", "other"] = "supporting-document"
+    authoritative: bool = False
+    sceneIds: list[str] = Field(default_factory=list)
+    currentVersion: str
+    versions: list[ReferenceResourceVersion]
+
+
+class EnhancementJobCreate(BaseModel):
+    scope: Literal["selected-scenes", "whole-course"]
+    sceneIds: list[str] = Field(default_factory=list, max_length=500)
+    goal: str = Field(min_length=1, max_length=2000)
+    resourceIds: list[str] = Field(default_factory=list, max_length=100)
+    commentId: str | None = None
+
+    @model_validator(mode="after")
+    def validate_scope(self) -> "EnhancementJobCreate":
+        if self.scope == "selected-scenes" and not self.sceneIds:
+            raise ValueError("Select at least one scene for a selected-scenes run")
+        if self.scope == "whole-course" and self.sceneIds:
+            raise ValueError("Whole-course runs must not include a scene subset")
+        if len(set(self.sceneIds)) != len(self.sceneIds):
+            raise ValueError("Scene IDs must be unique")
+        if len(set(self.resourceIds)) != len(self.resourceIds):
+            raise ValueError("Reference resource IDs must be unique")
+        return self
+
+
+class EnhancementResourceConflict(BaseModel):
+    explanation: str = Field(min_length=1, max_length=2000)
+    citations: list[EnhancementReferenceCitation] = Field(min_length=2, max_length=10)
+
+
+class EnhancementJob(BaseModel):
+    id: str
+    projectId: str
+    sourceRevision: int
+    scope: Literal["selected-scenes", "whole-course"]
+    sceneIds: list[str]
+    goal: str
+    resourceIds: list[str]
+    commentId: str | None = None
+    resourceVersions: dict[str, str] = Field(default_factory=dict)
+    status: Literal["queued", "running", "completed", "cancelled", "failed"] = "queued"
+    progress: int = Field(default=0, ge=0, le=100)
+    message: str = "Queued"
+    provider: str | None = None
+    model: str | None = None
+    estimatedInputTokens: int | None = None
+    estimatedCostUsd: float | None = None
+    proposalIds: list[str] = Field(default_factory=list)
+    resourceConflicts: list[EnhancementResourceConflict] = Field(default_factory=list)
+    error: str | None = None
+    retryOf: str | None = None
+    cancelRequested: bool = False
+    createdAt: str
+    updatedAt: str
+
+
+class ReviewCommentCreate(BaseModel):
+    sceneId: str
+    authorLabel: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=1, max_length=5000)
+    assetId: str | None = None
+    timeSeconds: float | None = Field(default=None, ge=0)
+
+
+class ReviewReplyCreate(BaseModel):
+    authorLabel: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=1, max_length=5000)
+
+
+class ReviewCommentReply(BaseModel):
+    id: str
+    actorId: str = "local-user"
+    authorLabel: str
+    body: str
+    createdAt: str
+
+
+class ReviewComment(BaseModel):
+    id: str
+    projectId: str
+    sceneId: str
+    sceneTitle: str
+    revision: int
+    actorId: str = "local-user"
+    authorLabel: str
+    body: str
+    assetId: str | None = None
+    timeSeconds: float | None = None
+    replies: list[ReviewCommentReply] = Field(default_factory=list)
+    resolved: bool = False
+    resolvedAt: str | None = None
+    createdAt: str
+    updatedAt: str
+    outdated: bool = False
+    sceneDeleted: bool = False
+
+
+class ReviewCommentDecision(BaseModel):
+    resolved: bool
+
+
+class MediaGenerationJobCreate(BaseModel):
+    kind: Literal["image", "narration"]
+    sceneId: str
+    purpose: str = Field(min_length=1, max_length=2000)
+    style: str = Field(default="", max_length=2000)
+    width: int | None = Field(default=None, ge=64, le=4096)
+    height: int | None = Field(default=None, ge=64, le=4096)
+    prompt: str = Field(default="", max_length=10000)
+    script: str = Field(default="", max_length=10000)
+    voice: str | None = Field(default=None, max_length=200)
+    language: str | None = Field(default=None, max_length=40)
+    altText: str = Field(default="", max_length=2000)
+    captions: str = Field(default="", max_length=20000)
+
+    @model_validator(mode="after")
+    def validate_kind(self) -> "MediaGenerationJobCreate":
+        if self.kind == "narration" and not self.script.strip():
+            raise ValueError("Narration generation requires a script")
+        if self.kind == "image" and not self.prompt.strip():
+            raise ValueError("Image generation requires a prompt")
+        return self
+
+
+class MediaGenerationJob(BaseModel):
+    id: str
+    projectId: str
+    sourceRevision: int
+    sceneId: str
+    kind: Literal["image", "narration"]
+    purpose: str
+    style: str = ""
+    width: int | None = None
+    height: int | None = None
+    prompt: str
+    script: str = ""
+    voice: str | None = None
+    language: str | None = None
+    altText: str = ""
+    captions: str = ""
+    status: Literal["queued", "running", "completed", "cancelled", "failed"] = "queued"
+    progress: int = Field(default=0, ge=0, le=100)
+    message: str = "Queued"
+    provider: str | None = None
+    model: str | None = None
+    estimatedCostUsd: float | None = None
+    candidateIds: list[str] = Field(default_factory=list)
+    error: str | None = None
+    retryOf: str | None = None
+    cancelRequested: bool = False
+    createdAt: str
+    updatedAt: str
+
+
+class GeneratedAssetCandidate(BaseModel):
+    id: str
+    projectId: str
+    jobId: str
+    sourceRevision: int
+    sceneId: str
+    kind: Literal["image", "audio"]
+    status: Literal["pending", "approved", "rejected"] = "pending"
+    filename: str
+    contentType: str
+    sizeBytes: int
+    sha256: str
+    path: str
+    purpose: str
+    prompt: str
+    style: str = ""
+    width: int | None = None
+    height: int | None = None
+    script: str = ""
+    voice: str | None = None
+    language: str | None = None
+    altText: str = ""
+    captions: str = ""
+    provider: str | None = None
+    model: str | None = None
+    createdAt: str
+    approvedAssetId: str | None = None
 
 
 class EnhancementProposalResult(BaseModel):
@@ -268,6 +528,7 @@ class Scene(BaseModel):
     sceneType: Literal["content", "title", "assessment", "media", "interaction", "summary"] = "content"
     extractedText: list[str] = Field(default_factory=list)
     actionDescription: str = Field(default="", max_length=5000)
+    narration: str = Field(default="", max_length=10000)
     layoutMode: Literal["fidelity", "hybrid", "native", "template"] = "fidelity"
     required: bool = True
     audioRequired: bool = False
@@ -316,6 +577,7 @@ class SceneOrder(BaseModel):
 
 class Storyboard(BaseModel):
     schemaVersion: str = "1.0"
+    revision: int = Field(default=1, ge=1)
     projectId: str
     title: str
     description: str = ""
@@ -331,6 +593,8 @@ class ProjectSummary(BaseModel):
     sceneCount: int
     updatedAt: str
     hasSourceDeck: bool
+    installationId: str = "local-installation"
+    ownerId: str = "local-user"
 
 
 class ProjectDetail(ProjectSummary):

@@ -7,7 +7,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 from xml.etree import ElementTree as ET
 
 from .models import ProjectDetail
-from .storage import project_path, slugify
+from .storage import project_path, read_project, slugify, storyboard_transaction
 from .validation import validate_project
 
 
@@ -69,7 +69,7 @@ PLAYER_JS = r'''(() => {
     }
     function finish() {
         const required = state.scenes.filter(scene => scene.required);
-        const complete = required.length > 0 && required.every(scene => { if (!state.visited.has(scene.id)) return false; if (!scene.assessmentItem) return true; const result = state.assessments[scene.id]; const config = settings(scene); return result && result.attempts > 0 && (result.isCorrect === true || result.attempts >= config.maxAttempts); }) && state.scenes.filter(scene => scene.audioRequired).every(scene => scene.audioAssets.length > 0 && scene.audioAssets.every(id => state.completedAudio.has(`${scene.id}:${id}`)));
+        const complete = state.scenes.length > 0 && required.every(scene => { if (!state.visited.has(scene.id)) return false; if (!scene.assessmentItem) return true; const result = state.assessments[scene.id]; const config = settings(scene); return result && result.attempts > 0 && (result.isCorrect === true || result.attempts >= config.maxAttempts); }) && state.scenes.filter(scene => scene.audioRequired).every(scene => scene.audioAssets.length > 0 && scene.audioAssets.every(id => state.completedAudio.has(`${scene.id}:${id}`)));
         const scored = state.scenes.filter(scene => scene.assessmentItem && (scene.required || (state.completionSettings.includeOptionalAssessments && (state.assessments[scene.id]?.attempts || 0) > 0)));
         const totalWeight = scored.reduce((sum, scene) => sum + settings(scene).scoreWeight, 0);
         const score = totalWeight ? Math.round(scored.reduce((sum, scene) => sum + (state.assessments[scene.id]?.isCorrect === true ? 100 : 0) * settings(scene).scoreWeight, 0) / totalWeight) : null;
@@ -82,7 +82,10 @@ PLAYER_JS = r'''(() => {
         call("SetValue", ["cmi.score.scaled", String((score ?? 0) / 100)]);
     save();
   }
-  function text(scene) { return [...(scene.extractedText || []), scene.actionDescription, scene.notes].filter(Boolean).map(value => `<p>${escapeHtml(value)}</p>`).join(""); }
+    function text(scene) {
+        const paragraphs = (scene.extractedText || []).filter(Boolean).map(value => `<p>${escapeHtml(value)}</p>`).join("");
+        return scene.previewImage && paragraphs ? `<details><summary>Read slide text</summary>${paragraphs}</details>` : paragraphs;
+    }
   function escapeHtml(value) { return String(value).replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;", "'":"&#39;"}[char])); }
     function bindAssessment(scene) {
         const form = document.querySelector("#assessment-form");
@@ -102,7 +105,21 @@ PLAYER_JS = r'''(() => {
     if (!scene) return;
     state.visited.add(scene.id);
     document.querySelector("#scene-title").textContent = scene.title;
-    document.querySelector("#scene-body").innerHTML = (state.remediation && state.remediation.remediationSceneId === scene.id ? `<button type="button" data-return-assessment>Return to question</button>` : "") + text(scene);
+    const body = document.querySelector("#scene-body");
+    body.innerHTML = (state.remediation && state.remediation.remediationSceneId === scene.id ? `<button type="button" data-return-assessment>Return to question</button>` : "") + text(scene);
+    if (scene.previewImage) {
+        const slideImage = document.createElement("img");
+        slideImage.src = scene.previewImage;
+        slideImage.alt = `Slide ${scene.sourceSlide || state.current + 1}: ${scene.title || "Untitled scene"}`;
+        slideImage.style.display = "block";
+        slideImage.style.maxWidth = "100%";
+        slideImage.style.maxHeight = "520px";
+        slideImage.style.objectFit = "contain";
+        slideImage.style.margin = "0 auto 16px";
+        slideImage.style.background = "#fff";
+        slideImage.addEventListener("error", () => { runtimeStatus("Slide preview could not be loaded; slide text remains available below."); slideImage.remove(); });
+        body.prepend(slideImage);
+    }
     document.querySelector("#scene-assessment").innerHTML = assessmentHtml(scene);
     bindAssessment(scene);
     const returnButton = document.querySelector("[data-return-assessment]");
@@ -213,6 +230,7 @@ def _build_report(project: ProjectDetail, profile: str, package: bytes, files: d
     return {
         "projectId": project.id,
         "projectTitle": project.title,
+        "sourceRevision": project.storyboard.revision,
         "exportProfile": profile,
         "buildStatus": "passed-with-warnings" if warnings else "passed",
         "packageSizeBytes": len(package),
@@ -283,7 +301,30 @@ def _manifest_12(project: ProjectDetail) -> bytes:
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
+def _published_storyboard_json(project: ProjectDetail) -> bytes:
+    storyboard = project.storyboard.model_dump(
+        mode="json",
+        exclude={"scenes": {"__all__": {"actionDescription", "notes"}}},
+    )
+    return json.dumps(storyboard, indent=2).encode("utf-8")
+
+
+def _ensure_build_revision(project: ProjectDetail) -> None:
+    current = read_project(project.id)
+    if current.storyboard.revision != project.storyboard.revision:
+        raise ValueError(
+            f"Storyboard changed during SCORM build from revision {project.storyboard.revision} "
+            f"to {current.storyboard.revision}. Build again from the current revision."
+        )
+
+
 def build_scorm_2004(project: ProjectDetail) -> tuple[bytes, dict[str, object]]:
+    with storyboard_transaction():
+        return _build_scorm_2004_locked(project)
+
+
+def _build_scorm_2004_locked(project: ProjectDetail) -> tuple[bytes, dict[str, object]]:
+    _ensure_build_revision(project)
     validation = validate_project(project, target="production")
     errors = [issue.message for issue in validation.issues if issue.severity == "error"]
     if errors:
@@ -293,7 +334,7 @@ def build_scorm_2004(project: ProjectDetail) -> tuple[bytes, dict[str, object]]:
         "imsmanifest.xml": _manifest(project),
         "index.html": PLAYER_HTML.encode("utf-8"),
         "player.js": PLAYER_JS.encode("utf-8"),
-        "storyboard.json": project.storyboard.model_dump_json(indent=2).encode("utf-8"),
+        "storyboard.json": _published_storyboard_json(project),
     }
     for asset in project.storyboard.assets:
         package_path = _safe_package_path(asset.path).as_posix()
@@ -313,21 +354,29 @@ def build_scorm_2004(project: ProjectDetail) -> tuple[bytes, dict[str, object]]:
     with ZipFile(output, "w", ZIP_DEFLATED) as package:
         for filename, content in files.items():
             package.writestr(filename, content)
+    _ensure_build_revision(project)
     report = _build_report(project, "SCORM 2004 4th Edition", output.getvalue(), files, [issue.message for issue in validation.issues if issue.severity == "warning"])
     return output.getvalue(), report
 
 
 def persist_scorm_build(project: ProjectDetail) -> tuple[bytes, dict[str, object], str]:
-    package, report = build_scorm_2004(project)
-    project_root = project_path(project.id)
-    filename = f"{slugify(project.title)}-scorm2004.zip"
-    (project_root / "output" / filename).write_bytes(package)
-    report_path = project_root / "reports" / "build-scorm2004.json"
-    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    return package, report, filename
+    with storyboard_transaction():
+        package, report = build_scorm_2004(project)
+        project_root = project_path(project.id)
+        filename = f"{slugify(project.title)}-scorm2004.zip"
+        (project_root / "output" / filename).write_bytes(package)
+        report_path = project_root / "reports" / "build-scorm2004.json"
+        report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        return package, report, filename
 
 
 def build_scorm_12(project: ProjectDetail) -> tuple[bytes, dict[str, object]]:
+    with storyboard_transaction():
+        return _build_scorm_12_locked(project)
+
+
+def _build_scorm_12_locked(project: ProjectDetail) -> tuple[bytes, dict[str, object]]:
+    _ensure_build_revision(project)
     validation = validate_project(project, target="production")
     errors = [issue.message for issue in validation.issues if issue.severity == "error"]
     if errors:
@@ -337,7 +386,7 @@ def build_scorm_12(project: ProjectDetail) -> tuple[bytes, dict[str, object]]:
         "imsmanifest.xml": _manifest_12(project),
         "index.html": PLAYER_HTML.encode("utf-8"),
         "player.js": _scorm_12_player().encode("utf-8"),
-        "storyboard.json": project.storyboard.model_dump_json(indent=2).encode("utf-8"),
+        "storyboard.json": _published_storyboard_json(project),
     }
     for asset in project.storyboard.assets:
         relative = _safe_package_path(asset.path)
@@ -356,18 +405,20 @@ def build_scorm_12(project: ProjectDetail) -> tuple[bytes, dict[str, object]]:
     with ZipFile(output, "w", ZIP_DEFLATED) as package:
         for filename, content in files.items():
             package.writestr(filename, content)
+    _ensure_build_revision(project)
     report = _build_report(project, "SCORM 1.2", output.getvalue(), files, [issue.message for issue in validation.issues if issue.severity == "warning"])
     return output.getvalue(), report
 
 
 def persist_scorm_12_build(project: ProjectDetail) -> tuple[bytes, dict[str, object], str]:
-    package, report = build_scorm_12(project)
-    project_root = project_path(project.id)
-    filename = f"{slugify(project.title)}-scorm12.zip"
-    (project_root / "output" / filename).write_bytes(package)
-    report_path = project_root / "reports" / "build-scorm12.json"
-    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    return package, report, filename
+    with storyboard_transaction():
+        package, report = build_scorm_12(project)
+        project_root = project_path(project.id)
+        filename = f"{slugify(project.title)}-scorm12.zip"
+        (project_root / "output" / filename).write_bytes(package)
+        report_path = project_root / "reports" / "build-scorm12.json"
+        report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        return package, report, filename
 
 
 def read_scorm_report(project_id: str, profile: str) -> dict[str, object]:

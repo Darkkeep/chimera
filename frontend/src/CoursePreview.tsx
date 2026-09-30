@@ -1,10 +1,11 @@
 import { BrandMark } from "./BrandMark";
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, MessageCircle, Send, X } from "lucide-react";
 import type { AssessmentItem, AssessmentSettings, Project, Scene } from "./App";
 import { evaluateCourseCompletion, type AssessmentOutcome } from "./completion";
 import "./course-preview.css";
 import "./course-preview-overrides.css";
+import "./course-preview-review.css";
 import "./assessment-types.css";
 
 type CoursePreviewProps = {
@@ -15,6 +16,8 @@ type CoursePreviewProps = {
 type AssessmentResult = AssessmentOutcome & { response: string[]; matches: Record<string, string>; textResponse: string; assessmentSignature: string };
 type RemediationRoute = { assessmentSceneId: string; remediationSceneId: string };
 type ResumeState = { sceneIndex: number; visitedSceneIds: string[]; completedAudioKeys: string[]; assessmentResults: Record<string, AssessmentResult>; remediationRoute: RemediationRoute | null };
+type ReviewReply = { id: string; authorLabel: string; body: string; createdAt: string };
+type ReviewComment = { id: string; sceneId: string; sceneTitle: string; revision: number; authorLabel: string; body: string; replies: ReviewReply[]; resolved: boolean; outdated: boolean; sceneDeleted: boolean };
 
 function audioCompletionKey(sceneId: string, audioId: string): string {
   return `${sceneId}:${audioId}`;
@@ -128,6 +131,13 @@ export function CoursePreview({ project, onClose }: CoursePreviewProps) {
   const [completedAudioKeys, setCompletedAudioKeys] = useState(resumeState.completedAudioKeys);
   const [assessmentResults, setAssessmentResults] = useState(resumeState.assessmentResults);
   const [remediationRoute, setRemediationRoute] = useState(resumeState.remediationRoute);
+  const [comments, setComments] = useState<ReviewComment[]>([]);
+  const [commentAuthor, setCommentAuthor] = useState("Reviewer");
+  const [commentBody, setCommentBody] = useState("");
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [commentFilter, setCommentFilter] = useState<"all" | "unresolved" | "outdated">("all");
+  const [commentBusy, setCommentBusy] = useState(false);
+  const [commentError, setCommentError] = useState("");
   const dotsContainerRef = useRef<HTMLDivElement | null>(null);
   const activeDotRef = useRef<HTMLButtonElement | null>(null);
   const scene = scenes[sceneIndex];
@@ -191,6 +201,15 @@ export function CoursePreview({ project, onClose }: CoursePreviewProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, scenes.length]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/projects/${project.id}/review-comments`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() as Promise<ReviewComment[]> : Promise.reject(new Error("Review comments could not be loaded.")))
+      .then(setComments)
+      .catch((error: unknown) => { if (error instanceof DOMException && error.name === "AbortError") return; setCommentError(error instanceof Error ? error.message : "Review comments could not be loaded."); });
+    return () => controller.abort();
+  }, [project.id]);
+
   const assetById = new Map(project.storyboard.assets.map((asset) => [asset.id, asset]));
 
   function renderImage(imageId: string, className: string) {
@@ -231,6 +250,39 @@ export function CoursePreview({ project, onClose }: CoursePreviewProps) {
     const assessmentIndex = scenes.findIndex((item) => item.id === remediationRoute.assessmentSceneId);
     if (assessmentIndex >= 0) setSceneIndex(assessmentIndex);
     setRemediationRoute(null);
+  }
+
+  async function postComment() {
+    if (!scene || !commentAuthor.trim() || !commentBody.trim() || commentBusy) return;
+    setCommentBusy(true); setCommentError("");
+    try {
+      const response = await fetch(`/api/projects/${project.id}/review-comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sceneId: scene.id, authorLabel: commentAuthor, body: commentBody }) });
+      if (!response.ok) throw new Error("Comment could not be saved.");
+      const created = await response.json() as ReviewComment;
+      setComments((current) => [...current, created]); setCommentBody("");
+    } catch (error: unknown) { setCommentError(error instanceof Error ? error.message : "Comment could not be saved."); }
+    finally { setCommentBusy(false); }
+  }
+
+  async function updateComment(commentId: string, action: "decision" | "replies", body: object) {
+    setCommentBusy(true); setCommentError("");
+    try {
+      const response = await fetch(`/api/projects/${project.id}/review-comments/${commentId}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (!response.ok) throw new Error("Review update could not be saved.");
+      const updated = await response.json() as ReviewComment;
+      setComments((current) => current.map((comment) => comment.id === updated.id ? updated : comment));
+      if (action === "replies") setReplyDrafts((current) => ({ ...current, [commentId]: "" }));
+    } catch (error: unknown) { setCommentError(error instanceof Error ? error.message : "Review update could not be saved."); }
+    finally { setCommentBusy(false); }
+  }
+
+  async function enhanceComment(comment: ReviewComment) {
+    setCommentBusy(true); setCommentError("");
+    try {
+      const response = await fetch(`/api/projects/${project.id}/enhancement-jobs`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope: "selected-scenes", sceneIds: [comment.sceneId], goal: comment.body, resourceIds: [], commentId: comment.id }) });
+      if (!response.ok) throw new Error("Enhancement request could not be started.");
+    } catch (error: unknown) { setCommentError(error instanceof Error ? error.message : "Enhancement request could not be started."); }
+    finally { setCommentBusy(false); }
   }
 
   return <section className="course-preview-shell" role="dialog" aria-modal="true" aria-label={`${project.title} course preview`}>
@@ -304,6 +356,12 @@ export function CoursePreview({ project, onClose }: CoursePreviewProps) {
           const isComplete = completedAudioKeys.includes(audioCompletionKey(scene.id, audioId));
           return <section className={`course-preview-audio ${isRequired ? "required-audio" : ""}`} key={audioId}><span>{asset.filename}{isRequired ? ` · ${isComplete ? "Complete" : "Required"}` : ""}</span><audio controls preload="metadata" src={`/api/projects/${project.id}/assets/${audioId}`} aria-label={`Audio: ${asset.filename}${isRequired ? ", required" : ""}`} onEnded={() => { if (isRequired) setCompletedAudioKeys((current) => current.includes(audioCompletionKey(scene.id, audioId)) ? current : [...current, audioCompletionKey(scene.id, audioId)]); }} /></section>;
         })}
+        <section className="course-preview-review" aria-labelledby="course-preview-review-title">
+          <div className="course-preview-review-heading"><div><span className="course-preview-assessment-kicker">IN-APP REVIEW · REVISION {project.storyboard.revision}</span><h2 id="course-preview-review-title"><MessageCircle size={17} /> Scene discussion</h2></div><label className="course-preview-comment-filter">Show<select value={commentFilter} onChange={(event) => setCommentFilter(event.target.value as "all" | "unresolved" | "outdated")}><option value="all">All threads</option><option value="unresolved">Unresolved</option><option value="outdated">Outdated</option></select></label></div>
+          <div className="course-preview-comment-form"><label>Reviewer<input value={commentAuthor} onChange={(event) => setCommentAuthor(event.target.value)} /></label><label>Comment<textarea rows={2} value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Leave feedback on this scene" /></label><button type="button" className="course-preview-nav-button next" onClick={() => void postComment()} disabled={commentBusy || !commentBody.trim()}><Send size={14} /> Add comment</button></div>
+          {commentError && <p className="course-preview-comment-error" role="alert">{commentError}</p>}
+          <div className="course-preview-comment-list">{comments.filter((comment) => comment.sceneId === scene.id && (commentFilter === "all" || (commentFilter === "unresolved" && !comment.resolved) || (commentFilter === "outdated" && comment.outdated))).map((comment) => <article className={`course-preview-comment ${comment.resolved ? "resolved" : ""}`} key={comment.id}><div className="course-preview-comment-meta"><strong>{comment.authorLabel}</strong><span>{comment.outdated ? "Outdated context" : comment.resolved ? "Resolved" : `Revision ${comment.revision}`}</span></div><p>{comment.body}</p>{comment.replies.map((reply) => <div className="course-preview-reply" key={reply.id}><strong>{reply.authorLabel}</strong><span>{reply.body}</span></div>)}<div className="course-preview-comment-actions">{!comment.resolved && <button type="button" onClick={() => void updateComment(comment.id, "decision", { resolved: true })}>Resolve</button>}{comment.resolved && <button type="button" onClick={() => void updateComment(comment.id, "decision", { resolved: false })}>Reopen</button>}<button type="button" onClick={() => void enhanceComment(comment)} disabled={commentBusy}>Enhance</button><input aria-label={`Reply to ${comment.authorLabel}`} value={replyDrafts[comment.id] ?? ""} onChange={(event) => setReplyDrafts((current) => ({ ...current, [comment.id]: event.target.value }))} placeholder="Reply" /><button type="button" onClick={() => void updateComment(comment.id, "replies", { authorLabel: commentAuthor, body: replyDrafts[comment.id] ?? "" })} disabled={commentBusy || !(replyDrafts[comment.id] ?? "").trim()}>Reply</button></div></article>)}</div>
+        </section>
       </article>
       <footer className="course-preview-navigation"><button type="button" className="course-preview-nav-button previous" onClick={() => setSceneIndex((current) => Math.max(0, current - 1))} disabled={sceneIndex === 0}><ArrowLeft size={17} /><span>Previous</span></button><div className="course-preview-dots" ref={dotsContainerRef} role="group" aria-label="Scene navigation">{scenes.map((item, index) => <button type="button" key={item.id} ref={index === sceneIndex ? activeDotRef : null} className={`${index === sceneIndex ? "active" : ""} ${visitedSceneIds.includes(item.id) ? "visited" : ""}`} aria-label={`Go to scene ${index + 1}: ${item.title}`} aria-current={index === sceneIndex ? "step" : undefined} onClick={() => setSceneIndex(index)} />)}</div><button type="button" className="course-preview-nav-button next" onClick={() => setSceneIndex((current) => Math.min(scenes.length - 1, current + 1))} disabled={sceneIndex === scenes.length - 1}><span>{sceneIndex === scenes.length - 1 ? "End" : "Next"}</span>{sceneIndex === scenes.length - 1 ? <Check size={17} /> : <ArrowRight size={17} />}</button></footer>
     </main> : <main className="course-preview-no-scenes"><h1>This course has no scenes yet.</h1><p>Add or import scenes in the storyboard to preview the learner experience.</p><button type="button" className="course-preview-nav-button" onClick={onClose}>Return to authoring</button></main>}

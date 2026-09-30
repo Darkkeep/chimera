@@ -1,0 +1,23 @@
+.management-view{min-height:100dvh;padding:32px 38px;background:#f4f6f8}.management-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;max-width:1180px;margin:0 auto 26px}.management-header h1{margin:4px 0 8px;font-size:28px;color:#1d3555}.management-header p:not(.eyebrow){margin:0;color:#596e87}.management-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;max-width:1180px;margin:0 auto 18px}.management-summary>div{display:grid;gap:5px;padding:18px;background:#fff;border:1px solid #dce5ee;border-radius:6px}.management-summary strong{font-size:25px;color:#1765ce}.management-summary span{font-size:11px;color:#596e87}.management-grid{display:grid;grid-template-columns:minmax(240px,.8fr) minmax(0,1.2fr);gap:18px;max-width:1180px;margin:0 auto}.management-panel{min-width:0;padding:20px;background:#fff;border:1px solid #dce5ee;border-radius:6px}.management-panel-wide{grid-column:1/-1}.management-panel-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.management-panel-title>div{display:flex;align-items:center;gap:8px;color:#1765ce}.management-panel h3{margin:0;color:#1d3555;font-size:15px}.management-facts{display:grid;gap:11px;margin:0}.management-facts div{display:flex;justify-content:space-between;gap:16px;border-bottom:1px solid #edf1f5;padding-bottom:8px}.management-facts dt{color:#596e87;font-size:11px}.management-facts dd{margin:0;text-align:right;color:#1d3555;font-size:12px;overflow-wrap:anywhere}.health-list{display:grid;gap:4px}.health-row{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 0;border-top:1px solid #edf1f5}.health-row>div:first-child{display:grid;gap:4px;min-width:0}.health-row strong{color:#1d3555;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.health-row span{color:#596e87;font-size:10px}.health-counts{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}.health-counts span{padding:4px 6px;background:#f4f6f8;border-radius:3px;white-space:nowrap}.health-counts .is-blocked{color:#9a3d38;background:#fff0ee}.health-counts .is-clear{color:#387246;background:#eef8f0}.management-empty{margin:0;color:#596e87;font-size:12px}.audit-list{display:grid;gap:0;margin:0;padding:0;list-style:none}.audit-list li{display:grid;grid-template-columns:82px minmax(160px,1fr) auto minmax(130px,.5fr);align-items:center;gap:12px;padding:10px 0;border-top:1px solid #edf1f5;font-size:12px}.audit-list strong{color:#1d3555;font-weight:600}.audit-list time,.audit-list small{color:#596e87;font-size:10px}.audit-class{text-transform:uppercase;font:600 9px 'DM Mono',monospace;letter-spacing:.7px}.audit-class.product{color:#1765ce}.audit-class.security{color:#9a3d38}.audit-class.operational{color:#596e87}@media(max-width:800px){.management-view{padding:24px 18px}.management-header{display:grid}.management-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.management-grid{grid-template-columns:1fr}.management-panel-wide{grid-column:auto}.audit-list li{grid-template-columns:70px minmax(0,1fr);gap:6px}.audit-list time,.audit-list small{grid-column:2}.health-row{align-items:flex-start;flex-direction:column}.health-counts{justify-content:flex-start}}
+/* My Work occupies the main workspace; narrow layouts must wrap their content. */
+.management-view { width: 100%; min-width: 0; }
+.management-header > div { min-width: 0; }
+.management-header h1 { overflow-wrap: anywhere; }
+.management-header .button { flex-shrink: 0; }
+.management-facts div > * { min-width: 0; overflow-wrap: anywhere; }
+.management-summary > div { min-width: 0; }
+.management-summary span { overflow-wrap: anywhere; }
+.health-row > div:first-child { flex: 1; }
+.audit-list li > * { min-width: 0; overflow-wrap: anywhere; }
+@media (min-width: 801px) and (max-width: 1100px) {
+  .management-grid { grid-template-columns: 1fr; }
+  .management-panel-wide { grid-column: auto; }
+}
+@media (max-width: 480px) {
+  .management-view { padding: 24px 12px; }
+  .management-panel { padding: 16px; }
+  .management-facts div { flex-direction: column; gap: 4px; }
+  .management-facts dd { text-align: left; }
+  .audit-list li { grid-template-columns: 1fr; }
+  .audit-list time, .audit-list small { grid-column: 1; }
+}

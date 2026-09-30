@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
 import type { CourseCompletionSettings, Project } from "./App";
+import { revisionConflictMessage, storyboardWriteHeaders } from "./revision";
 
 type CompletionSettingsEditorProps = {
   project: Project;
@@ -22,11 +23,13 @@ export function CompletionSettingsEditor({ project, onClose, onProjectUpdated }:
     try {
       const response = await fetch(`/api/projects/${project.id}/completion-settings`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: storyboardWriteHeaders(project.storyboard.revision),
         body: JSON.stringify(settings),
       });
       if (!response.ok) {
         const detail = await response.json().catch(() => null) as { detail?: string } | null;
+        const conflictMessage = revisionConflictMessage(response.status);
+        if (conflictMessage) throw new Error(conflictMessage);
         throw new Error(detail?.detail || "Completion rules could not be saved.");
       }
       onProjectUpdated(await response.json() as Project);

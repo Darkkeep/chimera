@@ -89,3 +89,9 @@ Recorded 2026-09-29 against generated packages served from `http://127.0.0.1:876
 - [x] SCORM 1.2 fake `API` session issued `LMSInitialize`, `LMSGetValue`, `LMSSetValue`, and legacy `cmi.core.*` calls.
 - [x] Assessment and required-audio browser paths passed with a disposable fixture: correct answer reported 100%, audio `ended` completed the gate, and SCORM 2004 received completed/passed/score/suspend-data updates.
 - [x] Blackboard Learn upload and gradebook/resume behavior were confirmed in the Blackboard SCORM item workflow above.
+
+### Single-User Deployment Pass: 2026-09-30
+
+- [x] Fresh SCORM requests enforced production attribution validation; the representative `TestFrame` project was blocked with a clear `422` response until `UncySam2.png` attribution is completed.
+- [x] Previously recorded SCORM 1.2 and 2004 release archives still pass manifest completeness and profile runtime-token checks.
+- [ ] No new Blackboard SCORM 1.2 LMS session was available during this pass; external qualification remains open.

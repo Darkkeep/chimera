@@ -102,7 +102,7 @@ export function GoldenPathView({ project, onClose, onCreateProject, onOpenStoryb
           <div className="golden-path-step-copy"><div className="golden-path-step-heading"><h3>{step.title}</h3><span>{step.statusLabel}</span></div><p>{step.instructions}</p>{step.action && <button type="button" className="golden-path-action" onClick={step.action}>{step.actionLabel}<ChevronRight size={15} /></button>}</div>
         </li>)}
       </ol>
-      <footer className="golden-path-footer"><span>Local learner preview is available. SCORM package build is not implemented yet.</span></footer>
+      <footer className="golden-path-footer"><span>SCORM 2004 and 1.2 packages can be built. Blackboard verification is documented for SCORM 2004 only.</span></footer>
     </section>
   </div>;
 }

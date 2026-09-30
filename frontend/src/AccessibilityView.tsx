@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Accessibility, Check, Image as ImageIcon, X } from "lucide-react";
 import type { Asset, Project, Scene } from "./App";
+import { revisionConflictMessage, storyboardWriteHeaders } from "./revision";
 import "./accessibility.css";
 
 type AccessibilityViewProps = {
   projectId: string;
+  revision: number;
   scenes: Scene[];
   assets: Asset[];
   onClose: () => void;
@@ -13,7 +15,7 @@ type AccessibilityViewProps = {
 
 type ImageDraft = { altText: Record<string, string>; decorative: string[] };
 
-export function AccessibilityView({ projectId, scenes, assets, onClose, onProjectUpdated }: AccessibilityViewProps) {
+export function AccessibilityView({ projectId, revision, scenes, assets, onClose, onProjectUpdated }: AccessibilityViewProps) {
   const [drafts, setDrafts] = useState<Record<string, ImageDraft>>(() => Object.fromEntries(scenes.map((scene) => [scene.id, {
     altText: scene.imageAltText ?? {},
     decorative: scene.decorativeImages ?? [],
@@ -37,13 +39,13 @@ export function AccessibilityView({ projectId, scenes, assets, onClose, onProjec
     try {
       const response = await fetch(`/api/projects/${projectId}/scenes/${scene.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: storyboardWriteHeaders(revision),
         body: JSON.stringify({
           imageAltText: Object.fromEntries(Object.entries(draft.altText).filter(([, value]) => value.trim())),
           decorativeImages: draft.decorative,
         }),
       });
-      if (!response.ok) throw new Error("Image accessibility details could not be saved.");
+      if (!response.ok) throw new Error(revisionConflictMessage(response.status) || "Image accessibility details could not be saved.");
       onProjectUpdated(await response.json() as Project);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Image accessibility details could not be saved.");

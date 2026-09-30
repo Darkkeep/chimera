@@ -1,0 +1,242 @@
+{
+  "capturedAt": "2026-09-30T19:11:13.527Z",
+  "viewport": {
+    "width": 1500,
+    "height": 1400
+  },
+  "fixture": "isolated demonstration data; no live AI generation",
+  "screenshots": [
+    {
+      "file": "workspace.png",
+      "selector": ".app-shell"
+    },
+    {
+      "file": "project-controls.png",
+      "selector": ".sidebar-project"
+    },
+    {
+      "file": "top-actions.png",
+      "selector": ".top-actions"
+    },
+    {
+      "file": "scene-sequence.png",
+      "selector": ".scene-list"
+    },
+    {
+      "file": "appearance.png",
+      "selector": ".appearance-selector"
+    },
+    {
+      "file": "create-project.png",
+      "selector": "[role=dialog]"
+    },
+    {
+      "file": "review-tools.png",
+      "selector": "#review-tools"
+    },
+    {
+      "file": "scene-editor.png",
+      "selector": "[role=dialog]"
+    },
+    {
+      "file": "template-selection.png",
+      "selector": "[role=dialog]"
+    },
+    {
+      "file": "new-scene.png",
+      "selector": "[role=dialog]"
+    },
+    {
+      "file": "audio-requirement.png",
+      "selector": ".audio-requirement-setting"
+    },
+    {
+      "file": "completion-rules.png",
+      "selector": "[role=dialog]"
+    },
+    {
+      "file": "image-descriptions.png",
+      "selector": "[role=dialog]"
+    },
+    {
+      "file": "validation.png",
+      "selector": "[role=dialog]"
+    },
+    {
+      "file": "production-validation.png",
+      "selector": "[role=dialog]"
+    },
+    {
+      "file": "guided-review.png",
+      "selector": "[role=dialog]"
+    },
+    {
+      "file": "templates.png",
+      "selector": ".template-library"
+    },
+    {
+      "file": "template-details.png",
+      "selector": "[role=dialog]"
+    },
+    {
+      "file": "media-image-form.png",
+      "selector": ".generated-media-form"
+    },
+    {
+      "file": "media-narration-form.png",
+      "selector": ".generated-media-form"
+    },
+    {
+      "file": "candidate-review.png",
+      "selector": ".generated-candidate"
+    },
+    {
+      "file": "media-library.png",
+      "selector": ".media-library"
+    },
+    {
+      "file": "assessment-launch.png",
+      "selector": ".assessment-authoring-launch"
+    },
+    {
+      "file": "attach-media.png",
+      "selector": ".media-library"
+    },
+    {
+      "file": "assessment-actions.png",
+      "selector": ".assessment-editor-footer"
+    },
+    {
+      "file": "question-single-choice.png",
+      "selector": ".assessment-editor-dialog"
+    },
+    {
+      "file": "question-multiple-response.png",
+      "selector": ".assessment-editor-dialog"
+    },
+    {
+      "file": "question-true-false.png",
+      "selector": ".assessment-editor-dialog"
+    },
+    {
+      "file": "question-ordering.png",
+      "selector": ".assessment-editor-dialog"
+    },
+    {
+      "file": "question-drag-drop.png",
+      "selector": ".assessment-editor-dialog"
+    },
+    {
+      "file": "question-matching.png",
+      "selector": ".assessment-editor-dialog"
+    },
+    {
+      "file": "question-short-answer.png",
+      "selector": ".assessment-editor-dialog"
+    },
+    {
+      "file": "assessment-rules.png",
+      "selector": ".assessment-settings"
+    },
+    {
+      "file": "enhancement-form.png",
+      "selector": ".enhancement-submission"
+    },
+    {
+      "file": "submission-preview.png",
+      "selector": ".enhancement-submission-preview"
+    },
+    {
+      "file": "submission-actions.png",
+      "selector": ".enhancement-submit-actions"
+    },
+    {
+      "file": "enhancement-jobs.png",
+      "selector": ".enhancement-job-list"
+    },
+    {
+      "file": "proposal.png",
+      "selector": "semantic locator"
+    },
+    {
+      "file": "proposal-edit.png",
+      "selector": "semantic locator"
+    },
+    {
+      "file": "proposal-accepted.png",
+      "selector": "semantic locator"
+    },
+    {
+      "file": "preview-header.png",
+      "selector": ".course-preview-header"
+    },
+    {
+      "file": "preview-navigation.png",
+      "selector": ".course-preview-navigation"
+    },
+    {
+      "file": "scene-discussion.png",
+      "selector": ".course-preview-review"
+    },
+    {
+      "file": "resolved-thread.png",
+      "selector": ".course-preview-comment.resolved"
+    },
+    {
+      "file": "preview-audio.png",
+      "selector": ".course-preview-audio"
+    },
+    {
+      "file": "slide-transcript.png",
+      "selector": ".course-preview-transcript"
+    },
+    {
+      "file": "learner-question.png",
+      "selector": ".course-preview-assessment"
+    },
+    {
+      "file": "remediation.png",
+      "selector": ".course-preview-assessment"
+    },
+    {
+      "file": "return-question.png",
+      "selector": "semantic locator"
+    },
+    {
+      "file": "learner-result.png",
+      "selector": ".course-preview-assessment"
+    },
+    {
+      "file": "export-dialog.png",
+      "selector": "[role=dialog]"
+    },
+    {
+      "file": "scorm-export.png",
+      "selector": "semantic locator"
+    },
+    {
+      "file": "backup-controls.png",
+      "selector": "semantic locator"
+    },
+    {
+      "file": "word-export.png",
+      "selector": "semantic locator"
+    },
+    {
+      "file": "qti-test.png",
+      "selector": "semantic locator"
+    },
+    {
+      "file": "my-work.png",
+      "selector": ".management-view"
+    },
+    {
+      "file": "assessment-create.png",
+      "selector": ".assessment-authoring-launch"
+    },
+    {
+      "file": "validation-issues.png",
+      "selector": ".validation-dialog"
+    }
+  ]
+}
