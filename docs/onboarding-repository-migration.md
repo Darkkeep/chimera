@@ -29,11 +29,15 @@ Upstream validation after a fresh `npm ci`: 11 engine checks, strict exported-de
 
 Both upstream GitHub Linux CI runs passed: [main](https://github.com/Darkkeep/onboarding/actions/runs/37333718732) and [release tag](https://github.com/Darkkeep/onboarding/actions/runs/37333882740).
 
-Chimera artifact checksum/export verification and production build passed. Final application browser and clean-checkout results are recorded below after cutover validation.
+Chimera artifact checksum/export verification, production build and all 81 retained browser checks passed across Chromium, Firefox and WebKit. After removing the local package/demo sources, a clean detached worktree at `effa1eb` installed both dependency trees with `npm ci`, passed artifact verification and the production build, and passed all 81 browser checks again using the committed backend (excluding the unrelated working-tree storage edits). This verifies the consumer without a sibling package checkout. The clean worktree and isolated fixture outputs remain under ignored `workspace/onboarding-extraction/` for diagnosis.
+
+An explicit upgrade check wrote paused progress with the baseline `0.1.0` engine and resumed/completed it using the installed `0.1.1` artifact without changing storage keys. The published release download checksum also matched the vendored bytes.
+
+The Chimera migration is pushed as [draft PR #1](https://github.com/Darkkeep/chimera/pull/1); its Linux consumer [CI run](https://github.com/Darkkeep/chimera/actions/runs/37334739347) independently verifies the committed application. The PR remains unmerged.
 
 ## Rollback and future updates
 
-Revert the focused artifact-cutover commit to restore the source package/demo, old dependency and mixed test configuration. The preceding `57ddc76` baseline includes the local frontend dependency. Do not revert the baseline application integration or alter progress keys to repair packaging. Keep the upstream release available.
+Revert the focused artifact-cutover commit `effa1eb` to restore the source package/demo, old dependency and mixed test configuration. The preceding `57ddc76` baseline includes the local frontend dependency. Do not revert the baseline application integration or alter progress keys to repair packaging. Keep the upstream release available.
 
 Future changes originate upstream, release as a new version, and enter Chimera through a focused artifact/manifest/lockfile update with consumer verification. Do not modify the vendored tarball or install a mutable branch.
 
