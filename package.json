@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test:onboarding": "playwright test --config playwright.onboarding.config.cjs",
-    "test:onboarding:core": "node --test packages/onboarding/test/*.test.js"
+    "verify:onboarding:artifact": "node vendor/onboarding/verify.cjs"
   },
   "repository": {
     "type": "git",
@@ -25,10 +25,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "1.59.1",
-    "@types/node": "^26.6.4"
-  },
-  "workspaces": [
-    "packages/onboarding",
-    "examples/onboarding-demo"
-  ]
+    "@types/node": "^26.6.4",
+    "@guided-workflows/onboarding": "file:vendor/onboarding/guided-workflows-onboarding-0.1.1.tgz"
+  }
 }

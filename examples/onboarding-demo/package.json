@@ -1,8 +1,0 @@
-{
-  "name": "onboarding-task-demo",
-  "private": true,
-  "version": "0.1.0",
-  "type": "module",
-  "dependencies": { "@guided-workflows/onboarding": "file:../../packages/onboarding" },
-  "scripts": { "dev": "node ../../frontend/node_modules/vite/bin/vite.js --config vite.config.mjs" }
-}

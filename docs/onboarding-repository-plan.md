@@ -2,6 +2,8 @@
 
 Prepared 2026-10-05. Planning only; this document does not create a repository, move code, publish a package, or change dependencies.
 
+Implementation is recorded in the [migration record](onboarding-repository-migration.md). This document preserves the original plan; the user subsequently authorized implementation using these defaults.
+
 ## Proposed outcome
 
 Create `Darkkeep/onboarding` as the independent home of `@guided-workflows/onboarding`. Treat the owner and repository name as proposed until implementation. Preserve the package name and its existing exports so consumers need only change how they install it.

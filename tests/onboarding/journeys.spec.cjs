@@ -71,34 +71,7 @@ test('guide controls participate in modal keyboard navigation and pass scoped ax
   await page.screenshot({ path: test.info().outputPath('chimera-guide-dark.png') });
 });
 
-test('standalone vanilla application uses the same engine for create, edit, complete', async ({ page }) => {
-  await page.goto('http://127.0.0.1:5188');
-  await page.getByRole('button', { name: 'Start / resume walkthrough' }).click();
-  await expectStep(page, 'Create a task');
-  await page.getByRole('textbox', { name: 'TITLE', exact: true }).fill('Write the introduction');
-  await page.getByRole('button', { name: 'Create task →' }).click();
-  await expectStep(page, 'Refine the title');
-  await page.getByRole('textbox', { name: 'Edit title for Write the introduction' }).fill('Review the introduction');
-  await page.getByRole('button', { name: 'Save title' }).click();
-  await expectStep(page, 'Mark it complete');
-  await page.getByRole('button', { name: 'Mark complete' }).click();
-  await expectStep(page, 'Walkthrough complete');
-  await page.reload(); await expect(page.getByRole('button', { name: 'Completed', exact: true })).toBeVisible();
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('task-demo.items'))[0].done)).toBe(true);
-});
 
-test('standalone progress resumes and skipped steps remain incomplete', async ({ page }) => {
-  await page.goto('http://127.0.0.1:5188');
-  await page.getByRole('button', { name: 'Start / resume walkthrough' }).click();
-  await expectStep(page, 'Create a task');
-  await page.getByRole('textbox', { name: 'TITLE', exact: true }).fill('Practice');
-  await page.getByRole('button', { name: 'Create task →' }).click(); await expectStep(page, 'Refine the title');
-  await page.reload(); await expect(guide(page)).toHaveCount(0);
-  await page.getByRole('button', { name: 'Start / resume walkthrough' }).click(); await expectStep(page, 'Refine the title');
-  await guide(page).getByRole('button', { name: 'Skip step' }).click(); await expectStep(page, 'Mark it complete');
-  await guide(page).getByRole('button', { name: 'Skip step' }).click(); await expectStep(page, 'Walkthrough ended');
-  await expect(guide(page)).toContainText('2 step(s) skipped');
-});
 
 test('manually created projects do not inherit completed walkthroughs', async ({ page }) => {
   await startChimera(page); await createProject(page, unique('Completed project'));
@@ -109,13 +82,4 @@ test('manually created projects do not inherit completed walkthroughs', async ({
   await page.getByRole('dialog').getByRole('button', { name: 'Create project', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0); await expect(guide(page)).toHaveCount(0);
   await page.getByRole('button', { name: 'Start / resume walkthrough' }).click(); await expectStep(page, 'Create a scene');
-});
-
-test('standalone guide remains usable in a narrow window with reduced motion', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 }); await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('http://127.0.0.1:5188'); await page.getByRole('button', { name: 'Start / resume walkthrough' }).click();
-  await expectStep(page, 'Create a task');
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  await page.screenshot({ path: test.info().outputPath('demo-narrow.png'), fullPage: true });
 });

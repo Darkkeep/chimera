@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@guided-workflows/onboarding": "file:../packages/onboarding",
+    "@guided-workflows/onboarding": "file:../vendor/onboarding/guided-workflows-onboarding-0.1.1.tgz",
     "@vitejs/plugin-react": "latest",
     "lucide-react": "latest",
     "react": "latest",

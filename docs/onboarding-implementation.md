@@ -1,27 +1,21 @@
 # Reusable onboarding implementation
 
-For the proposed independent GitHub repository, see the [repository extraction plan](onboarding-repository-plan.md).
+The reusable package now lives in the private [Darkkeep/onboarding repository](https://github.com/Darkkeep/onboarding). See the [repository extraction plan](onboarding-repository-plan.md) and [migration record](onboarding-repository-migration.md).
 
 The first implementation consists of a headless package, a shared DOM renderer and Playwright helpers, and two application adapters. The package imports neither React nor Chimera. It remains private and unpublished.
 
 | Deliverable | Location | Journey |
 | --- | --- | --- |
-| Engine, declarations, renderer, test helpers, adapter contract | `packages/onboarding/` | Scoped outcomes, explicit skips, abortable preparation, versioned local progress, recovery |
+| Engine, declarations, renderer, test helpers, adapter contract | [Darkkeep/onboarding](https://github.com/Darkkeep/onboarding) | Scoped outcomes, explicit skips, abortable preparation, versioned local progress, recovery |
 | Chimera integration | `frontend/src/onboarding.ts`, `App.tsx`, `EditorDialog.tsx` | Create/select project → create and save scene → acknowledge review |
-| Independent vanilla JavaScript application | `examples/onboarding-demo/` | Create task → save edited title → persist completion |
-| Browser checks and isolated server fixtures | `tests/onboarding/`, `playwright.onboarding.config.cjs` | Both journeys and recovery cases |
+| Independent vanilla JavaScript application | [upstream task demo](https://github.com/Darkkeep/onboarding/tree/main/examples/onboarding-demo) | Create task → save edited title → persist completion |
+| Chimera browser checks and isolated server fixtures | `tests/onboarding/`, `playwright.onboarding.config.cjs` | Application journeys and recovery cases; standalone checks run upstream |
 
 ## Try the walkthroughs
 
 Install root dependencies with `npm ci`, then frontend dependencies with `npm ci --prefix frontend`. Start Chimera normally using the root README. Choose **Start / resume walkthrough** in the sidebar or in **Review tools → Guided review**. Existing projects start at scene creation; an empty workspace starts with project creation. Saves create real authored content. Restarting the guide adds another practice scene rather than resetting the project.
 
-For the independent demo, run from the repository root:
-
-```powershell
-node frontend/node_modules/vite/bin/vite.js --config examples/onboarding-demo/vite.config.mjs
-```
-
-Open `http://127.0.0.1:5188`. The demo has no Chimera API dependency; tasks and practice progress remain in that browser's local storage.
+The independent demo now lives in [Darkkeep/onboarding](https://github.com/Darkkeep/onboarding). In that repository, run `npm ci` and `npm run dev`, then open `http://127.0.0.1:5188`. It requires no Chimera checkout or API. Chimera installs the private `0.1.1` release tarball from `vendor/onboarding`; see its [provenance and update instructions](../vendor/onboarding/README.md).
 
 ## Walkthrough catalog
 
@@ -52,11 +46,11 @@ Install backend requirements into your active Python environment. The browser fi
 
 ```powershell
 npx playwright install chromium firefox webkit
-npm run test:onboarding:core
+npm run verify:onboarding:artifact
 npm run test:onboarding
 ```
 
-The test runner starts frontend services at 5187 and 5188 and the API at 8027. Those ports must be free. It refuses to reuse an existing service. Each run creates a fresh directory under `workspace/onboarding-tests/run-*`, keeps it for diagnosis, and clears AI-provider settings. Each test writes uniquely named projects; the initial empty project selector is mocked, while project and scene saves hit the real isolated API.
+The test runner starts the frontend service at 5187 and the API at 8027. Those ports must be free. It refuses to reuse an existing service. Each run creates a fresh directory under `workspace/onboarding-tests/run-*`, keeps it for diagnosis, and clears AI-provider settings. Each test writes uniquely named projects; the initial empty project selector is mocked, while project and scene saves hit the real isolated API.
 
 For this workspace's existing documentation browser cache:
 
@@ -79,7 +73,7 @@ Driver.js was removed after browser failures showed blocked form controls and a 
 
 ## Acceptance boundaries
 
-Verification on 2026-10-05: **24 browser checks passed** (eight scenarios in Chromium, Firefox, and WebKit), **11 engine checks passed**, and the frontend TypeScript/production build passed. The engine regression checks include keeping skipped journeys finished across start/reload until an explicit restart. The package tarball was installed into a separate consumer directory; headless completion and the DOM-module import passed without application imports or runtime dependencies. The portable artifact is `workspace/onboarding-package/guided-workflows-onboarding-0.1.0.tgz` (ignored local output; regenerate with `npm pack`).
+Verification on 2026-10-05: **24 browser checks passed** (eight scenarios in Chromium, Firefox, and WebKit), **11 engine checks passed**, and the frontend TypeScript/production build passed. The engine regression checks include keeping skipped journeys finished across start/reload until an explicit restart. Before extraction, the package tarball was installed into a separate consumer directory; headless completion and the DOM-module import passed without application imports or runtime dependencies. The current portable artifact is the versioned upstream `0.1.1` release, vendored in `vendor/onboarding`. Library tests and standalone-demo browser checks now run upstream; Chimera retains adapter and catalog browser checks.
 
 Screenshots from isolated Chromium fixtures: [Light guide](onboarding/images/chimera-guide.png), [Dark guide](onboarding/images/chimera-guide-dark.png), and [narrow standalone demo](onboarding/images/demo-narrow.png). They contain demonstration data only.
 

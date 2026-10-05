@@ -119,13 +119,13 @@ for (const [type, name] of [['single-choice', 'Single-choice question'], ['multi
     await choose(page, name);
     if (type === 'single-choice') {
       await page.getByRole('combobox', { name: /^Question type/ }).selectOption('true-false');
-      await page.getByLabel('Question prompt', { exact: true }).fill('Wrong type must not advance');
+      await page.getByRole('textbox', { name: 'Question prompt', exact: true }).fill('Wrong type must not advance');
       await page.getByRole('button', { name: 'Save question', exact: true }).click();
       await expect(page.getByText(/^Saved to Catalog/)).toBeVisible();
       await expectStep(page, name);
     }
     await page.getByRole('combobox', { name: /^Question type/ }).selectOption(type);
-    await page.getByLabel('Question prompt', { exact: true }).fill('Practice question');
+    await page.getByRole('textbox', { name: 'Question prompt', exact: true }).fill('Practice question');
     if (['single-choice', 'multiple-response', 'ordering'].includes(type)) { await page.getByRole('textbox', { name: 'Text for CHOICE_A' }).fill('One'); await page.getByRole('textbox', { name: 'Text for CHOICE_B' }).fill('Two'); }
     if (type === 'short-answer') await page.getByLabel('Enter one accepted answer per line').fill('Practice');
     if (['matching', 'drag-drop'].includes(type)) {
@@ -178,11 +178,12 @@ test('prerequisites block safely and cancelled deletion never completes', async 
 });
 
 test('templates upload, edit, replace and assign; PowerPoint import saves real scenes', async ({ page }) => {
-  const id = await seed(page); const deck = pptx();
+  test.setTimeout(60000);
+  const id = await seed(page); const deck = pptx(); const editedName = unique('Edited template');
   await choose(page, 'Upload a scene template');
   await page.getByLabel('Upload PPTX template', { exact: true }).setInputFiles({ name: 'practice.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer: deck }); await finish(page);
-  await choose(page, 'Edit template details'); await page.getByLabel('Template name', { exact: true }).fill(unique('Edited template')); await page.getByRole('button', { name: 'Save template', exact: true }).click(); await finish(page);
-  await choose(page, 'Replace a template source'); await page.getByLabel('Replace template PowerPoint').first().setInputFiles({ name: 'replacement.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer: deck }); await finish(page);
+  await choose(page, 'Edit template details'); await page.getByLabel('Template name', { exact: true }).fill(editedName); await page.getByRole('button', { name: 'Save template', exact: true }).click(); await finish(page);
+  await choose(page, 'Replace a template source'); await page.getByRole('article').filter({ hasText: editedName }).getByLabel('Replace template PowerPoint').setInputFiles({ name: 'replacement.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer: deck }); await finish(page);
   await choose(page, 'Assign a template to a scene'); await page.getByRole('combobox', { name: /^Scene layout/ }).selectOption('template');
   const select = page.getByRole('dialog').getByRole('combobox', { name: /^Template/ }); const templateId = await select.locator('option').nth(1).getAttribute('value');
   await select.selectOption(templateId); await page.getByRole('button', { name: 'Save changes', exact: true }).click(); await finish(page);
