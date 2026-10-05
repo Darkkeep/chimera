@@ -1,0 +1,18 @@
+/* Semantic adaptation of 12ui's A.html: cream canvas, 385px guide rail, wide task form. */
+* { box-sizing: border-box; } body { margin: 0; background: #f8f7f4; color: #12212b; font: 16px/1.55 system-ui, sans-serif; }
+.demo-layout { max-width: 1536px; padding: 48px 36px; margin: auto; display: grid; grid-template-columns: 385px minmax(0, 820px); gap: 55px; }
+#guide-rail { background: #f6f5f1; border: 1px solid #e4e3df; border-radius: 13px; padding: 32px; min-height: 730px; }
+.rail-label, .eyebrow { color: #50572c; font-size: 12px; font-weight: 600; letter-spacing: 1px; }
+h1, #guide-rail h2 { font-family: Georgia, serif; font-weight: 500; letter-spacing: -1px; } h1 { font-size: clamp(32px, 3.5vw, 48px); margin: 18px 0; line-height: 1.15; }
+#guide-rail h2 { font-size: 32px; line-height: 1.2; margin-top: 35px; } header { margin: 32px 0 52px; } header > p:last-child { color: #62696d; max-width: 575px; }
+label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .8px; margin: 30px 0 14px; color: #62696d; }
+input, textarea { background: transparent; width: 100%; padding: 17px; border: 1px solid #d8d9d5; border-radius: 12px; font: inherit; color: inherit; } textarea { resize: vertical; }
+textarea { background: url('../assets/resize-grip.png') no-repeat right 5px bottom 5px / 12px 12px; }
+.rail-label { color: #252b2c; font-size: 15px; letter-spacing: 0; }
+.eyebrow { font-weight: 700; }
+button { background: #50572c; color: white; padding: 15px 22px; border: 1px solid #50572c; border-radius: 9px; font: 600 14px system-ui, sans-serif; cursor: pointer; } button:disabled { opacity: .6; cursor: wait; }
+:focus-visible { outline: 3px solid #207c70; outline-offset: 3px; } .form-actions { display: flex; justify-content: end; margin-top: 30px; }
+.task-row { border-top: 1px solid #d8d9d5; padding: 20px 0; display: grid; gap: 12px; } .task-row h3, .task-row p { margin: 0; } .task-row form { display: flex; gap: 12px; } .task-row button { width: fit-content; }
+#guide-rail > .onboarding-card { position: relative; inset: auto; width: 100%; padding: 20px 0; margin-top: 28px; border: 0; border-top: 1px solid #d8d9d5; border-radius: 0; box-shadow: none; }
+#notice { color: #50572c; } @media(max-width: 1000px) { .demo-layout { grid-template-columns: 300px minmax(0, 1fr); gap: 28px; padding: 28px; } }
+@media(max-width: 700px) { .demo-layout { display: flex; flex-direction: column; padding: 20px; gap: 20px; } #guide-rail { min-height: 0; padding: 20px; } header { margin: 20px 0; } .task-row form { flex-wrap: wrap; } }

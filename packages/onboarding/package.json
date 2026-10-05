@@ -1,0 +1,16 @@
+{
+  "name": "@guided-workflows/onboarding",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "license": "ISC",
+  "files": ["src", "testing", "README.md"],
+  "peerDependencies": { "@playwright/test": ">=1.59.1 <2" },
+  "peerDependenciesMeta": { "@playwright/test": { "optional": true } },
+  "exports": {
+    ".": { "types": "./src/core.d.ts", "import": "./src/core.js" },
+    "./dom": { "types": "./src/dom.d.ts", "import": "./src/dom.js" },
+    "./style.css": "./src/style.css",
+    "./playwright": { "types": "./testing/playwright.d.ts", "require": "./testing/playwright.cjs", "default": "./testing/playwright.cjs" }
+  }
+}
