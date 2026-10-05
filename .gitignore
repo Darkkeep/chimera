@@ -9,3 +9,11 @@ frontend/tsconfig.tsbuildinfo
 
 # 12ui improve kits: candidates, captures and targets are not source
 .improve/
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

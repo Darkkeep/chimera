@@ -38,7 +38,7 @@ export function AppearanceSelector() {
     };
   }, [preference]);
 
-  return <fieldset className="appearance-selector">
+  return <fieldset data-onboarding="workspace.appearance" className="appearance-selector">
     <legend>Appearance</legend>
     <div className="appearance-options">
       {([{ value: "light", label: "Light", Icon: Sun }, { value: "dark", label: "Dark", Icon: Moon }, { value: "system", label: "System", Icon: Monitor }] as const).map(({ value, label, Icon }) =>
