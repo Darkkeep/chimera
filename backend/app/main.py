@@ -8,6 +8,8 @@ from typing import Annotated, Literal
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
 from PIL import Image, UnidentifiedImageError
 from pptx import Presentation
 
@@ -26,13 +28,20 @@ from .scorm import persist_scorm_12_build, persist_scorm_build, read_scorm_repor
 from .storage import ROOT, EnhancementProposalConflict, StoryboardRevisionConflict, add_project_asset, add_review_reply, approve_generated_candidate, create_enhancement_job, create_enhancement_proposal, create_media_generation_job, create_project, create_review_comment, create_scene, create_template, decide_enhancement_proposal, decide_review_comment, delete_scene, list_enhancement_jobs, list_enhancement_proposals, list_generated_candidates, list_media_generation_jobs, list_projects, list_reference_resources, list_review_comments, list_templates, project_path, read_enhancement_job, read_generated_candidate, read_media_generation_job, read_project, persist_imported_assets, persist_slide_previews, reorder_scenes, replace_storyboard, replace_template_source, save_reference_resource, slugify, storyboard_transaction, update_from_import, update_project_asset_attribution, update_project_completion_settings, update_project_export_settings, update_generated_candidate, update_media_generation_job, update_scene, update_template
 from .validation import validate_project
 from .word_export import DOCX_MEDIA_TYPE, build_storyboard_docx
+from .deployment import cors_origins, installation_policy
+from .password_auth import AccountStore, COOKIE, LoginRequest, SESSION_SECONDS, require_origin
 
 
 def get_authorization_policy() -> RoleBasedAuthorizationPolicy:
-    return RoleBasedAuthorizationPolicy(LocalIdentityDirectory(ROOT))
+    directory = LocalIdentityDirectory(ROOT)
+    if installation_policy(directory).identityProvider == "builtin":
+        return RoleBasedAuthorizationPolicy(AccountStore(ROOT))
+    return RoleBasedAuthorizationPolicy(directory)
 
 
 def _request_action(request: Request) -> str:
+    if request.url.path.endswith("/management/audit"):
+        return "admin.audit.view"
     if request.method == "GET":
         return "project.view"
     path = request.url.path
@@ -85,18 +94,37 @@ def _request_action(request: Request) -> str:
 
 def _require_request_access(
     request: Request,
-    context: Annotated[ActorContext, Depends(resolve_actor_context)],
     policy: Annotated[AuthorizationPolicy, Depends(get_authorization_policy)],
 ) -> None:
+    if request.url.path in {"/api/health", "/api/auth/config", "/api/auth/login", "/api/auth/logout"}:
+        return
+    context = resolve_actor_context(request)
     action = _request_action(request)
     project_id = request.path_params.get("project_id")
     _require_action(policy, context, action, project_id)
 
 
 app = FastAPI(title="Chimera API", version="0.1.0", dependencies=[Depends(_require_request_access)])
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request: Request, error: RequestValidationError):
+    if request.url.path == "/api/auth/login":
+        return JSONResponse({"detail": "Provide an email and a password of at most 1024 characters"}, status_code=422, headers={"Cache-Control": "no-store"})
+    return await request_validation_exception_handler(request, error)
+
+
+@app.middleware("http")
+async def private_response_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -153,19 +181,59 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _password_store() -> AccountStore:
+    if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider != "builtin":
+        raise HTTPException(404, "Password sign-in is not enabled")
+    return AccountStore(ROOT)
+
+
+@app.get("/api/auth/config")
+def auth_config() -> dict[str, str | bool]:
+    selected = installation_policy(LocalIdentityDirectory(ROOT))
+    return {"deploymentMode": selected.deploymentMode, "identityProvider": selected.identityProvider,
+        "passwordLoginAvailable": selected.identityProvider == "builtin"}
+
+
+@app.post("/api/auth/login")
+def login(data: LoginRequest, request: Request) -> JSONResponse:
+    store = _password_store()
+    require_origin(request)
+    token = store.login(data.email, data.password.get_secret_value(), request.client.host if request.client else "unknown", request.cookies.get(COOKIE))
+    response = JSONResponse({"authenticated": True}, headers={"Cache-Control": "no-store"})
+    response.set_cookie(COOKIE, token, max_age=SESSION_SECONDS, httponly=True, secure=True, samesite="strict", path="/")
+    return response
+
+
+@app.post("/api/auth/logout")
+def logout(request: Request) -> JSONResponse:
+    store = _password_store()
+    require_origin(request)
+    store.logout(request.cookies.get(COOKIE))
+    response = JSONResponse({"authenticated": False}, headers={"Cache-Control": "no-store"})
+    response.delete_cookie(COOKIE, path="/", secure=True, httponly=True, samesite="strict")
+    return response
+
+
 @app.get("/api/identity/context", response_model=IdentitySnapshot)
-def get_identity_context() -> IdentitySnapshot:
-    return LocalIdentityDirectory(ROOT).snapshot()
+def get_identity_context(context: Annotated[ActorContext, Depends(resolve_actor_context)]) -> IdentitySnapshot:
+    snapshot = LocalIdentityDirectory(ROOT).snapshot()
+    policy = installation_policy(LocalIdentityDirectory(ROOT))
+    if policy.identityProvider == "builtin":
+        from .identity import Membership, TeamRecord, UserRecord
+        return IdentitySnapshot(actor=context, user=UserRecord(id=context.actorId, displayName=context.actorDisplayName),
+            teams=[TeamRecord(id=context.installationId, name="Hosted workspace")],
+            memberships=[Membership(userId=context.actorId, teamId=context.installationId, role=role) for role in sorted(AccountStore(ROOT).roles_for(context.actorId))], policy=policy)
+    return snapshot
 
 
 @app.get("/api/identity/policy", response_model=OrganizationPolicy)
 def get_identity_policy() -> OrganizationPolicy:
-    return LocalIdentityDirectory(ROOT).policy()
+    return installation_policy(LocalIdentityDirectory(ROOT))
 
 
 @app.get("/api/installation/config", response_model=OrganizationPolicy)
 def get_installation_config() -> OrganizationPolicy:
-    return LocalIdentityDirectory(ROOT).policy()
+    return installation_policy(LocalIdentityDirectory(ROOT))
 
 
 @app.patch("/api/identity/policy", response_model=OrganizationPolicy)
@@ -175,6 +243,8 @@ def patch_identity_policy(
     policy: Annotated[AuthorizationPolicy | None, Depends(get_authorization_policy)] = None,
 ) -> OrganizationPolicy:
     actor = context or LOCAL_ACTOR
+    if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider == "builtin":
+        raise HTTPException(409, "Hosted installation choices are operator-managed")
     _require_action(policy or get_authorization_policy(), actor, "admin.policy.manage")
     return LocalIdentityDirectory(ROOT).update_policy(policy_data)
 

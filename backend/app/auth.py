@@ -5,6 +5,7 @@ from fastapi import HTTPException, Request
 
 from .identity import IdentityDirectory, LocalIdentityDirectory
 from .platform import ActorContext
+from .deployment import installation_policy
 
 
 class IdentityProvider(Protocol):
@@ -35,13 +36,27 @@ class LocalIdentityProvider:
         return self.directory.snapshot().actor
 
 
+class UnconfiguredIdentityProvider:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def resolve(self, request: Request) -> ActorContext:
+        raise RuntimeError(f"{self.name} identity validation is not implemented for this deployment")
+
+
 def get_identity_provider() -> IdentityProvider:
     from .storage import ROOT
 
     directory = LocalIdentityDirectory(ROOT)
-    if directory.policy().identityProvider == "encarta":
+    selected = installation_policy(directory)
+    if selected.identityProvider == "encarta":
         return EncartaIdentityProvider(directory)
-    return LocalIdentityProvider(directory)
+    if selected.identityProvider == "builtin":
+        from .password_auth import AccountStore, PasswordIdentityProvider
+        return PasswordIdentityProvider(AccountStore(ROOT))
+    if selected.identityProvider == "local" and selected.deploymentMode == "single-user":
+        return LocalIdentityProvider(directory)
+    return UnconfiguredIdentityProvider(selected.identityProvider)
 
 
 def resolve_actor_context(request: Request) -> ActorContext:

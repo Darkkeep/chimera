@@ -1,5 +1,7 @@
 # Chimera backend
 
+Authentication profiles and built-in hosted sign-in/session APIs are documented in the [deployment guide](../docs/authentication-deployments.md). Set `CHIMERA_DEPLOYMENT_PROFILE=darkrogue` for the password-authentication backend foundation, or `encarta` for the intentionally disabled integration profile. Unimplemented providers never fall back to local identity. Hosted frontend login and project-scoped membership remain follow-up work.
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1

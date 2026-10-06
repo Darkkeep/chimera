@@ -14,6 +14,8 @@ Onboarding's reusable engine and standalone demo live in the private [Darkkeep/o
 
 ## Start locally
 
+For local, Encarta, and darkrogue.io authentication preparation, see the [deployment authentication guide](docs/authentication-deployments.md). Local single-user operation remains the default; hosted profiles use separate workspaces.
+
 ### Backend
 
 Install Python 3.11+ and run:
