@@ -16,10 +16,18 @@
   overflow-y: auto;
 }
 
+.assessment-editor-dialog > .onboarding-card {
+  inset: auto auto 20px 20px;
+}
+
 @media (max-width: 600px) {
   [role="dialog"] > .onboarding-card {
     inset: auto 16px 16px auto;
     width: calc(100vw - 32px);
     padding: 16px;
+  }
+
+  .assessment-editor-dialog > .onboarding-card {
+    inset: auto auto 16px 16px;
   }
 }
