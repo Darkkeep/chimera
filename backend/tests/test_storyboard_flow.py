@@ -1,5 +1,6 @@
 import base64
 from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 import hashlib
 import io
 import json
@@ -79,6 +80,25 @@ def make_presentation() -> bytes:
 
 
 class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
+    def test_project_read_waits_for_storyboard_write_transaction(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Concurrent read"))
+        read_started = Event()
+        read_finished = Event()
+
+        def read():
+            read_started.set()
+            result = storage.read_project(project.id)
+            read_finished.set()
+            return result
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with storage.storyboard_transaction():
+                pending = executor.submit(read)
+                self.assertTrue(read_started.wait(timeout=2))
+                self.assertFalse(read_finished.wait(timeout=0.05))
+                storage.create_scene(project.id, SceneCreate(title="Saved while read waits"), expected_revision=project.storyboard.revision)
+            self.assertEqual(pending.result(timeout=2).storyboard.scenes[0].title, "Saved while read waits")
+
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.original_root = storage.ROOT

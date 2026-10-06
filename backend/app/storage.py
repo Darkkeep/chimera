@@ -187,19 +187,21 @@ def append_platform_event(project_id: str, event_name: str, metadata: dict[str, 
 
 
 def read_project(project_id: str) -> ProjectDetail:
-    path = project_path(project_id)
-    project_file = path / "project.json"
-    storyboard_file = path / "storyboard.json"
-    if not project_file.exists() or not storyboard_file.exists():
-        raise FileNotFoundError(project_id)
-    metadata = json.loads(project_file.read_text(encoding="utf-8"))
-    storyboard = Storyboard.model_validate(json.loads(storyboard_file.read_text(encoding="utf-8")))
-    return ProjectDetail(
-        **metadata,
-        sceneCount=len(storyboard.scenes),
-        hasSourceDeck=any((path / "original").iterdir()),
-        storyboard=storyboard,
-    )
+    # Windows readers must close their handles before an atomic replacement.
+    with _storyboard_write_lock:
+        path = project_path(project_id)
+        project_file = path / "project.json"
+        storyboard_file = path / "storyboard.json"
+        if not project_file.exists() or not storyboard_file.exists():
+            raise FileNotFoundError(project_id)
+        metadata = json.loads(project_file.read_text(encoding="utf-8"))
+        storyboard = Storyboard.model_validate(json.loads(storyboard_file.read_text(encoding="utf-8")))
+        return ProjectDetail(
+            **metadata,
+            sceneCount=len(storyboard.scenes),
+            hasSourceDeck=any((path / "original").iterdir()),
+            storyboard=storyboard,
+        )
 
 
 def write_project_metadata(path: Path, metadata: dict[str, str]) -> None:
