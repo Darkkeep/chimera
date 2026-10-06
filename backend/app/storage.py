@@ -15,7 +15,7 @@ from threading import RLock, local
 from typing import Iterator, Literal
 from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalChange, EnhancementProposalChangeCreate, EnhancementProposalCreate, EnhancementProposalDecisionRecord, ExportSettings, ExtractedAsset, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, ReferencePassage, ReferenceResource, ReferenceResourceVersion, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewCommentReply, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate
 ROOT = Path(os.environ.get("CHIMERA_WORKSPACE", Path(__file__).resolve().parents[2] / "workspace"))
-from .platform import DurableEventSink, LOCAL_ACTOR, ActorContext, PlatformEvent
+from .platform import DurableEventSink, LOCAL_ACTOR, ActorContext, PlatformEvent, get_actor_context
 PROJECTS = ROOT / "projects"
 _storyboard_write_lock = RLock()
 _storyboard_transaction_state = local()
@@ -174,7 +174,8 @@ def ensure_project_dirs(path: Path) -> None:
         (path / name).mkdir(parents=True, exist_ok=True)
 
 
-def append_platform_event(project_id: str, event_name: str, metadata: dict[str, str | int | float | bool | None] | None = None, context: ActorContext = LOCAL_ACTOR) -> None:
+def append_platform_event(project_id: str, event_name: str, metadata: dict[str, str | int | float | bool | None] | None = None, context: ActorContext | None = None) -> None:
+    context = context or get_actor_context()
     event = PlatformEvent(
         eventName=event_name,
         installationId=context.installationId,

@@ -10,10 +10,32 @@ from fastapi.testclient import TestClient
 from backend.app import main, storage
 from backend.app.auth import get_identity_provider
 from backend.app.identity import LocalIdentityDirectory, OrganizationPolicy
+from backend.app.models import ProjectCreate
 from backend.app.password_auth import AccountStore, COOKIE, token_digest
 
 
 class PasswordAuthTests(unittest.TestCase):
+    def test_atomic_account_write_retries_transient_lock(self):
+        replace = Path.replace
+        attempts = []
+        def briefly_locked(source, target):
+            attempts.append(source)
+            if len(attempts) == 1:
+                raise PermissionError("temporary scanner lock")
+            return replace(source, target)
+        with patch.object(Path, "replace", briefly_locked):
+            self.store._write(self.store._read())
+        self.assertEqual(len(attempts), 2)
+        self.assertEqual(list(self.store.path.parent.glob(".accounts-*.tmp")), [])
+
+    def test_failed_atomic_write_preserves_accounts_and_cleans_temporary(self):
+        original = self.store.path.read_bytes()
+        with patch.object(Path, "replace", side_effect=PermissionError("locked")), patch("backend.app.password_auth.time.sleep"):
+            with self.assertRaises(PermissionError):
+                self.store._write({})
+        self.assertEqual(self.store.path.read_bytes(), original)
+        self.assertEqual(list(self.store.path.parent.glob(".accounts-*.tmp")), [])
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
@@ -88,10 +110,11 @@ class PasswordAuthTests(unittest.TestCase):
         self.store._write(data)
         self.assertEqual(self.client.get("/api/projects").status_code, 401)
 
-    def test_non_admin_account_cannot_access_projects_yet(self):
+    def test_unassigned_reviewer_sees_no_projects(self):
         self.store.provision("reviewer@example.com", self.password, "Reviewer", ["reviewer"])
         self.client.post("/api/auth/login", json={"email": "reviewer@example.com", "password": self.password}, headers=self.origin)
-        self.assertEqual(self.client.get("/api/projects").status_code, 403)
+        self.assertEqual(self.client.get("/api/projects").json(), [])
+        self.assertEqual(self.client.get("/api/accounts").status_code, 403)
 
     def test_hosted_profile_cannot_be_downgraded_from_api(self):
         self.login()
@@ -108,6 +131,99 @@ class PasswordAuthTests(unittest.TestCase):
         response = self.client.get("/api/auth/config")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"deploymentMode": "team", "identityProvider": "builtin", "passwordLoginAvailable": True})
+
+    def test_project_membership_scopes_reads_and_reviewer_writes(self):
+        self.login()
+        project = self.client.post("/api/projects", json={"title": "Assigned"}, headers=self.origin).json()
+        other = self.client.post("/api/projects", json={"title": "Other"}, headers=self.origin).json()
+        scene = self.client.post(f'/api/projects/{project["id"]}/scenes', json={"title": "Review this"}, headers=self.origin).json()["storyboard"]["scenes"][0]
+        reviewer = self.store.provision("reviewer@example.com", self.password, "Real Reviewer", ["reviewer"])
+        response = self.client.post(f'/api/projects/{project["id"]}/members', json={"userId": reviewer, "role": "reviewer"}, headers=self.origin)
+        self.assertEqual(response.status_code, 201)
+        self.client.post("/api/auth/login", json={"email": "reviewer@example.com", "password": self.password}, headers=self.origin)
+        self.assertEqual([p["id"] for p in self.client.get("/api/projects").json()], [project["id"]])
+        self.assertEqual(self.client.get(f'/api/projects/{other["id"]}').status_code, 403)
+        self.assertEqual(self.client.get(f'/api/projects/{other["id"]}/assets/missing').status_code, 403)
+        self.assertEqual(self.client.post(f'/api/projects/{project["id"]}/scenes', json={"title": "Forbidden"}, headers=self.origin).status_code, 403)
+        self.assertEqual(self.client.get(f'/api/projects/{project["id"]}/backup.zip').status_code, 403)
+        self.assertEqual(self.client.get(f'/api/projects/{project["id"]}/members').status_code, 403)
+        self.assertEqual(self.client.post(f'/api/projects/{project["id"]}/enhancement-proposals/fake/decision', json={"decision": "accept"}, headers={**self.origin, "If-Match": '"1"'}).status_code, 403)
+        comment = self.client.post(f'/api/projects/{project["id"]}/review-comments', json={"sceneId": scene["id"], "authorLabel": "Spoofed", "body": "Review feedback"}, headers=self.origin)
+        self.assertEqual(comment.status_code, 201)
+        self.assertEqual(comment.json()["authorLabel"], "Real Reviewer")
+        events = (storage.project_path(project["id"])/"audit/events.jsonl").read_text().splitlines()
+        self.assertEqual(json.loads(events[-1])["actorId"], reviewer)
+        self.assertEqual(self.client.get("/api/management/my-work").json()["actorId"], reviewer)
+
+    def test_author_owns_created_project_without_organization_wide_access(self):
+        self.login()
+        other = self.client.post("/api/projects", json={"title": "Admin project"}, headers=self.origin).json()
+        self.store.provision("writer@example.com", self.password, "Writer", ["author"])
+        self.client.post("/api/auth/login", json={"email": "writer@example.com", "password": self.password}, headers=self.origin)
+        own = self.client.post("/api/projects", json={"title": "My own"}, headers=self.origin)
+        self.assertEqual(own.status_code, 201)
+        self.assertEqual(len(self.client.get("/api/projects").json()), 1)
+        self.assertEqual(self.client.get(f'/api/projects/{other["id"]}').status_code, 403)
+        self.assertEqual(self.client.get(f'/api/projects/{own.json()["id"]}/permissions').json()["canEdit"], True)
+
+    def test_reset_is_single_use_and_revokes_sessions(self):
+        self.login()
+        old = self.client.cookies.get(COOKIE)
+        token = self.store.issue_reset("author@example.com")
+        self.assertNotIn(token, self.store.path.read_text())
+        replacement = "replacement password long enough"
+        response = self.client.post("/api/auth/reset-password", json={"token": token, "password": replacement}, headers=self.origin)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.client.get("/api/projects", headers={"Cookie": f"{COOKIE}={old}"}).status_code, 401)
+        self.assertEqual(self.client.post("/api/auth/reset-password", json={"token": token, "password": replacement}, headers=self.origin).status_code, 400)
+        self.assertEqual(self.client.post("/api/auth/login", json={"email": "author@example.com", "password": replacement}, headers=self.origin).status_code, 200)
+
+    def test_reset_expiry_and_last_admin_protection(self):
+        token = self.store.issue_reset("author@example.com")
+        with patch("backend.app.password_auth.time.time", return_value=time.time()+901):
+            self.assertEqual(self.client.post("/api/auth/reset-password", json={"token": token, "password": self.password}, headers=self.origin).status_code, 400)
+        with self.assertRaisesRegex(ValueError, "last active administrator"):
+            self.store.change_account("author@example.com", disabled=True)
+
+    def test_review_link_audience_expiry_revision_and_revocation(self):
+        self.login()
+        project = self.client.post("/api/projects", json={"title": "Review project"}, headers=self.origin).json()
+        with patch.dict("os.environ", {"CHIMERA_REVIEW_ACCESS": "authenticated"}):
+            invite = self.client.post(f'/api/projects/{project["id"]}/review-links', json={"userId": self.user_id, "expiresHours": 1}, headers=self.origin)
+            self.assertEqual(invite.status_code, 201)
+            token = invite.json()["url"].split("#review=")[1]
+            headers = {**self.origin, "X-Review-Token": token}
+            self.assertEqual(self.client.post("/api/reviews/access", headers=headers).status_code, 200)
+            self.store.provision("unassigned@example.com", self.password, "Unassigned Reviewer", ["reviewer"])
+            with TestClient(main.app, base_url="https://darkrogue.io") as outsider:
+                outsider.post("/api/auth/login", json={"email": "unassigned@example.com", "password": self.password}, headers=self.origin)
+                self.assertEqual(outsider.post("/api/reviews/access", headers=headers).status_code, 404)
+            with patch("backend.app.password_auth.time.time", return_value=time.time()+3601):
+                self.assertEqual(self.client.post("/api/reviews/access", headers=headers).status_code, 404)
+            self.client.post(f'/api/projects/{project["id"]}/scenes', json={"title": "Changed"}, headers=self.origin)
+            self.assertEqual(self.client.post("/api/reviews/access", headers=headers).status_code, 409)
+            self.client.delete(f'/api/projects/{project["id"]}/review-links/{invite.json()["id"]}', headers=self.origin)
+            self.assertEqual(self.client.post("/api/reviews/access", headers=headers).status_code, 404)
+        self.assertEqual(self.client.post("/api/reviews/access", headers=headers).status_code, 404)
+
+    def test_administrator_is_not_automatically_content_approver(self):
+        self.login()
+        project = storage.create_project(ProjectCreate(title="Unassigned content"))
+        permissions = self.client.get(f'/api/projects/{project.id}/permissions').json()
+        self.assertTrue(permissions["canManageMembers"])
+        self.assertFalse(permissions["canApprove"])
+
+    def test_membership_removal_revokes_project_and_review_link_access(self):
+        self.login()
+        project = self.client.post("/api/projects", json={"title": "Revoked project"}, headers=self.origin).json()
+        reviewer = self.store.provision("revoked@example.com", self.password, "Reviewer", ["reviewer"])
+        self.client.post(f'/api/projects/{project["id"]}/members', json={"userId": reviewer, "role": "reviewer"}, headers=self.origin)
+        link = self.store.issue_review(project["id"], reviewer, project["storyboard"]["revision"], 1)
+        self.client.delete(f'/api/projects/{project["id"]}/members/{reviewer}', headers=self.origin)
+        self.client.post("/api/auth/login", json={"email": "revoked@example.com", "password": self.password}, headers=self.origin)
+        self.assertEqual(self.client.get(f'/api/projects/{project["id"]}').status_code, 403)
+        with patch.dict("os.environ", {"CHIMERA_REVIEW_ACCESS": "authenticated"}):
+            self.assertEqual(self.client.post("/api/reviews/access", headers={**self.origin, "X-Review-Token": link["url"].split("#review=")[1]}).status_code, 404)
 
     def test_encarta_remains_closed_even_with_endpoint(self):
         with patch.dict("os.environ", {"CHIMERA_DEPLOYMENT_PROFILE": "encarta", "CHIMERA_ENCARTA_URL": "https://encarta.example"}):

@@ -1,4 +1,5 @@
 import base64
+from contextvars import copy_context
 import hashlib
 import json
 import os
@@ -74,7 +75,7 @@ def start_media_generation_job(project_id: str, job_id: str) -> None:
         current = _active_threads.get(job_id)
         if current and current.is_alive():
             return
-        thread = threading.Thread(target=_run_job, args=(project_id, job_id), name=job_id, daemon=True)
+        thread = threading.Thread(target=copy_context().run, args=(_run_job, project_id, job_id), name=job_id, daemon=True)
         _active_threads[job_id] = thread
         thread.start()
 

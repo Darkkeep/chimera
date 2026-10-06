@@ -8,6 +8,7 @@
   },
   "scripts": {
     "test:onboarding": "playwright test --config playwright.onboarding.config.cjs",
+    "test:auth": "node tests/auth/qualify.cjs",
     "verify:onboarding:artifact": "node vendor/onboarding/verify.cjs"
   },
   "repository": {

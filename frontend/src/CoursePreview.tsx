@@ -8,10 +8,12 @@ import "./course-preview.css";
 import "./course-preview-overrides.css";
 import "./course-preview-review.css";
 import "./assessment-types.css";
+import { useSession } from "./AuthGate";
 
 type CoursePreviewProps = {
   project: Project;
   onClose: () => void;
+  canEnhance?: boolean;
 };
 
 type AssessmentResult = AssessmentOutcome & { response: string[]; matches: Record<string, string>; textResponse: string; assessmentSignature: string };
@@ -124,16 +126,18 @@ function createEmptyAssessmentResult(item: AssessmentItem, settings: AssessmentS
   return { response: [], matches: {}, textResponse: "", attempts: 0, isCorrect: null, assessmentSignature: assessmentSignature(item, settings) };
 }
 
-export function CoursePreview({ project, onClose }: CoursePreviewProps) {
+export function CoursePreview({ project, onClose, canEnhance = true }: CoursePreviewProps) {
+  const { session } = useSession();
+  const resumeProjectId = session ? `${session.actor.actorId}.${project.id}` : project.id;
   const scenes = project.storyboard.scenes;
-  const [resumeState] = useState(() => readResumeState(project.id, scenes));
+  const [resumeState] = useState(() => readResumeState(resumeProjectId, scenes));
   const [sceneIndex, setSceneIndex] = useState(resumeState.sceneIndex);
   const [visitedSceneIds, setVisitedSceneIds] = useState(resumeState.visitedSceneIds);
   const [completedAudioKeys, setCompletedAudioKeys] = useState(resumeState.completedAudioKeys);
   const [assessmentResults, setAssessmentResults] = useState(resumeState.assessmentResults);
   const [remediationRoute, setRemediationRoute] = useState(resumeState.remediationRoute);
   const [comments, setComments] = useState<ReviewComment[]>([]);
-  const [commentAuthor, setCommentAuthor] = useState("Reviewer");
+  const [commentAuthor, setCommentAuthor] = useState(session?.actor.actorDisplayName || "Reviewer");
   const [commentBody, setCommentBody] = useState("");
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [commentFilter, setCommentFilter] = useState<"all" | "unresolved" | "outdated">("all");
@@ -185,11 +189,11 @@ export function CoursePreview({ project, onClose }: CoursePreviewProps) {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(`chimera.preview.${project.id}`, JSON.stringify({ sceneIndex, visitedSceneIds, completedAudioKeys, assessmentResults, remediationRoute }));
+      window.localStorage.setItem(`chimera.preview.${resumeProjectId}`, JSON.stringify({ sceneIndex, visitedSceneIds, completedAudioKeys, assessmentResults, remediationRoute }));
     } catch {
       // Preview remains usable if browser storage is unavailable.
     }
-  }, [project.id, sceneIndex, visitedSceneIds, completedAudioKeys, assessmentResults, remediationRoute]);
+  }, [resumeProjectId, sceneIndex, visitedSceneIds, completedAudioKeys, assessmentResults, remediationRoute]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -361,9 +365,9 @@ export function CoursePreview({ project, onClose }: CoursePreviewProps) {
         })}
         <section data-onboarding="preview.comments" className="course-preview-review" aria-labelledby="course-preview-review-title">
           <div className="course-preview-review-heading"><div><span className="course-preview-assessment-kicker">IN-APP REVIEW · REVISION {project.storyboard.revision}</span><h2 id="course-preview-review-title"><MessageCircle size={17} /> Scene discussion</h2></div><label className="course-preview-comment-filter">Show<select value={commentFilter} onChange={(event) => setCommentFilter(event.target.value as "all" | "unresolved" | "outdated")}><option value="all">All threads</option><option value="unresolved">Unresolved</option><option value="outdated">Outdated</option></select></label></div>
-          <div className="course-preview-comment-form"><label>Reviewer<input value={commentAuthor} onChange={(event) => setCommentAuthor(event.target.value)} /></label><label>Comment<textarea rows={2} value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Leave feedback on this scene" /></label><button type="button" className="course-preview-nav-button next" onClick={() => void postComment()} disabled={commentBusy || !commentBody.trim()}><Send size={14} /> Add comment</button></div>
+          <div className="course-preview-comment-form"><label>Reviewer<input value={commentAuthor} readOnly={Boolean(session)} onChange={(event) => setCommentAuthor(event.target.value)} /></label><label>Comment<textarea rows={2} value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Leave feedback on this scene" /></label><button type="button" className="course-preview-nav-button next" onClick={() => void postComment()} disabled={commentBusy || !commentBody.trim()}><Send size={14} /> Add comment</button></div>
           {commentError && <p className="course-preview-comment-error" role="alert">{commentError}</p>}
-          <div className="course-preview-comment-list">{comments.filter((comment) => comment.sceneId === scene.id && (commentFilter === "all" || (commentFilter === "unresolved" && !comment.resolved) || (commentFilter === "outdated" && comment.outdated))).map((comment) => <article className={`course-preview-comment ${comment.resolved ? "resolved" : ""}`} key={comment.id}><div className="course-preview-comment-meta"><strong>{comment.authorLabel}</strong><span>{comment.outdated ? "Outdated context" : comment.resolved ? "Resolved" : `Revision ${comment.revision}`}</span></div><p>{comment.body}</p>{comment.replies.map((reply) => <div className="course-preview-reply" key={reply.id}><strong>{reply.authorLabel}</strong><span>{reply.body}</span></div>)}<div className="course-preview-comment-actions">{!comment.resolved && <button type="button" onClick={() => void updateComment(comment.id, "decision", { resolved: true })}>Resolve</button>}{comment.resolved && <button type="button" onClick={() => void updateComment(comment.id, "decision", { resolved: false })}>Reopen</button>}<button type="button" onClick={() => void enhanceComment(comment)} disabled={commentBusy}>Enhance</button><input aria-label={`Reply to ${comment.authorLabel}`} value={replyDrafts[comment.id] ?? ""} onChange={(event) => setReplyDrafts((current) => ({ ...current, [comment.id]: event.target.value }))} placeholder="Reply" /><button type="button" onClick={() => void updateComment(comment.id, "replies", { authorLabel: commentAuthor, body: replyDrafts[comment.id] ?? "" })} disabled={commentBusy || !(replyDrafts[comment.id] ?? "").trim()}>Reply</button></div></article>)}</div>
+          <div className="course-preview-comment-list">{comments.filter((comment) => comment.sceneId === scene.id && (commentFilter === "all" || (commentFilter === "unresolved" && !comment.resolved) || (commentFilter === "outdated" && comment.outdated))).map((comment) => <article className={`course-preview-comment ${comment.resolved ? "resolved" : ""}`} key={comment.id}><div className="course-preview-comment-meta"><strong>{comment.authorLabel}</strong><span>{comment.outdated ? "Outdated context" : comment.resolved ? "Resolved" : `Revision ${comment.revision}`}</span></div><p>{comment.body}</p>{comment.replies.map((reply) => <div className="course-preview-reply" key={reply.id}><strong>{reply.authorLabel}</strong><span>{reply.body}</span></div>)}<div className="course-preview-comment-actions">{!comment.resolved && <button type="button" onClick={() => void updateComment(comment.id, "decision", { resolved: true })}>Resolve</button>}{comment.resolved && <button type="button" onClick={() => void updateComment(comment.id, "decision", { resolved: false })}>Reopen</button>}{canEnhance && <button type="button" onClick={() => void enhanceComment(comment)} disabled={commentBusy}>Enhance</button>}<input aria-label={`Reply to ${comment.authorLabel}`} value={replyDrafts[comment.id] ?? ""} onChange={(event) => setReplyDrafts((current) => ({ ...current, [comment.id]: event.target.value }))} placeholder="Reply" /><button type="button" onClick={() => void updateComment(comment.id, "replies", { authorLabel: commentAuthor, body: replyDrafts[comment.id] ?? "" })} disabled={commentBusy || !(replyDrafts[comment.id] ?? "").trim()}>Reply</button></div></article>)}</div>
         </section>
       </article>
       <footer className="course-preview-navigation"><button type="button" className="course-preview-nav-button previous" onClick={() => setSceneIndex((current) => Math.max(0, current - 1))} disabled={sceneIndex === 0}><ArrowLeft size={17} /><span>Previous</span></button><div className="course-preview-dots" ref={dotsContainerRef} role="group" aria-label="Scene navigation">{scenes.map((item, index) => <button type="button" key={item.id} ref={index === sceneIndex ? activeDotRef : null} className={`${index === sceneIndex ? "active" : ""} ${visitedSceneIds.includes(item.id) ? "visited" : ""}`} aria-label={`Go to scene ${index + 1}: ${item.title}`} aria-current={index === sceneIndex ? "step" : undefined} onClick={() => setSceneIndex(index)} />)}</div><button type="button" className="course-preview-nav-button next" onClick={() => setSceneIndex((current) => Math.min(scenes.length - 1, current + 1))} disabled={sceneIndex === scenes.length - 1}><span>{sceneIndex === scenes.length - 1 ? "End" : "Next"}</span>{sceneIndex === scenes.length - 1 ? <Check size={17} /> : <ArrowRight size={17} />}</button></footer>

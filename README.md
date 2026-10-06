@@ -6,6 +6,8 @@ Chimera is a local authoring tool for turning PowerPoint decks into editable sto
 
 See the [illustrated user guide](docs/user-guide.md) for process-based task tables, step-by-step instructions, and screenshots of the current controls. Planned capabilities are labeled separately.
 
+See [current work and handoff](docs/current-work.md) for completed milestones, remaining deployment checks, and continuing on another workstation.
+
 The authoring workspace keeps scenes beside the canvas. Use a scene's pencil button to edit it directly, or **Edit scene** above the preview. Project selection and libraries live in the sidebar; **Review tools** groups validation, accessibility, completion rules, and guided review. **Export** opens SCORM packages, build reports, JSON backup/restore, and available QTI test export. Editing dialogs support Tab, Shift+Tab, and Escape.
 
 Choose **Light**, **Dark**, or **System** under **Appearance** in the sidebar. The preference is remembered in this browser and shared across its tabs. System is the default and follows changes to your device's color scheme. Slide images and uploaded media retain their original colors.

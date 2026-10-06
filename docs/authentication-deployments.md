@@ -6,7 +6,7 @@ Chimera uses one backend with installation-specific authentication. No hosted de
 | --- | --- | --- |
 | `local` | Existing local single-user identity | Available; no login required |
 | `encarta` | Encarta adapter | Profile prepared; protected requests return 503 until real validation is implemented |
-| `darkrogue` | Built-in email/password accounts | Backend sign-in/session foundation implemented; operator-created administrators only |
+| `darkrogue` | Built-in email/password accounts | Login, logout, recovery, project roles, and authenticated review links implemented; live server qualification deferred |
 
 The examples under `deploy/` describe environment variables. They are not automatically loaded. Each hosted profile must use its own `CHIMERA_WORKSPACE`; do not reuse the local authoring workspace. Profiles take precedence over stored installation identity settings. A `local` profile cannot override a workspace already configured for team identity. Unimplemented OIDC, SAML, or generic adapters never fall back to local identity.
 
@@ -18,6 +18,7 @@ Set these variables in the service environment:
 CHIMERA_DEPLOYMENT_PROFILE=darkrogue
 CHIMERA_PUBLIC_ORIGIN=https://darkrogue.io
 CHIMERA_WORKSPACE=/srv/chimera/darkrogue-workspace
+CHIMERA_REVIEW_ACCESS=authenticated
 ```
 
 If the application will use a subdomain, set its exact HTTPS origin instead. Serve the frontend and `/api` at that same origin behind an HTTPS reverse proxy. Bind Uvicorn to a private interface and configure trusted proxy addresses explicitly. CORS permits the configured origin in the darkrogue profile; it does not accept wildcards.
@@ -28,14 +29,19 @@ Provision the initial operator account from the server, using the same workspace
 .\.venv\Scripts\python.exe scripts/provision-account.py --email operator@example.com --name "Operator" --roles administrator author instructional-designer
 ```
 
-The command prompts for a password and confirmation; passwords do not appear in command arguments. Passwords must be 15–1024 characters. The application stores salted scrypt password hashes, not passwords. Parameters are `N=2^17`, `r=8`, `p=1`, consistent with the [OWASP password storage guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
+The command prompts for a password and confirmation; passwords do not appear in command arguments. Passwords must be 15â€“1024 characters. The application stores salted scrypt password hashes, not passwords. Parameters are `N=2^17`, `r=8`, `p=1`, consistent with the [OWASP password storage guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
 
 Backend endpoints:
 
 - `GET /api/auth/config`: public discovery of deployment mode, provider, and whether password login is available.
 - `POST /api/auth/login`: JSON `email` and `password`; requires the exact configured `Origin` header. Returns an opaque session cookie.
 - `POST /api/auth/logout`: requires the same origin; revokes the server-side session and removes the cookie.
+- `POST /api/auth/reset-password`: one-use reset token and new password; same-origin requests only.
 - `GET /api/identity/context`: returns the signed-in hosted actor and roles rather than the local user.
+- `GET /api/accounts`: administrator-only account directory, with no password/session material.
+- `/api/projects/{id}/members`: administrator-controlled project roles; removing membership immediately removes that project access.
+- `/api/projects/{id}/permissions`: capabilities for the current actor/project.
+- `/api/projects/{id}/review-links`: create/list/revoke authenticated, audience-bound, expiring review links.
 - Other API data routes require authentication and authorization. `/api/health` remains public.
 
 Sessions expire after eight hours. Cookies use `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`, and the `__Host-` prefix; session tokens are stored only as SHA-256 digests. Signing in again rotates and revokes the presented session. Disabled accounts and expired/revoked sessions cannot resolve an actor. Mutating authenticated requests require the exact configured origin, including requests from sibling subdomains. Login validation errors do not echo submitted passwords. API responses use `Cache-Control: no-store`.
@@ -44,15 +50,38 @@ Failed sign-ins are limited to five per normalized account and thirty per direct
 
 Account hashes, failure counters, and session digests live in `identity/accounts.json` inside the dedicated workspace. Writes use the existing filesystem transaction lock and atomic replacement. Protect that directory with operating-system permissions; Windows requires appropriate ACLs. These installation credentials are not project backup content.
 
-### Remaining work before public release
+### Account management and recovery
 
-- Login/logout UI and session-expiry handling in the frontend.
-- Password reset, account recovery, operator account disabling/reset tools, and account lifecycle audit events.
-- Project-scoped membership and tenant authorization. Non-administrator accounts are deliberately denied application data access in this foundation; no self-registration route is provided. Administrators need additional explicit content roles to approve enhancements.
-- Resolve current local assumptions in remaining management/audit read models and event attribution before enabling collaborative use.
-- Hosting configuration, TLS/proxy integration tests, restricted filesystem permissions, ingress limits, and end-to-end browser qualification at the actual deployment origin.
+Accounts are operator-provisioned; there is no public registration or outbound email flow. The login page's recovery guidance directs the user to their administrator. Use the same workspace and public-origin environment for these operator commands:
 
-This is backend preparation, not a public-release claim. MFA and email verification are not implemented. No live credentials, outbound email service, or public deployment were configured.
+```powershell
+.\.venv\Scripts\python.exe scripts/manage-account.py disable --email reviewer@example.com
+.\.venv\Scripts\python.exe scripts/manage-account.py enable --email reviewer@example.com
+.\.venv\Scripts\python.exe scripts/manage-account.py reset-password --email reviewer@example.com
+.\.venv\Scripts\python.exe scripts/manage-account.py reset-link --email reviewer@example.com
+```
+
+On Linux use `.venv/bin/python`. Direct password changes prompt securely. Reset links last fifteen minutes, are stored as token digests, and can be used once. Operators deliver links through their approved channel; the application sends no messages. Password changes and disabling accounts revoke sessions and outstanding reset links. The last active administrator cannot be disabled. Account lifecycle and membership actions produce security audit events.
+
+### Project permissions and review links
+
+Organization roles allow project creation and administration; they do not grant authors or reviewers access to every project. Creating a project assigns its creator the instructional-designer project role. Assigned reviewers can view/play the project and comment/reply/resolve threads; they cannot change scenes, approve enhancements, manage members, or export project content. Project lists and My Work are filtered to accessible projects. Administrators have content access under the installation policy, but content approval requires an explicit author/instructional-designer project membership. Comments and replies use the authenticated display name. Request and background-job audit attribution follows the verified actor; recovered background work uses a service actor.
+
+In the hosted frontend, open **Settings ? Project access** as an administrator to assign an existing account, update a role, or remove membership. Set `CHIMERA_REVIEW_ACCESS=authenticated` to expose review-link creation. Other installations retain `no-external-review` by default.
+
+Review links are bound to an existing project's assigned account, current storyboard revision, and configured HTTPS origin. Creation defaults to three days; the API supports one to 168 hours. Tokens are in URL fragments and then supplied in the `X-Review-Token` request header, not the API URL. The invited user must sign in. Expired, revoked, wrong-user, or removed-membership links fail; a changed storyboard requires a new link. Link revocation controls that invitation, while membership separately controls ordinary project access. Remove membership to withdraw all project access. No unauthenticated guest review is enabled.
+
+### Linux/Nginx deployment handoff
+
+The user selected an existing Linux server with Nginx. Server/SSH details and live qualification are explicitly deferred.
+
+- `deploy/darkrogue.env.example`: service environment, dedicated workspace, exact public origin, authenticated review mode.
+- `deploy/darkrogue.nginx.conf`: same-origin static SPA and reverse proxy, TLS certificate paths, security headers, login/API rate limits, body-size limits, and loopback upstream.
+- `deploy/chimera-darkrogue.service`: service-user API process, restrictive file creation, filesystem boundary, and trusted loopback proxy settings.
+
+Before enabling the live site, adapt the hostname, certificate paths, checkout directory, service user, and workspace to the actual server. Build `frontend/dist`, install Python dependencies into the server's virtual environment, provision accounts under the service identity, and restrict workspace ownership/permissions. Validate `nginx -t` and service startup before switching traffic. These configuration templates were not installed or tested against the real Nginx server in this session.
+
+Remaining live checks: certificate/hostname and redirect behavior, proxy client-IP handling, Linux workspace permissions, real-domain login/logout/reset/review flows, and intended browser coverage. MFA, email verification, automatic email delivery, and multi-organization tenancy are separate scope; they are not implemented by this single-organization deployment.
 
 ## Encarta integration contract
 
@@ -73,7 +102,22 @@ Do not infer role grants from unverified browser headers or token payloads. Each
 Run the backend suite from the repository root:
 
 ```powershell
+.\.venv\Scripts\python.exe -m pip install -r backend/requirements-dev.txt
 .\.venv\Scripts\python.exe -m unittest discover -s backend/tests
 ```
 
 The hosted authentication tests cover credential errors, password redaction, hashed session storage, secure cookies, actor mapping, logout/relogin revocation, expiry, disabled accounts, origin checks, rate limiting, non-admin denial, installation downgrade prevention, and Encarta/unimplemented-provider rejection.
+
+
+Run the real HTTPS frontend/API harness after building the frontend:
+
+```powershell
+npm run build --prefix frontend
+npm run test:auth
+```
+
+The harness uses disposable accounts/passwords, an isolated temporary workspace, a short-lived test certificate, and an HTTPS reverse proxy. It does not enable a production authentication bypass. Set `OPENSSL_BINARY` and `CHIMERA_TEST_PYTHON` if needed. Node, Playwright Chromium, and OpenSSL are required; browser contexts ignore the disposable certificate only inside the test harness. Evidence is regenerated in `workspace/auth-qualification`.
+
+The 2026-10-06 browser pass verified sign-in errors, login, secure session cookie flags, recovery guidance, password reset/mismatch handling, project membership display, authenticated review/comments, cross-project denial, session-expiry handling, and logout. The sign-in page had no Axe violations, no horizontal overflow at 390px, and no observed JavaScript errors. This is local HTTPS qualification, not live darkrogue.io certification. GitHub CI now runs backend regression tests and this hosted authentication harness alongside the existing onboarding tests.
+
+12ui produced the account-screen images and HTML references; clickable prototype export hit a Windows `fsync` error. Completed outputs were integrated into React. Screenshot comparisons against the original LayerDocs are retained locally under `.improve/chimera-auth-align-*`; those image-based kits have no DOM-selector coverage claim. The actual Chimera logo, existing application styles, fifteen-character password policy, and fifteen-minute reset expiry were retained over conflicting generated copy.

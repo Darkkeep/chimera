@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
+from starlette.concurrency import run_in_threadpool
 from PIL import Image, UnidentifiedImageError
 from pptx import Presentation
 
@@ -20,7 +21,7 @@ from .enhancement_jobs import cancel_enhancement_job, preview_enhancement_submis
 from .identity import IdentitySnapshot, LocalIdentityDirectory, OrganizationPolicy, ProjectMembership, ProjectMembershipCreate, RoleBasedAuthorizationPolicy
 from .media_generation import cancel_media_generation_job, recover_media_generation_jobs, regenerate_candidate, retry_media_generation_job, start_media_generation_job
 from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalCreate, EnhancementProposalDecision, EnhancementProposalResult, ExportSettings, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, ReferenceResource, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewReplyCreate, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate, ValidationReport
-from .platform import ActorContext, AuditEventPage, AuthorizationPolicy, LOCAL_ACTOR, read_audit_events
+from .platform import ActorContext, AuditEventPage, AuthorizationPolicy, DurableEventSink, PlatformEvent, LOCAL_ACTOR, REQUEST_ACTOR, get_actor_context, read_audit_events
 from .references import SUPPORTED_REFERENCE_EXTENSIONS, extract_reference_passages
 from .render import render_slides
 from .qti import assessment_item_xml, assessment_test_package
@@ -28,18 +29,39 @@ from .scorm import persist_scorm_12_build, persist_scorm_build, read_scorm_repor
 from .storage import ROOT, EnhancementProposalConflict, StoryboardRevisionConflict, add_project_asset, add_review_reply, approve_generated_candidate, create_enhancement_job, create_enhancement_proposal, create_media_generation_job, create_project, create_review_comment, create_scene, create_template, decide_enhancement_proposal, decide_review_comment, delete_scene, list_enhancement_jobs, list_enhancement_proposals, list_generated_candidates, list_media_generation_jobs, list_projects, list_reference_resources, list_review_comments, list_templates, project_path, read_enhancement_job, read_generated_candidate, read_media_generation_job, read_project, persist_imported_assets, persist_slide_previews, reorder_scenes, replace_storyboard, replace_template_source, save_reference_resource, slugify, storyboard_transaction, update_from_import, update_project_asset_attribution, update_project_completion_settings, update_project_export_settings, update_generated_candidate, update_media_generation_job, update_scene, update_template
 from .validation import validate_project
 from .word_export import DOCX_MEDIA_TYPE, build_storyboard_docx
-from .deployment import cors_origins, installation_policy
-from .password_auth import AccountStore, COOKIE, LoginRequest, SESSION_SECONDS, require_origin
+from .deployment import cors_origins, installation_policy, public_origin
+from .password_auth import AccountStore, COOKIE, HostedAuthorizationPolicy, LoginRequest, ResetPasswordRequest, ReviewInvitationRequest, SESSION_SECONDS, require_origin
 
 
-def get_authorization_policy() -> RoleBasedAuthorizationPolicy:
+def get_authorization_policy() -> AuthorizationPolicy:
     directory = LocalIdentityDirectory(ROOT)
     if installation_policy(directory).identityProvider == "builtin":
-        return RoleBasedAuthorizationPolicy(AccountStore(ROOT))
+        return HostedAuthorizationPolicy(AccountStore(ROOT), installation_policy(directory))
     return RoleBasedAuthorizationPolicy(directory)
 
 
 def _request_action(request: Request) -> str:
+    path = request.url.path
+    if path.startswith("/api/identity/") and request.method == "GET" or path == "/api/installation/config":
+        return "identity.self"
+    if path.startswith("/api/accounts"):
+        return "admin.accounts.manage"
+    if path.startswith("/api/reviews"):
+        return "review.invitation"
+    if path.endswith("/review-comments") and request.method == "POST":
+        return "review.comment.create"
+    if "/review-links" in path:
+        return "review.share"
+    if "/enhancement-proposals/" in path and path.endswith("/decision"):
+        return "enhancement.proposal.decide"
+    if "/generated-candidates/" in path and path.endswith("/approve"):
+        return "enhancement.proposal.decide"
+    if path.endswith("/members") or "/members/" in path:
+        return "project.membership.manage"
+    if request.method == "GET" and (path.endswith((".zip", ".docx", ".xml", "/storyboard/export")) or "/scorm-report/" in path):
+        return "project.export"
+    if request.method == "GET" and path in {"/api/projects", "/api/templates", "/api/management/project-health", "/api/management/my-work"}:
+        return "workspace.view"
     if request.url.path.endswith("/management/audit"):
         return "admin.audit.view"
     if request.method == "GET":
@@ -96,7 +118,7 @@ def _require_request_access(
     request: Request,
     policy: Annotated[AuthorizationPolicy, Depends(get_authorization_policy)],
 ) -> None:
-    if request.url.path in {"/api/health", "/api/auth/config", "/api/auth/login", "/api/auth/logout"}:
+    if request.url.path in {"/api/health", "/api/auth/config", "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password"}:
         return
     context = resolve_actor_context(request)
     action = _request_action(request)
@@ -109,16 +131,36 @@ app = FastAPI(title="Chimera API", version="0.1.0", dependencies=[Depends(_requi
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(request: Request, error: RequestValidationError):
-    if request.url.path == "/api/auth/login":
+    if request.url.path in {"/api/auth/login", "/api/auth/reset-password"}:
         return JSONResponse({"detail": "Provide an email and a password of at most 1024 characters"}, status_code=422, headers={"Cache-Control": "no-store"})
     return await request_validation_exception_handler(request, error)
 
 
 @app.middleware("http")
 async def private_response_headers(request: Request, call_next):
-    response = await call_next(request)
+    token = None
+    actor = None
+    public = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password"}
+    if request.url.path.startswith("/api/") and request.url.path not in public and request.method != "OPTIONS":
+        try:
+            actor = await run_in_threadpool(resolve_actor_context, request)
+        except HTTPException as error:
+            return JSONResponse({"detail": error.detail}, status_code=error.status_code, headers={"Cache-Control": "no-store"})
+        request.state.actor = actor
+        token = REQUEST_ACTOR.set(actor)
+    try:
+        response = await call_next(request)
+    finally:
+        if token is not None:
+            REQUEST_ACTOR.reset(token)
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
+    if actor and actor.deploymentMode == "team" and response.status_code < 400 and (request.method not in {"GET", "HEAD", "OPTIONS"} or _request_action(request) == "project.export"):
+        project_id = request.path_params.get("project_id")
+        event = PlatformEvent(eventName="request."+_request_action(request), eventClass="security", actorId=actor.actorId,
+            installationId=actor.installationId, deploymentMode="team", projectId=project_id, metadata={"method": request.method})
+        with storyboard_transaction():
+            DurableEventSink(project_path(project_id) if project_id else ROOT).record(event)
     return response
 
 
@@ -139,8 +181,14 @@ AUDIO_UPLOAD_EXTENSIONS = {".mp3", ".m4a", ".aac", ".wav", ".ogg"}
 
 @app.on_event("startup")
 def resume_enhancement_jobs() -> None:
-    recover_enhancement_jobs()
-    recover_media_generation_jobs()
+    selected = installation_policy(LocalIdentityDirectory(ROOT))
+    context = ActorContext(actorId="system-service", actorDisplayName="Chimera service", installationId=public_origin(), deploymentMode="team") if selected.deploymentMode == "team" else LOCAL_ACTOR
+    token = REQUEST_ACTOR.set(context)
+    try:
+        recover_enhancement_jobs()
+        recover_media_generation_jobs()
+    finally:
+        REQUEST_ACTOR.reset(token)
 
 
 def _expected_revision(if_match: str | None) -> int | None:
@@ -214,6 +262,24 @@ def logout(request: Request) -> JSONResponse:
     return response
 
 
+@app.post("/api/auth/reset-password")
+def reset_password(data: ResetPasswordRequest, request: Request) -> dict[str, bool]:
+    store = _password_store()
+    require_origin(request)
+    store.reset_password(data.token.get_secret_value(), data.password.get_secret_value())
+    return {"reset": True}
+
+
+@app.get("/api/accounts")
+def get_accounts() -> list[dict]:
+    return _password_store().accounts()
+
+
+def _identity_directory():
+    local = LocalIdentityDirectory(ROOT)
+    return AccountStore(ROOT) if installation_policy(local).identityProvider == "builtin" else local
+
+
 @app.get("/api/identity/context", response_model=IdentitySnapshot)
 def get_identity_context(context: Annotated[ActorContext, Depends(resolve_actor_context)]) -> IdentitySnapshot:
     snapshot = LocalIdentityDirectory(ROOT).snapshot()
@@ -253,7 +319,7 @@ def patch_identity_policy(
 def get_project_members(project_id: str) -> list[ProjectMembership]:
     try:
         read_project(project_id)
-        return LocalIdentityDirectory(ROOT).project_memberships(project_id)
+        return _identity_directory().project_memberships(project_id)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
 
@@ -269,17 +335,70 @@ def post_project_member(
     _require_action(policy or get_authorization_policy(), actor, "project.membership.manage", project_id)
     try:
         read_project(project_id)
-        return LocalIdentityDirectory(ROOT).add_project_membership(ProjectMembership(projectId=project_id, **data.model_dump()))
+        return _identity_directory().add_project_membership(ProjectMembership(projectId=project_id, **data.model_dump()))
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
+@app.delete("/api/projects/{project_id}/members/{user_id}")
+def delete_project_member(project_id: str, user_id: str) -> dict[str, bool]:
+    _password_store().remove_membership(project_id, user_id)
+    return {"removed": True}
+
+
+@app.get("/api/projects/{project_id}/permissions")
+def get_project_permissions(project_id: str) -> dict[str, bool]:
+    policy = get_authorization_policy()
+    actor = get_actor_context()
+    return {name: policy.allows(actor, action, project_id) for name, action in {
+        "canEdit": "scene.manage", "canExport": "project.export", "canManageMembers": "project.membership.manage",
+        "canShare": "review.share", "canEnhance": "enhancement.job.create", "canApprove": "enhancement.proposal.decide"}.items()}
+
+
+@app.post("/api/projects/{project_id}/review-links", status_code=201)
+def create_review_link(project_id: str, data: ReviewInvitationRequest) -> dict:
+    if installation_policy(LocalIdentityDirectory(ROOT)).reviewAccess != "authenticated":
+        raise HTTPException(409, "Authenticated external review is not enabled for this installation")
+    try:
+        project = read_project(project_id)
+        return _password_store().issue_review(project_id, data.userId, project.storyboard.revision, data.expiresHours)
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+
+
+@app.delete("/api/projects/{project_id}/review-links/{invite_id}")
+def revoke_review_link(project_id: str, invite_id: str) -> dict[str, bool]:
+    _password_store().revoke_review(project_id, invite_id)
+    return {"revoked": True}
+
+
+@app.get("/api/projects/{project_id}/review-links")
+def get_review_links(project_id: str) -> list[dict]:
+    return _password_store().review_links(project_id)
+
+
+@app.post("/api/reviews/access", response_model=ProjectDetail)
+def access_review(request: Request, token: Annotated[str, Header(alias="X-Review-Token")]) -> ProjectDetail:
+    if installation_policy(LocalIdentityDirectory(ROOT)).reviewAccess != "authenticated":
+        raise HTTPException(404, "External review is not enabled")
+    invite = _password_store().review_for_token(token, resolve_actor_context(request).actorId)
+    try:
+        project = read_project(invite["projectId"])
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+    if project.storyboard.revision != invite["revision"]:
+        raise HTTPException(409, "The storyboard has changed; request a new review link")
+    return project
+
+
 @app.get("/api/management/project-health")
 def get_project_health() -> list[dict[str, object]]:
     health: list[dict[str, object]] = []
-    for summary in list_projects():
+    for summary in get_projects():
         project = read_project(summary.id)
         authoring = validate_project(project, target="authoring")
         production = validate_project(project, target="production")
@@ -301,7 +420,7 @@ def get_project_health() -> list[dict[str, object]]:
 
 @app.get("/api/management/my-work")
 def get_my_work() -> dict[str, object]:
-    actor = LocalIdentityDirectory(ROOT).snapshot().actor
+    actor = get_actor_context()
     projects = get_project_health()
     return {
         "actorId": actor.actorId,
@@ -321,7 +440,9 @@ def get_audit_events(project_id: str | None = None, offset: int = 0, limit: int 
 
 @app.get("/api/projects", response_model=list[ProjectSummary])
 def get_projects() -> list[ProjectSummary]:
-    return list_projects()
+    actor = get_actor_context()
+    policy = get_authorization_policy()
+    return [project for project in list_projects() if policy.allows(actor, "project.view", project.id)]
 
 
 @app.get("/api/templates", response_model=list[TemplateRecord])
@@ -384,7 +505,11 @@ def post_project(
 ) -> ProjectDetail:
     actor = context or LOCAL_ACTOR
     _require_action(policy or get_authorization_policy(), actor, "project.create")
-    return create_project(data, actor)
+    with storyboard_transaction():
+        project = create_project(data, actor)
+        if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider == "builtin":
+            AccountStore(ROOT).add_project_membership(ProjectMembership(projectId=project.id, userId=actor.actorId, role="instructional-designer"))
+    return project
 
 
 @app.get("/api/projects/{project_id}", response_model=ProjectDetail)
@@ -482,6 +607,8 @@ def post_review_comment(
     policy: Annotated[AuthorizationPolicy | None, Depends(get_authorization_policy)] = None,
 ) -> ReviewComment:
     actor = context or LOCAL_ACTOR
+    if actor.deploymentMode == "team":
+        data = data.model_copy(update={"authorLabel": actor.actorDisplayName})
     _require_action(policy or get_authorization_policy(), actor, "review.comment.create", project_id)
     try:
         return create_review_comment(project_id, data, actor)
@@ -502,6 +629,8 @@ def post_review_reply(
     policy: Annotated[AuthorizationPolicy | None, Depends(get_authorization_policy)] = None,
 ) -> ReviewComment:
     actor = context or LOCAL_ACTOR
+    if actor.deploymentMode == "team":
+        data = data.model_copy(update={"authorLabel": actor.actorDisplayName})
     _require_action(policy or get_authorization_policy(), actor, "review.reply.create", project_id)
     try:
         return add_review_reply(project_id, comment_id, data, actor)

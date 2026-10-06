@@ -21,7 +21,7 @@ export function ManagementView({ onClose }: ManagementViewProps) {
     Promise.all([
       fetch("/api/management/project-health").then((response) => response.ok ? response.json() as Promise<Health[]> : Promise.reject(new Error("Project health unavailable."))),
       fetch("/api/identity/context").then((response) => response.ok ? response.json() as Promise<Context> : Promise.reject(new Error("Identity context unavailable."))),
-      fetch("/api/management/audit?limit=12").then((response) => response.ok ? response.json() as Promise<{ events: AuditEvent[] }> : Promise.reject(new Error("Audit activity unavailable."))),
+      fetch("/api/management/audit?limit=12").then((response) => response.status === 403 ? { events: [] } : response.ok ? response.json() as Promise<{ events: AuditEvent[] }> : Promise.reject(new Error("Audit activity unavailable."))),
     ]).then(([nextHealth, nextContext, nextEvents]) => {
       setHealth(nextHealth);
       setContext(nextContext);

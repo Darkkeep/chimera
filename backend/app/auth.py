@@ -60,6 +60,8 @@ def get_identity_provider() -> IdentityProvider:
 
 
 def resolve_actor_context(request: Request) -> ActorContext:
+    if getattr(request.state, "actor", None) is not None:
+        return request.state.actor
     try:
         return get_identity_provider().resolve(request)
     except RuntimeError as error:

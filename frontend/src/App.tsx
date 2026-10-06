@@ -22,6 +22,9 @@ import "./assessment-editor.css";
 import { createChimeraOnboarding } from "./onboarding";
 import { chimeraJourneys, reportOnboardingOutcome } from "./onboarding-journeys";
 import type { Step } from "@guided-workflows/onboarding";
+import { useSession } from "./AuthGate";
+import { ProjectAccessPanel } from "./ProjectAccessPanel";
+import { ReviewLinkView } from "./ReviewLinkView";
 
 type LayoutMode = "fidelity" | "hybrid" | "native" | "template";
 type SceneType = "content" | "title" | "assessment" | "media" | "interaction" | "summary";
@@ -53,6 +56,10 @@ const emptyProject: Project = { id: "", title: "", sceneCount: 0, updatedAt: "",
 const MAX_STORYBOARD_JSON_BYTES = 25 * 1024 * 1024;
 
 export function App() {
+  const { session, logout } = useSession();
+  const [reviewToken, setReviewToken] = useState(() => location.hash.startsWith("#review=") ? location.hash.slice(8) : "");
+  const [showProjectAccess, setShowProjectAccess] = useState(false);
+  const [permissions, setPermissions] = useState({ canEdit: !session, canExport: !session, canManageMembers: false, canEnhance: !session });
   const [project, setProject] = useState<Project>(emptyProject);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [selectedScene, setSelectedScene] = useState(0);
@@ -80,6 +87,18 @@ export function App() {
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
   const [readiness, setReadiness] = useState<Readiness | null>(null);
+  useEffect(() => {
+    if (!session || !project.id) return;
+    let alive = true;
+    setPermissions({ canEdit: false, canExport: false, canManageMembers: false, canEnhance: false });
+    fetch(`/api/projects/${project.id}/permissions`).then(async response => { if (!response.ok) throw new Error("Project permissions could not be loaded."); return response.json() as Promise<typeof permissions>; }).then(next => { if (alive) setPermissions(next); }).catch(issue => { if (alive) setError(issue instanceof Error ? issue.message : "Project access unavailable."); });
+    return () => { alive = false; };
+  }, [session, project.id]);
+  useEffect(() => {
+    const update = () => setReviewToken(location.hash.startsWith("#review=") ? location.hash.slice(8) : "");
+    window.addEventListener("hashchange", update);
+    return () => window.removeEventListener("hashchange", update);
+  }, []);
   const guideContext = useRef<Record<string, unknown>>({});
   const guideNavigate = useRef<(step: Step) => void>(() => {});
   const [guideId, setGuideId] = useState(() => {
@@ -800,13 +819,15 @@ export function App() {
   const assessmentItemCount = scenes.filter((item) => item.assessmentItem !== null).length;
   const scene = scenes[selectedScene];
 
+  if (reviewToken && session) return <ReviewLinkView token={reviewToken} onClose={() => { history.replaceState(null, "", location.pathname+location.search); setReviewToken(""); }} />;
+
   return <div className="app-shell">
     <a className="skip-link" href="#workspace-content">Skip to workspace</a>
     <aside className="sidebar" aria-label="Workspace navigation">
       <div className="brand"><BrandMark /><div className="brand-wordmark"><span>CHIMERA</span></div></div>
       <div className="sidebar-project">
         <label data-onboarding="workspace.project" className="project-switcher"><span>PROJECT</span><select value={project.id} onChange={(event) => void switchProject(event.target.value)} disabled={busy || projects.length === 0} aria-label="Switch project"><option value="" disabled>Select a project</option>{[...projects].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)).map((item) => <option key={item.id} value={item.id}>{item.title} · {item.sceneCount} scenes</option>)}</select></label>
-        <button className="new-project-button" onClick={() => setIsCreating(true)} disabled={busy}><Plus size={15} /> Create project</button>
+        <button className="new-project-button" onClick={() => setIsCreating(true)} disabled={busy || Boolean(session && !session.memberships.some(item => ["author", "instructional-designer", "administrator"].includes(item.role)))}><Plus size={15} /> Create project</button>
         <button className="new-project-button" onClick={() => startOnboarding()} disabled={busy}><Route size={15} /> Start / resume walkthrough</button>
       </div>
       <div className="workspace-label">WORKSPACE</div>
@@ -828,12 +849,13 @@ export function App() {
       </div>
       <div className="sidebar-bottom">
         <button className="nav-item settings-toggle" aria-expanded={showSettings} aria-controls="workspace-settings" onClick={() => setShowSettings((open) => !open)}><Settings2 size={18} /><span>Settings</span><ChevronDown size={15} className={showSettings ? "expanded" : ""} /></button>
-        {showSettings && <div id="workspace-settings" className="workspace-settings"><AppearanceSelector /></div>}
-        <div className="sidebar-footer"><span className="status-dot" />Local workspace</div>
+        {showSettings && <div id="workspace-settings" className="workspace-settings"><AppearanceSelector />{session && permissions.canManageMembers && <button className="nav-item" disabled={!project.id} onClick={() => setShowProjectAccess(true)}>Project access</button>}</div>}
+        {session && <div className="hosted-session"><span>{session.actor.actorDisplayName}</span><button onClick={() => { if (window.confirm("Sign out? Unsaved changes will be discarded.")) void logout().catch(issue => setError(issue instanceof Error ? issue.message : "Sign-out failed.")); }}>Sign out</button></div>}
+        <div className="sidebar-footer"><span className="status-dot" />{session ? "Hosted workspace" : "Local workspace"}</div>
       </div>
     </aside>
     <main className="main-content" id="workspace-content" tabIndex={-1}>
-      {showManagement ? <ManagementView onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} /> : <>
+      {showProjectAccess ? <ProjectAccessPanel project={project} onClose={() => setShowProjectAccess(false)} /> : !permissions.canEdit && session && project.id ? <section className="project-access-panel"><h1>{project.title}</h1><p>You have review access to this project.</p><button className="button button-dark" onClick={() => setShowPreview(true)}>Open course review</button></section> : showManagement ? <ManagementView onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} /> : <>
       <header className="topbar">
         <div className="project-heading"><p className="eyebrow">COURSE AUTHORING / {activeView === "storyboard" ? "STORYBOARD" : activeView === "media" ? "MEDIA LIBRARY" : "TEMPLATES"}</p><h1 title={project.title}>{project.title || "Your workspace"}</h1></div>
         <div className="top-actions"><span className="save-state" role="status">{busy ? "Working…" : project.id ? <><Check size={14} /> Saved locally</> : "Local authoring"}</span><button className="button button-outline" onClick={() => setShowPreview(true)} disabled={!project.id || !scenes.length || busy}><Play size={15} /> Preview course</button><button className="button button-accent" onClick={() => setShowExport(true)} disabled={!project.id || busy}><Download size={15} /> Export</button></div>
@@ -892,7 +914,7 @@ export function App() {
     {showValidation && <ValidationView projectId={project.id} onClose={() => setShowValidation(false)} onOpenScene={(sceneId, issueCode) => { const index = scenes.findIndex((item) => item.id === sceneId); setShowValidation(false); if (index >= 0) setSelectedScene(index); if (issueCode === "missing-image-alt-text") setShowAccessibility(true); else if (issueCode === "missing-assessment-item") setShowAssessmentEditor(true); else setActiveView("storyboard"); }} />}
     {showAccessibility && <AccessibilityView projectId={project.id} revision={project.storyboard.revision} scenes={scenes} assets={project.storyboard.assets} onClose={() => setShowAccessibility(false)} onProjectUpdated={applyProject} />}
     {showGoldenPath && <GoldenPathView walkthroughStatuses={Object.fromEntries(Object.entries(guides).map(([id, guide]) => [id, guide.controller.snapshot().status]))} onStartWalkthrough={() => startOnboarding()} onSelectWalkthrough={id => startOnboarding(id)} project={project} onClose={() => setShowGoldenPath(false)} onCreateProject={() => { setShowGoldenPath(false); setIsCreating(true); }} onOpenStoryboard={() => { setShowGoldenPath(false); setActiveView("storyboard"); }} onOpenMedia={() => { setShowGoldenPath(false); setActiveView("media"); }} onOpenAccessibility={() => { setShowGoldenPath(false); setShowAccessibility(true); }} onOpenPreview={() => { setShowGoldenPath(false); if (project.id) setShowPreview(true); }} onRunValidation={() => { setShowGoldenPath(false); setShowValidation(true); }} />}
-    {showPreview && project.id && <CoursePreview project={project} onClose={() => setShowPreview(false)} />}
+    {showPreview && project.id && <CoursePreview project={project} onClose={() => setShowPreview(false)} canEnhance={permissions.canEnhance} />}
     {showAssessmentEditor && project.id && scene?.sceneType === "assessment" && <AssessmentEditor projectId={project.id} projectTitle={project.title} revision={project.storyboard.revision} scene={scene} scenes={scenes}
       onClose={() => setShowAssessmentEditor(false)}
       onProjectUpdated={applyProject}

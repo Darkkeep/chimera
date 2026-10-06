@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Callable, Literal, Protocol
 from uuid import uuid4
+from contextvars import ContextVar
 
 from pydantic import BaseModel, Field
 
@@ -43,7 +44,7 @@ class AuditEventPage(BaseModel):
 
 def read_audit_events(root: Path, project_id: str | None = None, offset: int = 0, limit: int = 100) -> AuditEventPage:
     events: list[PlatformEvent] = []
-    project_roots = [root / "projects" / project_id] if project_id else sorted((root / "projects").glob("*"))
+    project_roots = [root / "projects" / project_id] if project_id else [root, *sorted((root / "projects").glob("*"))]
     for project_root in project_roots:
         path = project_root / "audit" / "events.jsonl"
         if not path.is_file():
@@ -153,6 +154,8 @@ LOCAL_ACTOR = ActorContext(
     deploymentMode="single-user",
 )
 
+REQUEST_ACTOR: ContextVar[ActorContext] = ContextVar("chimera_request_actor", default=LOCAL_ACTOR)
+
 
 def get_actor_context() -> ActorContext:
-    return LOCAL_ACTOR
+    return REQUEST_ACTOR.get()

@@ -24,7 +24,7 @@ def installation_policy(directory) -> OrganizationPolicy:
     return OrganizationPolicy.model_validate({
         **stored.model_dump(), "deploymentMode": "team",
         "identityProvider": "builtin" if profile == "darkrogue" else "encarta",
-        "reviewAccess": "no-external-review", "allowGuestReviewers": False,
+        "reviewAccess": os.environ.get("CHIMERA_REVIEW_ACCESS", "no-external-review") if profile == "darkrogue" else "no-external-review", "allowGuestReviewers": False,
     })
 
 
