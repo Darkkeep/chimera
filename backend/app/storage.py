@@ -551,6 +551,8 @@ def list_review_comments(project_id: str) -> list[ReviewComment]:
 
 def create_review_comment(project_id: str, data: ReviewCommentCreate, context: ActorContext | None = None) -> ReviewComment:
     context = context or get_actor_context()
+    if context.deploymentMode == "team":
+        data = data.model_copy(update={"authorLabel": context.actorDisplayName})
     with storyboard_transaction():
         project = read_project(project_id)
         scene = next((scene for scene in project.storyboard.scenes if scene.id == data.sceneId), None)
@@ -579,6 +581,8 @@ def create_review_comment(project_id: str, data: ReviewCommentCreate, context: A
 
 def add_review_reply(project_id: str, comment_id: str, data: ReviewReplyCreate, context: ActorContext | None = None) -> ReviewComment:
     context = context or get_actor_context()
+    if context.deploymentMode == "team":
+        data = data.model_copy(update={"authorLabel": context.actorDisplayName})
     with storyboard_transaction():
         comments = list_review_comments(project_id)
         for index, comment in enumerate(comments):
