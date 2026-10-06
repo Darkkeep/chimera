@@ -281,6 +281,10 @@ class EnhancementProposalDecisionRecord(BaseModel):
     decision: Literal["accept", "reject", "superseded", "reverse"]
     decidedAt: str
     expectedRevision: int
+    actorId: str | None = None
+    actorDisplayName: str | None = None
+    installationId: str | None = None
+    correlationId: str | None = None
     originalChanges: list[EnhancementProposalChange] = Field(default_factory=list)
     appliedChanges: list[EnhancementProposalChange] = Field(default_factory=list)
 

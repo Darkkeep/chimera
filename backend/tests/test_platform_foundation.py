@@ -99,7 +99,7 @@ class PlatformFoundationTests(unittest.TestCase):
             disabled.record(event)
             self.assertFalse((root / "audit" / "events.jsonl").exists())
 
-            sink = DurableEventSink(root, EventDeliveryPolicy(mode="centralized", maxAttempts=2))
+            sink = DurableEventSink(root, EventDeliveryPolicy(mode="centralized", maxAttempts=2, retryBaseSeconds=0))
             sink.record(event)
             queue = root / "audit" / "event-queue.jsonl"
             self.assertTrue(queue.exists())
@@ -107,9 +107,10 @@ class PlatformFoundationTests(unittest.TestCase):
             self.assertTrue(queue.exists())
             self.assertEqual(sink.flush(lambda _: False), 0)
             self.assertFalse(queue.exists())
+            self.assertTrue((root / "audit" / "event-dead-letter.jsonl").exists())
 
             sink.record(event)
-            self.assertEqual(sink.flush(lambda _: True), 1)
+            self.assertEqual(sink.flush(lambda event: event.eventId), 1)
             self.assertFalse(queue.exists())
 
     def test_audit_reader_paginates_and_ignores_malformed_lines(self) -> None:

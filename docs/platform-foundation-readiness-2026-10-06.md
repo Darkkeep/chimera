@@ -1,5 +1,7 @@
 # Platform foundation readiness: 2026-10-06
 
+This is the historical source audit. Follow-up implementation and current deployment boundaries are recorded in [Platform Foundation Implementation](platform-foundation-implementation.md).
+
 Word rendering/editability and representative SCORM 1.2 human qualification are recorded in the [release evidence](release-qualification-2026-10-06.md). This audit starts the next foundation milestone in the [operating model](product-operating-model.md); it does not certify team deployment or external review.
 
 The existing local implementation has actor/install IDs, persisted identity and membership records, an action-role map, a global API authorization dependency, policy fields, local audit files and a retry queue. All 16 existing auth, identity and platform-foundation tests passed. Those tests principally establish local behavior and adapter contracts, not isolation between authenticated team users.

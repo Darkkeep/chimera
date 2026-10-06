@@ -65,6 +65,7 @@ def build_project_archive(project_id: str) -> bytes:
 def restore_project_archive(project_id: str, content: bytes) -> object:
     root = project_path(project_id)
     read_project(project_id)
+    current_metadata = json.loads((root / "project.json").read_text(encoding="utf-8"))
     with tempfile.TemporaryDirectory() as temporary_name:
         temporary_root = Path(temporary_name)
         archive_path = temporary_root / "project.zip"
@@ -99,6 +100,11 @@ def restore_project_archive(project_id: str, content: bytes) -> object:
             project_path_file = extracted / "project.json"
             if not storyboard_path.is_file() or not project_path_file.is_file():
                 raise ValueError("Archive must contain project and storyboard records")
+            restored_metadata = json.loads(project_path_file.read_text(encoding="utf-8"))
+            for field in ("id", "installationId", "ownerId"):
+                if field in current_metadata:
+                    restored_metadata[field] = current_metadata[field]
+            project_path_file.write_text(json.dumps(restored_metadata, indent=2), encoding="utf-8")
             storyboard = Storyboard.model_validate_json(storyboard_path.read_text(encoding="utf-8"))
             if storyboard.projectId != project_id:
                 raise ValueError("Storyboard project ID does not match the archive")
@@ -117,6 +123,13 @@ def restore_project_archive(project_id: str, content: bytes) -> object:
             try:
                 for source in _included_files(extracted):
                     if source.relative_to(extracted).parts[0] == "templates":
+                        continue
+                    if source.relative_to(extracted).parts[0] == "audit":
+                        # Imported history is evidence, never authoritative live audit/queue state.
+                        if source.name == "events.jsonl":
+                            destination = root / "history" / f"imported-audit-{uuid.uuid4().hex}.jsonl"
+                            destination.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(source, destination)
                         continue
                     destination = root / source.relative_to(extracted)
                     destination.parent.mkdir(parents=True, exist_ok=True)
