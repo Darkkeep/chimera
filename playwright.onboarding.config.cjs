@@ -1,6 +1,6 @@
 const { defineConfig, devices } = require('@playwright/test');
 module.exports = defineConfig({
-  testDir: './tests/onboarding', testMatch: '*.spec.cjs', fullyParallel: true, workers: 3,
+  testDir: './tests/onboarding', testMatch: '*.spec.cjs', fullyParallel: true, workers: process.env.CI ? 1 : 3,
   forbidOnly: !!process.env.CI, retries: process.env.CI ? 1 : 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: { baseURL: 'http://127.0.0.1:5187', trace: 'retain-on-failure', screenshot: 'only-on-failure' },
