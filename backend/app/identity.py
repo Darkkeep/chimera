@@ -92,6 +92,12 @@ class IdentityDirectory(Protocol):
     def roles_for(self, user_id: str, project_id: str | None = None) -> set[PlatformRole]:
         ...
 
+    def project_installation(self, project_id: str) -> str | None:
+        ...
+
+    def project_owner(self, project_id: str) -> str | None:
+        ...
+
 
 class LocalIdentityDirectory:
     def __init__(self, root: Path, actor: ActorContext = LOCAL_ACTOR) -> None:
@@ -130,6 +136,15 @@ class LocalIdentityDirectory:
         try:
             metadata = json.loads((self.path.parent.parent / "projects" / project_id / "project.json").read_text(encoding="utf-8"))
             return metadata.get("installationId")
+        except (OSError, ValueError):
+            return None
+
+    def project_owner(self, project_id: str) -> str | None:
+        if Path(project_id).name != project_id or project_id in {".", ".."}:
+            return None
+        try:
+            metadata = json.loads((self.path.parent.parent / "projects" / project_id / "project.json").read_text(encoding="utf-8"))
+            return metadata.get("ownerId")
         except (OSError, ValueError):
             return None
 
@@ -228,14 +243,15 @@ class RoleBasedAuthorizationPolicy:
             return context.actorId == snapshot.actor.actorId
         organization_roles = self.directory.roles_for(context.actorId)
         if project_id is None:
+            if action == "identity.view":
+                return True
             if action == "project.list" and any(item.userId == context.actorId and self.directory.project_installation(item.projectId) == context.installationId for item in snapshot.projectMemberships):
                 return True
             return bool(organization_roles & required_roles)
         if self.directory.project_installation(project_id) != context.installationId:
             return False
         roles = self.directory.roles_for(context.actorId, project_id)
-        metadata = json.loads((self.directory.path.parent.parent / "projects" / project_id / "project.json").read_text(encoding="utf-8"))
-        if metadata.get("ownerId") == context.actorId:
+        if self.directory.project_owner(project_id) == context.actorId:
             roles.update(organization_roles & {"author", "instructional-designer"})
         if "administrator" in organization_roles:
             roles.add("administrator")
