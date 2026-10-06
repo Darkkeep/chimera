@@ -5,3 +5,21 @@
 .onboarding-card .onboarding-actions {
   pointer-events: auto;
 }
+
+[role="dialog"] > .onboarding-card {
+  position: fixed;
+  inset: auto 20px 20px auto;
+  width: min(385px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  margin: 0;
+  padding: 22px;
+  overflow-y: auto;
+}
+
+@media (max-width: 600px) {
+  [role="dialog"] > .onboarding-card {
+    inset: auto 16px 16px auto;
+    width: calc(100vw - 32px);
+    padding: 16px;
+  }
+}
