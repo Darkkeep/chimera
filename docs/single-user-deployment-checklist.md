@@ -64,4 +64,6 @@ It verifies health, installation mode, project loading, production validation, b
 
 Portable LibreOffice was extracted and verified on 2026-10-06: real PPTX rendering, visual inspection of the 34-page Word PDF, and an automated editable DOCX round trip passed. See the [verification record](portable-libreoffice-verification.md). Interactive Word editing and SCORM 1.2 LMS qualification remain separate checks.
 
+Follow-up on 2026-10-06: the user confirmed SCORM 1.2 passes their LMS; SCORM 2004 is unsupported there. Extended Word checks passed for the current 35-page export, long-text/Unicode rendering, and paragraph/table edits retained through a DOCX round trip. Interactive Writer editing remains unverified because automatic approval review blocked launching Writer.
+
 Do not select Team Mode for a demonstration deployment. Encarta is intentionally fail-closed until its token validation, claims mapping, tenant mapping, logout/session behavior, and failure contract are implemented against the real Encarta integration.

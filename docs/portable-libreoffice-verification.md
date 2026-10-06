@@ -23,6 +23,14 @@ Local evidence is retained in `workspace/portable-libreoffice-verification`: ori
 
 LibreOffice emitted `Could not find platform independent libraries <prefix>` during the Word conversions; conversions returned zero and produced verified files. Interactive Writer editing, broader Unicode/layout fixtures, and execution on a separately restricted user account were not tested by this pass. Application execution restrictions remain dependent on the user's Windows policy.
 
+## Extended Word qualification: 2026-10-06
+
+- Fresh TestFrame revision 8 export converted to a 35-page PDF, containing 31 editable tables and two embedded images.
+- A copy generated through Chimera's Word exporter with accented Latin text, Greek characters, typographic punctuation, and 100 long paragraphs converted to 41 pages. PDF text checks confirmed Unicode and the final long paragraph survived; representative first/last page renders were inspected visually.
+- A working copy with an edited paragraph, an edited table cell, and added Unicode text was converted to PDF and resaved as DOCX through LibreOffice. Reopening the saved DOCX confirmed the table-cell edit and Unicode persisted, with all 31 tables and both embedded images retained. The original project was not modified.
+- Evidence: `workspace/portable-libreoffice-verification/word-qualification-results.json`, `qualify_word.py`, `storyboard-current.docx/pdf`, `storyboard-stress.docx/pdf`, `storyboard-qualification-edit.docx/pdf`, `storyboard-qualification-reopened.docx`, and rendered page PNGs.
+- Interactive Writer launch was rejected by automatic approval review, without a specific reason supplied. Mouse/keyboard editing in Writer remains unverified; the headless edit/save/reopen checks above do not close that gate.
+
 ## Repeat the local verification
 
 From the repository root, with the retained evidence folder:

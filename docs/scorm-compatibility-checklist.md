@@ -95,3 +95,20 @@ Recorded 2026-09-29 against generated packages served from `http://127.0.0.1:876
 - [x] Fresh SCORM requests enforced production attribution validation; the representative `TestFrame` project was blocked with a clear `422` response until `UncySam2.png` attribution is completed.
 - [x] Previously recorded SCORM 1.2 and 2004 release archives still pass manifest completeness and profile runtime-token checks.
 - [ ] No new Blackboard SCORM 1.2 LMS session was available during this pass; external qualification remains open.
+
+### TestFrame requalification: 2026-10-06
+
+- Live production validation passed with no issues before and after export. Both fresh packages represent `testframe-565c5da8`, revision 8, with 28 required scenes and one image asset.
+- SCORM 1.2: `workspace/scorm-qualification-current/scorm12.zip`, 2,594,440 bytes; SHA-256 `26c7df5d8d1745084fe9e3e92e805e28071af5220b6595561c37db83b6f6db57`.
+- SCORM 2004: `workspace/scorm-qualification-current/scorm2004.zip`, 2,594,449 bytes; SHA-256 `ebd2df773d76e898b8bc910060eeed57b6d900677f52980a14a3bdd82c63e840`.
+- Both build reports returned `passed`, no warnings, and all seven archive compatibility checks passed.
+- Both packaged players were served over local HTTP and tested in headless Chromium: launch without an LMS, preview diagnostic, package-relative image loading, navigation, bookmark restoration, incorrect answer (0%), correct retry (100%), assessment state restoration, completion/pass status, score, and LMS termination passed. No browser JavaScript errors were observed. Suspend data was 531 UTF-8 bytes in each profile.
+- All 52 backend storyboard flow tests passed, including profile exports, invalid-production rejection, missing manifest targets, runtime syntax validation, revision changes during assembly, and completion behavior.
+- Browser evidence, screenshots, package copies, reports, and the local harness are retained in `workspace/scorm-qualification-current`. Run `node workspace/scorm-qualification-current/qualify.cjs` to repeat the retained-package browser pass.
+- Scope: the browser harness uses permissive fake LMS APIs. It does not validate every SCORM data-model constraint or certify Blackboard behavior. TestFrame contains no audio asset; actual audio playback was not exercised in this pass. Larger-course qualification and independent SCORM 1.2 Blackboard qualification remain open.
+
+### User LMS result: 2026-10-06
+
+- The user reported that the supplied TestFrame SCORM 1.2 package passes their LMS testing. This closes the target-LMS gate for that package based on user confirmation.
+- The user reported that their LMS does not accept SCORM 2004. That profile is unsupported for this deployment and is excluded from its acceptance requirements.
+- LMS name/version, browser, and individual test outcomes were not supplied; this record does not infer those details or extend the result to audio fixtures, larger courses, or other LMS deployments.
