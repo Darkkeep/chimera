@@ -21,7 +21,11 @@ jobs:
       with:
         python-version: '3.12'
     - name: Install backend dependencies
-      run: pip install -r backend/requirements.txt
+      run: pip install -r backend/requirements-dev.txt
+    - name: Verify retained qualification evidence
+      run: python docs/qualification/support/verify.py
+    - name: Run backend checks
+      run: python -m unittest discover -s backend/tests
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
     - name: Verify pinned onboarding artifact

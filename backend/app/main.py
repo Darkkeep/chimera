@@ -18,7 +18,7 @@ from .enhancement_jobs import cancel_enhancement_job, preview_enhancement_submis
 from .identity import IdentitySnapshot, LocalIdentityDirectory, OrganizationPolicy, ProjectMembership, ProjectMembershipCreate, RoleBasedAuthorizationPolicy
 from .media_generation import cancel_media_generation_job, recover_media_generation_jobs, regenerate_candidate, retry_media_generation_job, start_media_generation_job
 from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalCreate, EnhancementProposalDecision, EnhancementProposalResult, ExportSettings, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, ReferenceResource, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewReplyCreate, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate, ValidationReport
-from .platform import ActorContext, AuditEventPage, AuthorizationPolicy, LOCAL_ACTOR, read_audit_events
+from .platform import ActorContext, AuditEventPage, AuthorizationPolicy, LOCAL_ACTOR, read_audit_events, action_context, get_actor_context, DurableEventSink, PlatformEvent, get_correlation_id
 from .references import SUPPORTED_REFERENCE_EXTENSIONS, extract_reference_passages
 from .render import render_slides
 from .qti import assessment_item_xml, assessment_test_package
@@ -28,69 +28,72 @@ from .validation import validate_project
 from .word_export import DOCX_MEDIA_TYPE, build_storyboard_docx
 
 
+ROUTE_ACTIONS = {
+    "health": "identity.view", "get_identity_context": "identity.view",
+    "get_identity_policy": "identity.view", "get_installation_config": "identity.view",
+    "patch_identity_policy": "admin.policy.manage", "get_project_members": "project.membership.manage",
+    "post_project_member": "project.membership.manage", "get_project_health": "project.list",
+    "get_my_work": "project.list", "get_audit_events": "admin.audit.view",
+    "get_projects": "project.list", "get_templates": "template.view",
+    "post_template": "template.manage", "patch_template": "template.manage",
+    "put_template_source": "template.manage", "post_project": "project.create",
+    "get_project": "project.view", "get_project_validation": "project.view",
+    "get_project_readiness": "project.metadata.view", "patch_project_asset_attribution": "media.manage",
+    "patch_project_completion_settings": "project.settings.update", "patch_project_export_settings": "project.settings.update",
+    "get_enhancement_proposals": "project.view", "get_review_comments": "project.view",
+    "post_review_comment": "review.comment.create", "post_review_reply": "review.reply.create",
+    "post_review_comment_decision": "review.comment.resolve", "post_enhancement_proposal": "enhancement.proposal.create",
+    "post_enhancement_proposal_decision": "enhancement.proposal.decide", "get_reference_resources": "project.view",
+    "post_reference_resource": "reference.create", "get_enhancement_jobs": "project.view",
+    "get_media_generation_jobs": "project.view", "post_media_generation_job": "media.job.create",
+    "get_media_generation_job": "project.view", "post_media_generation_job_cancel": "media.job.manage",
+    "post_media_generation_job_retry": "media.job.manage", "get_generated_candidates": "project.view",
+    "post_generated_candidate_approval": "enhancement.proposal.decide", "post_generated_candidate_rejection": "media.candidate.manage",
+    "post_generated_candidate_regeneration": "media.job.create", "get_generated_candidate_asset": "project.view",
+    "post_enhancement_job_preview": "enhancement.job.create", "post_enhancement_job": "enhancement.job.create",
+    "get_enhancement_job": "project.view", "post_enhancement_job_cancel": "enhancement.job.manage",
+    "post_enhancement_job_retry": "enhancement.job.manage", "export_qti_assessment_item": "project.export",
+    "export_qti_assessment_test": "project.export", "export_scorm_2004": "project.export",
+    "export_scorm_12": "project.export", "get_scorm_report": "project.export",
+    "export_storyboard": "project.export", "export_project_backup": "project.export",
+    "import_project_backup": "project.restore", "export_storyboard_docx": "project.export",
+    "import_storyboard": "project.import", "post_project_asset": "media.manage",
+    "get_project_asset": "project.view", "get_slide_render": "project.view",
+    "post_scene": "scene.manage", "patch_scene": "scene.manage", "delete_project_scene": "scene.manage",
+    "put_scene_order": "scene.manage", "upload_source": "project.import",
+}
+
+
 def get_authorization_policy() -> RoleBasedAuthorizationPolicy:
     return RoleBasedAuthorizationPolicy(LocalIdentityDirectory(ROOT))
 
 
 def _request_action(request: Request) -> str:
-    if request.method == "GET":
-        return "project.view"
-    path = request.url.path
-    if path == "/api/projects":
-        return "project.create"
-    if path.endswith("/identity/policy"):
-        return "admin.policy.manage"
-    if path.endswith("/management/audit"):
-        return "admin.audit.view"
-    if path.endswith("/members"):
-        return "project.membership.manage"
-    if "/review-comments/" in path:
-        if path.endswith("/replies"):
-            return "review.reply.create"
-        if path.endswith("/decision"):
-            return "review.comment.resolve"
-        return "review.comment.create"
-    if "/enhancement-proposals/" in path and path.endswith("/decision"):
-        return "enhancement.proposal.decide"
-    if path.endswith("/enhancement-proposals"):
-        return "enhancement.proposal.create"
-    if "/reference-resources" in path:
-        return "reference.create"
-    if "/media-generation-jobs/" in path:
-        return "media.job.manage"
-    if path.endswith("/media-generation-jobs"):
-        return "media.job.create"
-    if "/generated-candidates/" in path:
-        return "media.candidate.manage"
-    if "/enhancement-jobs/" in path:
-        return "enhancement.job.manage"
-    if path.endswith("/enhancement-jobs"):
-        return "enhancement.job.create"
-    if path.endswith("/backup/restore"):
-        return "project.restore"
-    if path.endswith("/storyboard/import"):
-        return "project.import"
-    if "/assets" in path:
-        return "media.manage"
-    if "/completion-settings" in path or "/export-settings" in path:
-        return "project.settings.update"
-    if "/scenes" in path:
-        return "scene.manage"
-    if path.endswith("/source"):
-        return "project.import"
-    if path.startswith("/api/templates"):
-        return "template.manage"
-    return "project.mutate"
+    return ROUTE_ACTIONS.get(getattr(request.scope.get("route"), "name", ""), "unknown")
 
 
-def _require_request_access(
+async def _require_request_access(
     request: Request,
     context: Annotated[ActorContext, Depends(resolve_actor_context)],
     policy: Annotated[AuthorizationPolicy, Depends(get_authorization_policy)],
 ) -> None:
     action = _request_action(request)
     project_id = request.path_params.get("project_id")
+    if action == "admin.audit.view":
+        project_id = request.query_params.get("project_id")
     _require_action(policy, context, action, project_id)
+    with action_context(context):
+        yield
+        if request.method != "GET" or action == "project.export":
+            root = project_path(project_id) if project_id else ROOT
+            event_class = "security" if action in {"project.export", "project.restore", "project.membership.manage", "admin.policy.manage", "enhancement.proposal.decide", "review.comment.resolve"} else "operational"
+            DurableEventSink(root).record(PlatformEvent(
+                eventName="api.action_completed", installationId=context.installationId,
+                actorId=context.actorId, actorDisplayName=context.actorDisplayName,
+                correlationId=get_correlation_id(), projectId=project_id,
+                deploymentMode=context.deploymentMode, eventClass=event_class,
+                metadata={"action": action, "method": request.method},
+            ))
 
 
 app = FastAPI(title="Chimera API", version="0.1.0", dependencies=[Depends(_require_request_access)])
@@ -155,7 +158,14 @@ def health() -> dict[str, str]:
 
 @app.get("/api/identity/context", response_model=IdentitySnapshot)
 def get_identity_context() -> IdentitySnapshot:
-    return LocalIdentityDirectory(ROOT).snapshot()
+    snapshot = LocalIdentityDirectory(ROOT).snapshot()
+    actor = get_actor_context()
+    if actor.deploymentMode == "single-user":
+        return snapshot
+    user = next(item for item in [snapshot.user, *snapshot.users] if item.id == actor.actorId)
+    return snapshot.model_copy(update={"actor": actor, "user": user, "users": [],
+        "memberships": [item for item in snapshot.memberships if item.userId == actor.actorId],
+        "projectMemberships": [item for item in snapshot.projectMemberships if item.userId == actor.actorId]})
 
 
 @app.get("/api/identity/policy", response_model=OrganizationPolicy)
@@ -210,6 +220,8 @@ def post_project_member(
 def get_project_health() -> list[dict[str, object]]:
     health: list[dict[str, object]] = []
     for summary in list_projects():
+        if not get_authorization_policy().allows(get_actor_context(), "project.metadata.view", summary.id):
+            continue
         project = read_project(summary.id)
         authoring = validate_project(project, target="authoring")
         production = validate_project(project, target="production")
@@ -231,7 +243,7 @@ def get_project_health() -> list[dict[str, object]]:
 
 @app.get("/api/management/my-work")
 def get_my_work() -> dict[str, object]:
-    actor = LocalIdentityDirectory(ROOT).snapshot().actor
+    actor = get_actor_context()
     projects = get_project_health()
     return {
         "actorId": actor.actorId,
@@ -246,12 +258,12 @@ def get_my_work() -> dict[str, object]:
 def get_audit_events(project_id: str | None = None, offset: int = 0, limit: int = 100) -> AuditEventPage:
     if offset < 0 or limit < 1 or limit > 500:
         raise HTTPException(status_code=422, detail="Offset must be non-negative and limit must be between 1 and 500")
-    return read_audit_events(ROOT, project_id, offset, limit)
+    return read_audit_events(ROOT, project_id, offset, limit, installation_id=get_actor_context().installationId)
 
 
 @app.get("/api/projects", response_model=list[ProjectSummary])
 def get_projects() -> list[ProjectSummary]:
-    return list_projects()
+    return [project for project in list_projects() if get_authorization_policy().allows(get_actor_context(), "project.metadata.view", project.id)]
 
 
 @app.get("/api/templates", response_model=list[TemplateRecord])

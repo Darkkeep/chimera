@@ -1,5 +1,7 @@
 # Chimera Product Operating Model
 
+The 2026-10-06 foundation execution uses adapter-first identity, one organization and guests disabled, as selected by the installation owner. See [implementation and acceptance boundaries](platform-foundation-implementation.md); a real provider and collector trust/residency contract remain deployment gates.
+
 Status: Direction agreed 2026-09-30
 
 ## Product boundary
