@@ -69,6 +69,7 @@ class PlatformAccessTests(unittest.TestCase):
         response = self.client.post(base + '/review-comments', headers=headers, json={'sceneId': self.project.storyboard.scenes[0].id, 'authorLabel': 'Untrusted display label', 'body': 'Please review'})
         self.assertEqual(response.status_code, 201, response.text)
         self.assertEqual(response.json()['actorId'], 'reviewer')
+        self.assertEqual(response.json()['authorLabel'], 'Known reviewer')
         events = self.audit()[before:]
         self.assertTrue(all(event['actorId'] == 'reviewer' for event in events))
         self.assertEqual(len({event['correlationId'] for event in events}), 1)
