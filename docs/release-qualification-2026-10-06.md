@@ -4,7 +4,7 @@
 
 PR #1's run `37469497612` failed four WebKit checks and reported one flaky check. Clicks stalled during visibility/stability, scrolling or dispatch; one retry exhausted its overall test deadline during an API read. This is insufficient evidence of a product defect.
 
-Commit `feaf2a6` uses one worker on CI and retains three locally. All browser projects, assertions, deadlines and the existing single retry remain enabled. An isolated checkout of `996b21a` with only this configuration change passed all 27 WebKit checks without retries (4.8 minutes), using the committed backend rather than unrelated working-tree storage changes. Hosted verification: [run 37479229067](https://github.com/Darkkeep/chimera/actions/runs/37479229067), pending at preparation of this record. Reduced contention is a working diagnosis until hosted verification completes.
+Commit `feaf2a6` uses one worker on CI and retains three locally. All browser projects, assertions, deadlines and the existing single retry remain enabled. An isolated checkout of `996b21a` with only this configuration change passed all 27 WebKit checks without retries (4.8 minutes), using the committed backend rather than unrelated working-tree storage changes. Hosted verification: [run 37479229067](https://github.com/Darkkeep/chimera/actions/runs/37479229067) passed all 81 checks in 12.0 minutes with one worker, no flaky results and no retries. This supports reduced CI contention as the remedy for this failure set; it does not guarantee all future runs will be free of flakes.
 
 ## Word rendered inspection
 
@@ -31,12 +31,12 @@ Prepared a fresh two-scene package with a three-second generated WAV, required-a
 - Source project: `scorm-1-2-release-qualification-dc8a4fb6`, revision 7.
 - Supporting files: `scorm12-source.json`, `scorm12-build.json` in the same directory.
 - Intended independent environment: authenticated human testing at `https://usafsam.blackboard.com`.
-- Status: pending human observations of upload/launch, audio/completion, score, bookmark, response resume and LMS reporting. No browser-control tool is available in this agent session.
+- Status: human verification confirmed by Erik Hart on 2026-10-06: “SCORM 1.2 export is human-verified.” The supplied package above is the artifact for this pass. LMS version, browser and individual observations were not separately supplied, so no detailed environment matrix or per-check results are invented. No browser-control tool is available in this agent session; this is human attestation, distinct from local automated evidence.
 
 Test sequence: upload through Course Content → Add content → Create → SCORM package, enable score grading, and launch as preview learner. Verify incomplete status before required audio ends. Finish audio, advance to assessment, exit and reopen to verify location. Submit “Weather only,” exit/reopen to verify the failed attempt persists, then retry “Equipment.” Exit and confirm score 100 and passed status in LMS reporting. Record LMS version, browser, warnings and individual results. Larger-course and suspend-data-limit qualification remain separate open checks.
 
 ## Sequence and claim boundaries
 
-After independent SCORM 1.2 qualification, follow the [operating model](product-operating-model.md): settle installation identity/tenancy and policy, prove membership/action permissions, and establish audit retention and tracking/redaction/delivery before external-review design. External-review design must specify fixed revisions, reviewer identity or controlled invitations, expiry, permitted actions and concurrency before links are exposed. No broader workflow or richer-media implementation is added by this qualification work.
+With Word and representative SCORM 1.2 qualification complete, follow the [operating model](product-operating-model.md): settle installation identity/tenancy and policy, prove membership/action permissions, and establish audit retention and tracking/redaction/delivery before external-review design. The [foundation readiness audit](platform-foundation-readiness-2026-10-06.md) records the concrete implementation gaps and ordered acceptance checks. External-review design must specify fixed revisions, reviewer identity or controlled invitations, expiry, permitted actions and concurrency before links are exposed. No broader workflow or richer-media implementation is added by this qualification work.
 
 The [onboarding migration gates](onboarding-repository-migration.md) remain open: a second maintained consumer, observed novice-author pilot, manual screen-reader review and asset redistribution rights. CI passing does not establish API stability, human usability or permission for public rollout.

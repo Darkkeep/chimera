@@ -1,5 +1,11 @@
 # SCORM Compatibility Checklist
 
+## Human SCORM 1.2 qualification: 2026-10-06
+
+Erik Hart confirmed: “SCORM 1.2 export is human-verified,” following delivery of the two-scene qualification ZIP for the authenticated USAFSAM Blackboard session. The supplied package has SHA-256 `b3b023f2ba9c4cb9555281e5d5e08e6baabb96c142f76650d27d58cd238d9725`; its production build and seven archive checks passed without warnings. See the [dated qualification record](release-qualification-2026-10-06.md) for artifact paths, source revision and test sequence.
+
+This closes the representative independent-LMS gate by human attestation. LMS version, browser and per-step results were not separately supplied. Earlier dated records below remain historical; larger-course, suspend-data-limit and broader LMS/browser matrix qualification remain open.
+
 Use this checklist for every release candidate package. Automated checks are recorded in the profile-specific build report alongside each release ZIP.
 
 ## Automated

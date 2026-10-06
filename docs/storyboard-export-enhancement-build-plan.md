@@ -20,7 +20,7 @@ The source review found:
 
 | Capability | Existing foundation | Remaining work |
 | --- | --- | --- |
-| SCORM | SCORM 2004 and 1.2 builders, validation, build reports, runtime tracking, publication filtering, and local browser qualification for both profiles | Independent LMS qualification for SCORM 1.2; larger-course and suspend-data qualification remain open |
+| SCORM | SCORM 2004 and 1.2 builders, validation, build reports, runtime tracking, publication filtering, local browser qualification for both profiles, and human-confirmed representative SCORM 1.2 LMS qualification on 2026-10-06 | Larger-course, suspend-data-limit and broader LMS/browser matrix qualification remain open; see [qualification evidence](release-qualification-2026-10-06.md) |
 | Word | Pinned `python-docx` exporter, DOCX download endpoint, editable scene sections, media/accessibility details, assessments, opt-in answer keys, and source revision; representative output rendered and edited in Word 16.0 on 2026-10-06 | Narration transcripts, source-resource citations, and review comments remain unmodeled; see [qualification evidence](release-qualification-2026-10-06.md) |
 | Enhancement | Revision-bound proposals, grouped approval, edit-before-accept, audit history, reversal, stale/superseded handling, provider jobs, grounding references, cancellation, retry, and restart recovery | Provider-specific usage reporting, OCR, deployment authentication, and distributed queue hardening |
 | Media | Project image/audio upload, scene attachment, accessibility metadata, attribution, generated candidates, and explicit approval | Structured placement, shared library, course-wide usage, video, and richer generation settings |
@@ -344,12 +344,12 @@ These decisions do not block the publishing foundation, but must be resolved bef
 - [x] External image and audio media can be imported and attached per scene; shared/global placement and video remain open.
 - [x] Playable storyboard supports persistent review comments.
 - [x] Study Guides and supporting resources guide traceable enhancement; OCR remains open.
-- [x] Preview and exported course follow the implemented shared content, assessment, completion, and media rules; independent SCORM 1.2 LMS verification remains open.
+- [x] Preview and exported course follow the implemented shared content, assessment, completion, and media rules; representative independent SCORM 1.2 LMS verification was human-confirmed on 2026-10-06.
 - [x] The connected workflow is validated and documented.
 - [x] Complete project backup and restore preserve the current local project scope.
 
 ## Next decision
 
-After the remaining Word inspection and SCORM 1.2 LMS qualification, begin external review design as the next product milestone. Keep the richer media backlog explicit rather than making it a prerequisite for external review: structured placement, shared/course-wide media, video, OCR, and provider-specific generation controls are separate follow-up work.
+Word inspection and representative SCORM 1.2 LMS qualification are complete; see the [dated evidence](release-qualification-2026-10-06.md). External review design remains the next product milestone after platform foundations. Keep the richer media backlog explicit rather than making it a prerequisite for external review: structured placement, shared/course-wide media, video, OCR, and provider-specific generation controls are separate follow-up work.
 
-The broader platform foundation now precedes that milestone: settle identity/tenancy, membership permissions, centralized tracking, and audit retention in the [Product Operating Model](product-operating-model.md), then implement those foundations before exposing external review links or adding further workflow breadth.
+The broader platform foundation precedes that milestone: settle identity/tenancy, membership permissions, centralized tracking, and audit retention in the [Product Operating Model](product-operating-model.md), then implement those foundations before exposing external review links or adding further workflow breadth. The [2026-10-06 readiness audit](platform-foundation-readiness-2026-10-06.md) identifies the remaining gaps in the existing local scaffolding.
