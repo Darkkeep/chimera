@@ -6,6 +6,15 @@ from pathlib import Path
 
 
 def find_libreoffice() -> str | None:
+    configured = os.environ.get("CHIMERA_LIBREOFFICE_PATH")
+    if configured:
+        candidate = Path(configured).expanduser()
+        # An explicit configuration must not silently use another installation.
+        return str(candidate.resolve()) if candidate.is_file() else None
+    project_root = Path(__file__).resolve().parents[2]
+    portable = project_root / "tools" / "LibreOfficePortable" / "App" / "libreoffice" / "program" / "soffice.exe"
+    if portable.is_file():
+        return str(portable)
     executable = shutil.which("soffice") or shutil.which("libreoffice")
     if executable:
         return executable

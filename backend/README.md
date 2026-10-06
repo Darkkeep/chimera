@@ -9,7 +9,7 @@ uvicorn app.main:app --reload --port 8000
 
 The API stores projects under `workspace/projects` by default. Set `CHIMERA_WORKSPACE` to use another location.
 
-Rendered slide previews require LibreOffice with `soffice` available on `PATH`. If it is unavailable, PPTX import still extracts slide content and reports that previews could not be generated.
+Rendered slide previews require LibreOffice. Windows users can extract LibreOffice Portable into `tools/LibreOfficePortable` at the repository root without a system installation; Chimera detects `App/libreoffice/program/soffice.exe` there automatically. Alternatively, set `CHIMERA_LIBREOFFICE_PATH` to the full executable path before starting the backend. Discovery prefers that explicit setting, then the project portable copy, then `PATH` and standard Windows installation folders. An invalid explicit setting disables discovery rather than silently selecting a different installation. See the root README for portable setup. If LibreOffice is unavailable, PPTX import still extracts slide content and reports that previews could not be generated.
 
 Enhancement references accept PDF, DOCX, PPTX, TXT, and Markdown files up to 25 MB. Originals and extracted page/slide/paragraph/line passages are stored as versioned project references, separately from learner media. Scanned PDFs without extractable text are marked as failed and cannot be selected for a grounded enhancement run; OCR is not currently provided.
 

@@ -62,4 +62,6 @@ It verifies health, installation mode, project loading, production validation, b
 
 ## Team Mode boundary
 
+Portable LibreOffice was extracted and verified on 2026-10-06: real PPTX rendering, visual inspection of the 34-page Word PDF, and an automated editable DOCX round trip passed. See the [verification record](portable-libreoffice-verification.md). Interactive Word editing and SCORM 1.2 LMS qualification remain separate checks.
+
 Do not select Team Mode for a demonstration deployment. Encarta is intentionally fail-closed until its token validation, claims mapping, tenant mapping, logout/session behavior, and failure contract are implemented against the real Encarta integration.
