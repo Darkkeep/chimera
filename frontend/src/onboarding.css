@@ -1,0 +1,7 @@
+.onboarding-card {
+  pointer-events: none;
+}
+
+.onboarding-card .onboarding-actions {
+  pointer-events: auto;
+}

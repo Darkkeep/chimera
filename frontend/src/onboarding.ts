@@ -1,6 +1,7 @@
 import { createJourney, type Context, type Journey, type Step } from '@guided-workflows/onboarding';
 import { mountJourney } from '@guided-workflows/onboarding/dom';
 import '@guided-workflows/onboarding/style.css';
+import './onboarding.css';
 
 export const firstSceneJourney: Journey = {
   id: 'first-scene', version: 1, title: 'Your first saved scene',
