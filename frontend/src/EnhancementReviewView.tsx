@@ -1,3 +1,4 @@
+import { reportOnboardingOutcome } from "./onboarding-journeys";
 import { ChangeEvent, useEffect, useState } from "react";
 import { Check, FileUp, RotateCw, Sparkles, X } from "lucide-react";
 import type { Project } from "./App";
@@ -188,6 +189,7 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
       if (!response.ok || !result) throw new Error(result?.detail || "Enhancement job could not be submitted.");
       setJobs((current) => [result, ...current.filter((job) => job.id !== result.id)]);
       setPreview(null);
+      reportOnboardingOutcome("enhancement.submitted", project.id);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Enhancement job could not be submitted.");
     } finally {
@@ -211,6 +213,7 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
       if (!response.ok || !resource) throw new Error(resource?.detail || "Reference resource could not be uploaded.");
       setResources((current) => [resource, ...current]);
       if (resource.versions.at(-1)?.extractionStatus === "complete") setSelectedResourceIds((current) => [...current, resource.id]);
+      reportOnboardingOutcome("reference.uploaded", project.id);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Reference resource could not be uploaded.");
     } finally {
@@ -227,6 +230,7 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
       const result = await response.json().catch(() => null) as EnhancementJob & { detail?: string } | null;
       if (!response.ok || !result) throw new Error(result?.detail || `Could not ${action} enhancement job.`);
       setJobs((current) => [result, ...current.filter((job) => job.id !== result.id)]);
+      reportOnboardingOutcome("enhancement.job-updated", project.id);
     } catch (jobError) {
       setError(jobError instanceof Error ? jobError.message : `Could not ${action} enhancement job.`);
     } finally {
@@ -269,6 +273,7 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
       setProposals((current) => current.map((proposal) => proposal.id === result.proposal.id ? result.proposal : proposal));
       if (result.project) onProjectUpdated(result.project);
       setEditingProposalId("");
+      reportOnboardingOutcome("suggestion.decided", project.id);
     } catch (decisionError) {
       setError(decisionError instanceof Error ? decisionError.message : "Suggestion could not be reviewed.");
       if (decisionError instanceof Error && decisionError.message.includes("stale")) {
@@ -302,7 +307,7 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
   }
 
   return <div className="assessment-editor-backdrop" onMouseDown={(event) => event.target === event.currentTarget && !busyProposalId && onClose()}>
-    <section className="enhancement-review-dialog" role="dialog" aria-modal="true" aria-labelledby="enhancement-review-title">
+    <section data-onboarding="review.enhancement" className="enhancement-review-dialog" role="dialog" aria-modal="true" aria-labelledby="enhancement-review-title">
       <header className="assessment-editor-header">
         <div><p className="eyebrow">AUTHOR APPROVAL · {pendingCount} PENDING</p><h2 id="enhancement-review-title">Storyboard suggestions</h2></div>
         <button className="icon-button" onClick={onClose} disabled={Boolean(busyProposalId)} aria-label="Close suggestion review"><X size={18} /></button>

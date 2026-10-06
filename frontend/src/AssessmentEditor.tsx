@@ -1,3 +1,4 @@
+import { reportOnboardingOutcome } from "./onboarding-journeys";
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Download, Minus, Plus, Save, X } from "lucide-react";
 import type { AssessmentChoice, AssessmentItem, AssessmentPair, AssessmentSettings, AssessmentType, Project, Scene } from "./App";
@@ -199,6 +200,8 @@ export function AssessmentEditor({ projectId, projectTitle, revision, scene, sce
       }
       onProjectUpdated(await response.json() as Project);
       setSaved(true);
+      reportOnboardingOutcome(`question.saved.${item.type}`, projectId, scene.id);
+      reportOnboardingOutcome("question.saved", projectId, scene.id);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Question could not be saved.");
     } finally {
@@ -221,6 +224,7 @@ export function AssessmentEditor({ projectId, projectTitle, revision, scene, sce
       link.click();
       link.remove();
       window.URL.revokeObjectURL(downloadUrl);
+      reportOnboardingOutcome("question.exported", projectId, scene.id);
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "QTI 2.1 item could not be exported.");
     } finally {
@@ -240,6 +244,7 @@ export function AssessmentEditor({ projectId, projectTitle, revision, scene, sce
       });
       if (!response.ok) throw new Error(revisionConflictMessage(response.status) || "Question could not be removed.");
       onProjectUpdated(await response.json() as Project);
+      reportOnboardingOutcome("question.removed", projectId, scene.id);
       onClose();
     } catch (removeError) {
       setError(removeError instanceof Error ? removeError.message : "Question could not be removed.");
@@ -275,7 +280,7 @@ export function AssessmentEditor({ projectId, projectTitle, revision, scene, sce
   }
 
   return <div className="assessment-editor-backdrop" onMouseDown={(event) => event.target === event.currentTarget && !busy && onClose()}>
-    <section className="assessment-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="assessment-editor-title">
+    <section data-onboarding="assessment.editor" className="assessment-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="assessment-editor-title">
       <header className="assessment-editor-header">
         <div><p className="eyebrow">VERSION-NEUTRAL ASSESSMENT</p><h2 id="assessment-editor-title">{scene.title}</h2></div>
         <button className="icon-button" onClick={onClose} disabled={busy} aria-label="Close question editor"><X size={18} /></button>

@@ -1,8 +1,13 @@
 import { Check, ChevronRight, CircleHelp, X } from "lucide-react";
+import { useState } from "react";
+import { chimeraJourneys } from "./onboarding-journeys";
 import type { Project } from "./App";
 import "./golden-path.css";
 
 type GoldenPathViewProps = {
+  onStartWalkthrough: () => void;
+  onSelectWalkthrough: (id: string) => void;
+  walkthroughStatuses: Record<string, string>;
   project: Project;
   onClose: () => void;
   onCreateProject: () => void;
@@ -24,7 +29,9 @@ type GuideStep = {
   action?: () => void;
 };
 
-export function GoldenPathView({ project, onClose, onCreateProject, onOpenStoryboard, onOpenMedia, onOpenAccessibility, onOpenPreview, onRunValidation }: GoldenPathViewProps) {
+export function GoldenPathView({ onStartWalkthrough, onSelectWalkthrough, walkthroughStatuses, project, onClose, onCreateProject, onOpenStoryboard, onOpenMedia, onOpenAccessibility, onOpenPreview, onRunValidation }: GoldenPathViewProps) {
+  const [walkthroughQuery, setWalkthroughQuery] = useState("");
+  const visibleJourneys = chimeraJourneys.filter(journey => `${journey.title} ${journey.steps[0].instruction}`.toLowerCase().includes(walkthroughQuery.trim().toLowerCase()));
   const scenes = project.storyboard.scenes;
   const imageCount = scenes.reduce((count, scene) => count + scene.imageAssets.length, 0);
   const imagesNeedingDescriptions = scenes.reduce((count, scene) => count + scene.imageAssets.filter((assetId) => !scene.decorativeImages.includes(assetId) && !scene.imageAltText[assetId]?.trim()).length, 0);
@@ -96,6 +103,18 @@ export function GoldenPathView({ project, onClose, onCreateProject, onOpenStoryb
         <button className="icon-button" onClick={onClose} aria-label="Close Golden Path"><X size={18} /></button>
       </header>
       <p className="golden-path-intro">A practical route from a new project to a reviewed storyboard.</p>
+      <button type="button" className="button button-accent" onClick={onStartWalkthrough}>Start / resume walkthrough</button>
+      <details><summary>All functionality walkthroughs ({chimeraJourneys.length})</summary>
+        <p>Choose a task. Saves and downloads advance only on success; review steps need acknowledgment. Pause preserves forms. Some tasks require existing content or a configured provider.</p>
+        <label>Find a walkthrough<input type="search" value={walkthroughQuery} onChange={event => setWalkthroughQuery(event.target.value)} placeholder="e.g. audio, questions, backup" /></label>
+        {visibleJourneys.length === 0 && <p role="status">No matching walkthroughs. Try a different task name.</p>}
+        <ol className="golden-path-steps">{visibleJourneys.map((journey, index) => <li className="golden-path-step" key={journey.id}>
+          <span className="golden-path-number">{index + 1}</span>
+          <div className="golden-path-step-copy"><div className="golden-path-step-heading"><h3>{journey.title}</h3><span>{walkthroughStatuses[journey.id] === "complete" ? "Practiced" : walkthroughStatuses[journey.id] === "finished" ? "Ended with skips" : walkthroughStatuses[journey.id] === "paused" ? "Paused" : "Ready to start"}</span></div><p>{journey.steps[0].instruction}</p>
+            <button type="button" className="golden-path-action" onClick={() => onSelectWalkthrough(journey.id)}>Start {journey.title}<ChevronRight size={15} /></button>
+          </div>
+        </li>)}</ol>
+      </details>
       <ol className="golden-path-steps">
         {steps.map((step, index) => <li className={`golden-path-step ${step.status}`} key={step.title}>
           <span className="golden-path-number">{step.status === "done" ? <Check size={15} /> : String(index + 1).padStart(2, "0")}</span>

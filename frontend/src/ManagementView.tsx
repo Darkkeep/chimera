@@ -35,7 +35,7 @@ export function ManagementView({ onClose }: ManagementViewProps) {
     blockers: summary.blockers + item.publicationBlockers,
   }), { pending: 0, comments: 0, blockers: 0 });
 
-  return <section className="management-view" aria-labelledby="management-title">
+  return <section data-onboarding="workspace.management" className="management-view" aria-labelledby="management-title">
     <header className="management-header">
       <div><p className="eyebrow">TEAM PLATFORM / MANAGEMENT</p><h1 ref={titleRef} tabIndex={-1} id="management-title">My Work</h1><p>Review your projects, approvals, and recent activity.</p></div>
       <button type="button" className="button button-outline" onClick={onClose}><ArrowLeft size={15} /> Return to authoring</button>

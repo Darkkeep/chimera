@@ -1,0 +1,31 @@
+{
+  "name": "chimera",
+  "version": "1.0.0",
+  "description": "Chimera is a local authoring tool for turning PowerPoint decks into editable storyboards and portable SCORM packages.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test:onboarding": "playwright test --config playwright.onboarding.config.cjs",
+    "verify:onboarding:artifact": "node vendor/onboarding/verify.cjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Darkkeep/chimera.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Darkkeep/chimera/issues"
+  },
+  "homepage": "https://github.com/Darkkeep/chimera#readme",
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "1.59.1",
+    "@types/node": "^26.6.4",
+    "@guided-workflows/onboarding": "file:vendor/onboarding/guided-workflows-onboarding-0.1.1.tgz"
+  }
+}

@@ -1,3 +1,4 @@
+import { reportOnboardingOutcome } from "./onboarding-journeys";
 import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import type { Asset, Project } from "./App";
@@ -38,6 +39,7 @@ export function MediaAttributionEditor({ projectId, revision, asset, onProjectUp
         throw new Error(detail?.detail || "Media attribution could not be saved.");
       }
       onProjectUpdated(await response.json() as Project);
+      reportOnboardingOutcome("media.credit-saved", projectId, asset.id);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Media attribution could not be saved.");
     } finally {

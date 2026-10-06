@@ -1,3 +1,4 @@
+import { reportOnboardingOutcome } from "./onboarding-journeys";
 import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
 import type { CourseCompletionSettings, Project } from "./App";
@@ -33,6 +34,7 @@ export function CompletionSettingsEditor({ project, onClose, onProjectUpdated }:
         throw new Error(detail?.detail || "Completion rules could not be saved.");
       }
       onProjectUpdated(await response.json() as Project);
+      reportOnboardingOutcome("completion.saved", project.id);
       onClose();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Completion rules could not be saved.");
@@ -42,7 +44,7 @@ export function CompletionSettingsEditor({ project, onClose, onProjectUpdated }:
   }
 
   return <div className="modal-backdrop" onClick={() => !busy && onClose()}>
-    <section className="modal scene-editor" role="dialog" aria-modal="true" aria-labelledby="completion-settings-title" onClick={(event) => event.stopPropagation()}>
+    <section data-onboarding="review.completion" className="modal scene-editor" role="dialog" aria-modal="true" aria-labelledby="completion-settings-title" onClick={(event) => event.stopPropagation()}>
       <div className="modal-head"><div><p className="eyebrow">COURSE SUCCESS</p><h2 id="completion-settings-title">Completion rules</h2></div><button className="icon-button" onClick={onClose} disabled={busy} aria-label="Close completion settings"><X size={18} /></button></div>
       {error && <p className="assessment-editor-error" role="alert">{error}</p>}
       <label>Course passing score<select value={settings.passingScore} onChange={(event) => setSettings({ ...settings, passingScore: Number(event.target.value) })}>{[50, 60, 70, 75, 80, 85, 90, 100].map((score) => <option key={score} value={score}>{score}% weighted assessment score</option>)}</select></label>

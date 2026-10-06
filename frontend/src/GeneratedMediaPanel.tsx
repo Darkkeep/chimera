@@ -1,3 +1,4 @@
+import { reportOnboardingOutcome } from "./onboarding-journeys";
 import { useEffect, useState } from "react";
 import { Check, ImagePlus, Mic, RefreshCw, Sparkles, X } from "lucide-react";
 import type { Project, Scene } from "./App";
@@ -71,6 +72,7 @@ export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated }: 
       const result = await response.json().catch(() => null) as { project?: Project; detail?: string } | null;
       if (!response.ok) throw new Error(result?.detail || "Candidate decision could not be saved.");
       if (result?.project) onProjectUpdated(result.project);
+      reportOnboardingOutcome("candidate.decided", project.id, candidate.id);
       await loadCandidates();
     } catch (decisionError) { setError(decisionError instanceof Error ? decisionError.message : "Candidate decision could not be saved."); }
     finally { setWorking(false); }
@@ -82,12 +84,13 @@ export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated }: 
       const response = await fetch(`/api/projects/${project.id}/generated-candidates/${candidate.id}/regenerate`, { method: "POST" });
       if (!response.ok) throw new Error((await response.json().catch(() => null) as { detail?: string } | null)?.detail || "Candidate regeneration could not be started.");
       await loadCandidates();
+      reportOnboardingOutcome("candidate.regenerated", project.id, candidate.id);
     } catch (regenerationError) { setError(regenerationError instanceof Error ? regenerationError.message : "Candidate regeneration could not be started."); }
     finally { setWorking(false); }
   }
 
   const visibleCandidates = candidates.filter((candidate) => !scene || candidate.sceneId === scene.id);
-  return <section className="generated-media-panel" aria-labelledby="generated-media-title">
+  return <section data-onboarding="media.generated" className="generated-media-panel" aria-labelledby="generated-media-title">
     <div className="generated-media-heading"><div><p className="eyebrow">AUTHOR CONTROLLED GENERATION</p><h3 id="generated-media-title">Create a media candidate</h3><span className="field-hint">Generation never attaches media to a scene automatically.</span></div><Sparkles size={18} /></div>
     <div className="generated-media-form">
       <label>Scene<select value={scene?.id || ""} disabled><option>{scene?.title || "Select a scene first"}</option></select></label>

@@ -12,6 +12,8 @@ The source has changed since the original capability review: Word export, refere
 
 **Working convention:** Select the intended project and scene before editing. Use the task's Save/Create/Accept control and wait for completion. Merely typing into a form does not save it. If a revision-conflict message appears, reload the project, inspect the latest values, and reapply the intended change. Do not assume unsaved form text will survive a reload.
 
+Optional interactive help is available under **Review tools ? Guided review ? All functionality walkthroughs**. Search the catalog and start the task you want to practice. The sidebar resumes your last selected walkthrough. Action steps wait for confirmed saves/downloads; review steps use Next. Escape pauses without clearing an open draft. Progress is browser-local and separate for each task/project; completing a walkthrough does not certify readiness. Restore/deletion confirmations and provider submissions remain your decisions.
+
 ## Processes
 
 1. [Manage projects and workspace](#1-manage-projects-and-workspace)
@@ -54,6 +56,8 @@ The source has changed since the original capability review: Word export, refere
 | 2 | Choose **Light**, **Dark**, or **System**. | The preference is applied and remembered in this browser. | <a href="user-guide/images/appearance.png"><img src="user-guide/images/appearance.png" alt="appearance controls" width="240"></a> |
 
 ### Follow the guided workflow
+
+For an interactive first-scene walkthrough, choose **Start / resume walkthrough** in the sidebar or in Guided review. The guide highlights the relevant control and advances after a confirmed project/scene save. Existing projects begin at scene creation. **Escape** or **Pause guide** hides the guide without discarding the open form; use **Resume walkthrough** inside that form to continue. Skipping a step ends the walkthrough without marking it complete. Restarting creates new practice content; it does not reset the project. See the [implementation and verification record](onboarding-implementation.md).
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |

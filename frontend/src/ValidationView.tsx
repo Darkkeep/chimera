@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { reportOnboardingOutcome } from "./onboarding-journeys";
 import { AlertTriangle, Check, CircleCheck, X } from "lucide-react";
 import "./validation.css";
 import "./validation-target.css";
@@ -38,7 +39,11 @@ export function ValidationView({ projectId, onClose, onOpenScene }: ValidationVi
         if (!response.ok) throw new Error("Validation could not be run.");
         return response.json() as Promise<ValidationReport>;
       })
-      .then(setReport)
+      .then(result => {
+        if (controller.signal.aborted) return;
+        setReport(result);
+        reportOnboardingOutcome("validation.loaded", projectId);
+      })
       .catch((requestError: unknown) => {
         if (requestError instanceof Error && requestError.name !== "AbortError") setError(requestError.message);
       })
@@ -52,7 +57,7 @@ export function ValidationView({ projectId, onClose, onOpenScene }: ValidationVi
   const warnings = report?.issues.filter((issue) => issue.severity === "warning").length ?? 0;
 
   return <div className="validation-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-    <section className="validation-dialog" role="dialog" aria-modal="true" aria-labelledby="validation-title">
+    <section data-onboarding="review.validation" className="validation-dialog" role="dialog" aria-modal="true" aria-labelledby="validation-title">
       <header className="validation-header">
         <div><p className="eyebrow">{target === "production" ? "PRODUCTION RELEASE GATE" : "PROJECT REVIEW"}</p><h2 id="validation-title">{target === "production" ? "Production readiness" : "Validation"}</h2></div>
         <button className="icon-button" onClick={onClose} aria-label="Close validation report"><X size={18} /></button>

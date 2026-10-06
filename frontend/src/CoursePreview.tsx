@@ -1,3 +1,4 @@
+import { reportOnboardingOutcome } from "./onboarding-journeys";
 import { BrandMark } from "./BrandMark";
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, MessageCircle, Send, X } from "lucide-react";
@@ -260,6 +261,7 @@ export function CoursePreview({ project, onClose }: CoursePreviewProps) {
       if (!response.ok) throw new Error("Comment could not be saved.");
       const created = await response.json() as ReviewComment;
       setComments((current) => [...current, created]); setCommentBody("");
+      reportOnboardingOutcome("comment.saved", project.id, scene.id);
     } catch (error: unknown) { setCommentError(error instanceof Error ? error.message : "Comment could not be saved."); }
     finally { setCommentBusy(false); }
   }
@@ -271,6 +273,7 @@ export function CoursePreview({ project, onClose }: CoursePreviewProps) {
       if (!response.ok) throw new Error("Review update could not be saved.");
       const updated = await response.json() as ReviewComment;
       setComments((current) => current.map((comment) => comment.id === updated.id ? updated : comment));
+      reportOnboardingOutcome("comment.updated", project.id, updated.sceneId);
       if (action === "replies") setReplyDrafts((current) => ({ ...current, [commentId]: "" }));
     } catch (error: unknown) { setCommentError(error instanceof Error ? error.message : "Review update could not be saved."); }
     finally { setCommentBusy(false); }
@@ -285,7 +288,7 @@ export function CoursePreview({ project, onClose }: CoursePreviewProps) {
     finally { setCommentBusy(false); }
   }
 
-  return <section className="course-preview-shell" role="dialog" aria-modal="true" aria-label={`${project.title} course preview`}>
+  return <section data-onboarding="preview.content" className="course-preview-shell" role="dialog" aria-modal="true" aria-label={`${project.title} course preview`}>
     <header className="course-preview-header">
       <div className="preview-brand-lockup"><BrandMark /><div className="course-preview-brand"><span>CHIMERA PREVIEW</span><strong>{project.title}</strong></div></div>
       <div className={`course-preview-progress ${coursePassed ? "course-complete" : ""}`}><span>{courseComplete ? coursePassed ? `Course passed · Score ${weightedScore ?? 100}%` : `Course complete · Score ${weightedScore ?? 0}% · Pass ${project.storyboard.completionSettings.passingScore}%` : requiredAudioSetupMissingCount ? `${requiredAudioSetupMissingCount} required-audio ${requiredAudioSetupMissingCount === 1 ? "scene has" : "scenes have"} no audio attached` : `${completedRequiredSceneCount} of ${requiredSceneCount} required scenes · ${completedRequiredAudioCount} of ${requiredAudioTrackCount} required audio tracks`}</span><div className="course-preview-progress-track" role="progressbar" aria-label="Required scenes completed" aria-valuemin={0} aria-valuemax={Math.max(requiredSceneCount, 1)} aria-valuenow={completedRequiredSceneCount}><span style={{ width: `${requiredSceneCount ? Math.round(completedRequiredSceneCount / requiredSceneCount * 100) : 0}%` }} /></div></div>
@@ -356,7 +359,7 @@ export function CoursePreview({ project, onClose }: CoursePreviewProps) {
           const isComplete = completedAudioKeys.includes(audioCompletionKey(scene.id, audioId));
           return <section className={`course-preview-audio ${isRequired ? "required-audio" : ""}`} key={audioId}><span>{asset.filename}{isRequired ? ` · ${isComplete ? "Complete" : "Required"}` : ""}</span><audio controls preload="metadata" src={`/api/projects/${project.id}/assets/${audioId}`} aria-label={`Audio: ${asset.filename}${isRequired ? ", required" : ""}`} onEnded={() => { if (isRequired) setCompletedAudioKeys((current) => current.includes(audioCompletionKey(scene.id, audioId)) ? current : [...current, audioCompletionKey(scene.id, audioId)]); }} /></section>;
         })}
-        <section className="course-preview-review" aria-labelledby="course-preview-review-title">
+        <section data-onboarding="preview.comments" className="course-preview-review" aria-labelledby="course-preview-review-title">
           <div className="course-preview-review-heading"><div><span className="course-preview-assessment-kicker">IN-APP REVIEW · REVISION {project.storyboard.revision}</span><h2 id="course-preview-review-title"><MessageCircle size={17} /> Scene discussion</h2></div><label className="course-preview-comment-filter">Show<select value={commentFilter} onChange={(event) => setCommentFilter(event.target.value as "all" | "unresolved" | "outdated")}><option value="all">All threads</option><option value="unresolved">Unresolved</option><option value="outdated">Outdated</option></select></label></div>
           <div className="course-preview-comment-form"><label>Reviewer<input value={commentAuthor} onChange={(event) => setCommentAuthor(event.target.value)} /></label><label>Comment<textarea rows={2} value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Leave feedback on this scene" /></label><button type="button" className="course-preview-nav-button next" onClick={() => void postComment()} disabled={commentBusy || !commentBody.trim()}><Send size={14} /> Add comment</button></div>
           {commentError && <p className="course-preview-comment-error" role="alert">{commentError}</p>}

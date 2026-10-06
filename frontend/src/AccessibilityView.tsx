@@ -1,3 +1,4 @@
+import { reportOnboardingOutcome } from "./onboarding-journeys";
 import { useState } from "react";
 import { Accessibility, Check, Image as ImageIcon, X } from "lucide-react";
 import type { Asset, Project, Scene } from "./App";
@@ -47,6 +48,7 @@ export function AccessibilityView({ projectId, revision, scenes, assets, onClose
       });
       if (!response.ok) throw new Error(revisionConflictMessage(response.status) || "Image accessibility details could not be saved.");
       onProjectUpdated(await response.json() as Project);
+      reportOnboardingOutcome("image.described", projectId, scene.id);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Image accessibility details could not be saved.");
     } finally {
@@ -55,7 +57,7 @@ export function AccessibilityView({ projectId, revision, scenes, assets, onClose
   }
 
   return <div className="accessibility-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-    <section className="accessibility-dialog" role="dialog" aria-modal="true" aria-labelledby="accessibility-title">
+    <section data-onboarding="review.accessibility" className="accessibility-dialog" role="dialog" aria-modal="true" aria-labelledby="accessibility-title">
       <header className="accessibility-header">
         <div><p className="eyebrow">ACCESSIBILITY</p><h2 id="accessibility-title">Image descriptions</h2></div>
         <button className="icon-button" onClick={onClose} aria-label="Close image accessibility editor"><X size={18} /></button>
