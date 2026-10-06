@@ -21,7 +21,7 @@ The source review found:
 | Capability | Existing foundation | Remaining work |
 | --- | --- | --- |
 | SCORM | SCORM 2004 and 1.2 builders, validation, build reports, runtime tracking, publication filtering, and local browser qualification for both profiles | Independent LMS qualification for SCORM 1.2; larger-course and suspend-data qualification remain open |
-| Word | Pinned `python-docx` exporter, DOCX download endpoint, editable scene sections, media/accessibility details, assessments, opt-in answer keys, and source revision | Manual rendered pagination/editability inspection; narration transcripts, source-resource citations, and review comments remain unmodeled |
+| Word | Pinned `python-docx` exporter, DOCX download endpoint, editable scene sections, media/accessibility details, assessments, opt-in answer keys, and source revision; representative output rendered and edited in Word 16.0 on 2026-10-06 | Narration transcripts, source-resource citations, and review comments remain unmodeled; see [qualification evidence](release-qualification-2026-10-06.md) |
 | Enhancement | Revision-bound proposals, grouped approval, edit-before-accept, audit history, reversal, stale/superseded handling, provider jobs, grounding references, cancellation, retry, and restart recovery | Provider-specific usage reporting, OCR, deployment authentication, and distributed queue hardening |
 | Media | Project image/audio upload, scene attachment, accessibility metadata, attribution, generated candidates, and explicit approval | Structured placement, shared library, course-wide usage, video, and richer generation settings |
 | Playback review | Learner preview, assessment playback, persistent comments, replies, resolution, outdated context, and comment-linked enhancement | External reviewer hosting, authentication, permissions, and link expiry |
@@ -141,8 +141,8 @@ Acceptance:
 
 - [x] Text and tables are native editable Word content, not reconstructed screenshots.
 - [x] Scene order and substantive content match the selected revision in automated checks.
-- [ ] Long scenes, Unicode, tables, images, and page breaks remain readable in a rendered inspection.
-- [x] Automated document checks verify required sections and content; manual rendered Word inspection remains pending.
+- [x] Long scenes, Unicode, tables, images, and page breaks remain readable in a representative rendered inspection in Word 16.0; see [qualification evidence](release-qualification-2026-10-06.md).
+- [x] Automated document checks verify required sections and content; Word paragraph/table edits survived save and reopen on 2026-10-06.
 
 Milestone A: trustworthy direct SCORM and editable Word export.
 
