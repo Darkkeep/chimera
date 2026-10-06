@@ -1,0 +1,124 @@
+{
+  "id": "release-qualification-caf-storyboard-a86acbc0",
+  "title": "Release qualification — café storyboard",
+  "sceneCount": 2,
+  "updatedAt": "2026-10-06T14:28:26.071160+00:00",
+  "hasSourceDeck": false,
+  "installationId": "local-installation",
+  "ownerId": "local-user",
+  "storyboard": {
+    "schemaVersion": "1.0",
+    "revision": 7,
+    "projectId": "release-qualification-caf-storyboard-a86acbc0",
+    "title": "Release qualification — café storyboard",
+    "description": "",
+    "completionSettings": {
+      "passingScore": 80,
+      "includeOptionalAssessments": false
+    },
+    "exportSettings": {
+      "packageWarningThresholdMB": 200
+    },
+    "scenes": [
+      {
+        "id": "scene-7f294735",
+        "sourceSlide": null,
+        "title": "Long Unicode scene — café",
+        "sceneType": "content",
+        "extractedText": [
+          "Paragraph 1: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 1: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 1: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 1: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. ",
+          "Paragraph 2: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 2: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 2: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 2: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. ",
+          "Paragraph 3: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 3: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 3: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 3: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. ",
+          "Paragraph 4: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 4: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 4: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 4: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. ",
+          "Paragraph 5: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 5: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 5: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 5: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. ",
+          "Paragraph 6: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 6: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 6: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 6: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. ",
+          "Paragraph 7: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 7: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 7: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 7: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. ",
+          "Paragraph 8: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 8: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 8: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 8: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. ",
+          "Paragraph 9: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 9: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 9: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 9: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. ",
+          "Paragraph 10: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 10: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 10: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 10: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. ",
+          "Paragraph 11: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 11: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 11: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 11: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. ",
+          "Paragraph 12: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 12: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 12: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. Paragraph 12: Inspect the equipment before use. Café, naïve façade, Ελληνικά, résumé. Record the result and confirm the safe operating condition. "
+        ],
+        "actionDescription": "Production direction: display the inspection illustration.",
+        "narration": "",
+        "layoutMode": "native",
+        "required": true,
+        "audioRequired": false,
+        "assessmentItem": null,
+        "assessmentSettings": null,
+        "backgroundAsset": null,
+        "templateId": null,
+        "imageAssets": [
+          "image-d7aafb4d0a1fa311386b64b9b8962cef27415c91aaca69876c528214aa555023"
+        ],
+        "imageAltText": {
+          "image-d7aafb4d0a1fa311386b64b9b8962cef27415c91aaca69876c528214aa555023": "Equipment inspection illustration."
+        },
+        "decorativeImages": [],
+        "audioAssets": [],
+        "previewImage": null,
+        "renderWarning": null,
+        "notes": "Speaker notes remain editable authoring material.",
+        "sourceAnimationXml": null,
+        "sourceTransitionXml": null
+      },
+      {
+        "id": "scene-92168ad5",
+        "sourceSlide": null,
+        "title": "Assessment and editable response table",
+        "sceneType": "content",
+        "extractedText": [
+          "Choose the correct inspection action."
+        ],
+        "actionDescription": "",
+        "narration": "",
+        "layoutMode": "native",
+        "required": true,
+        "audioRequired": false,
+        "assessmentItem": {
+          "identifier": "QUALIFICATION",
+          "prompt": "What should you inspect before use?",
+          "correctFeedback": "Correct — inspect the equipment.",
+          "incorrectFeedback": "Review the material and try again.",
+          "type": "single-choice",
+          "choices": [
+            {
+              "identifier": "equipment",
+              "text": "Equipment — check condition and record findings."
+            },
+            {
+              "identifier": "weather",
+              "text": "Weather only"
+            }
+          ],
+          "correctResponse": "equipment"
+        },
+        "assessmentSettings": null,
+        "backgroundAsset": null,
+        "templateId": null,
+        "imageAssets": [],
+        "imageAltText": {},
+        "decorativeImages": [],
+        "audioAssets": [],
+        "previewImage": null,
+        "renderWarning": null,
+        "notes": "",
+        "sourceAnimationXml": null,
+        "sourceTransitionXml": null
+      }
+    ],
+    "assets": [
+      {
+        "id": "image-d7aafb4d0a1fa311386b64b9b8962cef27415c91aaca69876c528214aa555023",
+        "kind": "image",
+        "filename": "inspection.png",
+        "contentType": "image/png",
+        "sizeBytes": 3298,
+        "sha256": "d7aafb4d0a1fa311386b64b9b8962cef27415c91aaca69876c528214aa555023",
+        "path": "assets/images/image-d7aafb4d0a1fa311386b64b9b8962cef27415c91aaca69876c528214aa555023.png",
+        "attributionText": "Original qualification fixture created locally",
+        "attributionStatus": "complete"
+      }
+    ]
+  }
+}

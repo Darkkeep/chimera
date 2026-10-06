@@ -1,0 +1,116 @@
+{
+  "id": "scorm-1-2-release-qualification-dc8a4fb6",
+  "title": "SCORM 1.2 release qualification",
+  "sceneCount": 2,
+  "updatedAt": "2026-10-06T14:29:43.041854+00:00",
+  "hasSourceDeck": false,
+  "installationId": "local-installation",
+  "ownerId": "local-user",
+  "storyboard": {
+    "schemaVersion": "1.0",
+    "revision": 7,
+    "projectId": "scorm-1-2-release-qualification-dc8a4fb6",
+    "title": "SCORM 1.2 release qualification",
+    "description": "",
+    "completionSettings": {
+      "passingScore": 80,
+      "includeOptionalAssessments": false
+    },
+    "exportSettings": {
+      "packageWarningThresholdMB": 200
+    },
+    "scenes": [
+      {
+        "id": "scene-6cebce73",
+        "sourceSlide": null,
+        "title": "Required audio and bookmark",
+        "sceneType": "content",
+        "extractedText": [
+          "Play the three-second tone to the end, then advance. Exit on the assessment scene before answering, and reopen to check the bookmark."
+        ],
+        "actionDescription": "",
+        "narration": "",
+        "layoutMode": "native",
+        "required": true,
+        "audioRequired": true,
+        "assessmentItem": null,
+        "assessmentSettings": null,
+        "backgroundAsset": null,
+        "templateId": null,
+        "imageAssets": [],
+        "imageAltText": {},
+        "decorativeImages": [],
+        "audioAssets": [
+          "audio-fe4d6354300bae5559235c2bb78d2821d0c6bb9942cb65d6772d595724b7f953"
+        ],
+        "previewImage": null,
+        "renderWarning": null,
+        "notes": "",
+        "sourceAnimationXml": null,
+        "sourceTransitionXml": null
+      },
+      {
+        "id": "scene-2c6818ef",
+        "sourceSlide": null,
+        "title": "Assessment resume and score",
+        "sceneType": "assessment",
+        "extractedText": [
+          "First answer Weather only (incorrect), exit and resume, then retry with Equipment (correct)."
+        ],
+        "actionDescription": "",
+        "narration": "",
+        "layoutMode": "native",
+        "required": true,
+        "audioRequired": false,
+        "assessmentItem": {
+          "identifier": "QUALIFY_SCORM12",
+          "prompt": "What should you inspect before use?",
+          "correctFeedback": "Correct: inspect the equipment.",
+          "incorrectFeedback": "Try again: inspect equipment.",
+          "type": "single-choice",
+          "choices": [
+            {
+              "identifier": "equipment",
+              "text": "Equipment"
+            },
+            {
+              "identifier": "weather",
+              "text": "Weather only"
+            }
+          ],
+          "correctResponse": "equipment"
+        },
+        "assessmentSettings": {
+          "maxAttempts": 3,
+          "passingScore": 100,
+          "scoreWeight": 1.0,
+          "remediationSceneId": null
+        },
+        "backgroundAsset": null,
+        "templateId": null,
+        "imageAssets": [],
+        "imageAltText": {},
+        "decorativeImages": [],
+        "audioAssets": [],
+        "previewImage": null,
+        "renderWarning": null,
+        "notes": "",
+        "sourceAnimationXml": null,
+        "sourceTransitionXml": null
+      }
+    ],
+    "assets": [
+      {
+        "id": "audio-fe4d6354300bae5559235c2bb78d2821d0c6bb9942cb65d6772d595724b7f953",
+        "kind": "audio",
+        "filename": "qualification-tone.wav",
+        "contentType": "audio/wav",
+        "sizeBytes": 48044,
+        "sha256": "fe4d6354300bae5559235c2bb78d2821d0c6bb9942cb65d6772d595724b7f953",
+        "path": "assets/audio/audio-fe4d6354300bae5559235c2bb78d2821d0c6bb9942cb65d6772d595724b7f953.wav",
+        "attributionText": "Original locally generated qualification tone",
+        "attributionStatus": "complete"
+      }
+    ]
+  }
+}

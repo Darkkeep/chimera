@@ -12,7 +12,7 @@ Microsoft Word 16.0 opened the export, rendered PDFs and saved/reopened ordinary
 
 The first inspection exposed a media-table layout defect: a long opaque asset ID squeezed accessibility and credit text into narrow columns. The exporter now fixes the four column widths within the six-inch text area. Re-rendering confirmed readable wrapped IDs, accessibility text and credits. The existing DOCX export/content test passed. Edits to the title and scene metadata survived save/reopen in Word after the correction.
 
-Evidence remains in `workspace/release-qualification/workspace/qualification/`:
+Exact evidence is retained in [the versioned qualification archive](qualification/README.md), under `docs/qualification/2026-10-06/`, with a complete SHA-256 manifest and portable verification/fixture-generation scripts:
 
 | Artifact | SHA-256 |
 | --- | --- |
@@ -26,7 +26,7 @@ The source is synthetic, project `release-qualification-caf-storyboard-a86acbc0`
 
 Prepared a fresh two-scene package with a three-second generated WAV, required-audio completion, a three-attempt single-choice assessment, score and bookmark/response persistence. Production validation and all seven archive checks passed with no warnings. These checks are preparation, not independent LMS qualification.
 
-- Artifact: `workspace/release-qualification/workspace/qualification/scorm12-qualification.zip` (7,793 bytes).
+- Artifact: [retained SCORM 1.2 package](qualification/2026-10-06/scorm12-qualification.zip) (7,793 bytes).
 - SHA-256: `b3b023f2ba9c4cb9555281e5d5e08e6baabb96c142f76650d27d58cd238d9725`.
 - Source project: `scorm-1-2-release-qualification-dc8a4fb6`, revision 7.
 - Supporting files: `scorm12-source.json`, `scorm12-build.json` in the same directory.
