@@ -8,6 +8,7 @@ from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.oxml.ns import qn
 
 from .models import ExtractedAsset, Scene
+from .pptx_layout import extract_slide_layout
 
 
 IMAGE_EXTENSIONS = {".bmp", ".emf", ".gif", ".jpeg", ".jpg", ".png", ".svg", ".tif", ".tiff", ".wmf"}
@@ -94,6 +95,14 @@ def extract_presentation(source: Path, output_root: Path) -> tuple[list[Scene], 
             asset_refs = image_assets if kind == "image" else audio_assets
             if asset.id not in asset_refs:
                 asset_refs.append(asset.id)
+        def register_image(relationship: Any) -> str:
+            asset = _asset_from_relationship(relationship, "image", output_root)
+            assets_by_id[asset.id] = asset
+            if asset.id not in image_assets:
+                image_assets.append(asset.id)
+            return asset.id
+
+        visual_layout = extract_slide_layout(presentation, slide, register_image)
         slide_xml = ElementTree.fromstring(slide._element.xml)
         timing = slide_xml.find(qn("p:timing"))
         transition = slide_xml.find(qn("p:transition"))
@@ -103,7 +112,8 @@ def extract_presentation(source: Path, output_root: Path) -> tuple[list[Scene], 
                 sourceSlide=index,
                 title=title,
                 extractedText=texts[1:],
-                backgroundAsset=None,
+                backgroundAsset=visual_layout.backgroundAsset,
+                visualLayout=visual_layout,
                 imageAssets=image_assets,
                 audioAssets=audio_assets,
                 notes=notes_frame.text.strip() if notes_frame else "",

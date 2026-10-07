@@ -1164,6 +1164,61 @@ def delete_project_scene(project_id: str, scene_id: str, if_match: Annotated[str
         raise HTTPException(status_code=404, detail="Scene not found") from error
 
 
+@app.post("/api/projects/{project_id}/scenes/{scene_id}/extract-layout", response_model=ProjectDetail)
+def extract_scene_layout(project_id: str, scene_id: str, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
+    from .storage import write_storyboard
+
+    try:
+        current = read_project(project_id)
+        expected = _expected_revision(if_match) or current.storyboard.revision
+        _check_expected_revision(expected, current.storyboard.revision)
+        scene = next((item for item in current.storyboard.scenes if item.id == scene_id), None)
+        if scene is None:
+            raise HTTPException(status_code=404, detail="Scene not found")
+        if scene.visualLayout is not None:
+            return current
+        source = project_path(project_id) / "original" / "source-deck.pptx"
+        if not source.is_file() or scene.sourceSlide is None:
+            raise HTTPException(status_code=422, detail="This scene has no retained PowerPoint source")
+        with tempfile.TemporaryDirectory(prefix=".layout-", dir=project_path(project_id)) as directory:
+            staging = Path(directory)
+            extracted, assets = extract_presentation(source, staging)
+            source_scene = next((item for item in extracted if item.sourceSlide == scene.sourceSlide), None)
+            if source_scene is None or source_scene.visualLayout is None:
+                raise HTTPException(status_code=422, detail="Source slide is not available")
+            layout = source_scene.visualLayout.model_copy(deep=True)
+            slide_text = [element for element in layout.elements if element.kind == "text" and element.source == "slide"]
+            current_text = [scene.title, *scene.extractedText]
+            if len(slide_text) == len(current_text):
+                for element, text in zip(slide_text, current_text):
+                    element.text = text
+            elif current_text != [source_scene.title, *source_scene.extractedText]:
+                layout.elements = [element for element in layout.elements if element.kind != "text" or element.source != "slide"]
+                from .models import SceneElement
+                layout.elements.append(SceneElement(id="preserved-text", kind="text", x=40, y=40, width=layout.width - 80, height=max(40, layout.height - 80), text="\n".join(current_text)))
+                layout.warnings.append("Existing text edits were preserved in a combined text box.")
+            updated_scene = scene.model_copy(update={"visualLayout": layout, "backgroundAsset": layout.backgroundAsset, "imageAssets": list(dict.fromkeys([*scene.imageAssets, *source_scene.imageAssets]))})
+            needed = {element.assetId for element in layout.elements if element.kind == "image"}
+            needed.update(source_scene.imageAssets)
+            if layout.backgroundAsset:
+                needed.add(layout.backgroundAsset)
+            imported_assets = [asset for asset in assets if asset.id in needed]
+            merged_assets = {asset.id: asset for asset in imported_assets}
+            merged_assets.update({asset.id: asset for asset in current.storyboard.assets})
+            storyboard = current.storyboard.model_copy(update={"scenes": [updated_scene if item.id == scene_id else item for item in current.storyboard.scenes], "assets": list(merged_assets.values())})
+            with storyboard_transaction():
+                _check_expected_revision(expected, read_project(project_id).storyboard.revision)
+                persist_imported_assets(project_id, staging, imported_assets)
+                write_storyboard(project_path(project_id), storyboard, expected)
+            return read_project(project_id)
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
 @app.put("/api/projects/{project_id}/scenes/order", response_model=ProjectDetail)
 def put_scene_order(project_id: str, data: SceneOrder, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
     try:

@@ -25,6 +25,9 @@ import type { Step } from "@guided-workflows/onboarding";
 import { useSession } from "./AuthGate";
 import { ProjectAccessPanel } from "./ProjectAccessPanel";
 import { ReviewLinkView } from "./ReviewLinkView";
+import { SceneVisualEditor } from "./SceneVisualEditor";
+import { SceneSurface } from "./SceneSurface";
+import type { SceneLayout } from "./SceneSurface";
 
 type LayoutMode = "fidelity" | "hybrid" | "native" | "template";
 type SceneType = "content" | "title" | "assessment" | "media" | "interaction" | "summary";
@@ -43,7 +46,7 @@ export type AssessmentType = AssessmentItem["type"];
 export type AssessmentSettings = { maxAttempts: number; passingScore: number; scoreWeight: number; remediationSceneId: string | null };
 export type CourseCompletionSettings = { passingScore: number; includeOptionalAssessments: boolean };
 export type ExportSettings = { packageWarningThresholdMB: number };
-export type Scene = { id: string; sourceSlide: number | null; title: string; sceneType: SceneType; layoutMode: LayoutMode; templateId: string | null; required: boolean; audioRequired: boolean; assessmentItem: AssessmentItem | null; assessmentSettings: AssessmentSettings | null; extractedText: string[]; actionDescription: string; narration: string; imageAssets: string[]; imageAltText: Record<string, string>; decorativeImages: string[]; audioAssets: string[]; previewImage: string | null; renderWarning: string | null; sourceAnimationXml: string | null; sourceTransitionXml: string | null; notes: string };
+export type Scene = { visualLayout?: SceneLayout | null; backgroundAsset?: string | null; id: string; sourceSlide: number | null; title: string; sceneType: SceneType; layoutMode: LayoutMode; templateId: string | null; required: boolean; audioRequired: boolean; assessmentItem: AssessmentItem | null; assessmentSettings: AssessmentSettings | null; extractedText: string[]; actionDescription: string; narration: string; imageAssets: string[]; imageAltText: Record<string, string>; decorativeImages: string[]; audioAssets: string[]; previewImage: string | null; renderWarning: string | null; sourceAnimationXml: string | null; sourceTransitionXml: string | null; notes: string };
 export type Asset = { id: string; kind: "image" | "audio"; filename: string; contentType: string; sizeBytes: number; sha256: string; path: string; attributionText: string; attributionStatus: "draft" | "complete" };
 export type ProjectSummary = { id: string; title: string; sceneCount: number; updatedAt: string; hasSourceDeck: boolean };
 export type Project = ProjectSummary & { storyboard: { revision: number; scenes: Scene[]; assets: Asset[]; completionSettings: CourseCompletionSettings; exportSettings: ExportSettings } };
@@ -66,6 +69,7 @@ export function App() {
   const [isCreating, setIsCreating] = useState(false);
   const [title, setTitle] = useState("");
   const [sceneDraft, setSceneDraft] = useState<SceneDraft | null>(null);
+  const [visualSceneId, setVisualSceneId] = useState<string | null>(null);
   const [templateDraft, setTemplateDraft] = useState<TemplateDraft | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [activeView, setActiveView] = useState<"storyboard" | "media" | "templates">("storyboard");
@@ -780,6 +784,22 @@ export function App() {
     }
   }
 
+  async function saveVisualScene(layout: SceneLayout) {
+    const response = await fetch(`/api/projects/${project.id}/scenes/${visualSceneId}`, { method: "PATCH", headers: storyboardWriteHeaders(project.storyboard.revision), body: JSON.stringify({ visualLayout: layout }) });
+    if (!response.ok) throw new Error(revisionConflictMessage(response.status) || "Visual scene could not be saved.");
+    applyProject(await response.json() as Project);
+  }
+
+  async function extractVisualScene(): Promise<SceneLayout> {
+    const response = await fetch(`/api/projects/${project.id}/scenes/${visualSceneId}/extract-layout`, { method: "POST", headers: storyboardWriteHeaders(project.storyboard.revision) });
+    if (!response.ok) { const issue = await response.json(); throw new Error(revisionConflictMessage(response.status) || issue.detail || "Source layout could not be extracted."); }
+    const updated = await response.json() as Project;
+    const layout = updated.storyboard.scenes.find(item => item.id === visualSceneId)?.visualLayout;
+    if (!layout) throw new Error("No source layout is available.");
+    applyProject(updated);
+    return layout;
+  }
+
   async function deleteScene(sceneToDelete: Scene, index: number) {
     if (!project.id || busy) return;
     const clearsRemediation = scenes.some((item) => item.assessmentSettings?.remediationSceneId === sceneToDelete.id);
@@ -880,11 +900,13 @@ export function App() {
           </div>
           <div className="sequence-hint"><GripVertical size={14} /> Drag scenes to reorder</div>
         </section>
-        <section data-onboarding="scene.saved" className="canvas-panel" aria-label="Selected scene">{scene ? <>
+        <section data-onboarding="scene.saved" className={`canvas-panel ${scene?.visualLayout?.enabled ? "visual-active" : ""}`} aria-label="Selected scene">{scene ? <>
           <div className="scene-context-header">
             <button className="button button-accent" onClick={() => beginSceneEdit()} disabled={busy}><Pencil size={16} /> Edit scene</button>
+            <button className="button button-outline" onClick={() => setVisualSceneId(scene.id)} disabled={busy || !permissions.canEdit}><Layers3 size={16} /> Edit canvas</button>
             <div className="scene-context-title"><h2>{scene.title}</h2><span>Scene {selectedScene + 1} of {scenes.length} · {scene.required ? "Required" : "Optional"}</span></div>
           </div>
+          {scene.visualLayout?.enabled && <div className="visual-authoring-surface"><SceneSurface project={project} scene={scene} /></div>}
           <div className="canvas-body"><div className="canvas-meta"><span>SCENE {String(selectedScene + 1).padStart(2, "0")} · {scene.sceneType.toUpperCase()}</span><span>{scene.layoutMode === "template" ? templates.find((template) => template.id === scene.templateId)?.title || "TEMPLATE LAYOUT" : `${scene.layoutMode.toUpperCase()} LAYOUT`}{scene.sourceSlide ? ` · SOURCE SLIDE ${scene.sourceSlide}` : " · NEW SCENE"}</span></div><div className="slide-canvas">{scene.previewImage ? <img className="slide-preview" src={`/api/projects/${project.id}/${scene.previewImage}`} alt={scene.sourceSlide ? `Rendered source slide ${scene.sourceSlide}` : scene.title} /> : <><div className="canvas-grid" /><div className="slide-label">{scene.title}</div><div className="slide-subtitle">{scene.extractedText.join(" · ") || "No additional slide text extracted"}</div></>}<div className="canvas-chip">{scene.previewImage ? "SOURCE SLIDE PREVIEW" : `${scene.layoutMode.toUpperCase()} LAYOUT`}</div></div><div className="canvas-footer"><div><strong>{scene.title}</strong><span>Speaker notes: {scene.notes || "None extracted"}</span><span>{scene.imageAssets.length} images / {scene.audioAssets.length} audio files{scene.sourceAnimationXml ? " / Native animation captured" : ""}{scene.sourceTransitionXml ? " / Transition captured" : ""}</span>{scene.renderWarning && <span className="render-warning">{scene.renderWarning}</span>}</div></div>{(scene.imageAssets.length > 0 || scene.audioAssets.length > 0) && <div className="scene-media-strip">{scene.imageAssets.map((assetId) => { const asset = project.storyboard.assets.find((item) => item.id === assetId); return asset ? <img key={assetId} src={`/api/projects/${project.id}/assets/${assetId}`} alt={asset.filename} title={asset.filename} /> : null; })}{scene.audioAssets.map((assetId) => { const asset = project.storyboard.assets.find((item) => item.id === assetId); return asset ? <div className="scene-audio" key={assetId}><span>{asset.filename}</span><audio controls preload="metadata" src={`/api/projects/${project.id}/assets/${assetId}`} /></div> : null; })}</div>}{scene.sceneType === "assessment" && <section className="assessment-authoring-launch" aria-label="Scene assessment">
             <div><strong>{scene.assessmentItem ? "Question authored" : "Add a knowledge check"}</strong><span>Author a question and set its scoring rules.</span></div>
             <button className="button button-outline" onClick={() => setShowAssessmentEditor(true)} disabled={busy}><ClipboardList size={15} />{scene.assessmentItem ? "Edit question" : "Create question"}</button>
@@ -915,6 +937,7 @@ export function App() {
     {showAccessibility && <AccessibilityView projectId={project.id} revision={project.storyboard.revision} scenes={scenes} assets={project.storyboard.assets} onClose={() => setShowAccessibility(false)} onProjectUpdated={applyProject} />}
     {showGoldenPath && <GoldenPathView walkthroughStatuses={Object.fromEntries(Object.entries(guides).map(([id, guide]) => [id, guide.controller.snapshot().status]))} onStartWalkthrough={() => startOnboarding()} onSelectWalkthrough={id => startOnboarding(id)} project={project} onClose={() => setShowGoldenPath(false)} onCreateProject={() => { setShowGoldenPath(false); setIsCreating(true); }} onOpenStoryboard={() => { setShowGoldenPath(false); setActiveView("storyboard"); }} onOpenMedia={() => { setShowGoldenPath(false); setActiveView("media"); }} onOpenAccessibility={() => { setShowGoldenPath(false); setShowAccessibility(true); }} onOpenPreview={() => { setShowGoldenPath(false); if (project.id) setShowPreview(true); }} onRunValidation={() => { setShowGoldenPath(false); setShowValidation(true); }} />}
     {showPreview && project.id && <CoursePreview project={project} onClose={() => setShowPreview(false)} canEnhance={permissions.canEnhance} />}
+    {visualSceneId && scenes.find(item => item.id === visualSceneId) && <SceneVisualEditor key={`${project.id}:${visualSceneId}`} project={project} scene={scenes.find(item => item.id === visualSceneId)!} onClose={() => setVisualSceneId(null)} onSave={saveVisualScene} onExtract={extractVisualScene} />}
     {showAssessmentEditor && project.id && scene?.sceneType === "assessment" && <AssessmentEditor projectId={project.id} projectTitle={project.title} revision={project.storyboard.revision} scene={scene} scenes={scenes}
       onClose={() => setShowAssessmentEditor(false)}
       onProjectUpdated={applyProject}

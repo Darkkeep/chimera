@@ -339,6 +339,7 @@ def replace_storyboard(project_id: str, imported: Storyboard, expected_revision:
             if background is None or background.kind != "image":
                 raise ValueError(f"Scene '{scene.title}' references an unavailable background image")
 
+        validate_visual_assets(scene, asset_by_id)
         image_ids = set(scene.imageAssets)
         if set(scene.imageAltText) - image_ids or set(scene.decorativeImages) - image_ids:
             raise ValueError(f"Image accessibility metadata in '{scene.title}' references an unattached image")
@@ -392,6 +393,16 @@ def create_scene(project_id: str, data: SceneCreate, expected_revision: int | No
     return read_project(project_id)
 
 
+def validate_visual_assets(scene: Scene, assets: dict[str, ExtractedAsset]) -> None:
+    references = {scene.backgroundAsset} if scene.backgroundAsset else set()
+    if scene.visualLayout:
+        references.update(element.assetId for element in scene.visualLayout.elements if element.kind == "image")
+        if scene.visualLayout.backgroundAsset:
+            references.add(scene.visualLayout.backgroundAsset)
+    if any(reference not in assets or assets[reference].kind != "image" for reference in references):
+        raise ValueError("Visual scene elements must reference image assets in this project")
+
+
 def update_scene(project_id: str, scene_id: str, data: SceneUpdate, expected_revision: int | None = None) -> ProjectDetail:
     path = project_path(project_id)
     current = read_project(project_id)
@@ -404,6 +415,35 @@ def update_scene(project_id: str, scene_id: str, data: SceneUpdate, expected_rev
     for index, scene in enumerate(scenes):
         if scene.id == scene_id:
             updated_scene = Scene.model_validate({**scene.model_dump(), **updates})
+            if "visualLayout" not in updates and updated_scene.visualLayout and any(field in updates for field in ["extractedText", "title", "imageAssets"]):
+                from .models import SceneElement
+                layout = updated_scene.visualLayout.model_copy(deep=True)
+                text_elements = [element for element in layout.elements if element.kind == "text" and (layout.enabled or element.source == "slide")]
+                if not layout.enabled and text_elements:
+                    if "title" in updates and updated_scene.title != scene.title:
+                        text_elements[0].text = updated_scene.title
+                    text_elements = text_elements[1:]
+                if "extractedText" in updates and updated_scene.extractedText != scene.extractedText:
+                    texts = list(updated_scene.extractedText)
+                    for element, text in zip(text_elements, texts):
+                        element.text = text
+                    if len(texts) < len(text_elements):
+                        removed_ids = {element.id for element in text_elements[len(texts):]}
+                        layout.elements = [element for element in layout.elements if element.id not in removed_ids]
+                    for index, text in enumerate(texts[len(text_elements):], start=len(text_elements)):
+                        layout.elements.append(SceneElement(id=f"text-{uuid.uuid4().hex[:8]}", kind="text", source="manual" if layout.enabled else "slide", text=text, x=40, y=min(layout.height - 100, 40 + index * 100), width=max(20, layout.width - 80), height=100))
+                if "imageAssets" in updates:
+                    detached = set(scene.imageAssets) - set(updated_scene.imageAssets)
+                    layout.elements = [element for element in layout.elements if element.kind != "image" or element.assetId not in detached]
+                updated_scene = updated_scene.model_copy(update={"visualLayout": layout})
+            validate_visual_assets(updated_scene, {asset.id: asset for asset in current.storyboard.assets})
+            if "visualLayout" in updates and updated_scene.visualLayout and updated_scene.visualLayout.enabled:
+                visual_image_ids = [element.assetId for element in updated_scene.visualLayout.elements if element.kind == "image"]
+                updated_scene = updated_scene.model_copy(update={
+                    "extractedText": [element.text for element in updated_scene.visualLayout.elements if element.kind == "text" and element.text.strip()],
+                    "imageAssets": list(dict.fromkeys([*updated_scene.imageAssets, *visual_image_ids])),
+                    "backgroundAsset": updated_scene.visualLayout.backgroundAsset,
+                })
             validate_scene_template(updated_scene.layoutMode, updated_scene.templateId)
             attached_image_ids = set(updated_scene.imageAssets)
             if "imageAltText" in updates and set(updated_scene.imageAltText) - attached_image_ids:

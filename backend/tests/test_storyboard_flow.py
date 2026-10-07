@@ -319,7 +319,7 @@ const nodes = new Map();
 const document = {
   querySelector(selector) {
     if (selector === "#assessment-form" || selector === "[data-return-assessment]") return null;
-    if (!nodes.has(selector)) nodes.set(selector, { textContent: "", innerHTML: "", disabled: false, addEventListener: () => {} });
+    if (!nodes.has(selector)) nodes.set(selector, { textContent: "", innerHTML: "", disabled: false, addEventListener: () => {}, appendChild: () => {} });
     return nodes.get(selector);
   },
   createElement: () => ({ addEventListener: () => {}, style: {}, remove: () => {} })

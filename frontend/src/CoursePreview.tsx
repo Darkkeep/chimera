@@ -1,14 +1,16 @@
 import { reportOnboardingOutcome } from "./onboarding-journeys";
 import { BrandMark } from "./BrandMark";
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, MessageCircle, Send, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, List, MessageCircle, Send, X } from "lucide-react";
 import type { AssessmentItem, AssessmentSettings, Project, Scene } from "./App";
 import { evaluateCourseCompletion, type AssessmentOutcome } from "./completion";
 import "./course-preview.css";
 import "./course-preview-overrides.css";
 import "./course-preview-review.css";
+import "./scene-navigation.css";
 import "./assessment-types.css";
 import { useSession } from "./AuthGate";
+import { SceneSurface } from "./SceneSurface";
 
 type CoursePreviewProps = {
   project: Project;
@@ -132,6 +134,7 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
   const scenes = project.storyboard.scenes;
   const [resumeState] = useState(() => readResumeState(resumeProjectId, scenes));
   const [sceneIndex, setSceneIndex] = useState(resumeState.sceneIndex);
+  const [contentsOpen, setContentsOpen] = useState(false);
   const [visitedSceneIds, setVisitedSceneIds] = useState(resumeState.visitedSceneIds);
   const [completedAudioKeys, setCompletedAudioKeys] = useState(resumeState.completedAudioKeys);
   const [assessmentResults, setAssessmentResults] = useState(resumeState.assessmentResults);
@@ -298,14 +301,16 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
       <div className={`course-preview-progress ${coursePassed ? "course-complete" : ""}`}><span>{courseComplete ? coursePassed ? `Course passed · Score ${weightedScore ?? 100}%` : `Course complete · Score ${weightedScore ?? 0}% · Pass ${project.storyboard.completionSettings.passingScore}%` : requiredAudioSetupMissingCount ? `${requiredAudioSetupMissingCount} required-audio ${requiredAudioSetupMissingCount === 1 ? "scene has" : "scenes have"} no audio attached` : `${completedRequiredSceneCount} of ${requiredSceneCount} required scenes · ${completedRequiredAudioCount} of ${requiredAudioTrackCount} required audio tracks`}</span><div className="course-preview-progress-track" role="progressbar" aria-label="Required scenes completed" aria-valuemin={0} aria-valuemax={Math.max(requiredSceneCount, 1)} aria-valuenow={completedRequiredSceneCount}><span style={{ width: `${requiredSceneCount ? Math.round(completedRequiredSceneCount / requiredSceneCount * 100) : 0}%` }} /></div></div>
       <button type="button" className="course-preview-close" onClick={onClose} aria-label="Close course preview"><X size={18} /><span>Exit preview</span></button>
     </header>
+    <button type="button" className="course-preview-contents-toggle course-preview-nav-button" aria-expanded={contentsOpen} aria-controls="preview-contents" onClick={() => setContentsOpen(!contentsOpen)}><List size={17} /> Contents</button>
+    {contentsOpen && <nav id="preview-contents" className="course-preview-contents" aria-label="Table of contents"><div className="course-preview-contents-heading"><strong>Contents</strong><button type="button" className="icon-button" aria-label="Close contents" onClick={() => setContentsOpen(false)}><X size={18} /></button></div>{scenes.map((item, index) => <button type="button" key={item.id} aria-current={index === sceneIndex ? "step" : undefined} onClick={() => { setSceneIndex(index); setRemediationRoute(null); setContentsOpen(false); }}><span>{index + 1}</span><span>{item.title || "Untitled scene"}</span>{visitedSceneIds.includes(item.id) && <Check size={14} aria-label="Visited" />}</button>)}</nav>}
     {scene ? <main className="course-preview-main">
       <div className="course-preview-scene-meta"><span>SCENE {String(sceneIndex + 1).padStart(2, "0")} / {String(scenes.length).padStart(2, "0")}</span><span>{scene.sceneType}</span></div>
       <article className="course-preview-content" aria-labelledby="course-preview-scene-title">
         {remediationRoute?.remediationSceneId === scene.id && <button type="button" className="course-preview-nav-button previous" onClick={returnToAssessment}><ArrowLeft size={16} /><span>Return to question</span></button>}
         <h1 id="course-preview-scene-title">{scene.title || "Untitled scene"}</h1>
-        {scene.previewImage ? <div className="course-preview-slide"><img src={`/api/projects/${project.id}/${scene.previewImage}`} alt={`Slide ${scene.sourceSlide ?? sceneIndex + 1}: ${scene.title}`} /></div> : scene.extractedText.length > 0 ? <div className="course-preview-text">{scene.extractedText.map((text, index) => <p key={`${index}-${text}`}>{text}</p>)}</div> : <p className="course-preview-empty">This scene has no learner-facing content yet.</p>}
-        {scene.previewImage && scene.extractedText.length > 0 && <details className="course-preview-transcript"><summary>Read slide text</summary><div>{scene.extractedText.map((text, index) => <p key={`${index}-${text}`}>{text}</p>)}</div></details>}
-        {scene.imageAssets.length > 0 && <div className="course-preview-images" aria-label="Scene images">{scene.imageAssets.map((imageId) => renderImage(imageId, "course-preview-image"))}</div>}
+        {scene.visualLayout?.enabled ? <SceneSurface project={project} scene={scene} /> : scene.previewImage ? <div className="course-preview-slide"><img src={`/api/projects/${project.id}/${scene.previewImage}`} alt={`Slide ${scene.sourceSlide ?? sceneIndex + 1}: ${scene.title}`} /></div> : scene.extractedText.length > 0 ? <div className="course-preview-text">{scene.extractedText.map((text, index) => <p key={`${index}-${text}`}>{text}</p>)}</div> : <p className="course-preview-empty">This scene has no learner-facing content yet.</p>}
+        {!scene.visualLayout?.enabled && scene.previewImage && scene.extractedText.length > 0 && <details className="course-preview-transcript"><summary>Read slide text</summary><div>{scene.extractedText.map((text, index) => <p key={`${index}-${text}`}>{text}</p>)}</div></details>}
+        {!scene.visualLayout?.enabled && scene.imageAssets.length > 0 && <div className="course-preview-images" aria-label="Scene images">{scene.imageAssets.map((imageId) => renderImage(imageId, "course-preview-image"))}</div>}
         {scene.assessmentItem && (() => {
           const item = scene.assessmentItem;
           const settings = assessmentSettings(scene);

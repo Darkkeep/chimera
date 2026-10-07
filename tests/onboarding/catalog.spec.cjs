@@ -188,7 +188,13 @@ test('templates upload, edit, replace and assign; PowerPoint import saves real s
   const select = page.getByRole('dialog').getByRole('combobox', { name: /^Template/ }); const templateId = await select.locator('option').nth(1).getAttribute('value');
   await select.selectOption(templateId); await page.getByRole('button', { name: 'Save changes', exact: true }).click(); await finish(page);
   expect((await readProject(page, id)).storyboard.scenes[0].templateId).toBe(templateId);
-  await choose(page, 'Import PowerPoint'); await page.getByLabel('Import PowerPoint', { exact: true }).setInputFiles({ name: 'course.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer: deck }); await finish(page);
+  await choose(page, 'Import PowerPoint');
+  const [importResponse] = await Promise.all([
+    page.waitForResponse(response => response.url().endsWith(`/api/projects/${id}/source`) && response.request().method() === 'POST', { timeout: 45000 }),
+    page.getByLabel('Import PowerPoint', { exact: true }).setInputFiles({ name: 'course.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer: deck }),
+  ]);
+  expect(importResponse.ok()).toBe(true);
+  await finish(page);
   expect((await readProject(page, id)).hasSourceDeck).toBe(true);
 });
 

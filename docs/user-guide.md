@@ -96,6 +96,27 @@ On-screen text is learner content. Action descriptions and speaker notes are aut
 | 2 | Update the title, type, layout, on-screen text, action description, speaker notes, or required status. | The form contains your intended edits. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
 | 3 | Click **Save changes**; use **Cancel** to discard form edits. | Saved changes update the storyboard and its revision. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
 
+### Edit text and images on the canvas
+
+Select the scene and choose **Edit canvas** beside **Edit scene**. The canvas editor saves a separate editable layout; it does not paint over the flattened PowerPoint preview.
+
+1. For an older imported scene, choose **Extract source layout** to recover positions and inherited artwork from the retained PPTX. This preserves scene IDs, notes, questions, review threads, existing assets, and authored text. The extracted layout remains inactive until **Save scene**. Cancelling keeps the extracted data but does not change playback.
+2. Double-click a text box, or focus it and press Enter, to edit its text directly. The **Text** field also edits the selected box. Drag boxes to move them, use resize handles, or enter exact position and size in the properties panel. Arrow keys move the focused element; Shift changes the step from one to ten slide-space units.
+3. Drag an **Attached images** thumbnail onto the canvas. Clicking the thumbnail adds it without dragging. The media-library selector can add other project images. Selecting an image exposes replacement and crop-reset controls.
+4. Use **Layers** to select overlapping or inherited content. Master and layout artwork starts locked; unlock it before editing. Toolbar controls add text, undo/redo, duplicate/delete elements, and change stacking order. Text properties include size, color, typeface, alignment, bold, and italic.
+5. Choose a background color or project image in the properties panel. Imported picture backgrounds and supported inherited master/layout images are available as project assets. **Source slide**, when available, temporarily shows the original flattened rendering for comparison.
+6. Choose **Save scene**, then check **Preview course**. The saved canvas replaces the source preview in authoring, preview, and both SCORM profiles. **Cancel** discards unsaved canvas changes.
+
+New imports capture editable text/image geometry, rotation, cropping, slide dimensions, inherited graphics, and solid/picture backgrounds. The original preview remains the default until a visual layout is saved. Inspect **Import limitations** before enabling it: charts, SmartArt, shape decorations, gradients, group rotation, mixed text formatting, bullets, and inherited styles may be unsupported or approximated. Original previews and retained PPTX files remain available; this is not full PowerPoint-equivalent editing.
+
+For a scene with an enabled visual layout, edits to **On-screen text** in the original metadata dialog also update the corresponding visual text boxes. The scene title remains the navigation label; use the canvas editor to change a title drawn on the slide.
+
+### Jump directly to another scene
+
+In **Preview course**, open **Contents** and choose a scene by number and title. The list marks the current and visited scenes. Jumping preserves assessment answers and audio-completion state, and only the selected scene becomes visited. Exported SCORM players provide a **Contents** selector with the same scene sequence.
+
+The reviewer form follows Light and Dark appearance for labels, fields, thread text, and controls. Its contrast is qualified in both modes.
+
 ### Reorder scenes
 
 | Step | Action | Result | Control image |
