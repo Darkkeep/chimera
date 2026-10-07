@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock, local
 from typing import Iterator, Literal
+from .models import ProductionStageUpdate
+from .ai_connection import connection_status
 from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalChange, EnhancementProposalChangeCreate, EnhancementProposalCreate, EnhancementProposalDecisionRecord, ExportSettings, ExtractedAsset, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, ReferencePassage, ReferenceResource, ReferenceResourceVersion, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewCommentReply, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate
 ROOT = Path(os.environ.get("CHIMERA_WORKSPACE", Path(__file__).resolve().parents[2] / "workspace"))
 from .platform import DurableEventSink, LOCAL_ACTOR, ActorContext, PlatformEvent, get_actor_context
@@ -250,12 +252,27 @@ def create_project(data: ProjectCreate, context: ActorContext = LOCAL_ACTOR) -> 
         "updatedAt": timestamp,
         "installationId": context.installationId,
         "ownerId": context.actorId,
+        "productionStage": "draft",
     }
     write_project_metadata(path, metadata)
     storyboard = Storyboard(projectId=project_id, title=data.title)
     write_storyboard(path, storyboard)
     append_platform_event(project_id, "project.created", {"title": data.title}, context)
     return read_project(project_id)
+
+
+def update_project_production_stage(project_id: str, data: ProductionStageUpdate) -> ProjectDetail:
+    with storyboard_transaction():
+        project = read_project(project_id)
+        write_project_metadata(project_path(project_id), {
+            "productionStage": data.productionStage,
+            "updatedAt": now_iso(),
+        })
+        append_platform_event(project_id, "project.production_stage_changed", {
+            "previousStage": project.productionStage,
+            "productionStage": data.productionStage,
+        })
+        return read_project(project_id)
 
 
 def list_projects() -> list[ProjectSummary]:
@@ -746,6 +763,7 @@ def create_enhancement_job(
             id=f"enhancement-{uuid.uuid4().hex[:12]}",
             projectId=project_id,
             sourceRevision=project.storyboard.revision,
+            aiConnectionRevision=connection_status(ROOT)["revision"],
             scope=data.scope,
             sceneIds=scene_ids,
             goal=data.goal,
@@ -805,6 +823,7 @@ def create_media_generation_job(project_id: str, data: MediaGenerationJobCreate)
             id=f"media-generation-{uuid.uuid4().hex[:12]}",
             projectId=project_id,
             sourceRevision=project.storyboard.revision,
+            aiConnectionRevision=connection_status(ROOT)["revision"],
             **data.model_dump(),
             createdAt=timestamp,
             updatedAt=timestamp,

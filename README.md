@@ -10,6 +10,12 @@ See [current work and handoff](docs/current-work.md) for completed milestones, r
 
 The authoring workspace keeps scenes beside the canvas. Use a scene's pencil button to edit it directly, or **Edit scene** above the preview. Project selection and libraries live in the sidebar; **Review tools** groups validation, accessibility, completion rules, and guided review. **Export** opens SCORM packages, build reports, JSON backup/restore, and available QTI test export. Editing dialogs support Tab, Shift+Tab, and Escape.
 
+Chimera opens on **My Work**, the first workspace menu item. Use **New Project** to create a course, select a project row to open its Storyboard, or **Resume authoring** to continue the remembered project. Project health shows manually declared production stages and categorized publication blockers; validation readiness is separate from approval. Project health scrolls at five projects, and Recent activity is collapsed by default with its own scroll area when expanded. See [My Work](docs/my-work.md).
+
+The Media Library **Project** selector defaults to the active course and switches the active project while retaining the library view. **Add media** adds image/audio files to that project. **Create a media candidate** starts collapsed and disables generation when AI configuration or permissions are unavailable.
+
+Configure an approved OpenAI connection through **Settings > AI connection**. Saved keys use the server account's OS credential store, never browser storage or project backups. Shared-deployment changes require an installation administrator. Existing server environment configuration remains supported; headless services without a supported credential store cannot save connections through the panel. See [AI connection](docs/ai-connection.md) for connection testing, request limits, and data-handling requirements.
+
 Choose **Light**, **Dark**, or **System** under **Appearance** in the sidebar. The preference is remembered in this browser and shared across its tabs. System is the default and follows changes to your device's color scheme. Slide images and uploaded media retain their original colors.
 
 Onboarding's reusable engine and standalone demo live in the private [Darkkeep/onboarding repository](https://github.com/Darkkeep/onboarding). Chimera retains its application walkthroughs and installs the pinned release from `vendor/onboarding`, so no sibling checkout or GitHub credentials are needed. See the [implementation record](docs/onboarding-implementation.md) and [artifact update instructions](vendor/onboarding/README.md).
@@ -59,3 +65,7 @@ Open http://localhost:5173. The authoring slice supports local project creation,
 Use the [single-user deployment checklist](docs/single-user-deployment-checklist.md) for the repeatable local demonstration and release evidence.
 
 Editable Word storyboard export is available from **Export**. The document preserves scene text as editable Word content and includes authoring directions, speaker notes, media details, accessibility text, assessments, and the source revision. Answer keys are excluded unless explicitly selected.
+
+## Verify changes
+
+From the repository root, run the backend suite with `python -m unittest discover -s backend/tests`, build with `npm --prefix frontend run build`, and run Chromium workflows with `npm run test:onboarding -- --project chromium`. `npm run test:management` targets My Work. The browser suites use temporary workspaces and inert AI responses, not real provider credentials. Hosted HTTPS verification remains `npm run test:auth` after the frontend build.

@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
-const { guide, expectStep, startChimera, createProject, saveScene } = require('./helpers.cjs');
+const { guide, expectStep, startChimera, createProject, saveScene, reloadAuthoring } = require('./helpers.cjs');
 const unique = title => `${title} ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`;
 
 test('Chimera confirms real saves, resumes after reload, and finishes review', async ({ page }) => {
@@ -9,7 +9,7 @@ test('Chimera confirms real saves, resumes after reload, and finishes review', a
   const projectId = await page.evaluate(() => localStorage.getItem('chimera.activeProjectId'));
   const stored = await (await page.request.get(`/api/projects/${projectId}`)).json();
   expect(stored.storyboard.scenes.at(-1).title).toBe(scene);
-  await page.unroute('**/api/projects'); await page.reload();
+  await page.unroute('**/api/projects'); await reloadAuthoring(page);
   await expect(page.getByRole('heading', { name: course, exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Start / resume walkthrough' }).click();
   await expectStep(page, 'Review your saved content');

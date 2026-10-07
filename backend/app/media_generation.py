@@ -9,6 +9,7 @@ import urllib.request
 from typing import Protocol
 
 from . import storage
+from .ai_connection import connection_status, open_provider_request, request_budget, resolve_connection
 from .models import GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate
 
 
@@ -22,12 +23,16 @@ class MediaGenerationProvider(Protocol):
 
 
 class OpenAICompatibleMediaProvider:
-    def __init__(self) -> None:
-        self.base_url = os.environ["CHIMERA_AI_BASE_URL"].rstrip("/")
-        self.api_key = os.environ["CHIMERA_AI_API_KEY"]
-        self.name = os.environ.get("CHIMERA_AI_PROVIDER", "openai-compatible")
-        self.image_model = os.environ.get("CHIMERA_AI_IMAGE_MODEL", os.environ["CHIMERA_AI_MODEL"])
-        self.audio_model = os.environ.get("CHIMERA_AI_AUDIO_MODEL", os.environ["CHIMERA_AI_MODEL"])
+    def __init__(self, expected_revision: str | None = None) -> None:
+        connection = resolve_connection(storage.ROOT, expected_revision)
+        if not connection:
+            raise RuntimeError("AI media generation is not configured.")
+        self.connection = connection
+        self.base_url = connection.base_url
+        self.api_key = connection.api_key
+        self.name = connection.provider
+        self.image_model = connection.image_model
+        self.audio_model = connection.audio_model
 
     def _request(self, path: str, body: dict[str, object], accept: str = "application/json") -> tuple[bytes, str]:
         request = urllib.request.Request(
@@ -37,14 +42,17 @@ class OpenAICompatibleMediaProvider:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=180) as response:
+            with request_budget(self.connection), open_provider_request(self.connection, request, 180) as response:
                 return response.read(), response.headers.get_content_type()
         except (urllib.error.URLError, TimeoutError, OSError) as error:
-            raise RuntimeError(f"Media provider request failed: {error}") from error
+            raise RuntimeError("Media provider request failed. Check the connection and provider account.") from None
 
     def generate_image(self, job: MediaGenerationJob) -> tuple[bytes, str, str]:
         size = f"{job.width or 1024}x{job.height or 1024}"
-        raw, _ = self._request("/images/generations", {"model": self.image_model, "prompt": job.prompt, "size": size, "response_format": "b64_json"})
+        body = {"model": self.image_model, "prompt": job.prompt, "size": size}
+        if not self.image_model.startswith("gpt-image-"):
+            body["response_format"] = "b64_json"
+        raw, _ = self._request("/images/generations", body)
         try:
             encoded = json.loads(raw.decode("utf-8"))["data"][0]["b64_json"]
             return base64.b64decode(encoded), "image/png", self.image_model
@@ -58,11 +66,12 @@ class OpenAICompatibleMediaProvider:
         return raw, content_type or "audio/mpeg", self.audio_model
 
 
-def _provider() -> MediaGenerationProvider:
-    required = ("CHIMERA_AI_BASE_URL", "CHIMERA_AI_API_KEY", "CHIMERA_AI_MODEL")
-    if not all(os.environ.get(name) for name in required):
-        raise RuntimeError("AI media generation is not configured. Set CHIMERA_AI_BASE_URL, CHIMERA_AI_API_KEY, and CHIMERA_AI_MODEL on the server.")
-    return OpenAICompatibleMediaProvider()
+def media_provider_configured() -> bool:
+    return connection_status(storage.ROOT)["configured"]
+
+
+def _provider(expected_revision: str | None = None) -> MediaGenerationProvider:
+    return OpenAICompatibleMediaProvider(expected_revision)
 
 
 _registry_lock = threading.Lock()
@@ -100,7 +109,7 @@ def _run_job(project_id: str, job_id: str) -> None:
         if job.cancelRequested:
             storage.update_media_generation_job(project_id, job_id, status="cancelled", progress=100, message="Cancelled before processing")
             return
-        provider = _provider_factory()
+        provider = _provider(job.aiConnectionRevision) if _provider_factory is _provider else _provider_factory()
         storage.update_media_generation_job(project_id, job_id, status="running", progress=20, message="Generating media", provider=provider.name, model=provider.image_model if job.kind == "image" else provider.audio_model)
         job = storage.read_media_generation_job(project_id, job_id)
         content, content_type, model = provider.generate_image(job) if job.kind == "image" else provider.generate_narration(job)

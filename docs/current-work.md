@@ -1,6 +1,6 @@
 # Current work and handoff
 
-Updated 2026-10-06. The active development branch is `extract-onboarding-repository`.
+Updated 2026-10-07. The active development branch is `extract-onboarding-repository`.
 
 ## Completed
 
@@ -12,6 +12,17 @@ Updated 2026-10-06. The active development branch is `extract-onboarding-reposit
 - Project-scoped access, administrator-controlled membership, filtered project/management views, authenticated review names, and request/background audit attribution.
 - Authenticated, account-bound, revision-bound review links with expiry and revocation.
 - Local HTTPS browser qualification, responsive login/accessibility checks, and Linux/Nginx deployment templates. Regression and hosted browser checks are included in GitHub CI.
+- Editable scene canvas, source-layout extraction, image/text manipulation, Preview Contents navigation, and theme-aware review controls. Existing imported scenes retain their flattened previews until an authored visual layout is enabled; unsupported PowerPoint features remain explicit limitations. See [visual scene authoring](visual-scene-authoring.md).
+- My Work as the opening screen and first menu item, New Project and direct project authoring navigation, compact identity summary, manual production stages, specific publication-blocker findings, five-project scrolling, and collapsed/scrollable Recent activity. See [My Work](my-work.md).
+- Media Library project filtering defaults to the current course and switches the active project without leaving the library. Add media replaces the Upload media label. Candidate creation starts collapsed and disables generation when configuration/permission is unavailable; existing candidate review remains available.
+- Settings > AI connection with approved OpenAI presets, write-only OS-keyring credentials, local-operator/shared-admin controls, same-origin mutations, redacted errors, explicit connection tests, disconnect, request limits, safe audit events, and queued-job connection-revision protection. See [AI connection](ai-connection.md). No real API key was saved or external AI call made during implementation.
+- Evidence Before Impact proof v0.1 approved by user direction on 2026-10-07 for continued illustrative use only. Editable DOCX/PPTX and visual-review PDFs remain local under `workspace/storyboard-proof`; PDFs were checked as 20 and 6 pages. This is not SME approval, production handoff, or release approval. Named SME, production owner, and release approver remain pending.
+
+## Latest verification
+
+On 2026-10-07, the backend suite passed 123 tests and the full Chromium onboarding/dashboard/media/AI suite passed 56 tests. The TypeScript/Vite production build passed, and scoped accessibility/responsive checks covered light/dark desktop/mobile views. Live checks confirmed the New Project dialog, My Work startup, media controls, and OS credential-store availability without modifying the five existing projects or submitting a real AI request. These results do not replace live-provider model qualification, Firefox/WebKit checks, or the deferred public-server deployment checks.
+
+The hosted HTTPS harness also passed login/error handling, secure cookies, recovery/reset, membership display, authenticated review/commenting, reviewer isolation, session expiry, and logout, with zero JavaScript errors or Axe violations. The harness now explicitly resumes authoring from My Work and scopes identity checks to the sidebar. One parallel pre-commit browser run hit a transient Windows metadata replacement lock; the independent full rerun passed without storage changes.
 
 ## Next
 

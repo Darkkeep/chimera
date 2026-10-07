@@ -1,0 +1,19 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Chimera Backend",
+			"type": "shell",
+			"command": ".\\.venv\\Scripts\\python.exe -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000",
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "Chimera Frontend",
+			"type": "shell",
+			"command": "npm --prefix frontend run dev -- --host 127.0.0.1",
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}

@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from backend.app import main, storage
 from backend.app.auth import get_identity_provider
-from backend.app.identity import LocalIdentityDirectory, OrganizationPolicy
+from backend.app.identity import LocalIdentityDirectory, OrganizationPolicy, ProjectMembership
 from backend.app.models import ProjectCreate
 from backend.app.password_auth import AccountStore, COOKIE, token_digest
 
@@ -71,6 +71,41 @@ class PasswordAuthTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/projects").status_code, 200)
         self.assertEqual(self.client.post("/api/auth/logout", headers=self.origin).status_code, 200)
         self.assertEqual(self.client.get("/api/projects", headers={"Cookie": f"{COOKIE}={token}"}).status_code, 401)
+
+    def test_project_stage_requires_edit_access_and_health_preserves_review_access(self):
+        self.assertEqual(self.login().status_code, 200)
+        created = self.client.post("/api/projects", json={"title": "Stage permissions"}, headers=self.origin)
+        self.assertEqual(created.status_code, 201)
+        project_id = created.json()["id"]
+        updated = self.client.patch(f"/api/projects/{project_id}/production-stage", json={"productionStage": "in-review"}, headers=self.origin)
+        self.assertEqual(updated.status_code, 200)
+        reviewer_id = self.store.provision("reviewer@example.com", self.password, "Reviewer", ["reviewer"])
+        self.store.add_project_membership(ProjectMembership(projectId=project_id, userId=reviewer_id, role="reviewer"))
+        login = self.client.post("/api/auth/login", json={"email": "reviewer@example.com", "password": self.password}, headers=self.origin)
+        self.assertEqual(login.status_code, 200)
+        health = self.client.get("/api/management/project-health")
+        self.assertEqual(health.status_code, 200)
+        self.assertEqual(health.json()[0]["productionStage"], "in-review")
+        self.assertFalse(health.json()[0]["canEdit"])
+        self.assertFalse(health.json()[0]["canSetStage"])
+        denied = self.client.patch(f"/api/projects/{project_id}/production-stage", json={"productionStage": "published"}, headers=self.origin)
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(storage.read_project(project_id).productionStage, "in-review")
+
+    def test_ai_connection_is_admin_only_and_validation_redacts_secrets(self):
+        self.assertEqual(self.login().status_code, 200)
+        self.assertEqual(self.client.get("/api/ai-connection").status_code, 200)
+        self.assertTrue(self.client.get("/api/ai-connection").json()["canManage"])
+        invalid = self.client.put("/api/ai-connection", json={"expectedRevision": "unconfigured", "apiKey": "redaction-test-only", "baseUrl": "http://127.0.0.1"}, headers=self.origin)
+        self.assertEqual(invalid.status_code, 422)
+        self.assertNotIn("redaction-test-only", invalid.text)
+        author = self.store.provision("settings-author@example.com", self.password, "Settings author", ["author"])
+        response = self.client.post("/api/auth/login", json={"email": "settings-author@example.com", "password": self.password}, headers=self.origin)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(self.client.get("/api/ai-connection").json()["canManage"])
+        for method, path in (("put", "/api/ai-connection"), ("post", "/api/ai-connection/test"), ("post", "/api/ai-connection/disconnect")):
+            denied = getattr(self.client, method)(path, json={"expectedRevision": "unconfigured"}, headers=self.origin)
+            self.assertEqual(denied.status_code, 403)
 
     def test_bad_credentials_and_account_lookup_share_error(self):
         a = self.client.post("/api/auth/login", json={"email": "author@example.com", "password": "wrong"}, headers=self.origin)

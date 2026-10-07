@@ -71,6 +71,12 @@ In the hosted frontend, open **Settings ? Project access** as an administrator t
 
 Review links are bound to an existing project's assigned account, current storyboard revision, and configured HTTPS origin. Creation defaults to three days; the API supports one to 168 hours. Tokens are in URL fragments and then supplied in the `X-Review-Token` request header, not the API URL. The invited user must sign in. Expired, revoked, wrong-user, or removed-membership links fail; a changed storyboard requires a new link. Link revocation controls that invitation, while membership separately controls ordinary project access. Remove membership to withdraw all project access. No unauthenticated guest review is enabled.
 
+### AI connection administration
+
+Settings > AI connection lets installation administrators manage the approved OpenAI preset; other authenticated users see status only. Keys use the service account's OS credential store and never appear in settings responses or project archives. Mutations require administrator authority and an approved origin; safe audit events and validation redaction cover credential changes. See [AI connection](ai-connection.md).
+
+Before enabling browser-based saves on Linux, provision and unlock a supported Secret Service or KWallet backend for the actual service identity. Headless services without that store fail closed rather than using plaintext storage; protected service environment variables remain available. Do not assume a developer's Windows credential-store verification qualifies the Linux service. Use one API worker for the current per-process concurrency limit, configure provider-account spending controls, and approve the data destination/retention policy. Daily request counts are durable, but are not a currency budget.
+
 ### Linux/Nginx deployment handoff
 
 The user selected an existing Linux server with Nginx. Server/SSH details and live qualification are explicitly deferred.
@@ -119,5 +125,7 @@ npm run test:auth
 The harness uses disposable accounts/passwords, an isolated temporary workspace, a short-lived test certificate, and an HTTPS reverse proxy. It does not enable a production authentication bypass. Set `OPENSSL_BINARY` and `CHIMERA_TEST_PYTHON` if needed. Node, Playwright Chromium, and OpenSSL are required; browser contexts ignore the disposable certificate only inside the test harness. Evidence is regenerated in `workspace/auth-qualification`.
 
 The 2026-10-06 browser pass verified sign-in errors, login, secure session cookie flags, recovery guidance, password reset/mismatch handling, project membership display, authenticated review/comments, cross-project denial, session-expiry handling, and logout. The sign-in page had no Axe violations, no horizontal overflow at 390px, and no observed JavaScript errors. This is local HTTPS qualification, not live darkrogue.io certification. GitHub CI now runs backend regression tests and this hosted authentication harness alongside the existing onboarding tests.
+
+On 2026-10-07, the same HTTPS harness passed again after adapting identity selectors and navigation to My Work startup. Backend tests additionally verify AI-setting administrator authority, origin enforcement, safe audit entries, and key redaction. This remains isolated local qualification, not public-server or live-provider certification.
 
 12ui produced the account-screen images and HTML references; clickable prototype export hit a Windows `fsync` error. Completed outputs were integrated into React. Screenshot comparisons against the original LayerDocs are retained locally under `.improve/chimera-auth-align-*`; those image-based kits have no DOM-selector coverage claim. The actual Chimera logo, existing application styles, fifteen-character password policy, and fifteen-minute reset expiry were retained over conflicting generated copy.

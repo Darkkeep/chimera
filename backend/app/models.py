@@ -395,6 +395,7 @@ class EnhancementJob(BaseModel):
     id: str
     projectId: str
     sourceRevision: int
+    aiConnectionRevision: str | None = None
     scope: Literal["selected-scenes", "whole-course"]
     sceneIds: list[str]
     goal: str
@@ -489,6 +490,7 @@ class MediaGenerationJob(BaseModel):
     id: str
     projectId: str
     sourceRevision: int
+    aiConnectionRevision: str | None = None
     sceneId: str
     kind: Literal["image", "narration"]
     purpose: str
@@ -636,6 +638,13 @@ class Storyboard(BaseModel):
     assets: list[ExtractedAsset] = Field(default_factory=list)
 
 
+ProductionStage = Literal["not-set", "draft", "in-production", "in-review", "approved", "published"]
+
+
+class ProductionStageUpdate(BaseModel):
+    productionStage: ProductionStage
+
+
 class ProjectSummary(BaseModel):
     id: str
     title: str
@@ -644,6 +653,7 @@ class ProjectSummary(BaseModel):
     hasSourceDeck: bool
     installationId: str = "local-installation"
     ownerId: str = "local-user"
+    productionStage: ProductionStage = "not-set"
 
 
 class ProjectDetail(ProjectSummary):

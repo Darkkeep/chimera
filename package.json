@@ -9,6 +9,7 @@
   "scripts": {
     "test:visual": "node tests/visual/qualify.cjs",
     "test:onboarding": "playwright test --config playwright.onboarding.config.cjs",
+    "test:management": "playwright test --config playwright.onboarding.config.cjs management.spec.cjs --project chromium",
     "test:auth": "node tests/auth/qualify.cjs",
     "verify:onboarding:artifact": "node vendor/onboarding/verify.cjs"
   },

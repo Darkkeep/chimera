@@ -28,6 +28,10 @@ from .qti import assessment_item_xml, assessment_test_package
 from .scorm import persist_scorm_12_build, persist_scorm_build, read_scorm_report
 from .storage import ROOT, EnhancementProposalConflict, StoryboardRevisionConflict, add_project_asset, add_review_reply, approve_generated_candidate, create_enhancement_job, create_enhancement_proposal, create_media_generation_job, create_project, create_review_comment, create_scene, create_template, decide_enhancement_proposal, decide_review_comment, delete_scene, list_enhancement_jobs, list_enhancement_proposals, list_generated_candidates, list_media_generation_jobs, list_projects, list_reference_resources, list_review_comments, list_templates, project_path, read_enhancement_job, read_generated_candidate, read_media_generation_job, read_project, persist_imported_assets, persist_slide_previews, reorder_scenes, replace_storyboard, replace_template_source, save_reference_resource, slugify, storyboard_transaction, update_from_import, update_project_asset_attribution, update_project_completion_settings, update_project_export_settings, update_generated_candidate, update_media_generation_job, update_scene, update_template
 from .validation import validate_project
+from .models import ProductionStageUpdate
+from .storage import update_project_production_stage
+from .media_generation import media_provider_configured
+from .ai_connection import ConnectionRevision, ConnectionUpdate, connection_status, disconnect_connection, save_connection, test_connection
 from .word_export import DOCX_MEDIA_TYPE, build_storyboard_docx
 from .deployment import cors_origins, installation_policy, public_origin
 from .password_auth import AccountStore, COOKIE, HostedAuthorizationPolicy, LoginRequest, ResetPasswordRequest, ReviewInvitationRequest, SESSION_SECONDS, require_origin
@@ -42,6 +46,8 @@ def get_authorization_policy() -> AuthorizationPolicy:
 
 def _request_action(request: Request) -> str:
     path = request.url.path
+    if path.startswith("/api/ai-connection"):
+        return "identity.self" if request.method == "GET" else "admin.policy.manage"
     if path.startswith("/api/identity/") and request.method == "GET" or path == "/api/installation/config":
         return "identity.self"
     if path.startswith("/api/accounts"):
@@ -103,7 +109,7 @@ def _request_action(request: Request) -> str:
         return "project.import"
     if "/assets" in path:
         return "media.manage"
-    if "/completion-settings" in path or "/export-settings" in path:
+    if "/completion-settings" in path or "/export-settings" in path or path.endswith("/production-stage"):
         return "project.settings.update"
     if "/scenes" in path:
         return "scene.manage"
@@ -131,6 +137,8 @@ app = FastAPI(title="Chimera API", version="0.1.0", dependencies=[Depends(_requi
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(request: Request, error: RequestValidationError):
+    if request.url.path.startswith("/api/ai-connection"):
+        return JSONResponse({"detail": "Provide an approved provider, supported models, a valid key, and valid request limits."}, status_code=422, headers={"Cache-Control": "no-store"})
     if request.url.path in {"/api/auth/login", "/api/auth/reset-password"}:
         return JSONResponse({"detail": "Provide an email and a password of at most 1024 characters"}, status_code=422, headers={"Cache-Control": "no-store"})
     return await request_validation_exception_handler(request, error)
@@ -404,6 +412,10 @@ def get_project_health() -> list[dict[str, object]]:
         production = validate_project(project, target="production")
         comments = list_review_comments(summary.id)
         proposals = list_enhancement_proposals(summary.id)
+        blockers = [issue for issue in production.issues if issue.severity == "error"]
+        blocker_counts: dict[str, int] = {}
+        for issue in blockers:
+            blocker_counts[issue.code] = blocker_counts.get(issue.code, 0) + 1
         health.append({
             "projectId": summary.id,
             "title": summary.title,
@@ -413,6 +425,12 @@ def get_project_health() -> list[dict[str, object]]:
             "unresolvedComments": sum(not comment.resolved for comment in comments),
             "publicationBlockers": sum(issue.severity == "error" for issue in production.issues),
             "authoringWarnings": sum(issue.severity == "warning" for issue in authoring.issues),
+            "productionStage": project.productionStage,
+            "productionPassed": production.passed,
+            "blockerCounts": blocker_counts,
+            "blockers": [issue.model_dump() for issue in blockers],
+            "canEdit": get_authorization_policy().allows(get_actor_context(), "scene.manage", summary.id),
+            "canSetStage": get_authorization_policy().allows(get_actor_context(), "project.settings.update", summary.id),
             "updatedAt": summary.updatedAt,
         })
     return health
@@ -524,6 +542,14 @@ def get_project(project_id: str) -> ProjectDetail:
 def get_project_validation(project_id: str, target: Literal["authoring", "production"] = "authoring") -> ValidationReport:
     try:
         return validate_project(read_project(project_id), target=target)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+
+
+@app.patch("/api/projects/{project_id}/production-stage", response_model=ProjectDetail)
+def patch_project_production_stage(project_id: str, data: ProductionStageUpdate) -> ProjectDetail:
+    try:
+        return update_project_production_stage(project_id, data)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
 
@@ -754,6 +780,78 @@ def get_enhancement_jobs(project_id: str) -> list[EnhancementJob]:
         return list_enhancement_jobs(project_id)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
+
+
+def _require_ai_origin(request: Request) -> None:
+    policy = installation_policy(LocalIdentityDirectory(ROOT))
+    allowed = {public_origin()} if policy.deploymentMode == "team" else set(cors_origins())
+    if request.headers.get("origin") not in allowed:
+        raise HTTPException(403, "Request origin is not allowed")
+
+
+def _record_ai_event(name: str) -> None:
+    actor = get_actor_context()
+    DurableEventSink(ROOT).record(PlatformEvent(eventName=name, eventClass="security", actorId=actor.actorId, installationId=actor.installationId, deploymentMode=actor.deploymentMode))
+
+
+@app.get("/api/ai-connection")
+def get_ai_connection() -> dict:
+    return {**connection_status(ROOT), "canManage": get_authorization_policy().allows(get_actor_context(), "admin.policy.manage")}
+
+
+@app.put("/api/ai-connection")
+def put_ai_connection(request: Request, data: ConnectionUpdate) -> dict:
+    _require_ai_origin(request)
+    try:
+        with storyboard_transaction():
+            save_connection(ROOT, data)
+            _record_ai_event("ai.connection_saved")
+        return get_ai_connection()
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(503, str(error)) from error
+
+
+@app.post("/api/ai-connection/disconnect")
+def post_ai_disconnect(request: Request, data: ConnectionRevision) -> dict:
+    _require_ai_origin(request)
+    try:
+        with storyboard_transaction():
+            disconnect_connection(ROOT, data.expectedRevision)
+            _record_ai_event("ai.connection_disconnected")
+        return get_ai_connection()
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(503, str(error)) from error
+
+
+@app.post("/api/ai-connection/test")
+def post_ai_test(request: Request, data: ConnectionRevision) -> dict:
+    _require_ai_origin(request)
+    try:
+        if connection_status(ROOT)["revision"] != data.expectedRevision:
+            raise ValueError("The connection settings changed. Reload before testing.")
+        result = test_connection(ROOT)
+        _record_ai_event("ai.connection_tested")
+        return result
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(503, str(error)) from error
+
+
+@app.get("/api/projects/{project_id}/media-generation-capability")
+def get_media_generation_capability(project_id: str) -> dict[str, bool]:
+    try:
+        read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    return {
+        "providerConfigured": media_provider_configured(),
+        "canGenerate": get_authorization_policy().allows(get_actor_context(), "media.job.create", project_id),
+    }
 
 
 @app.get("/api/projects/{project_id}/media-generation-jobs", response_model=list[MediaGenerationJob])

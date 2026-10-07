@@ -3,7 +3,7 @@ const AxeBuilder = require('@axe-core/playwright').default;
 const { execFileSync } = require('node:child_process');
 const { existsSync } = require('node:fs');
 const path = require('node:path');
-const { guide, expectStep, startChimera, createProject, saveScene } = require('./helpers.cjs');
+const { guide, expectStep, startChimera, createProject, saveScene, reloadAuthoring } = require('./helpers.cjs');
 const unique = name => `${name} ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`;
 const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAE0lEQVR4nGP8//8/AwMDEwMYAAAkBgMBXaJOiAAAAABJRU5ErkJggg==', 'base64');
 function pptx() {
@@ -56,7 +56,7 @@ test('every catalog journey opens a visible target in a prepared project', async
   await write(page, id, `scenes/${sceneId}`, { imageAssets: [p.storyboard.assets.find(a => a.kind === 'image').id], audioAssets: [p.storyboard.assets.find(a => a.kind === 'audio').id] }, 'patch');
   const template = await page.request.post('/api/templates', { multipart: { file: { name: 'fixture.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer: pptx() } } });
   expect(template.ok()).toBe(true);
-  await page.unroute('**/api/projects'); await page.reload();
+  await page.unroute('**/api/projects'); await reloadAuthoring(page);
   await expect(page.getByRole('heading', { name: (await readProject(page, id)).title, exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Review tools', exact: true }).click();
   await page.getByRole('button', { name: 'Guided review', exact: true }).click();
@@ -93,7 +93,7 @@ test('editing waits for a real save, preserves failed drafts, and has independen
   await page.getByRole('button', { name: 'Save changes', exact: true }).click(); await finish(page);
   expect((await readProject(page, id)).storyboard.scenes[0].title).toBe('Edited by walkthrough');
   await choose(page, 'Upload images or audio'); await guide(page).getByRole('button', { name: 'Pause guide' }).click();
-  await page.unroute('**/api/projects'); await page.reload();
+  await page.unroute('**/api/projects'); await reloadAuthoring(page);
   await expect(page.getByRole('heading', { name: (await readProject(page, id)).title, exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Start / resume walkthrough', exact: true }).click();
   await expectStep(page, 'Upload images or audio');
@@ -103,7 +103,7 @@ test('editing waits for a real save, preserves failed drafts, and has independen
 
 test('media upload, attachment, credit and image description confirm persisted outcomes', async ({ page }) => {
   const id = await seed(page); await choose(page, 'Upload images or audio');
-  await page.getByLabel('Upload media', { exact: true }).setInputFiles({ name: 'guide.png', mimeType: 'image/png', buffer: image }); await finish(page);
+  await page.getByLabel('Add media', { exact: true }).setInputFiles({ name: 'guide.png', mimeType: 'image/png', buffer: image }); await finish(page);
   await choose(page, 'Attach or detach media'); await page.getByRole('button', { name: 'Attach to scene', exact: true }).click(); await finish(page);
   await choose(page, 'Save media attribution'); await page.getByLabel('Attribution / credit').fill('Practice illustration, local fixture'); await page.getByRole('button', { name: 'Save credit' }).click(); await finish(page);
   await choose(page, 'Describe scene images'); await page.getByLabel('Alternative text').fill('A practice fixture'); await page.getByRole('button', { name: 'Save', exact: true }).click(); await finish(page);
@@ -115,7 +115,7 @@ test('media upload, attachment, credit and image description confirm persisted o
 for (const [type, name] of [['single-choice', 'Single-choice question'], ['multiple-response', 'Multiple-answer question'], ['true-false', 'True / false question'], ['ordering', 'Ordering question'], ['drag-drop', 'Drag-and-drop question'], ['matching', 'Matching question'], ['short-answer', 'Short-answer question']]) {
   test(`${name} guide completes only after its matching question is saved`, async ({ page }) => {
     const id = await seed(page); await write(page, id, 'scenes', { title: 'Assessment practice', sceneType: 'assessment' });
-    await page.unroute('**/api/projects'); await page.reload(); await expect(page.getByRole('button', { name: /Assessment practice assessment/ })).toBeVisible();
+    await page.unroute('**/api/projects'); await reloadAuthoring(page); await expect(page.getByRole('button', { name: /Assessment practice assessment/ })).toBeVisible();
     await choose(page, name);
     if (type === 'single-choice') {
       await page.getByRole('combobox', { name: /^Question type/ }).selectOption('true-false');
@@ -229,7 +229,7 @@ test('restore guides retain confirmation and advance after successful JSON and Z
 
 test('reordering, audio requirements, export threshold and deletion persist only after confirmation', async ({ page }) => {
   const id = await seed(page); await write(page, id, 'scenes', { title: 'Second scene' });
-  await page.unroute('**/api/projects'); await page.reload(); await expect(page.getByRole('button', { name: /Second scene content/ })).toBeVisible();
+  await page.unroute('**/api/projects'); await reloadAuthoring(page); await expect(page.getByRole('button', { name: /Second scene content/ })).toBeVisible();
   await choose(page, 'Reorder scenes'); await page.getByRole('button', { name: 'Move Practice content down', exact: true }).click(); await finish(page);
   expect((await readProject(page, id)).storyboard.scenes[1].title).toBe('Practice content');
   await choose(page, 'Set the package size warning'); await page.getByRole('spinbutton', { name: 'Package warning threshold in MB' }).fill('250'); await page.getByRole('heading', { name: 'Export course', exact: true }).click(); await finish(page);

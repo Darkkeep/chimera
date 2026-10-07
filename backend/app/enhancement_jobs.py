@@ -9,6 +9,7 @@ from typing import Protocol
 from .models import EnhancementJob, EnhancementJobCreate, EnhancementProposalCreate, EnhancementReferenceCitation
 from .models import EnhancementResourceConflict
 from . import storage
+from .ai_connection import connection_status, open_provider_request, request_budget, resolve_connection
 
 
 class EnhancementProvider(Protocol):
@@ -19,11 +20,15 @@ class EnhancementProvider(Protocol):
 
 
 class OpenAICompatibleProvider:
-    def __init__(self) -> None:
-        self.base_url = os.environ["CHIMERA_AI_BASE_URL"].rstrip("/")
-        self.api_key = os.environ["CHIMERA_AI_API_KEY"]
-        self.model = os.environ["CHIMERA_AI_MODEL"]
-        self.name = os.environ.get("CHIMERA_AI_PROVIDER", "openai-compatible")
+    def __init__(self, expected_revision: str | None = None) -> None:
+        connection = resolve_connection(storage.ROOT, expected_revision)
+        if not connection:
+            raise RuntimeError("AI enhancement is not configured.")
+        self.connection = connection
+        self.base_url = connection.base_url
+        self.api_key = connection.api_key
+        self.model = connection.text_model
+        self.name = connection.provider
 
     def generate(self, payload: dict[str, object]) -> object:
         request_body = {
@@ -52,10 +57,10 @@ class OpenAICompatibleProvider:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=120) as response:
+            with request_budget(self.connection), open_provider_request(self.connection, request, 120) as response:
                 response_data = json.loads(response.read().decode("utf-8"))
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
-            raise RuntimeError(f"Enhancement provider request failed: {error}") from error
+            raise RuntimeError("Enhancement provider request failed. Check the connection and provider account.") from None
         try:
             content = response_data["choices"][0]["message"]["content"]
             result = json.loads(content)
@@ -66,11 +71,8 @@ class OpenAICompatibleProvider:
         return result
 
 
-def _provider() -> EnhancementProvider:
-    required = ("CHIMERA_AI_BASE_URL", "CHIMERA_AI_API_KEY", "CHIMERA_AI_MODEL")
-    if not all(os.environ.get(name) for name in required):
-        raise RuntimeError("AI enhancement is not configured. Set CHIMERA_AI_BASE_URL, CHIMERA_AI_API_KEY, and CHIMERA_AI_MODEL on the server.")
-    return OpenAICompatibleProvider()
+def _provider(expected_revision: str | None = None) -> EnhancementProvider:
+    return OpenAICompatibleProvider(expected_revision)
 
 
 def _load_job_context(job: EnhancementJob) -> tuple[dict[str, object], dict[tuple[str, str, str], str]]:
@@ -163,7 +165,7 @@ def preview_enhancement_submission(project_id: str, data: EnhancementJobCreate) 
         "resourceCount": len(selected_resources),
         "estimatedInputTokens": estimated_tokens,
         "estimatedCostUsd": float(rate) * estimated_tokens / 1_000_000 if rate else None,
-        "providerConfigured": all(os.environ.get(name) for name in ("CHIMERA_AI_BASE_URL", "CHIMERA_AI_API_KEY", "CHIMERA_AI_MODEL")),
+        "providerConfigured": connection_status(storage.ROOT)["configured"],
         "payload": payload,
     }
 
@@ -293,7 +295,7 @@ def _run_job(project_id: str, job_id: str) -> None:
             job = storage.update_enhancement_job(project_id, job_id, status="running", message="Preparing selected content", progress=5)
         if job.cancelRequested:
             return
-        provider = _provider_factory()
+        provider = _provider(job.aiConnectionRevision) if _provider_factory is _provider else _provider_factory()
         payload, locator_text = _load_job_context(job)
         serialized_payload = json.dumps(payload, ensure_ascii=False)
         token_estimate = max(1, len(serialized_payload) // 4)

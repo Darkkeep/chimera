@@ -153,6 +153,10 @@ button:disabled, .button.disabled { opacity: .48; cursor: not-allowed; }
 .template-library { padding: 28px; }
 .template-toolbar { align-items: center; }
 .template-toolbar h2 { color: var(--ink); }
+.media-library .template-toolbar { flex-wrap: wrap; gap: 16px; }
+.media-project-filter { display: grid; gap: 6px; min-width: 0; max-width: 320px; flex: 1 1 220px; margin-left: auto; color: var(--muted); font-size: 12px; }
+.media-project-filter select { width: 100%; min-width: 0; min-height: 40px; padding: 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--theme-input, #fff); color: var(--ink); font-size: 13px; }
+@media (max-width: 800px) { .media-project-filter { margin-left: 0; max-width: none; flex-basis: 100%; } }
 .template-info span, .template-info small, .template-empty span, .field-hint { color: var(--muted); }
 @media (min-width: 1600px) {
   .sidebar { flex-basis: 240px; width: 240px; }
@@ -180,7 +184,7 @@ button:disabled, .button.disabled { opacity: .48; cursor: not-allowed; }
   .project-switcher select { width: 100%; max-width: none; min-height: 38px; }
   .new-project-button { flex-shrink: 0; padding: 8px 0; font-size: 11px; }
   .workspace-label, .sidebar-footer { display: none; }
-  .sidebar nav { display: flex; align-items: center; gap: 4px; grid-column: 1; }
+  .sidebar nav { display: flex; flex-wrap: wrap; min-width: 0; align-items: center; gap: 4px; grid-column: 1; }
   .nav-item { font-size: 12px; width: auto; justify-content: flex-start; margin: 0; padding: 10px; min-height: 40px; }
   .nav-item span { font-size: 12px; white-space: nowrap; }
   .sidebar-review { border: 0; padding: 0; margin: 0; justify-self: end; align-self: center; position: relative; }
@@ -198,7 +202,7 @@ button:disabled, .button.disabled { opacity: .48; cursor: not-allowed; }
   .brand { grid-column: 1; }
   .sidebar-project { grid-column: 1 / -1; grid-row: 2; justify-content: space-between; }
   .project-switcher { max-width: 72%; flex: 1; }
-  .sidebar nav { grid-column: 1 / -1; grid-row: 3; justify-content: space-between; }
+  .sidebar nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-column: 1 / -1; grid-row: 3; }
   .nav-item { padding: 10px 8px; gap: 7px; }
   .sidebar-review { grid-column: 2; grid-row: 1; }
   .review-toggle { padding-inline: 0; }

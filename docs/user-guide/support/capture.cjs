@@ -25,6 +25,7 @@ fs.mkdirSync(output, { recursive: true });
     if (projects.length !== 1 || projects[0].id !== fixture.projectId) {
       throw new Error('Capture requires the isolated guide workspace, not a real authoring workspace.');
     }
+    await button('Resume authoring').click();
     await button('Edit scene').waitFor();
     await shot('workspace', '.app-shell');
     await shot('project-controls', '.sidebar-project');
@@ -67,7 +68,9 @@ fs.mkdirSync(output, { recursive: true });
     await button('Edit details').click();
     await shot('template-details', '[role=dialog]');
     await button('Close template editor').click();
+    await page.route('**/media-generation-capability', route => route.fulfill({ json: { providerConfigured: true, canGenerate: true } }));
     await button('Media library').click();
+    await page.locator('.generation-creator > summary').click();
     await shot('media-image-form', '.generated-media-form');
     await page.getByLabel('Media type').selectOption('narration');
     await shot('media-narration-form', '.generated-media-form');
@@ -159,7 +162,7 @@ fs.mkdirSync(output, { recursive: true });
     await button('My Work').click();
     await page.locator('.health-row').first().waitFor();
     await shot('my-work', '.management-view');
-    await button('Return to authoring').click();
+    await button('Resume authoring').click();
     // Temporarily expose scene-specific validation controls, then restore fixture data.
     const original = await (await page.request.get(`/api/projects/${fixture.projectId}`)).json();
     try {
@@ -167,6 +170,7 @@ fs.mkdirSync(output, { recursive: true });
       const cleared = await page.request.patch(`/api/projects/${fixture.projectId}/scenes/${assessmentScene.id}`, { data: { assessmentItem: null } });
       if (!cleared.ok()) throw new Error('Could not prepare Create question control');
       await page.reload();
+      await button('Resume authoring').click();
       await page.locator('.scene-row').nth(1).click();
       await shot('assessment-create', '.assessment-authoring-launch');
       const changes = await page.request.patch(`/api/projects/${fixture.projectId}/scenes/${fixture.sceneId}`, { data: { imageAltText: {}, audioAssets: [], audioRequired: true } });

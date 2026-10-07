@@ -42,6 +42,10 @@ The new catalog reuses the existing Guided review rows and controls. The reusabl
 
 ## Run verification
 
+Chimera now opens on My Work after launch and refresh. Authoring reload checks explicitly choose Resume authoring before resuming a guide; this does not reset task/project progress. The media file picker is Add media, while the existing upload outcome identifier remains unchanged. Candidate review remains available when creation is collapsed or AI is unavailable. Settings > AI connection is a separate permission-aware dialog, not a provider call triggered by a walkthrough.
+
+The 2026-10-07 Chromium run passed 56 tests across the existing catalog/recovery workflows and My Work, Media Library, and AI connection regression specs. AI setting tests use inert mocked keys/responses and isolated server workspaces. `npm run test:management` runs the 18 My Work checks; `npm run test:onboarding -- --project chromium` runs the full Chromium suite. These results do not assert current Firefox/WebKit or live-provider qualification.
+
 Install backend requirements into your active Python environment. The browser fixture uses the root `.venv` Python when present, otherwise `python` on Windows or `python3` elsewhere. Override with `CHIMERA_TEST_PYTHON` if needed.
 
 ```powershell

@@ -1,6 +1,6 @@
 # Chimera user guide
 
-Process-based instructions for the restored local authoring interface. Prepared 2026-09-30. Source: `ce70067` plus recovered stash `fe48af8` (Export Enhancement -- Pass 1). See the [recovery record](export-enhancement-recovery.md).
+Process-based instructions for Chimera. Updated 2026-10-07 for My Work, project-filtered media, AI connection settings, and canvas authoring. The original 2026-09-30 captures came from `ce70067` plus recovered stash `fe48af8`; see the [recovery record](export-enhancement-recovery.md). Older control images may show previous labels; follow the current action text. New dashboard and AI screenshots use isolated documentation/test data, not live credentials or provider output.
 
 ## How to use this guide
 
@@ -8,7 +8,9 @@ Each task has its own **Step / Action / Result / Control image** table. Click a 
 
 The source has changed since the original capability review: Word export, reference upload, enhancement submission, generated-media candidate review, comments, and portable backups now have interface controls. Their presence does not certify a configured AI provider or compatibility with every LMS. Example proposals, candidates, and job statuses in these images are documentation fixtures; no live AI request was made for this guide.
 
-**Prerequisite:** Start the backend and frontend using the [README setup instructions](../README.md#start-locally), then open `http://localhost:5173`. Keep both services running while authoring. LibreOffice is needed for rendered PowerPoint slide previews. AI tasks additionally require server-side provider configuration; there is no provider settings form in the current UI.
+**Prerequisite:** Start the backend and frontend using the [README setup instructions](../README.md#start-locally), then open `http://localhost:5173`. Keep both services running while authoring. LibreOffice is needed for rendered PowerPoint slide previews. AI tasks require a configured connection through **Settings > AI connection** or server environment settings. Shared-installation changes require an administrator; see [AI connection](ai-connection.md).
+
+My Work opens after normal launch/sign-in and refresh. It is first in the workspace menu. Select a project row to open its authoring workspace, choose New Project to create one, or Resume authoring to return to the remembered project. Direct authenticated review links retain their review destination.
 
 **Working convention:** Select the intended project and scene before editing. Use the task's Save/Create/Accept control and wait for completion. Merely typing into a form does not save it. If a revision-conflict message appears, reload the project, inspect the latest values, and reapply the intended change. Do not assume unsaved form text will survive a reload.
 
@@ -38,8 +40,8 @@ Optional interactive help is available under **Review tools ? Guided review ? Al
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Click **Create project** in the sidebar. | The course-name dialog opens. | <a href="user-guide/images/project-controls.png"><img src="user-guide/images/project-controls.png" alt="Project selector and Create project button" width="240"></a> |
-| 2 | Enter a **Course name**, then click **Create project**. | A new empty project becomes active. | <a href="user-guide/images/create-project.png"><img src="user-guide/images/create-project.png" alt="create project controls" width="240"></a> |
+| 1 | Click **New Project** on My Work, or **Create project** in the sidebar. | The course-name dialog opens. Cancelling keeps your current workspace. | <a href="user-guide/images/my-work-current.png"><img src="user-guide/images/my-work-current.png" alt="My Work with New Project" width="240"></a> |
+| 2 | Enter a **Course name**, then click **Create project**. | A new empty project becomes active in Storyboard authoring, with production stage Draft. | <a href="user-guide/images/create-project.png"><img src="user-guide/images/create-project.png" alt="create project controls" width="240"></a> |
 
 ### Switch projects
 
@@ -54,6 +56,17 @@ Optional interactive help is available under **Review tools ? Guided review ? Al
 | --- | --- | --- | --- |
 | 1 | Open **Settings** at the bottom of the sidebar. | Appearance options become available. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a> |
 | 2 | Choose **Light**, **Dark**, or **System**. | The preference is applied and remembered in this browser. | <a href="user-guide/images/appearance.png"><img src="user-guide/images/appearance.png" alt="appearance controls" width="240"></a> |
+
+### Configure AI
+
+| Step | Action | Result | Control image |
+| --- | --- | --- | --- |
+| 1 | Open **Settings > AI connection**. | Connection status appears; shared-installation non-admins see a read-only view. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="AI connection settings" width="240"></a> |
+| 2 | Choose approved models, enter the API key, and set request limits. Click **Save connection**. | The key is stored in the server's OS credential store and cleared from the form. Saving fails closed when secure storage is unavailable. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Models, write-only API key and request limits" width="240"></a> |
+| 3 | Click **Test connection** after saving. | A models-list request checks the credential without sending course content or generating media. Model access and costs still depend on the provider account. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Save, test and disconnect controls" width="240"></a> |
+| 4 | To disable AI, click **Disconnect** and confirm. | The saved key is deleted and environment fallback is disabled. Running requests may finish; queued jobs against changed settings require resubmission. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Disconnect AI connection" width="240"></a> |
+
+Request limits are not spending limits. Set a provider-account budget and confirm organisational data-use approval before enabling generation. See [AI connection](ai-connection.md) for credential-store provisioning and operational requirements.
 
 ### Follow the guided workflow
 
@@ -169,12 +182,22 @@ Upload a template first. Assignment is not a guarantee that every PowerPoint eff
 
 The current upload interface accepts images and audio, up to 100 MB per file. Images: JPG, PNG, GIF, WebP. Audio: MP3, M4A, AAC, WAV, OGG. Video import, a shared media library across projects, and explicit course-wide placement are not exposed by these controls.
 
-### Upload external media
+### Add external media
+
+![Current Media Library project selector and Add media](user-guide/images/media-library-current.png)
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | Select the intended scene in **Storyboard**, then open **Media library**. | The media view identifies the selected scene. | <a href="user-guide/images/scene-sequence.png"><img src="user-guide/images/scene-sequence.png" alt="scene sequence controls" width="240"></a><br><a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a> |
-| 2 | Click **Upload media** and choose a supported file. | The asset is added to the project library. Upload does not by itself attach it. | <a href="user-guide/images/media-library.png"><img src="user-guide/images/media-library.png" alt="media library controls" width="240"></a> |
+| 2 | Select the intended project using **Project** (defaults to the current project), then click **Add media** and choose a supported file. | The asset is added to the selected project library. Adding media does not by itself attach it. | <a href="user-guide/images/media-library.png"><img src="user-guide/images/media-library.png" alt="media library controls" width="240"></a> |
+
+### Create a media candidate
+
+Configure AI through **Settings > AI connection** before generating candidates. In shared deployments, an installation administrator manages the connection. See [AI connection](ai-connection.md) for credential storage, connection testing, limits, and data handling.
+
+Create a media candidate starts collapsed. Select its heading to expand it. When the server-side AI connection is not configured, its heading is greyed and generation controls are disabled. If connection status cannot be loaded or your role does not permit generation, controls also remain disabled. Configuration availability does not guarantee that a provider is reachable or supports a particular model. Existing candidates can still be approved or rejected without a configured AI connection; regeneration requires the connection.
+
+The Media Library project selector defaults to the current project. Selecting another project opens that project's media library and makes it the current project; media files are not copied between projects.
 
 ### Attach or detach scene media
 
@@ -358,7 +381,7 @@ A proposal can contain multiple related changes. Accept change applies that disp
 
 ## 8. Generate and approve media
 
-Select the target scene before opening Media library. AI media generation requires compatible server-side image/audio provider configuration. The current interface does not offer arbitrary canvas positioning, a generation-cost preview, or a full media-job monitor. A candidate’s approval attaches it to its target scene.
+Select the target project and scene before opening Media library. Create a media candidate starts collapsed; expand its heading to access the form. Without AI configuration or generation permission, the section is greyed and generation/regeneration is disabled. Existing candidates remain reviewable. Approval attaches a candidate to its target scene; use Edit canvas afterward to place supported image assets. A generation-cost preview and full media-job monitor are not provided.
 
 ### Request an image candidate
 
@@ -366,7 +389,7 @@ The current provider implementation sends the prompt and dimensions to image gen
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Open **Media library** and verify the Scene shown in **Create a media candidate**. Set **Media type** to **Image**. | The selected scene is the generation target. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a><br><a href="user-guide/images/media-image-form.png"><img src="user-guide/images/media-image-form.png" alt="media image form controls" width="240"></a> |
+| 1 | Open **Media library**, expand **Create a media candidate**, and verify Scene. Set **Media type** to **Image**. | The selected scene is the generation target. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a><br><a href="user-guide/images/media-image-form.png"><img src="user-guide/images/media-image-form.png" alt="media image form controls" width="240"></a> |
 | 2 | Enter **Purpose**, **Prompt**, optional **Style**, **Dimensions**, and **Alt text**. | The request form describes the candidate. Provider support determines valid dimensions. | <a href="user-guide/images/media-image-form.png"><img src="user-guide/images/media-image-form.png" alt="media image form controls" width="240"></a> |
 | 3 | Click **Generate candidate** and wait for a candidate or error. | A successful request yields a pending candidate without attaching it to the storyboard. | <a href="user-guide/images/media-image-form.png"><img src="user-guide/images/media-image-form.png" alt="media image form controls" width="240"></a> |
 
@@ -388,7 +411,7 @@ The current provider implementation sends the prompt and dimensions to image gen
 
 ## 9. Play and comment on the storyboard
 
-Preview progress is stored in this browser. It is separate from a learner’s LMS session. In-app discussion is available; externally shared review links and timestamp-entry controls are not part of this documented interface.
+Preview progress is stored in this browser, separately from a learner's LMS session. In-app discussion is available. Hosted authenticated review links are documented in the [authentication deployment guide](authentication-deployments.md); local guest review and timestamp-entry controls are not available.
 
 ### Play the storyboard
 
@@ -548,20 +571,22 @@ Use this for structured transfer of storyboard data. It is not a self-contained 
 
 ### Inspect My Work
 
-This view is a local management foundation. It does not provide a complete team-administration interface or establish that external identity integration is configured.
+My Work is the opening workspace, with identity/policy shown compactly beside the summary counts. Hosted project lists are filtered by access. Production stage is a manually declared workflow label, not validation readiness or approval evidence: new projects start Draft, older projects remain Not set until classified. Authors with project-settings permission can update it without changing the storyboard revision. See [My Work](my-work.md).
+
+Project health uses a bounded, keyboard-scrollable area at five or more projects, with sticky desktop headings. Blocker summaries identify types and counts; expand them for individual findings. Recent activity starts collapsed and has its own scroll area when expanded.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | Click **My Work** in the sidebar. | My Work fills the main workspace, with sidebar navigation still available. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a> |
-| 2 | Review project counts, pending approvals, unresolved comments, publication blockers, identity/policy information, and recent activity. | You can identify projects that need attention. | <a href="user-guide/images/my-work.png"><img src="user-guide/images/my-work.png" alt="my work controls" width="240"></a> |
-| 3 | Click **Return to authoring**, then use the project selector to open a course. | You return to the authoring workflow. | <a href="user-guide/images/my-work.png"><img src="user-guide/images/my-work.png" alt="my work controls" width="240"></a><br><a href="user-guide/images/project-controls.png"><img src="user-guide/images/project-controls.png" alt="Project selector and Create project button" width="240"></a> |
+| 2 | Review counts, production stages and categorized blockers. Expand blocker findings or **Recent activity** as needed. | You can identify projects that need attention without treating readiness as approval. | <a href="user-guide/images/my-work-current.png"><img src="user-guide/images/my-work-current.png" alt="Project stages and categorized blockers" width="240"></a> |
+| 3 | Select a project name/row to open that project's Storyboard, or choose **Resume authoring**. | Authoring opens for editable projects; review-only users retain review access. | <a href="user-guide/images/my-work-current.png"><img src="user-guide/images/my-work-current.png" alt="Open a project or resume authoring" width="240"></a> |
 
 ## Features without a documented user-facing workflow
 
 Do not follow the implementation build plan as if every planned control already exists. The following have no complete workflow in the interface captured here:
 
-- Externally shared reviewer links and invitation management.
-- Video upload, caption/transcript authoring, arbitrary media placement, and course-wide/shared media-library controls.
+- Unauthenticated guest review. Authenticated hosted review links have a separate documented deployment workflow.
+- Video upload, caption/transcript authoring, and course-wide/shared media-library controls. Supported image placement is available through Edit canvas.
 - Full reference-resource classification, authority, version-management, and per-scene mapping editors.
 - Word reimport or automatic synchronization of external edits.
 - A general history browser and arbitrary revision restore.

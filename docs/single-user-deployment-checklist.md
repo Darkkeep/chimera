@@ -1,6 +1,6 @@
 # Single-User Deployment Checklist
 
-Use this checklist for a repeatable local demonstration while Team Mode remains scaffolded.
+Use this checklist for a repeatable local demonstration. Built-in hosted accounts are implemented separately; Encarta remains fail-closed until its integration contract is supplied.
 
 ## Install
 
@@ -9,6 +9,7 @@ Use this checklist for a repeatable local demonstration while Team Mode remains 
 - [ ] LibreOffice is installed if rendered slide previews are required.
 - [ ] The workspace directory is writable.
 - [ ] No provider credentials are stored in frontend files or project exports.
+- [ ] Backend requirements include `keyring`; a supported, unlocked OS credential store is available to the API account if browser-based AI connection saves will be used. Otherwise use protected server environment configuration.
 
 ## Start
 
@@ -38,8 +39,13 @@ It verifies health, installation mode, project loading, production validation, b
 
 - [ ] `GET /api/health` returns `{"status":"ok"}`.
 - [ ] `GET /api/installation/config` reports `single-user` and `local` identity.
-- [ ] The browser can list projects and open the active storyboard.
-- [ ] My Work displays identity, policy, project health, and audit activity.
+- [ ] The browser opens My Work after launch/refresh; New Project opens creation, project rows open authoring, and Resume authoring returns to the remembered course.
+- [ ] My Work displays compact identity/policy, categorized blockers, and explicit production stages without treating validation readiness as approval.
+- [ ] Project health scrolls at five projects; Recent activity starts collapsed and scrolls when expanded.
+- [ ] Media Library defaults its project selector to the current course; switching projects retains the library view and Add media targets that project.
+- [ ] Create a media candidate starts collapsed and is greyed/disabled without configured AI or generation permission.
+- [ ] Settings > AI connection shows safe status. Save/test/disconnect use the local operator's permissions; credentials are never returned to the browser. Tests use inert credentials unless the operator explicitly approves a live-provider check.
+- [ ] Provider-account spending controls and data-handling approval are in place before AI use; request caps are not currency budgets.
 - [ ] Preview opens and can navigate scenes without the backend learner runtime.
 - [ ] Review comments can be created, replied to, resolved, and reopened.
 - [ ] JSON backup and portable backup can be created and restored into a clean workspace.
@@ -59,6 +65,10 @@ It verifies health, installation mode, project loading, production validation, b
 - [x] Fresh SCORM requests correctly enforced the production gate and returned HTTP 422 for incomplete attribution on `UncySam2.png`.
 - [ ] Rendered Word pagination and ordinary editing inspection require Word or LibreOffice.
 - [ ] Blackboard/LMS SCORM 1.2 qualification remains external; Blackboard evidence currently covers SCORM 2004 only.
+
+## Verification follow-up: 2026-10-07
+
+The My Work, Media Library, and AI connection changes passed 123 backend tests, 56 Chromium workflow tests, the frontend production build, and scoped light/dark desktop/mobile accessibility checks. Live Windows checks confirmed secure credential-store availability and the New Project dialog without saving a real API key, making an external AI request, or creating test projects in the user's workspace. The Evidence Before Impact storyboard proof was approved for illustrative use only, not production release. See [current work](current-work.md).
 
 ## Team Mode boundary
 
