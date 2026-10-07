@@ -23,7 +23,7 @@ from pptx.util import Inches
 from unittest.mock import patch
 
 from backend.app import backup, enhancement_jobs, main, media_generation, references, storage
-from backend.app.models import AssessmentChoice, AssessmentPair, AssessmentSettings, AssetAttributionUpdate, CourseCompletionSettings, DragDropAssessment, EnhancementJobCreate, EnhancementProposalCreate, ExportSettings, MatchingAssessment, MediaGenerationJobCreate, MultipleResponseAssessment, OrderingAssessment, ProjectCreate, ReviewCommentCreate, ReviewCommentDecision, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, ShortAnswerAssessment, SingleChoiceAssessment, Storyboard, TemplateUpdate, TrueFalseAssessment
+from backend.app.models import AssessmentChoice, AssessmentPair, AssessmentSettings, AssetAttributionUpdate, CourseCompletionSettings, DragDropAssessment, EnhancementJobCreate, EnhancementProposalCreate, EnhancementProposalResult, ExportSettings, MatchingAssessment, MediaGenerationJobCreate, MultipleResponseAssessment, OrderingAssessment, ProjectCreate, ReviewCommentCreate, ReviewCommentDecision, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, ShortAnswerAssessment, SingleChoiceAssessment, Storyboard, TemplateUpdate, TrueFalseAssessment
 from backend.app.render import render_slides
 from backend.app.scorm import _compatibility_checks
 
@@ -1374,7 +1374,10 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
         self.assertEqual([scene.title for scene in imported.storyboard.scenes], ["Restored scene"])
         snapshots = list((storage.project_path(project.id) / "history").glob("storyboard-*.json"))
         self.assertTrue(snapshots)
-        previous = json.loads(snapshots[-1].read_text(encoding="utf-8"))
+        matching = [json.loads(snapshot.read_text(encoding="utf-8")) for snapshot in snapshots]
+        matching = [snapshot for snapshot in matching if snapshot["revision"] == project.storyboard.revision]
+        self.assertEqual(len(matching), 1)
+        previous = matching[0]
         self.assertEqual(previous["scenes"][0]["title"], "Before import")
 
     def test_storyboard_import_rejects_missing_assets_without_changing_project(self) -> None:

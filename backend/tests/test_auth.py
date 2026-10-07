@@ -17,7 +17,7 @@ class AuthTests(unittest.TestCase):
 
             self.assertEqual(actor, LOCAL_ACTOR)
 
-    def test_provider_can_resolve_a_future_team_actor_without_changing_contract(self) -> None:
+    def test_local_provider_rejects_a_team_actor(self) -> None:
         team_actor = LOCAL_ACTOR.model_copy(update={
             "actorId": "team-user",
             "actorDisplayName": "Team user",
@@ -27,10 +27,8 @@ class AuthTests(unittest.TestCase):
         directory = Mock()
         directory.snapshot.return_value.actor = team_actor
 
-        actor = LocalIdentityProvider(directory).resolve(Mock())
-
-        self.assertEqual(actor.deploymentMode, "team")
-        self.assertEqual(actor.installationId, "org-1")
+        with self.assertRaisesRegex(RuntimeError, "single-user"):
+            LocalIdentityProvider(directory).resolve(Mock())
 
     def test_encarta_provider_fails_closed_until_endpoint_and_validation_are_configured(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

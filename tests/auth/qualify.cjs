@@ -32,7 +32,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   server=https.createServer({key:fs.readFileSync(key),cert:fs.readFileSync(cert)},(req,res)=>{
     if(req.url.startsWith('/api/')) {
       const upstream=http.request({hostname:'127.0.0.1',port:apiPort,path:req.url,method:req.method,headers:req.headers},remote=>{res.writeHead(remote.statusCode,remote.headers);remote.pipe(res);});
-      upstream.on('error',()=>{res.writeHead(502);res.end();});req.pipe(upstream);return;
+      upstream.on('error',()=>{if(!res.headersSent){res.writeHead(502);res.end();}else res.destroy();});req.pipe(upstream);return;
     }
     const pathname=decodeURIComponent(req.url.split('?')[0]);
     const dist=path.join(root,'frontend/dist');

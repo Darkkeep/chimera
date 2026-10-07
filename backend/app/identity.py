@@ -1,11 +1,13 @@
 import json
+import time
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, Field, model_validator
 
-from .platform import ActorContext, LOCAL_ACTOR, get_event_delivery_policy
+from .platform import ActorContext, LOCAL_ACTOR, get_event_delivery_policy, event_transaction, get_actor_context
 
 
 PlatformRole = Literal["author", "reviewer", "instructional-designer", "administrator"]
@@ -20,18 +22,28 @@ class UserRecord(BaseModel):
 class TeamRecord(BaseModel):
     id: str = Field(min_length=1, max_length=120)
     name: str = Field(min_length=1, max_length=120)
+    installationId: str | None = None
+
+
+class ProjectTeamMembership(BaseModel):
+    projectId: str
+    teamId: str
 
 
 class Membership(BaseModel):
     userId: str
     teamId: str
     role: PlatformRole
+    grantedAt: datetime | None = None
+    grantSource: str = "legacy-unspecified"
 
 
 class ProjectMembership(BaseModel):
     projectId: str
     userId: str
     role: PlatformRole
+    grantedAt: datetime | None = None
+    grantedBy: str | None = None
 
 
 class ProjectMembershipCreate(BaseModel):
@@ -69,6 +81,8 @@ class IdentitySnapshot(BaseModel):
     teams: list[TeamRecord] = Field(default_factory=list)
     memberships: list[Membership] = Field(default_factory=list)
     projectMemberships: list[ProjectMembership] = Field(default_factory=list)
+    projectTeams: list[ProjectTeamMembership] = Field(default_factory=list)
+    users: list[UserRecord] = Field(default_factory=list)
     policy: OrganizationPolicy = Field(default_factory=OrganizationPolicy)
 
 
@@ -79,6 +93,12 @@ class IdentityDirectory(Protocol):
     def roles_for(self, user_id: str, project_id: str | None = None) -> set[PlatformRole]:
         ...
 
+    def project_installation(self, project_id: str) -> str | None:
+        ...
+
+    def project_owner(self, project_id: str) -> str | None:
+        ...
+
 
 class LocalIdentityDirectory:
     def __init__(self, root: Path, actor: ActorContext = LOCAL_ACTOR) -> None:
@@ -87,14 +107,22 @@ class LocalIdentityDirectory:
 
     def snapshot(self) -> IdentitySnapshot:
         if not self.path.is_file():
-            snapshot = self._default_snapshot()
-            self._write(snapshot)
-            return snapshot
+            with event_transaction(self.path.parent):
+                if not self.path.is_file():
+                    snapshot = self._default_snapshot()
+                    self._write(snapshot)
+                    return snapshot
         return IdentitySnapshot.model_validate(json.loads(self.path.read_text(encoding="utf-8")))
 
     def roles_for(self, user_id: str, project_id: str | None = None) -> set[PlatformRole]:
         snapshot = self.snapshot()
-        roles = {membership.role for membership in snapshot.memberships if membership.userId == user_id}
+        user = next((item for item in [snapshot.user, *snapshot.users] if item.id == user_id), None)
+        if user is None or user.status != "active":
+            return set()
+        team_ids = {team.id for team in snapshot.teams if team.installationId in (None, snapshot.actor.installationId)}
+        if project_id is not None:
+            team_ids &= {item.teamId for item in snapshot.projectTeams if item.projectId == project_id}
+        roles = {membership.role for membership in snapshot.memberships if membership.userId == user_id and membership.teamId in team_ids}
         if project_id is not None:
             roles.update(
                 membership.role
@@ -103,30 +131,55 @@ class LocalIdentityDirectory:
             )
         return roles
 
+    def project_installation(self, project_id: str) -> str | None:
+        if Path(project_id).name != project_id or project_id in {".", ".."}:
+            return None
+        try:
+            metadata = json.loads((self.path.parent.parent / "projects" / project_id / "project.json").read_text(encoding="utf-8"))
+            return metadata.get("installationId")
+        except (OSError, ValueError):
+            return None
+
+    def project_owner(self, project_id: str) -> str | None:
+        if Path(project_id).name != project_id or project_id in {".", ".."}:
+            return None
+        try:
+            metadata = json.loads((self.path.parent.parent / "projects" / project_id / "project.json").read_text(encoding="utf-8"))
+            return metadata.get("ownerId")
+        except (OSError, ValueError):
+            return None
+
     def project_memberships(self, project_id: str) -> list[ProjectMembership]:
         return [membership for membership in self.snapshot().projectMemberships if membership.projectId == project_id]
 
     def add_project_membership(self, membership: ProjectMembership) -> ProjectMembership:
-        snapshot = self.snapshot()
-        if membership.userId != snapshot.user.id:
-            raise ValueError("The local identity directory can only assign its local user")
-        memberships = [item for item in snapshot.projectMemberships if not (item.projectId == membership.projectId and item.userId == membership.userId)]
-        memberships.append(membership)
-        self._write(snapshot.model_copy(update={"projectMemberships": memberships}))
+        self.snapshot()
+        with event_transaction(self.path.parent):
+            snapshot = self.snapshot()
+            if membership.userId not in {item.id for item in [snapshot.user, *snapshot.users]}:
+                raise ValueError("Membership requires a known installation user")
+            if self.project_installation(membership.projectId) not in (None, snapshot.actor.installationId):
+                raise ValueError("Project belongs to another installation")
+            membership = membership.model_copy(update={"grantedBy": get_actor_context().actorId, "grantedAt": datetime.now(timezone.utc)})
+            memberships = [item for item in snapshot.projectMemberships if not (item.projectId == membership.projectId and item.userId == membership.userId)]
+            memberships.append(membership)
+            self._write(snapshot.model_copy(update={"projectMemberships": memberships}))
         return membership
 
     def policy(self) -> OrganizationPolicy:
         return self.snapshot().policy
 
     def update_policy(self, policy: OrganizationPolicy) -> OrganizationPolicy:
-        snapshot = self.snapshot()
-        self._write(snapshot.model_copy(update={"policy": policy}))
+        self.snapshot()
+        with event_transaction(self.path.parent):
+            snapshot = self.snapshot()
+            self._write(snapshot.model_copy(update={"policy": policy}))
         return policy
 
     def _default_snapshot(self) -> IdentitySnapshot:
         user = UserRecord(id=self.actor.actorId, displayName=self.actor.actorDisplayName)
         team = TeamRecord(id=self.actor.installationId, name="Local workspace")
-        memberships = [Membership(userId=user.id, teamId=team.id, role=role) for role in ("author", "reviewer", "instructional-designer", "administrator")]
+        memberships = [Membership(userId=user.id, teamId=team.id, role=role, grantedAt=datetime.now(timezone.utc), grantSource="local-bootstrap") for role in ("author", "reviewer", "instructional-designer", "administrator")]
         return IdentitySnapshot(
             actor=self.actor,
             user=user,
@@ -139,12 +192,27 @@ class LocalIdentityDirectory:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_name(f".{self.path.name}.{uuid.uuid4().hex}.tmp")
         temporary.write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
-        temporary.replace(self.path)
+        try:
+            for attempt in range(6):
+                try:
+                    temporary.replace(self.path)
+                    break
+                except PermissionError:
+                    if attempt == 5:
+                        raise
+                    time.sleep(0.02 * (attempt + 1))
+        finally:
+            temporary.unlink(missing_ok=True)
 
 
 class RoleBasedAuthorizationPolicy:
     actionRoles: dict[str, set[PlatformRole]] = {
         "project.view": {"author", "reviewer", "instructional-designer", "administrator"},
+        "project.metadata.view": {"author", "reviewer", "instructional-designer", "administrator"},
+        "project.list": {"author", "reviewer", "instructional-designer", "administrator"},
+        "project.export": {"author", "instructional-designer"},
+        "identity.view": {"author", "reviewer", "instructional-designer", "administrator"},
+        "template.view": {"author", "instructional-designer", "administrator"},
         "project.create": {"author", "instructional-designer", "administrator"},
         "project.mutate": {"author", "instructional-designer", "administrator"},
         "project.settings.update": {"author", "instructional-designer", "administrator"},
@@ -163,7 +231,7 @@ class RoleBasedAuthorizationPolicy:
         "enhancement.job.manage": {"author", "instructional-designer", "administrator"},
         "media.job.create": {"author", "instructional-designer", "administrator"},
         "media.job.manage": {"author", "instructional-designer", "administrator"},
-        "media.candidate.manage": {"author", "instructional-designer", "administrator"},
+        "media.candidate.manage": {"author", "instructional-designer"},
         "project.membership.manage": {"administrator"},
         "admin.policy.manage": {"administrator"},
         "admin.audit.view": {"administrator"},
@@ -173,7 +241,31 @@ class RoleBasedAuthorizationPolicy:
         self.directory = directory
 
     def allows(self, context: ActorContext, action: str, project_id: str | None = None) -> bool:
+        required_roles = self.actionRoles.get(action)
+        if required_roles is None:
+            return False
+        snapshot = self.directory.snapshot()
+        if context.installationId != snapshot.actor.installationId or context.deploymentMode != snapshot.policy.deploymentMode:
+            return False
+        user = next((item for item in [snapshot.user, *snapshot.users] if item.id == context.actorId), None)
+        if user is None or user.status != "active":
+            return False
         if context.deploymentMode == "single-user":
-            return True
-        required_roles = self.actionRoles.get(action, {"administrator"})
-        return bool(self.directory.roles_for(context.actorId, project_id) & required_roles)
+            return context.actorId == snapshot.actor.actorId
+        organization_roles = self.directory.roles_for(context.actorId)
+        if project_id is None:
+            if action == "identity.view":
+                return True
+            if action == "project.list" and any(item.userId == context.actorId and self.directory.project_installation(item.projectId) == context.installationId for item in snapshot.projectMemberships):
+                return True
+            return bool(organization_roles & required_roles)
+        if self.directory.project_installation(project_id) != context.installationId:
+            return False
+        roles = self.directory.roles_for(context.actorId, project_id)
+        if self.directory.project_owner(project_id) == context.actorId:
+            roles.update(organization_roles & {"author", "instructional-designer"})
+        if "administrator" in organization_roles:
+            roles.add("administrator")
+        if roles == {"administrator"} and not snapshot.policy.adminCanViewProjectContent and action not in {"project.metadata.view", "project.membership.manage", "admin.audit.view"}:
+            return False
+        return bool(roles & required_roles)

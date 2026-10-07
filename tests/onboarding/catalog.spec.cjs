@@ -106,7 +106,11 @@ test('media upload, attachment, credit and image description confirm persisted o
   await page.getByLabel('Add media', { exact: true }).setInputFiles({ name: 'guide.png', mimeType: 'image/png', buffer: image }); await finish(page);
   await choose(page, 'Attach or detach media'); await page.getByRole('button', { name: 'Attach to scene', exact: true }).click(); await finish(page);
   await choose(page, 'Save media attribution'); await page.getByLabel('Attribution / credit').fill('Practice illustration, local fixture'); await page.getByRole('button', { name: 'Save credit' }).click(); await finish(page);
-  await choose(page, 'Describe scene images'); await page.getByLabel('Alternative text').fill('A practice fixture'); await page.getByRole('button', { name: 'Save', exact: true }).click(); await finish(page);
+  await choose(page, 'Describe scene images');
+  const descriptions = page.getByRole('dialog', { name: 'Image descriptions' });
+  const sceneDescription = descriptions.getByRole('region', { name: 'Scene 1: Practice content' });
+  await sceneDescription.getByRole('textbox', { name: 'Alternative text' }).fill('A practice fixture');
+  await sceneDescription.getByRole('button', { name: 'Save', exact: true }).click(); await finish(page);
   const p = await readProject(page, id); const asset = p.storyboard.assets[0];
   expect(p.storyboard.scenes[0].imageAssets).toContain(asset.id); expect(asset.attributionText).toContain('Practice illustration');
   expect(p.storyboard.scenes[0].imageAltText[asset.id]).toBe('A practice fixture');

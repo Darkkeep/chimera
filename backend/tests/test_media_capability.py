@@ -1,14 +1,21 @@
 import os
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from fastapi import HTTPException
 
-from backend.app import main
+from backend.app import main, storage
 from backend.app.media_generation import _provider, media_provider_configured
 
 
 class MediaCapabilityTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.enterContext(patch.object(storage, "ROOT", Path(self.temporary.name)))
+
     def test_configuration_matches_provider_requirements(self) -> None:
         configured = {"CHIMERA_AI_BASE_URL": "https://example.test/v1", "CHIMERA_AI_API_KEY": "test-only-secret", "CHIMERA_AI_MODEL": "test-model"}
         with patch.dict(os.environ, configured, clear=True):

@@ -17,7 +17,7 @@ from .models import ProductionStageUpdate
 from .ai_connection import connection_status
 from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalChange, EnhancementProposalChangeCreate, EnhancementProposalCreate, EnhancementProposalDecisionRecord, ExportSettings, ExtractedAsset, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, ReferencePassage, ReferenceResource, ReferenceResourceVersion, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewCommentReply, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate
 ROOT = Path(os.environ.get("CHIMERA_WORKSPACE", Path(__file__).resolve().parents[2] / "workspace"))
-from .platform import DurableEventSink, LOCAL_ACTOR, ActorContext, PlatformEvent, get_actor_context
+from .platform import DurableEventSink, LOCAL_ACTOR, ActorContext, PlatformEvent, get_actor_context, get_correlation_id
 PROJECTS = ROOT / "projects"
 _storyboard_write_lock = RLock()
 _storyboard_transaction_state = local()
@@ -182,8 +182,11 @@ def append_platform_event(project_id: str, event_name: str, metadata: dict[str, 
         eventName=event_name,
         installationId=context.installationId,
         actorId=context.actorId,
+        actorDisplayName=context.actorDisplayName,
+        correlationId=get_correlation_id(),
         projectId=project_id,
         deploymentMode=context.deploymentMode,
+        eventClass="security",
         metadata=metadata or {},
     )
     DurableEventSink(project_path(project_id)).record(event)
@@ -214,8 +217,8 @@ def write_project_metadata(path: Path, metadata: dict[str, str]) -> None:
         persisted = {
             **existing,
             **metadata,
-            "installationId": existing.get("installationId", LOCAL_ACTOR.installationId),
-            "ownerId": existing.get("ownerId", LOCAL_ACTOR.actorId),
+            "installationId": existing.get("installationId", metadata.get("installationId", get_actor_context().installationId)),
+            "ownerId": existing.get("ownerId", metadata.get("ownerId", get_actor_context().actorId)),
         }
         temporary = path / f".project-{uuid.uuid4().hex}.json.tmp"
         temporary.write_text(json.dumps(persisted, indent=2), encoding="utf-8")
@@ -241,7 +244,8 @@ def write_storyboard(path: Path, storyboard: Storyboard, expected_revision: int 
         temp_file.replace(storyboard_file)
 
 
-def create_project(data: ProjectCreate, context: ActorContext = LOCAL_ACTOR) -> ProjectDetail:
+def create_project(data: ProjectCreate, context: ActorContext | None = None) -> ProjectDetail:
+    context = context or get_actor_context()
     PROJECTS.mkdir(parents=True, exist_ok=True)
     project_id = f"{slugify(data.title)}-{uuid.uuid4().hex[:8]}"
     path = project_path(project_id)
@@ -605,7 +609,10 @@ def list_review_comments(project_id: str) -> list[ReviewComment]:
     return sorted(comments, key=lambda comment: comment.createdAt)
 
 
-def create_review_comment(project_id: str, data: ReviewCommentCreate, context: ActorContext = LOCAL_ACTOR) -> ReviewComment:
+def create_review_comment(project_id: str, data: ReviewCommentCreate, context: ActorContext | None = None) -> ReviewComment:
+    context = context or get_actor_context()
+    if context.deploymentMode == "team":
+        data = data.model_copy(update={"authorLabel": context.actorDisplayName})
     with storyboard_transaction():
         project = read_project(project_id)
         scene = next((scene for scene in project.storyboard.scenes if scene.id == data.sceneId), None)
@@ -632,7 +639,10 @@ def create_review_comment(project_id: str, data: ReviewCommentCreate, context: A
         return comment
 
 
-def add_review_reply(project_id: str, comment_id: str, data: ReviewReplyCreate, context: ActorContext = LOCAL_ACTOR) -> ReviewComment:
+def add_review_reply(project_id: str, comment_id: str, data: ReviewReplyCreate, context: ActorContext | None = None) -> ReviewComment:
+    context = context or get_actor_context()
+    if context.deploymentMode == "team":
+        data = data.model_copy(update={"authorLabel": context.actorDisplayName})
     with storyboard_transaction():
         comments = list_review_comments(project_id)
         for index, comment in enumerate(comments):
@@ -647,7 +657,8 @@ def add_review_reply(project_id: str, comment_id: str, data: ReviewReplyCreate, 
         raise KeyError(comment_id)
 
 
-def decide_review_comment(project_id: str, comment_id: str, data: ReviewCommentDecision, context: ActorContext = LOCAL_ACTOR) -> ReviewComment:
+def decide_review_comment(project_id: str, comment_id: str, data: ReviewCommentDecision, context: ActorContext | None = None) -> ReviewComment:
+    context = context or get_actor_context()
     with storyboard_transaction():
         comments = list_review_comments(project_id)
         for index, comment in enumerate(comments):
@@ -1192,6 +1203,10 @@ def decide_enhancement_proposal(
                 decision=decision,
                 decidedAt=now,
                 expectedRevision=expected_revision,
+                actorId=get_actor_context().actorId,
+                actorDisplayName=get_actor_context().actorDisplayName,
+                installationId=get_actor_context().installationId,
+                correlationId=get_correlation_id(),
                 originalChanges=original_changes,
                 appliedChanges=applied_changes,
             )
@@ -1222,6 +1237,10 @@ def decide_enhancement_proposal(
                             decision="superseded",
                             decidedAt=now,
                             expectedRevision=expected_revision,
+                            actorId=get_actor_context().actorId,
+                            actorDisplayName=get_actor_context().actorDisplayName,
+                            installationId=get_actor_context().installationId,
+                            correlationId=get_correlation_id(),
                         )
                         proposals[other_index] = other.model_copy(update={
                             "status": "superseded",

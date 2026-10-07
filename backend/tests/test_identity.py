@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import json
 from pathlib import Path
 from pydantic import ValidationError
 
@@ -40,7 +41,12 @@ class IdentityTests(unittest.TestCase):
                 user=UserRecord(id=actor.actorId, displayName=actor.actorDisplayName),
                 teams=[TeamRecord(id="team-1", name="Content team")],
                 memberships=[Membership(userId=actor.actorId, teamId="team-1", role="author")],
+                projectMemberships=[ProjectMembership(projectId="project-1", userId=actor.actorId, role="author")],
+                policy=OrganizationPolicy(deploymentMode="team", identityProvider="adapter"),
             )
+            project_root = root / "projects" / "project-1"
+            project_root.mkdir(parents=True)
+            (project_root / "project.json").write_text(json.dumps({"installationId": "org-1"}), encoding="utf-8")
             directory._write(snapshot)
             policy = RoleBasedAuthorizationPolicy(directory)
 
@@ -51,6 +57,7 @@ class IdentityTests(unittest.TestCase):
                 "user": UserRecord(id=reviewer.actorId, displayName=reviewer.actorDisplayName),
                 "actor": reviewer,
                 "memberships": [Membership(userId=reviewer.actorId, teamId="team-1", role="reviewer")],
+                "projectMemberships": [ProjectMembership(projectId="project-1", userId=reviewer.actorId, role="reviewer")],
             })
             directory._write(reviewer_snapshot)
             self.assertTrue(policy.allows(reviewer, "review.comment.create", "project-1"))
@@ -61,9 +68,10 @@ class IdentityTests(unittest.TestCase):
             directory = LocalIdentityDirectory(Path(temporary))
             membership = ProjectMembership(projectId="project-1", userId=LOCAL_ACTOR.actorId, role="instructional-designer")
 
-            directory.add_project_membership(membership)
+            membership = directory.add_project_membership(membership)
 
             self.assertEqual(directory.project_memberships("project-1"), [membership])
+            self.assertEqual(membership.grantedBy, LOCAL_ACTOR.actorId)
             self.assertIn("instructional-designer", directory.roles_for(LOCAL_ACTOR.actorId, "project-1"))
 
     def test_organization_policy_round_trips(self) -> None:

@@ -1,0 +1,51 @@
+{
+  "projectId": "scorm-1-2-release-qualification-dc8a4fb6",
+  "projectTitle": "SCORM 1.2 release qualification",
+  "sourceRevision": 7,
+  "exportProfile": "SCORM 1.2",
+  "buildStatus": "passed",
+  "packageSizeBytes": 7793,
+  "uncompressedSizeBytes": 68338,
+  "packageWarningThresholdMB": 200,
+  "largestAssets": [
+    {
+      "path": "assets/audio/audio-fe4d6354300bae5559235c2bb78d2821d0c6bb9942cb65d6772d595724b7f953.wav",
+      "sizeBytes": 48044
+    }
+  ],
+  "compatibilityChecks": [
+    {
+      "name": "manifest-at-root",
+      "passed": true
+    },
+    {
+      "name": "manifest-parseable",
+      "passed": true
+    },
+    {
+      "name": "exactly-one-sco",
+      "passed": true
+    },
+    {
+      "name": "required-player-files",
+      "passed": true
+    },
+    {
+      "name": "manifest-references-packaged",
+      "passed": true
+    },
+    {
+      "name": "no-external-manifest-references",
+      "passed": true
+    },
+    {
+      "name": "runtime-profile-token",
+      "passed": true
+    }
+  ],
+  "sceneCount": 2,
+  "requiredSceneCount": 2,
+  "assetCount": 1,
+  "warnings": [],
+  "generatedAt": "2026-10-06T14:29:43.053707+00:00"
+}

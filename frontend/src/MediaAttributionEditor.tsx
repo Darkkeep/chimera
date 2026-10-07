@@ -59,6 +59,7 @@ export function MediaAttributionEditor({ projectId, revision, asset, scene, canA
         const updated = await response.json() as Project;
         nextRevision = updated.storyboard.revision;
         onProjectUpdated(updated);
+        if (attach) reportOnboardingOutcome("media.assigned", projectId, scene.id);
       }
       const response = await fetch(`/api/projects/${projectId}/assets/${asset.id}/attribution`, {
         method: "PATCH",

@@ -166,6 +166,12 @@ def _add_scene(document: DocumentType, project: ProjectDetail, scene: Scene, ind
         document.add_heading("Media", level=2)
         media_table = document.add_table(rows=1, cols=4)
         media_table.style = "Light Shading Accent 1"
+        # Long opaque asset IDs must not consume the accessibility/credit columns.
+        media_table.autofit = False
+        for column, width in zip(media_table.columns, (0.6, 2.2, 1.6, 1.6)):
+            column.width = Inches(width)
+        for cell, width in zip(media_table.rows[0].cells, (0.6, 2.2, 1.6, 1.6)):
+            cell.width = Inches(width)
         media_table.rows[0].cells[0].text = "Role"
         media_table.rows[0].cells[1].text = "File / reference"
         media_table.rows[0].cells[2].text = "Accessibility / attribution"

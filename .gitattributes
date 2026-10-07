@@ -1,0 +1,2 @@
+# Preserve exact qualification bytes, including source/build-report line endings.
+docs/qualification/2026-10-06/* -text
