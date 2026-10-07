@@ -6,7 +6,7 @@ import { AccessibilityView } from "./AccessibilityView";
 import { GoldenPathView } from "./GoldenPathView";
 import { CoursePreview } from "./CoursePreview";
 import { AssessmentEditor } from "./AssessmentEditor";
-import { MediaAttributionEditor } from "./MediaAttributionEditor";
+import { MediaLibraryItem } from "./MediaLibraryItem";
 import { GeneratedMediaPanel } from "./GeneratedMediaPanel";
 import { ManagementView } from "./ManagementView";
 import { AIConnectionPanel } from "./AIConnectionPanel";
@@ -70,6 +70,8 @@ export function App() {
   const [selectedScene, setSelectedScene] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
   const [title, setTitle] = useState("");
+  const [aiConfiguredForProject, setAiConfiguredForProject] = useState<boolean | null>(null);
+  const [courseDesignFiles, setCourseDesignFiles] = useState<File[]>([]);
   const [sceneDraft, setSceneDraft] = useState<SceneDraft | null>(null);
   const [visualSceneId, setVisualSceneId] = useState<string | null>(null);
   const [templateDraft, setTemplateDraft] = useState<TemplateDraft | null>(null);
@@ -101,6 +103,16 @@ export function App() {
     fetch(`/api/projects/${project.id}/permissions`).then(async response => { if (!response.ok) throw new Error("Project permissions could not be loaded."); return response.json() as Promise<typeof permissions>; }).then(next => { if (alive) setPermissions(next); }).catch(issue => { if (alive) setError(issue instanceof Error ? issue.message : "Project access unavailable."); });
     return () => { alive = false; };
   }, [session, project.id]);
+  useEffect(() => {
+    if (!isCreating) return;
+    let alive = true;
+    setAiConfiguredForProject(null);
+    fetch("/api/ai-connection").then(async response => {
+      if (!response.ok) throw new Error("AI status unavailable");
+      return response.json() as Promise<{ configured: boolean }>;
+    }).then(status => { if (alive) setAiConfiguredForProject(status.configured); }).catch(() => { if (alive) setAiConfiguredForProject(false); });
+    return () => { alive = false; };
+  }, [isCreating]);
   useEffect(() => {
     const update = () => setReviewToken(location.hash.startsWith("#review=") ? location.hash.slice(8) : "");
     window.addEventListener("hashchange", update);
@@ -268,12 +280,34 @@ export function App() {
 
   async function createProject() {
     if (!title.trim() || busy) return;
+    const designFiles = aiConfiguredForProject ? courseDesignFiles : [];
+    const oversizedFile = designFiles.find(file => file.size > 25 * 1024 * 1024);
+    if (oversizedFile) {
+      setError(`${oversizedFile.name} is larger than the 25 MB reference limit.`);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
       const response = await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) });
       if (!response.ok) throw new Error("Project could not be created.");
       const createdProject = await response.json() as Project;
+      const failedAttachments: string[] = [];
+      for (const file of designFiles) {
+        const form = new FormData();
+        form.append("file", file);
+        form.append("title", file.name.replace(/\.[^.]+$/, ""));
+        form.append("classification", "study-guide");
+        try {
+          const uploadResponse = await fetch(`/api/projects/${createdProject.id}/reference-resources`, { method: "POST", body: form });
+          if (!uploadResponse.ok) {
+            const detail = await uploadResponse.json().catch(() => null) as { detail?: string } | null;
+            throw new Error(detail?.detail || "Upload failed");
+          }
+        } catch {
+          failedAttachments.push(file.name);
+        }
+      }
       applyProject(createdProject);
       guideContext.current.projectId = createdProject.id;
       const guideState = onboarding.controller.snapshot();
@@ -284,6 +318,10 @@ export function App() {
       setActiveView("storyboard");
       setShowManagement(false);
       setTitle("");
+      setCourseDesignFiles([]);
+      setAiConfiguredForProject(null);
+      setFeedback(designFiles.length > 0 && failedAttachments.length === 0 ? "Course design documents added as references. Select them in an enhancement prompt." : "");
+      if (failedAttachments.length > 0) setError(`Project created, but these documents could not be attached: ${failedAttachments.join(", ")}. Add them from Storyboard suggestions.`);
     } catch {
       setError("Project could not be created. Check that the API is running and try again.");
     } finally {
@@ -933,7 +971,7 @@ export function App() {
           <div><p className="eyebrow">PROJECT ASSETS</p><h2>Media library</h2><span className="field-hint">{scene ? `Selected scene: ${scene.title}` : "Select a scene to attach media"}</span></div>
           <label className="media-project-filter">Project<select aria-label="Media library project" value={project.id} disabled={busy || restoringProject || projects.length === 0} onChange={(event) => void switchProject(event.target.value, false, "media")}><option value="" disabled>Select a project</option>{[...projects].sort((left, right) => left.title.localeCompare(right.title)).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
           <label className={`button button-accent upload-control ${!project.id || busy ? "disabled" : ""}`} title="Add an image or audio file to this project."><Plus size={15} /> Add media<input type="file" accept="image/jpeg,image/png,image/gif,image/webp,audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/ogg,.jpg,.jpeg,.png,.gif,.webp,.mp3,.m4a,.aac,.wav,.ogg" aria-label="Add media" onChange={uploadMedia} disabled={!project.id || busy} /></label>
-        </div>{project.storyboard.assets.length ? <div className="media-grid">{project.storyboard.assets.map((asset) => { const attached = scene ? (asset.kind === "image" ? scene.imageAssets : scene.audioAssets).includes(asset.id) : false; return <article className="media-item" key={asset.id}><div className="media-preview">{asset.kind === "image" ? <img src={`/api/projects/${project.id}/assets/${asset.id}`} alt={asset.filename} loading="lazy" /> : <audio controls preload="metadata" src={`/api/projects/${project.id}/assets/${asset.id}`} />}</div><div className="media-item-info"><strong title={asset.filename}>{asset.filename}</strong><small>{asset.kind} · {(asset.sizeBytes / 1024 / 1024).toFixed(2)} MB</small></div><MediaAttributionEditor projectId={project.id} revision={project.storyboard.revision} asset={asset} onProjectUpdated={applyProject} /><button className={`button ${attached ? "button-dark" : "button-outline"}`} onClick={() => void attachAsset(asset)} disabled={!scene || busy}>{attached ? "Detach media" : "Attach to scene"}</button></article>; })}</div> : <div className="template-empty"><strong>No media in this project</strong><span>No images or audio added yet.</span></div>}</section> : <section data-onboarding="templates.library" className="template-library"><div className="template-toolbar"><div><p className="eyebrow">AUTHORING LIBRARY</p><h2>Scene templates</h2></div><label className={`button button-accent upload-control ${busy ? "disabled" : ""}`} title="Upload a PowerPoint template."><Upload size={15} /> Upload PPTX template<input type="file" accept=".pptx" aria-label="Upload PPTX template" onChange={uploadTemplate} disabled={busy} /></label></div>{templates.length ? <div className="template-list">{templates.map((template) => <article className="template-row" key={template.id}><div className="template-info"><strong>{template.title}</strong><span>{template.description || "No description"}</span><small>{template.filename} · {(template.sizeBytes / 1024 / 1024).toFixed(1)} MB</small></div><div className="template-actions"><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`} title="Replace this template from a PPTX file."><FileUp size={14} /> Replace PPTX<input type="file" accept=".pptx" aria-label="Replace template PowerPoint" onChange={(event) => replaceTemplateSource(event, template.id)} disabled={busy} /></label><button className="button button-outline" onClick={() => setTemplateDraft({ id: template.id, title: template.title, description: template.description })} disabled={busy}>Edit details</button></div></article>)}</div> : <div className="template-empty"><strong>No templates yet</strong><span>Upload a PowerPoint template to use it when creating scenes.</span></div>}</section>}
+        </div>{project.storyboard.assets.length ? <div className="media-grid">{project.storyboard.assets.map((asset) => <MediaLibraryItem key={`${project.id}:${asset.id}`} projectId={project.id} revision={project.storyboard.revision} asset={asset} scenes={scenes} selectedScene={scene ?? undefined} attached={Boolean(scene && (asset.kind === "image" ? scene.imageAssets : scene.audioAssets).includes(asset.id))} canAttach={Boolean(scene) && !busy} onAttach={() => void attachAsset(asset)} onProjectUpdated={applyProject} />)}</div> : <div className="template-empty"><strong>No media in this project</strong><span>No images or audio added yet.</span></div>}</section> : <section data-onboarding="templates.library" className="template-library"><div className="template-toolbar"><div><p className="eyebrow">AUTHORING LIBRARY</p><h2>Scene templates</h2></div><label className={`button button-accent upload-control ${busy ? "disabled" : ""}`} title="Upload a PowerPoint template."><Upload size={15} /> Upload PPTX template<input type="file" accept=".pptx" aria-label="Upload PPTX template" onChange={uploadTemplate} disabled={busy} /></label></div>{templates.length ? <div className="template-list">{templates.map((template) => <article className="template-row" key={template.id}><div className="template-info"><strong>{template.title}</strong><span>{template.description || "No description"}</span><small>{template.filename} · {(template.sizeBytes / 1024 / 1024).toFixed(1)} MB</small></div><div className="template-actions"><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`} title="Replace this template from a PPTX file."><FileUp size={14} /> Replace PPTX<input type="file" accept=".pptx" aria-label="Replace template PowerPoint" onChange={(event) => replaceTemplateSource(event, template.id)} disabled={busy} /></label><button className="button button-outline" onClick={() => setTemplateDraft({ id: template.id, title: template.title, description: template.description })} disabled={busy}>Edit details</button></div></article>)}</div> : <div className="template-empty"><strong>No templates yet</strong><span>Upload a PowerPoint template to use it when creating scenes.</span></div>}</section>}
 
       </>}
     </main>
@@ -961,7 +999,17 @@ export function App() {
       onClose={() => setShowAssessmentEditor(false)}
       onProjectUpdated={applyProject}
     />}
-    {isCreating && <EditorDialog onResumeWalkthrough={guidePaused ? () => onboarding.controller.start() : undefined} labelledBy="create-project-title" onClose={() => setIsCreating(false)} busy={busy}><div className="modal-head"><div><p className="eyebrow">NEW PROJECT</p><h2 id="create-project-title">Name your course</h2></div><button className="icon-button" onClick={() => setIsCreating(false)} disabled={busy} aria-label="Close new project"><X size={18} /></button></div><input data-onboarding="project.name" aria-label="Course name" value={title} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => event.key === "Enter" && createProject()} placeholder="e.g. Equipment Inspection Fundamentals" /><button className="button button-accent modal-submit" disabled={busy || !title.trim()} onClick={createProject}>Create project <ChevronRight size={16} /></button>{error && <p role="alert">{error}</p>}</EditorDialog>}
+    {isCreating && <EditorDialog onResumeWalkthrough={guidePaused ? () => onboarding.controller.start() : undefined} labelledBy="create-project-title" onClose={() => { setIsCreating(false); setCourseDesignFiles([]); }} busy={busy}>
+      <div className="modal-head"><div><p className="eyebrow">NEW PROJECT</p><h2 id="create-project-title">Name your course</h2></div><button className="icon-button" onClick={() => { setIsCreating(false); setCourseDesignFiles([]); }} disabled={busy} aria-label="Close new project"><X size={18} /></button></div>
+      <input data-onboarding="project.name" aria-label="Course name" value={title} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => event.key === "Enter" && createProject()} placeholder="e.g. Equipment Inspection Fundamentals" />
+      {aiConfiguredForProject && <section className="project-design-documents" aria-label="Course design documents">
+        <div><strong>Course design documents</strong><span>Attach references for AI enhancement prompts. PDF, DOCX, PPTX, TXT, or Markdown, up to 25 MB each.</span></div>
+        <label className="button button-outline upload-control"><FileUp size={15} /> Attach documents<input type="file" aria-label="Attach course design documents" accept=".pdf,.docx,.pptx,.txt,.md" multiple onChange={(event) => { const added = Array.from(event.currentTarget.files || []); setCourseDesignFiles(current => [...current, ...added.filter(file => !current.some(existing => existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified))]); event.currentTarget.value = ""; }} disabled={busy} /></label>
+        {courseDesignFiles.length > 0 && <ul aria-label="Selected course design documents">{courseDesignFiles.map((file, index) => <li key={`${file.name}:${file.lastModified}:${index}`}><span>{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB</span><button type="button" className="icon-button" aria-label={`Remove ${file.name}`} onClick={() => setCourseDesignFiles(current => current.filter((_, fileIndex) => fileIndex !== index))} disabled={busy}><X size={14} /></button></li>)}</ul>}
+      </section>}
+      {aiConfiguredForProject === false && <p className="project-design-documents-status">Connect an AI provider in Settings to attach course design documents.</p>}
+      <button className="button button-accent modal-submit" disabled={busy || !title.trim()} onClick={createProject}>Create project <ChevronRight size={16} /></button>{error && <p role="alert">{error}</p>}
+    </EditorDialog>}
     {sceneDraft && <EditorDialog onResumeWalkthrough={guidePaused ? () => onboarding.controller.start() : undefined} className="scene-editor" labelledBy="scene-editor-title" onClose={() => setSceneDraft(null)} busy={busy}><div className="modal-head"><div><p className="eyebrow">SCENE SETTINGS</p><h2 id="scene-editor-title">{sceneDraft.id ? "Edit scene" : "New scene"}</h2></div><button className="icon-button" onClick={() => setSceneDraft(null)} disabled={busy} aria-label="Close scene editor"><X size={18} /></button></div><label data-onboarding={sceneDraft.id ? "scene.edit" : "scene.form"}>Scene title<input value={sceneDraft.title} maxLength={120} onChange={(event) => setSceneDraft({ ...sceneDraft, title: event.target.value })} /></label><label>Scene type<select value={sceneDraft.sceneType} onChange={(event) => setSceneDraft({ ...sceneDraft, sceneType: event.target.value as SceneType })}><option value="content">Content</option><option value="title">Title</option><option value="assessment">Assessment</option><option value="media">Media</option><option value="interaction">Interaction</option><option value="summary">Summary</option></select></label><label>Scene layout<select value={sceneDraft.layoutMode} onChange={(event) => setSceneDraft({ ...sceneDraft, layoutMode: event.target.value as LayoutMode, templateId: event.target.value === "template" ? sceneDraft.templateId : "" })}><option value="fidelity">Fidelity</option><option value="hybrid">Hybrid</option><option value="native">Native</option><option value="template">Template</option></select></label>{sceneDraft.layoutMode === "template" && <label>Template<select value={sceneDraft.templateId} onChange={(event) => setSceneDraft({ ...sceneDraft, templateId: event.target.value })}><option value="">Choose a template</option>{templates.map((template) => <option value={template.id} key={template.id}>{template.title}</option>)}</select>{templates.length === 0 && <span className="field-hint">Upload a PPTX template in the Templates section first.</span>}</label>}<label>On-screen text<textarea rows={5} value={sceneDraft.screenText} onChange={(event) => setSceneDraft({ ...sceneDraft, screenText: event.target.value })} /></label><label>Action description<textarea rows={3} maxLength={5000} value={sceneDraft.actionDescription} onChange={(event) => setSceneDraft({ ...sceneDraft, actionDescription: event.target.value })} placeholder="Describe movement, interaction, or timed actions shown in this scene" /></label><label>Speaker notes<textarea rows={4} value={sceneDraft.notes} onChange={(event) => setSceneDraft({ ...sceneDraft, notes: event.target.value })} /></label>
       <label className="required-toggle"><input type="checkbox" checked={sceneDraft.required} onChange={(event) => setSceneDraft({ ...sceneDraft, required: event.target.checked })} /> Required scene</label>
       {error && <p className="export-error" role="alert">{error}</p>}<div className="modal-actions"><button className="button button-outline" onClick={() => setSceneDraft(null)} disabled={busy}>Cancel</button><button className="button button-accent" onClick={saveScene} disabled={busy || !sceneDraft.title.trim() || (sceneDraft.layoutMode === "template" && !sceneDraft.templateId)}>{sceneDraft.id ? "Save changes" : "Create scene"} <Check size={15} /></button></div></EditorDialog>}

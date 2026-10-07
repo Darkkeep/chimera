@@ -208,17 +208,18 @@ def read_project(project_id: str) -> ProjectDetail:
 
 
 def write_project_metadata(path: Path, metadata: dict[str, str]) -> None:
-    project_file = path / "project.json"
-    existing = json.loads(project_file.read_text(encoding="utf-8")) if project_file.is_file() else {}
-    persisted = {
-        **existing,
-        **metadata,
-        "installationId": existing.get("installationId", LOCAL_ACTOR.installationId),
-        "ownerId": existing.get("ownerId", LOCAL_ACTOR.actorId),
-    }
-    temporary = path / f".project-{uuid.uuid4().hex}.json.tmp"
-    temporary.write_text(json.dumps(persisted, indent=2), encoding="utf-8")
-    temporary.replace(project_file)
+    with _storyboard_write_lock:
+        project_file = path / "project.json"
+        existing = json.loads(project_file.read_text(encoding="utf-8")) if project_file.is_file() else {}
+        persisted = {
+            **existing,
+            **metadata,
+            "installationId": existing.get("installationId", LOCAL_ACTOR.installationId),
+            "ownerId": existing.get("ownerId", LOCAL_ACTOR.actorId),
+        }
+        temporary = path / f".project-{uuid.uuid4().hex}.json.tmp"
+        temporary.write_text(json.dumps(persisted, indent=2), encoding="utf-8")
+        temporary.replace(project_file)
 
 
 def write_storyboard(path: Path, storyboard: Storyboard, expected_revision: int | None = None) -> None:

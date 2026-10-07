@@ -10,12 +10,18 @@ async function mockWorkspace(page, options = {}) {
   const projects = options.empty ? [] : [project('alpha', 'Alpha course'), project('beta', 'Beta course')];
   while (projects.length < (options.projectCount || 0)) projects.push(project(`project-${projects.length + 1}`, `Project ${projects.length + 1}`));
   let stage = 'draft';
+  let referenceUploads = 0;
   await page.addInitScript(() => localStorage.setItem('chimera.activeProjectId', 'alpha'));
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url());
     const path = url.pathname;
     const json = body => route.fulfill({ json: body });
     if (path === '/api/auth/config') return json({ deploymentMode: 'single-user', identityProvider: 'local', passwordLoginAvailable: false });
+    if (path === '/api/ai-connection') return json({ configured: Boolean(options.aiConfigured) });
+    if (path.endsWith('/reference-resources') && route.request().method() === 'POST') {
+      referenceUploads++;
+      return route.fulfill({ status: 201, json: { id: 'reference-1', title: 'Course design', classification: 'study-guide', currentVersion: 'v1', versions: [] } });
+    }
     if (path === '/api/projects') {
       if (route.request().method() === 'POST') {
         const created = project('new-project', route.request().postDataJSON().title);
@@ -46,6 +52,7 @@ async function mockWorkspace(page, options = {}) {
     }
     return route.fulfill({ status: 404, json: { detail: 'Not found' } });
   });
+  return { getReferenceUploads: () => referenceUploads };
 }
 
 test('opens My Work on launch and refresh, with detailed blockers', async ({ page }) => {
@@ -73,6 +80,21 @@ test('New Project on My Work opens creation and enters authoring after saving', 
   await page.getByRole('dialog').getByRole('button', { name: 'Create project', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Created from My Work', exact: true })).toBeVisible();
   await expect(page.getByLabel('Add scene', { exact: true })).toBeEnabled();
+});
+
+test('attaches course design documents as AI references when AI is configured', async ({ page }) => {
+  const workspace = await mockWorkspace(page, { empty: true, aiConfigured: true });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New Project', exact: true }).click();
+  const documentPicker = page.getByLabel('Attach course design documents');
+  await expect(documentPicker).toBeVisible();
+  await documentPicker.setInputFiles({ name: 'design-guide.txt', mimeType: 'text/plain', buffer: Buffer.from('Course goals and audience') });
+  await expect(page.getByText('design-guide.txt · 0.0 MB')).toBeVisible();
+  await page.getByRole('textbox', { name: 'Course name', exact: true }).fill('Course with design reference');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create project', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Course with design reference', exact: true })).toBeVisible();
+  await expect.poll(workspace.getReferenceUploads).toBe(1);
+  await expect(page.getByRole('status').filter({ hasText: 'Course design documents added as references' })).toBeVisible();
 });
 
 test('opens the remembered project and another project in authoring', async ({ page }) => {

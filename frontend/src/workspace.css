@@ -122,6 +122,13 @@ button:disabled, .button.disabled { opacity: .48; cursor: not-allowed; }
 .upload-control input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .upload-control:focus-within { outline: 3px solid #3b82e6; outline-offset: 3px; }
 .upload-control.disabled input { cursor: not-allowed; }
+.project-design-documents { display: grid; gap: 10px; margin-top: 16px; font-size: 12px; }
+.project-design-documents > div { display: grid; gap: 4px; }
+.project-design-documents > div span, .project-design-documents-status { color: var(--muted); font-size: 11px; line-height: 1.45; }
+.project-design-documents ul { display: grid; gap: 4px; max-height: 112px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.project-design-documents li { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; border-top: 1px solid var(--line); }
+.project-design-documents li span { min-width: 0; overflow-wrap: anywhere; }
+.project-design-documents-status { margin: 12px 0 0; }
 .notice { margin: 12px 20px 0; align-items: center; gap: 15px; line-height: 1.6; border-radius: 5px; }
 .success-notice { border-color: #c5decf; background: #eff8f2; color: #326146; }
 .modal-backdrop { z-index: 40; padding: 16px; background: #10243e99; }

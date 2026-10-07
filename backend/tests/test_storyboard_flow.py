@@ -80,6 +80,24 @@ def make_presentation() -> bytes:
 
 
 class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
+    def test_project_metadata_write_waits_for_project_reader_lock(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Metadata lock"))
+        write_started = Event()
+        write_finished = Event()
+
+        def write_metadata():
+            write_started.set()
+            storage.write_project_metadata(storage.project_path(project.id), {"title": "Metadata saved"})
+            write_finished.set()
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with storage._storyboard_write_lock:
+                pending = executor.submit(write_metadata)
+                self.assertTrue(write_started.wait(timeout=2))
+                self.assertFalse(write_finished.wait(timeout=0.05))
+            pending.result(timeout=2)
+        self.assertEqual(storage.read_project(project.id).title, "Metadata saved")
+
     def test_project_read_waits_for_storyboard_write_transaction(self) -> None:
         project = storage.create_project(ProjectCreate(title="Concurrent read"))
         read_started = Event()

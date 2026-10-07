@@ -217,11 +217,17 @@ The screenshot shows an attached example and its Detach media button. The same c
 
 ### Describe scene images
 
+You can enter **Alternative text** or select **Decorative image** directly in an image's Media library card beside its attribution. The description heading identifies the selected scene. For an attached image, **Save credit** also saves the scene description. For an unattached image, **Attach to scene** saves the attachment, description and credit; saving credit alone does not attach the image or persist its pending description. Descriptions are scene-specific, so editing one scene does not overwrite another scene's description of the same image.
+
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | Open **Review tools → Check image descriptions**. | Attached images are grouped by scene. | <a href="user-guide/images/review-tools.png"><img src="user-guide/images/review-tools.png" alt="review tools controls" width="240"></a> |
 | 2 | Enter **Alternative text** describing the image information, or select **Decorative image** when appropriate. | Each image has a description or explicit decorative designation. | <a href="user-guide/images/image-descriptions.png"><img src="user-guide/images/image-descriptions.png" alt="image descriptions controls" width="240"></a> |
-| 3 | Click **Save** for each scene you edited. | That scene’s accessibility settings are saved. | <a href="user-guide/images/image-descriptions.png"><img src="user-guide/images/image-descriptions.png" alt="image descriptions controls" width="240"></a> |
+| 3 | Click **Save** for a scene or **Save all** for all edited scenes. Closing the panel also saves pending changes. | Saved and unsaved states are visible. A failed save leaves the panel open with your draft intact. | <a href="user-guide/images/image-descriptions.png"><img src="user-guide/images/image-descriptions.png" alt="image descriptions controls" width="240"></a> |
+
+Image groups identify the current storyboard scene number and title, plus the source slide when available. Media library items list every scene that uses the image or audio.
+
+A green **Ready for production** check means the media loaded, its attribution is saved as Complete with credit text, and any image description or decorative designation is saved. In the Media library, images must meet the description requirement in every referencing scene; unattached media is not marked ready. Amber indicators identify pending saves, missing descriptions or attribution, and unavailable media. This is media readiness, not visual approval or whole-course release approval; run Production validation before release.
 
 ### Require audio completion
 
