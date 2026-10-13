@@ -40,6 +40,9 @@ fs.mkdirSync(output, { recursive: true });
     await shot('review-tools', '#review-tools');
     await button('Edit scene').click();
     await shot('scene-editor', '[role=dialog]');
+    await page.getByRole('tab', { name: 'Canvas', exact: true }).click();
+    await shot('scene-canvas-editor', '[role=dialog]');
+    await page.getByRole('tab', { name: 'Details', exact: true }).click();
     await page.getByLabel('Scene layout').selectOption('template');
     await shot('template-selection', '[role=dialog]');
     await button('Close scene editor').click();
@@ -155,13 +158,16 @@ fs.mkdirSync(output, { recursive: true });
     await button('Close course preview').click();
     await button('Export').click();
     await shot('export-dialog', '[role=dialog]');
-    for (const [name, title] of [['scorm-export', 'Learning management system'], ['backup-controls', 'Storyboard backup'], ['word-export', 'Editable Word storyboard'], ['qti-test', 'Assessment test']]) {
+    for (const [name, title] of [['scorm-export', 'Learning management system'], ['backup-controls', 'Chimera storyboard'], ['word-export', 'Editable Word storyboard'], ['qti-test', 'Assessment test']]) {
       await shot(name, page.locator('.export-section').filter({ has: page.getByRole('heading', { name: title, exact: true }) }));
     }
     await button('Close export').click();
     await button('My Work').click();
     await page.locator('.health-row').first().waitFor();
     await shot('my-work', '.management-view');
+    await page.locator('.health-row').first().getByRole('button', { name: 'Move to trash', exact: true }).click();
+    await shot('trash-confirmation', '[role=dialog]');
+    await button('Cancel').click();
     await button('Resume authoring').click();
     // Temporarily expose scene-specific validation controls, then restore fixture data.
     const original = await (await page.request.get(`/api/projects/${fixture.projectId}`)).json();

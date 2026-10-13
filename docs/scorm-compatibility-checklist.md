@@ -102,6 +102,8 @@ Recorded 2026-09-29 against generated packages served from `http://127.0.0.1:876
 - [x] Previously recorded SCORM 1.2 and 2004 release archives still pass manifest completeness and profile runtime-token checks.
 - [ ] No new Blackboard SCORM 1.2 LMS session was available during this pass; external qualification remains open.
 
+**Policy update: 2026-10-08.** The `422` result above records the policy at the time of that pass. Incomplete image attribution is now an **Attribution Pending** production warning included in the build report, so SCORM export may proceed; incomplete audio attribution and missing media files remain blockers. Reassess the temporary image exception after 2027-01-01.
+
 ### TestFrame requalification: 2026-10-06
 
 - Live production validation passed with no issues before and after export. Both fresh packages represent `testframe-565c5da8`, revision 8, with 28 required scenes and one image asset.

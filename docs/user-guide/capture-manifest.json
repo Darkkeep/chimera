@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-09-30T19:11:13.527Z",
+  "capturedAt": "2026-10-13T18:03:20.532Z",
   "viewport": {
     "width": 1500,
     "height": 1400
@@ -36,6 +36,10 @@
     },
     {
       "file": "scene-editor.png",
+      "selector": "[role=dialog]"
+    },
+    {
+      "file": "scene-canvas-editor.png",
       "selector": "[role=dialog]"
     },
     {
@@ -229,6 +233,10 @@
     {
       "file": "my-work.png",
       "selector": ".management-view"
+    },
+    {
+      "file": "trash-confirmation.png",
+      "selector": "[role=dialog]"
     },
     {
       "file": "assessment-create.png",

@@ -64,7 +64,7 @@ Open http://localhost:5173. The authoring slice supports local project creation,
 
 Use the [single-user deployment checklist](docs/single-user-deployment-checklist.md) for the repeatable local demonstration and release evidence.
 
-Editable Word storyboard export is available from **Export**. The document preserves scene text as editable Word content and includes authoring directions, speaker notes, media details, accessibility text, assessments, and the source revision. Answer keys are excluded unless explicitly selected.
+Editable Word storyboard export is available from **Export**. Choose **SME Master** for editable landscape scene pages styled after the visual slide template, or **Full storyboard** for the Multimedia Instructional template with the SME pages and detailed scene records included. Scene text, tables, and production details remain editable Word content; answer keys are excluded unless explicitly selected.
 
 ## Verify changes
 

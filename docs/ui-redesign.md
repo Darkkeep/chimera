@@ -4,7 +4,7 @@ Implemented September 30, 2026, using 12ui Design candidate A.
 
 The original interface placed approximately 395 pixels of headers and controls above the storyboard at 1440px width. The updated workspace starts at approximately 110px. Scene actions sit next to the selected content, with a persistent pencil button on every scene row. The sequence has its own scrolling area.
 
-Project selection, new-project creation, and libraries are in the navigation. Review tools expand in place. Preview and Export occupy one compact header. Export opens a keyboard-accessible dialog containing the existing SCORM, report, backup/restore, and conditional QTI test actions. Assessment and required-audio controls remain with their scene.
+Project selection, new-project creation, and libraries are in the navigation. Review tools expand in place. Preview and Export occupy one compact header. Export opens a keyboard-accessible dialog containing the existing SCORM, report, Chimera storyboard archive/restore, and conditional QTI test actions. Assessment and required-audio controls remain with their scene.
 
 Scene, template, project-creation, and export dialogs trap keyboard focus, support Escape, restore focus to their trigger, and prevent dismissal during saving. File upload controls are keyboard accessible. Save failures remain visible inside the editor. Export warning thresholds now persist on blur instead of updating local state before the persistence comparison.
 

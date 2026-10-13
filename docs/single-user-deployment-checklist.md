@@ -48,7 +48,7 @@ It verifies health, installation mode, project loading, production validation, b
 - [ ] Provider-account spending controls and data-handling approval are in place before AI use; request caps are not currency budgets.
 - [ ] Preview opens and can navigate scenes without the backend learner runtime.
 - [ ] Review comments can be created, replied to, resolved, and reopened.
-- [ ] JSON backup and portable backup can be created and restored into a clean workspace.
+- [ ] JSON export and Chimera storyboard archive can be created and restored into a clean workspace.
 - [ ] Word export downloads an editable document.
 - [ ] SCORM 2004 and 1.2 exports succeed only after production validation passes.
 - [ ] Export reports and known LMS limitations are recorded.
@@ -58,7 +58,7 @@ It verifies health, installation mode, project loading, production validation, b
 - [x] API health returned `ok`; installation configuration reported `single-user`, local identity, local tracking, and local residency.
 - [x] Python 3.14.5, Node.js, and npm were available. LibreOffice was not available on `PATH`.
 - [x] The browser opened `TestFrame`, loaded 28 scenes, entered Preview, navigated from scene 1 to scene 2, created a review comment, and resolved it without UI errors.
-- [x] Portable backup downloaded successfully for `TestFrame`; its manifest contained the source revision, project files, audit events, history, and SHA-256 hashes.
+- [x] Chimera storyboard downloaded successfully for `TestFrame`; its manifest contained the source revision, project files, audit events, history, and SHA-256 hashes.
 - [x] Editable Word export downloaded successfully for `TestFrame`; structural inspection found 187 paragraphs, 29 tables, 1 embedded image, scene 28, and the storyboard revision. Answer keys were absent by default.
 - [x] Backup round-trip and invalid-archive safety tests passed.
 - [x] Recorded SCORM 1.2 and SCORM 2004 release archives passed manifest, packaged-reference, and runtime-profile checks; both reports were `passed-with-warnings`.
@@ -69,6 +69,10 @@ It verifies health, installation mode, project loading, production validation, b
 ## Verification follow-up: 2026-10-07
 
 The My Work, Media Library, and AI connection changes passed 123 backend tests, 56 Chromium workflow tests, the frontend production build, and scoped light/dark desktop/mobile accessibility checks. Live Windows checks confirmed secure credential-store availability and the New Project dialog without saving a real API key, making an external AI request, or creating test projects in the user's workspace. The Evidence Before Impact storyboard proof was approved for illustrative use only, not production release. See [current work](current-work.md).
+
+## Verification follow-up: 2026-10-08
+
+The editable SME Master and Full Word storyboard templates were rendered with LibreOffice; landscape SME pages, portrait Full-template pages, and their section order were inspected. Media images now appear as compact row thumbnails. Interactive editing of the generated documents in Word/Writer remains unverified. The attribution-gate result recorded above is historical: pending image attribution now warns without blocking export, while audio attribution and missing media files remain blockers. See [current work](current-work.md) for the scheduled policy review.
 
 ## Team Mode boundary
 

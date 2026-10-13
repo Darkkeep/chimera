@@ -18,7 +18,7 @@ Stages are manually declared workflow labels, not approval records or evidence o
 
 ## Project Health
 
-Publication blockers are grouped by validation code, including missing attribution, missing media files, broken media references, unavailable templates, invalid remediation targets, duplicate identifiers, and an empty storyboard. Expand a project's blocker summary to inspect individual findings and their available scene or asset context. Authoring warnings, unresolved comments, and pending enhancement approvals remain separate counts.
+Publication blockers are grouped by validation code, including missing media files, broken media references, unavailable templates, invalid remediation targets, duplicate identifiers, incomplete audio attribution, and an empty storyboard. Pending image attribution is a production warning labeled **Attribution Pending**, not a publication blocker; complete and verify it before release. Expand a project's blocker summary to inspect individual findings and their available scene or asset context. Authoring warnings, unresolved comments, and pending enhancement approvals remain separate counts.
 
 With five or more projects, Project health uses a bounded vertical scroll area with sticky desktop column headings. The area can be focused and scrolled with the keyboard. Fewer than five projects retain the normal unbounded layout.
 

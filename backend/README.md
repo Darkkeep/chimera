@@ -48,7 +48,7 @@ Scenes can be deleted with `DELETE /api/projects/{project_id}/scenes/{scene_id}`
 
 SCORM package assembly and report persistence serialize with storyboard writes, and a build is rejected if its captured revision changes. The workspace uses a filesystem lock to coordinate processes sharing that workspace; all API workers must use the same reliable local filesystem.
 
-Editable Word storyboard export is available at `GET /api/projects/{project_id}/storyboard.docx`. Add `?include_answer_key=true` only when an authoring copy should contain answer keys; they are excluded by default. The DOCX records the source revision and includes editable scene content, authoring notes, assessment specifications, media references, image previews, accessibility text, and attribution.
+Editable Word storyboard exports are available at `GET /api/projects/{project_id}/storyboard-sme.docx` and `/api/projects/{project_id}/storyboard-full.docx`. SME Master uses editable landscape scene pages proportioned and organized to match `Visual_Slide_Storyboard_Template.pptx`; Full starts from `Multimedia_Instructional_Storyboard_Template.docx`, includes those SME pages in a landscape section, and adds detailed scene records in portrait. Attached image assets appear as compact thumbnails in their identifying Media-table rows. Both use `?include_answer_key=true` only when an authoring copy should contain answers; keys are excluded by default. The legacy `/storyboard.docx` endpoint remains available.
 
 The local identity directory is exposed at `GET /api/identity/context`. It materializes the single-user actor, installation, team, and all supported platform roles. Team authentication and membership management can replace this directory without changing storyboard or export records.
 
