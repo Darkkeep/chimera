@@ -158,7 +158,7 @@ The first management surface should answer operational questions rather than bec
 
 These decisions are installation choices, not per-project settings. The installer or deployment administrator must select them before team mode is enabled:
 
-- Identity provider: local, Encarta, OIDC, SAML, or a configured adapter.
+- Identity provider: local, built-in email/password, Encarta, OIDC, SAML, or a configured adapter.
 - Tenancy: one organization per installation or multiple organizations.
 - User provisioning: invitations, directory synchronization, or both.
 - Centralized tracking mode and whether analytics retain project/user identity or are organization-anonymous.
@@ -166,3 +166,5 @@ These decisions are installation choices, not per-project settings. The installe
 - Administrator content visibility, audit retention, and data residency.
 
 The selected values are represented by `OrganizationPolicy`, persisted with the installation identity directory, and exposed through `GET /api/installation/config`. Project records must not override these choices. Invalid combinations are rejected at configuration validation time, such as non-local identity in single-user mode, guest review without guest approval, or identified analytics when tracking is disabled. Encarta is scaffolded as the planned Team Mode provider but remains fail-closed until its real authentication contract is implemented.
+
+Local, Encarta, and darkrogue.io installation profiles are described in the [authentication deployment guide](authentication-deployments.md). The darkrogue profile provides built-in password sessions, operator-managed recovery, project membership/role enforcement, filtered read models, and authenticated review links. Profile environment settings override stored identity selection without modifying the local workspace; hosted profiles require a separate workspace. Live Linux/Nginx qualification awaits server details; Encarta verification awaits its integration contract.

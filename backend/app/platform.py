@@ -1,14 +1,13 @@
+import hashlib
 import json
 import os
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from threading import RLock
 from typing import Callable, Literal, Protocol
 from uuid import uuid4
-from threading import RLock
-from datetime import timedelta
-import hashlib
 
 from pydantic import BaseModel, Field
 
@@ -319,6 +318,8 @@ LOCAL_ACTOR = ActorContext(
     installationId="local-installation",
     deploymentMode="single-user",
 )
+
+REQUEST_ACTOR: ContextVar[ActorContext] = ContextVar("chimera_request_actor", default=LOCAL_ACTOR)
 
 
 def get_actor_context() -> ActorContext:

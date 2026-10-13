@@ -118,10 +118,11 @@ def validate_project(project: ProjectDetail, target: Literal["authoring", "produ
                 message=f"Restore or remove the missing asset: {asset.filename}.",
             ))
         if target == "production" and (asset.attributionStatus != "complete" or not asset.attributionText.strip()):
+            is_image = asset.kind == "image"
             issues.append(ValidationIssue(
-                severity="error",
+                severity="warning" if is_image else "error",
                 code="missing-media-attribution",
-                message=f"Complete attribution for {asset.filename} before production release.",
+                message=f"Attribution Pending for {asset.filename}. Complete and verify the credit before release." if is_image else f"Complete attribution for {asset.filename} before production release.",
                 sceneTitle=asset.filename,
             ))
 

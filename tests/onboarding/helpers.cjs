@@ -1,6 +1,10 @@
 const { guide, expectStep } = require('@guided-workflows/onboarding/playwright');
 exports.guide = guide;
 exports.expectStep = expectStep;
+exports.reloadAuthoring = async page => {
+  await page.reload();
+  await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+};
 exports.startChimera = async page => {
   // Every browser gets an empty initial selector; all writes still use the isolated real API.
   await page.route('**/api/projects', async route => {

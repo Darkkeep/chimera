@@ -1,14 +1,16 @@
 # Chimera user guide
 
-Process-based instructions for the restored local authoring interface. Prepared 2026-09-30. Source: `ce70067` plus recovered stash `fe48af8` (Export Enhancement -- Pass 1). See the [recovery record](export-enhancement-recovery.md).
+Process-based instructions for Chimera. Screenshots refreshed 2026-10-08 from commit `4ade811` plus uncommitted working-tree updates. Captures use the isolated user-guide demonstration workspace and made no live AI requests or use of credentials. Historical source/recovery context is documented in the [recovery record](export-enhancement-recovery.md).
 
 ## How to use this guide
 
 Each task has its own **Step / Action / Result / Control image** table. Click a control image to open the full-size screenshot. Screenshots show the real Chimera interface in Light appearance, using an isolated demonstration project. Course names and sample content will differ in your workspace. Browser file pickers, download prompts, and confirmation dialogs vary by browser and operating system; screenshots show the Chimera controls that open them.
 
-The source has changed since the original capability review: Word export, reference upload, enhancement submission, generated-media candidate review, comments, and portable backups now have interface controls. Their presence does not certify a configured AI provider or compatibility with every LMS. Example proposals, candidates, and job statuses in these images are documentation fixtures; no live AI request was made for this guide.
+The source has changed since the original capability review: Word export, reference upload, enhancement submission, generated-media candidate review, comments, and Chimera storyboard archives now have interface controls. Their presence does not certify a configured AI provider or compatibility with every LMS. Example proposals, candidates, and job statuses in these images are documentation fixtures; no live AI request was made for this guide.
 
-**Prerequisite:** Start the backend and frontend using the [README setup instructions](../README.md#start-locally), then open `http://localhost:5173`. Keep both services running while authoring. LibreOffice is needed for rendered PowerPoint slide previews. AI tasks additionally require server-side provider configuration; there is no provider settings form in the current UI.
+**Prerequisite:** Start the backend and frontend using the [README setup instructions](../README.md#start-locally), then open `http://localhost:5173`. Keep both services running while authoring. LibreOffice is needed for rendered PowerPoint slide previews. AI tasks require a configured connection through **Settings > AI connection** or server environment settings. Shared-installation changes require an administrator; see [AI connection](ai-connection.md).
+
+My Work opens after normal launch/sign-in and refresh. It is first in the workspace menu. Select a project row to open its authoring workspace, choose New Project to create one, or Resume authoring to return to the remembered project. Direct authenticated review links retain their review destination.
 
 **Working convention:** Select the intended project and scene before editing. Use the task's Save/Create/Accept control and wait for completion. Merely typing into a form does not save it. If a revision-conflict message appears, reload the project, inspect the latest values, and reapply the intended change. Do not assume unsaved form text will survive a reload.
 
@@ -38,8 +40,8 @@ Optional interactive help is available under **Review tools ? Guided review ? Al
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Click **Create project** in the sidebar. | The course-name dialog opens. | <a href="user-guide/images/project-controls.png"><img src="user-guide/images/project-controls.png" alt="Project selector and Create project button" width="240"></a> |
-| 2 | Enter a **Course name**, then click **Create project**. | A new empty project becomes active. | <a href="user-guide/images/create-project.png"><img src="user-guide/images/create-project.png" alt="create project controls" width="240"></a> |
+| 1 | Click **New Project** on My Work, or **Create project** in the sidebar. | The course-name dialog opens. Cancelling keeps your current workspace. | <a href="user-guide/images/my-work-current.png"><img src="user-guide/images/my-work-current.png" alt="My Work with New Project" width="240"></a> |
+| 2 | Enter a **Course name**, then click **Create project**. | A new empty project becomes active in Storyboard authoring, with production stage Draft. | <a href="user-guide/images/create-project.png"><img src="user-guide/images/create-project.png" alt="create project controls" width="240"></a> |
 
 ### Switch projects
 
@@ -48,12 +50,33 @@ Optional interactive help is available under **Review tools ? Guided review ? Al
 | 1 | Open the **PROJECT** selector and choose the desired course. | The selected storyboard and project media load. | <a href="user-guide/images/project-controls.png"><img src="user-guide/images/project-controls.png" alt="Project selector and Create project button" width="240"></a> |
 | 2 | Check the course title above the workspace before continuing. | Subsequent edits apply to the intended project. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a> |
 
+### Move a project to Trash and restore it
+
+Project owners can move a project to Trash from its row in **My Work**. Projects remain recoverable for 30 days; opening Trash removes expired entries. Projects with queued or running generation jobs must wait until those jobs finish. In shared installations, administrators can also manage project trash.
+
+| Step | Action | Result | Control image |
+| --- | --- | --- | --- |
+| 1 | In **My Work**, choose **Move to trash** for the project. Optionally download its project archive first. | The confirmation explains the 30-day recovery period and archive exclusions. | <a href="user-guide/images/my-work.png"><img src="user-guide/images/my-work.png" alt="My Work project actions" width="240"></a> |
+| 2 | Select **Are you sure you about that?**, then confirm **Move to trash**. | The project disappears from active lists and authoring. If it was open, Chimera switches to another active project or an empty workspace. | <a href="user-guide/images/trash-confirmation.png"><img src="user-guide/images/trash-confirmation.png" alt="Move project to trash confirmation checkbox" width="240"></a> |
+| 3 | Open **Trash** in My Work and choose **Restore** before the recovery date. | The project and its files return to the active workspace. | <a href="user-guide/images/my-work.png"><img src="user-guide/images/my-work.png" alt="My Work and Trash navigation" width="240"></a> |
+
 ### Change appearance
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | Open **Settings** at the bottom of the sidebar. | Appearance options become available. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a> |
 | 2 | Choose **Light**, **Dark**, or **System**. | The preference is applied and remembered in this browser. | <a href="user-guide/images/appearance.png"><img src="user-guide/images/appearance.png" alt="appearance controls" width="240"></a> |
+
+### Configure AI
+
+| Step | Action | Result | Control image |
+| --- | --- | --- | --- |
+| 1 | Open **Settings > AI connection**. | Connection status appears; shared-installation non-admins see a read-only view. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="AI connection settings" width="240"></a> |
+| 2 | Choose approved models, enter the API key, and set request limits. Click **Save connection**. | The key is stored in the server's OS credential store and cleared from the form. Saving fails closed when secure storage is unavailable. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Models, write-only API key and request limits" width="240"></a> |
+| 3 | Click **Test connection** after saving. | A models-list request checks the credential without sending course content or generating media. Model access and costs still depend on the provider account. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Save, test and disconnect controls" width="240"></a> |
+| 4 | To disable AI, click **Disconnect** and confirm. | The saved key is deleted and environment fallback is disabled. Running requests may finish; queued jobs against changed settings require resubmission. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Disconnect AI connection" width="240"></a> |
+
+Request limits are not spending limits. Set a provider-account budget and confirm organisational data-use approval before enabling generation. See [AI connection](ai-connection.md) for credential-store provisioning and operational requirements.
 
 ### Follow the guided workflow
 
@@ -70,7 +93,7 @@ Scene creation and edits are saved locally. History snapshots are maintained by 
 
 ### Import a PowerPoint storyboard
 
-Importing another deck updates the project from that deck. Download a portable backup first if the current authored work must be retained independently. Captured animation XML does not guarantee equivalent playback.
+Importing another deck updates the project from that deck. Download a Chimera storyboard first if the current authored work must be retained independently. Captured animation XML does not guarantee equivalent playback.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
@@ -88,13 +111,36 @@ Importing another deck updates the project from that deck. Download a portable b
 
 ### Edit scene content and settings
 
-On-screen text is learner content. Action descriptions and speaker notes are authoring material. Inspect playback and exports rather than assuming changes to extracted text redraw an imported slide image.
+The **Edit scene** dialog combines scene details and canvas authoring. On-screen text is learner content; action descriptions and speaker notes are authoring material. Inspect playback and exports rather than assuming changes to extracted text redraw an imported slide image.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Select a scene, then click **Edit scene** or its pencil icon. | The scene editor opens. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a><br><a href="user-guide/images/scene-sequence.png"><img src="user-guide/images/scene-sequence.png" alt="scene sequence controls" width="240"></a> |
-| 2 | Update the title, type, layout, on-screen text, action description, speaker notes, or required status. | The form contains your intended edits. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
-| 3 | Click **Save changes**; use **Cancel** to discard form edits. | Saved changes update the storyboard and its revision. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
+| 1 | Select a scene, then click **Edit scene** or its pencil icon. | The unified scene editor opens on Details. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a><br><a href="user-guide/images/scene-sequence.png"><img src="user-guide/images/scene-sequence.png" alt="scene sequence controls" width="240"></a> |
+| 2 | In **Details**, update the title, type, layout, on-screen text, action description, speaker notes, or required status. Choose **Canvas** to edit the visual layout in the same dialog. | Both sections share one draft and one save action. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
+| 3 | Click **Save scene**; use **Cancel** to discard edits from either section. | Saved changes update the storyboard and its revision. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor Details controls" width="240"></a> |
+
+### Edit text and images on the canvas
+
+Open **Edit scene**, then choose **Canvas**. The canvas editor saves an editable layout; it does not paint over the flattened PowerPoint preview. Canvas edits to an imported slide use Hybrid rendering so the edited layers, rather than an unchanged flattened image, are shown.
+
+![Unified scene editor Canvas tab](user-guide/images/scene-canvas-editor.png)
+
+1. For an older imported scene, choose **Extract source layout** to recover positions and inherited artwork from the retained PPTX. This preserves scene IDs, notes, questions, review threads, existing assets, and authored text. The extracted layout remains inactive until **Save scene**. Cancelling keeps the extracted data but does not change playback.
+2. Double-click a text box, or focus it and press Enter, to edit its text directly. The **Text** field also edits the selected box. Drag boxes to move them, use resize handles, or enter exact position and size in the properties panel. Text resize handles preserve the box's current aspect ratio; image resize handles allow freeform sizing. Arrow keys move the focused element; Shift changes the step from one to ten slide-space units.
+3. Drag an **Attached images** thumbnail onto the canvas. Clicking the thumbnail adds it without dragging. The media-library selector can add other project images. Selecting an image exposes replacement and crop-reset controls.
+4. Use **Layers** to select overlapping or inherited content. Master and layout artwork starts locked; unlock it before editing. Toolbar controls add text, undo/redo, duplicate/delete elements, and change stacking order. Text properties include size, color, typeface, alignment, bold, and italic.
+5. Choose a background color or project image in the properties panel. Imported picture backgrounds and supported inherited master/layout images are available as project assets. **Source slide**, when available, temporarily shows the original flattened rendering for comparison.
+6. Choose **Save scene**, then check **Preview course**. The saved canvas replaces the source preview in authoring, preview, and both SCORM profiles. **Cancel** discards unsaved canvas changes.
+
+New imports capture editable text, images, common PowerPoint shapes, line connectors, custom freeform geometry, rotation, cropping, slide dimensions, inherited graphics, and solid/picture backgrounds. Byte-identical images are shared as one Media library asset while every source placement stays separate on the canvas. Most extracted shapes can be moved, resized, rotated, layered, locked, or deleted like other canvas elements; text inside a shape remains separately editable. The original preview remains available for comparison. Less-common preset geometry, gradients, group rotation, mixed text formatting, bullets, and some inherited styles may be approximated and are listed under **Import limitations**; charts and SmartArt remain unsupported objects. This is not full PowerPoint-equivalent editing.
+
+For a scene with an enabled visual layout, edits to **On-screen text** in the original metadata dialog also update the corresponding visual text boxes. The scene title remains the navigation label; use the canvas editor to change a title drawn on the slide.
+
+### Jump directly to another scene
+
+In **Preview course**, open **Contents** and choose a scene by number and title. The list marks the current and visited scenes. Jumping preserves assessment answers and audio-completion state, and only the selected scene becomes visited. Exported SCORM players provide a **Contents** selector with the same scene sequence.
+
+The reviewer form follows Light and Dark appearance for labels, fields, thread text, and controls. Its contrast is qualified in both modes.
 
 ### Reorder scenes
 
@@ -105,7 +151,7 @@ On-screen text is learner content. Action descriptions and speaker notes are aut
 
 ### Delete a scene
 
-Use a portable backup before deletion when you need an accessible recovery copy. History storage does not imply a visible one-click undo control.
+Download a Chimera storyboard before deletion when you need an accessible recovery copy. History storage does not imply a visible one-click undo control.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
@@ -137,23 +183,40 @@ Use a portable backup before deletion when you need an accessible recovery copy.
 
 ### Assign a template to a scene
 
-Upload a template first. Assignment is not a guarantee that every PowerPoint effect will be reproduced in playback.
+Scene layout chooses how the scene is rendered:
+
+- **Fidelity** keeps the rendered source slide.
+- **Hybrid** uses the extracted slide background and editable slide layers.
+- **Native** uses a clean white canvas with the scene's learner-facing text.
+- **Template** uses the selected PPTX's first-slide design and master/layout artwork, replacing its sample text with the scene content.
+
+PowerPoint effects that Chimera cannot represent may be approximated or omitted; compare the result with the source slide before publishing.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | Open the scene editor and set **Scene layout** to **Template**. | A Template selector appears. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
-| 2 | Choose a template, then click **Save changes** or **Create scene**. | The scene stores the selected template reference. | <a href="user-guide/images/template-selection.png"><img src="user-guide/images/template-selection.png" alt="template selection controls" width="240"></a> |
+| 2 | Choose a template, then click **Save scene** or **Create scene**. | The scene background and editable design layers update to the selected template. | <a href="user-guide/images/template-selection.png"><img src="user-guide/images/template-selection.png" alt="template selection controls" width="240"></a> |
 
 ## 4. Manage imported media and accessibility
 
 The current upload interface accepts images and audio, up to 100 MB per file. Images: JPG, PNG, GIF, WebP. Audio: MP3, M4A, AAC, WAV, OGG. Video import, a shared media library across projects, and explicit course-wide placement are not exposed by these controls.
 
-### Upload external media
+### Add external media
+
+![Current Media Library project selector and Add media](user-guide/images/media-library-current.png)
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | Select the intended scene in **Storyboard**, then open **Media library**. | The media view identifies the selected scene. | <a href="user-guide/images/scene-sequence.png"><img src="user-guide/images/scene-sequence.png" alt="scene sequence controls" width="240"></a><br><a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a> |
-| 2 | Click **Upload media** and choose a supported file. | The asset is added to the project library. Upload does not by itself attach it. | <a href="user-guide/images/media-library.png"><img src="user-guide/images/media-library.png" alt="media library controls" width="240"></a> |
+| 2 | Select the intended project using **Project** (defaults to the current project), then click **Add media** and choose a supported file. | The asset is added to the selected project library. Adding media does not by itself attach it. | <a href="user-guide/images/media-library.png"><img src="user-guide/images/media-library.png" alt="media library controls" width="240"></a> |
+
+### Create a media candidate
+
+Configure AI through **Settings > AI connection** before generating candidates. In shared deployments, an installation administrator manages the connection. See [AI connection](ai-connection.md) for credential storage, connection testing, limits, and data handling.
+
+Create a media candidate starts collapsed. Select its heading to expand it. When the server-side AI connection is not configured, its heading is greyed and generation controls are disabled. If connection status cannot be loaded or your role does not permit generation, controls also remain disabled. Configuration availability does not guarantee that a provider is reachable or supports a particular model. Existing candidates can still be approved or rejected without a configured AI connection; regeneration requires the connection.
+
+The Media Library project selector defaults to the current project. Selecting another project opens that project's media library and makes it the current project; media files are not copied between projects.
 
 ### Attach or detach scene media
 
@@ -169,15 +232,21 @@ The screenshot shows an attached example and its Detach media button. The same c
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | In a media card, fill **Attribution / credit** with creator, source, and license or permission information. | Attribution text is prepared. | <a href="user-guide/images/media-library.png"><img src="user-guide/images/media-library.png" alt="media library controls" width="240"></a> |
-| 2 | Choose **Draft** while unfinished or **Complete** when verified, then click **Save credit**. | The attribution status is saved. Production validation checks attribution readiness. | <a href="user-guide/images/media-library.png"><img src="user-guide/images/media-library.png" alt="media library controls" width="240"></a> |
+| 2 | Choose **Draft** while unfinished or **Complete** when verified, then click **Save credit**. | The attribution status is saved. Production validation reports pending image attribution as a warning so export can proceed; verify the credit before release. | <a href="user-guide/images/media-library.png"><img src="user-guide/images/media-library.png" alt="media library controls" width="240"></a> |
 
 ### Describe scene images
+
+You can enter **Alternative text** or select **Decorative image** directly in an image's Media library card beside its attribution. The description heading identifies the selected scene. For an attached image, **Save credit** also saves the scene description. For an unattached image, **Attach to scene** saves the attachment, description and credit; saving credit alone does not attach the image or persist its pending description. Descriptions are scene-specific, so editing one scene does not overwrite another scene's description of the same image.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | Open **Review tools → Check image descriptions**. | Attached images are grouped by scene. | <a href="user-guide/images/review-tools.png"><img src="user-guide/images/review-tools.png" alt="review tools controls" width="240"></a> |
 | 2 | Enter **Alternative text** describing the image information, or select **Decorative image** when appropriate. | Each image has a description or explicit decorative designation. | <a href="user-guide/images/image-descriptions.png"><img src="user-guide/images/image-descriptions.png" alt="image descriptions controls" width="240"></a> |
-| 3 | Click **Save** for each scene you edited. | That scene’s accessibility settings are saved. | <a href="user-guide/images/image-descriptions.png"><img src="user-guide/images/image-descriptions.png" alt="image descriptions controls" width="240"></a> |
+| 3 | Click **Save** for a scene or **Save all** for all edited scenes. Closing the panel also saves pending changes. | Saved and unsaved states are visible. A failed save leaves the panel open with your draft intact. | <a href="user-guide/images/image-descriptions.png"><img src="user-guide/images/image-descriptions.png" alt="image descriptions controls" width="240"></a> |
+
+Image groups identify the current storyboard scene number and title, plus the source slide when available. Media library items list every scene that uses the image or audio.
+
+A green **Ready for production** check means the media loaded, its attribution is saved as Complete with credit text, and any image description or decorative designation is saved. In the Media library, images must meet the description requirement in every referencing scene; unattached media is not marked ready. Amber indicators identify pending saves, missing descriptions or attribution, and unavailable media. Image attribution marked **Attribution Pending** is a warning that does not block export, but the credit must be verified before release. Incomplete audio attribution remains a blocking production error. This is media readiness, not visual approval or whole-course release approval; run Production validation before release.
 
 ### Require audio completion
 
@@ -337,7 +406,7 @@ A proposal can contain multiple related changes. Accept change applies that disp
 
 ## 8. Generate and approve media
 
-Select the target scene before opening Media library. AI media generation requires compatible server-side image/audio provider configuration. The current interface does not offer arbitrary canvas positioning, a generation-cost preview, or a full media-job monitor. A candidate’s approval attaches it to its target scene.
+Select the target project and scene before opening Media library. Create a media candidate starts collapsed; expand its heading to access the form. Without AI configuration or generation permission, the section is greyed and generation/regeneration is disabled. Existing candidates remain reviewable. Approval attaches a candidate to its target scene; choose **Edit scene > Canvas** afterward to place supported image assets. A generation-cost preview and full media-job monitor are not provided.
 
 ### Request an image candidate
 
@@ -345,7 +414,7 @@ The current provider implementation sends the prompt and dimensions to image gen
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Open **Media library** and verify the Scene shown in **Create a media candidate**. Set **Media type** to **Image**. | The selected scene is the generation target. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a><br><a href="user-guide/images/media-image-form.png"><img src="user-guide/images/media-image-form.png" alt="media image form controls" width="240"></a> |
+| 1 | Open **Media library**, expand **Create a media candidate**, and verify Scene. Set **Media type** to **Image**. | The selected scene is the generation target. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a><br><a href="user-guide/images/media-image-form.png"><img src="user-guide/images/media-image-form.png" alt="media image form controls" width="240"></a> |
 | 2 | Enter **Purpose**, **Prompt**, optional **Style**, **Dimensions**, and **Alt text**. | The request form describes the candidate. Provider support determines valid dimensions. | <a href="user-guide/images/media-image-form.png"><img src="user-guide/images/media-image-form.png" alt="media image form controls" width="240"></a> |
 | 3 | Click **Generate candidate** and wait for a candidate or error. | A successful request yields a pending candidate without attaching it to the storyboard. | <a href="user-guide/images/media-image-form.png"><img src="user-guide/images/media-image-form.png" alt="media image form controls" width="240"></a> |
 
@@ -367,7 +436,7 @@ The current provider implementation sends the prompt and dimensions to image gen
 
 ## 9. Play and comment on the storyboard
 
-Preview progress is stored in this browser. It is separate from a learner’s LMS session. In-app discussion is available; externally shared review links and timestamp-entry controls are not part of this documented interface.
+Preview progress is stored in this browser, separately from a learner's LMS session. In-app discussion is available. Hosted authenticated review links are documented in the [authentication deployment guide](authentication-deployments.md); local guest review and timestamp-entry controls are not available.
 
 ### Play the storyboard
 
@@ -435,7 +504,7 @@ Passing validation is not certification for every LMS. Pending suggestions and u
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | In validation, click **Production release**. | Chimera runs production checks. | <a href="user-guide/images/production-validation.png"><img src="user-guide/images/production-validation.png" alt="production validation controls" width="240"></a> |
-| 2 | Resolve blocking errors, including missing assets or incomplete attribution, and inspect warnings. Reopen the report after changes. | The report shows whether current production checks pass. | <a href="user-guide/images/production-validation.png"><img src="user-guide/images/production-validation.png" alt="production validation controls" width="240"></a> |
+| 2 | Resolve blocking errors, including missing assets, and inspect warnings such as **Attribution Pending** for images. Reopen the report after changes. | The report shows blocking production errors separately from pending image credits; export can proceed with that warning. | <a href="user-guide/images/production-validation.png"><img src="user-guide/images/production-validation.png" alt="production validation controls" width="240"></a> |
 
 ## 11. Export course deliverables
 
@@ -462,13 +531,13 @@ A report may be absent before the first build. Verify its revision/date before t
 
 ### Export an editable Word storyboard
 
-Edits made in Word do not synchronize back into Chimera. Word reimport is not exposed by this interface.
+Choose **SME Master** for one editable landscape, slide-like page per scene, or **Full storyboard** for the Multimedia Instructional document with SME pages and detailed scene records. In both formats, attached image thumbnails appear in the corresponding media row with identifying, accessibility, and credit details. Edits made in Word do not synchronize back into Chimera. Word reimport is not exposed by this interface.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | Open **Export** and locate **Editable Word storyboard**. | The Word controls are visible. | <a href="user-guide/images/top-actions.png"><img src="user-guide/images/top-actions.png" alt="top actions controls" width="240"></a><br><a href="user-guide/images/word-export.png"><img src="user-guide/images/word-export.png" alt="word export controls" width="240"></a> |
-| 2 | Choose whether to **Include answer keys (authoring material)**. | The document’s answer-key policy is selected. | <a href="user-guide/images/word-export.png"><img src="user-guide/images/word-export.png" alt="word export controls" width="240"></a> |
-| 3 | Click **Download Word document**, then open the DOCX in Word. | Scene text and authoring specifications are editable; images remain images and interactions are documented rather than playable. | <a href="user-guide/images/word-export.png"><img src="user-guide/images/word-export.png" alt="word export controls" width="240"></a> |
+| 2 | Choose **SME Master** or **Full storyboard**, then decide whether to **Include answer keys (authoring material)**. | The format and answer-key policy are selected. | <a href="user-guide/images/word-export.png"><img src="user-guide/images/word-export.png" alt="word export controls" width="240"></a> |
+| 3 | Click **Download Word document**, then open the DOCX in Word. | Scene text and tables are editable; images remain images and interactions are documented rather than playable. | <a href="user-guide/images/word-export.png"><img src="user-guide/images/word-export.png" alt="word export controls" width="240"></a> |
 
 ### Export one assessment as QTI
 
@@ -488,23 +557,23 @@ Chimera attempt/retry settings are not equivalent to settings in the receiving a
 
 ## 12. Back up and restore
 
-Prefer portable backup when preserving the whole project. JSON contains storyboard data and asset references but not media binaries. Restore replaces active project content; select the target carefully and download a current backup first.
+Prefer a Chimera storyboard when preserving the whole project. JSON contains storyboard data and asset references but not media binaries. Restore replaces active project content; select the target carefully and download a current Chimera storyboard first.
 
-### Download a portable project backup
+### Download a Chimera storyboard
 
 Build outputs/reports, media-generation job records, and the generated-candidate index are excluded by the current archive policy. Do not treat the archive as a record of every generation operation.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Open **Export → Storyboard backup**. | Backup controls are visible. | <a href="user-guide/images/top-actions.png"><img src="user-guide/images/top-actions.png" alt="top actions controls" width="240"></a><br><a href="user-guide/images/backup-controls.png"><img src="user-guide/images/backup-controls.png" alt="Backup download and restore controls" width="240"></a> |
-| 2 | Click **Download portable backup** and retain the ZIP. | A project archive includes authored project files, resources, review records, history, and referenced templates according to the archive policy. | <a href="user-guide/images/backup-controls.png"><img src="user-guide/images/backup-controls.png" alt="Backup download and restore controls" width="240"></a> |
+| 1 | Open **Export → Chimera storyboard**. | Storyboard archive controls are visible. | <a href="user-guide/images/top-actions.png"><img src="user-guide/images/top-actions.png" alt="top actions controls" width="240"></a><br><a href="user-guide/images/backup-controls.png"><img src="user-guide/images/backup-controls.png" alt="Chimera storyboard download and restore controls" width="240"></a> |
+| 2 | Click **Download Chimera storyboard** and retain the ZIP. | A project archive includes authored project files, resources, review records, history, and referenced templates according to the archive policy. | <a href="user-guide/images/backup-controls.png"><img src="user-guide/images/backup-controls.png" alt="Chimera storyboard download and restore controls" width="240"></a> |
 
-### Restore a portable backup
+### Restore a Chimera storyboard
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Select the intended destination project and download its current portable backup. | You have a separate recovery copy. | <a href="user-guide/images/project-controls.png"><img src="user-guide/images/project-controls.png" alt="Project selector and Create project button" width="240"></a><br><a href="user-guide/images/backup-controls.png"><img src="user-guide/images/backup-controls.png" alt="Backup download and restore controls" width="240"></a> |
-| 2 | Click **Restore portable backup** and select the archive; read and confirm the replacement prompt if intended. | Chimera validates and restores the archive or reports an error. | <a href="user-guide/images/backup-controls.png"><img src="user-guide/images/backup-controls.png" alt="Backup download and restore controls" width="240"></a> |
+| 1 | Select the intended destination project and download its current Chimera storyboard. | You have a separate recovery copy. | <a href="user-guide/images/project-controls.png"><img src="user-guide/images/project-controls.png" alt="Project selector and Create project button" width="240"></a><br><a href="user-guide/images/backup-controls.png"><img src="user-guide/images/backup-controls.png" alt="Chimera storyboard download and restore controls" width="240"></a> |
+| 2 | Click **Restore Chimera storyboard** and select the archive; read and confirm the replacement prompt if intended. | Chimera validates and restores the archive or reports an error. | <a href="user-guide/images/backup-controls.png"><img src="user-guide/images/backup-controls.png" alt="Chimera storyboard download and restore controls" width="240"></a> |
 | 3 | Inspect scene order, media, references, comments, and validation after restoration. | The restored project can be checked before further authoring or publication. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a><br><a href="user-guide/images/review-tools.png"><img src="user-guide/images/review-tools.png" alt="review tools controls" width="240"></a> |
 
 ### Export storyboard JSON
@@ -513,34 +582,36 @@ Use this for structured transfer of storyboard data. It is not a self-contained 
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Open **Export** and click **Download JSON**. | The storyboard and asset-reference data download as JSON. | <a href="user-guide/images/top-actions.png"><img src="user-guide/images/top-actions.png" alt="top actions controls" width="240"></a><br><a href="user-guide/images/backup-controls.png"><img src="user-guide/images/backup-controls.png" alt="Backup download and restore controls" width="240"></a> |
+| 1 | Open **Export** and click **Download JSON**. | The storyboard and asset-reference data download as JSON. | <a href="user-guide/images/top-actions.png"><img src="user-guide/images/top-actions.png" alt="top actions controls" width="240"></a><br><a href="user-guide/images/backup-controls.png"><img src="user-guide/images/backup-controls.png" alt="Chimera storyboard and JSON controls" width="240"></a> |
 
 ### Restore storyboard JSON
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | Verify that referenced assets and templates already exist in the target project. | Required dependencies are available for restoration. | <a href="user-guide/images/media-library.png"><img src="user-guide/images/media-library.png" alt="media library controls" width="240"></a><br><a href="user-guide/images/templates.png"><img src="user-guide/images/templates.png" alt="templates controls" width="240"></a> |
-| 2 | Open **Export → Restore JSON**, choose the JSON file, and read the replacement confirmation. | You can confirm or cancel replacement of the active storyboard. | <a href="user-guide/images/backup-controls.png"><img src="user-guide/images/backup-controls.png" alt="Backup download and restore controls" width="240"></a> |
-| 3 | Confirm if intended, then inspect the restored storyboard. | Valid JSON replaces storyboard data and preserves the previous storyboard in history; invalid input reports an error. | <a href="user-guide/images/backup-controls.png"><img src="user-guide/images/backup-controls.png" alt="Backup download and restore controls" width="240"></a><br><a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a> |
+| 2 | Open **Export → Restore JSON**, choose the JSON file, and read the replacement confirmation. | You can confirm or cancel replacement of the active storyboard. | <a href="user-guide/images/backup-controls.png"><img src="user-guide/images/backup-controls.png" alt="Chimera storyboard and JSON controls" width="240"></a> |
+| 3 | Confirm if intended, then inspect the restored storyboard. | Valid JSON replaces storyboard data and preserves the previous storyboard in history; invalid input reports an error. | <a href="user-guide/images/backup-controls.png"><img src="user-guide/images/backup-controls.png" alt="Chimera storyboard and JSON controls" width="240"></a><br><a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a> |
 
 ## 13. Review project health
 
 ### Inspect My Work
 
-This view is a local management foundation. It does not provide a complete team-administration interface or establish that external identity integration is configured.
+My Work is the opening workspace, with identity/policy shown compactly beside the summary counts. Hosted project lists are filtered by access. Production stage is a manually declared workflow label, not validation readiness or approval evidence: new projects start Draft, older projects remain Not set until classified. Authors with project-settings permission can update it without changing the storyboard revision. See [My Work](my-work.md).
+
+Project health uses a bounded, keyboard-scrollable area at five or more projects, with sticky desktop headings. Blocker summaries identify types and counts; expand them for individual findings. Recent activity starts collapsed and has its own scroll area when expanded.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | Click **My Work** in the sidebar. | My Work fills the main workspace, with sidebar navigation still available. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a> |
-| 2 | Review project counts, pending approvals, unresolved comments, publication blockers, identity/policy information, and recent activity. | You can identify projects that need attention. | <a href="user-guide/images/my-work.png"><img src="user-guide/images/my-work.png" alt="my work controls" width="240"></a> |
-| 3 | Click **Return to authoring**, then use the project selector to open a course. | You return to the authoring workflow. | <a href="user-guide/images/my-work.png"><img src="user-guide/images/my-work.png" alt="my work controls" width="240"></a><br><a href="user-guide/images/project-controls.png"><img src="user-guide/images/project-controls.png" alt="Project selector and Create project button" width="240"></a> |
+| 2 | Review counts, production stages and categorized blockers. Expand blocker findings or **Recent activity** as needed. | You can identify projects that need attention without treating readiness as approval. | <a href="user-guide/images/my-work-current.png"><img src="user-guide/images/my-work-current.png" alt="Project stages and categorized blockers" width="240"></a> |
+| 3 | Select a project name/row to open that project's Storyboard, or choose **Resume authoring**. | Authoring opens for editable projects; review-only users retain review access. | <a href="user-guide/images/my-work-current.png"><img src="user-guide/images/my-work-current.png" alt="Open a project or resume authoring" width="240"></a> |
 
 ## Features without a documented user-facing workflow
 
 Do not follow the implementation build plan as if every planned control already exists. The following have no complete workflow in the interface captured here:
 
-- Externally shared reviewer links and invitation management.
-- Video upload, caption/transcript authoring, arbitrary media placement, and course-wide/shared media-library controls.
+- Unauthenticated guest review. Authenticated hosted review links have a separate documented deployment workflow.
+- Video upload, caption/transcript authoring, and course-wide/shared media-library controls. Supported image placement is available through **Edit scene > Canvas**.
 - Full reference-resource classification, authority, version-management, and per-scene mapping editors.
 - Word reimport or automatic synchronization of external edits.
 - A general history browser and arbitrary revision restore.
@@ -561,7 +632,7 @@ See the [implementation build plan](storyboard-export-enhancement-build-plan.md)
 | A proposal or save reports a revision conflict | Reload the latest project and compare changes before trying again. Preserve unsaved text separately first. |
 | A SCORM build is blocked | Run Production release validation and resolve the listed errors. |
 | A QTI test button is missing | Save at least two authored assessment questions. |
-| JSON restore reports missing references | Make required media/templates available, or use a portable backup that includes dependencies. |
+| JSON restore reports missing references | Make required media/templates available, or use a Chimera storyboard that includes dependencies. |
 | AI generation does not yield a candidate | Check the visible error and ask the administrator to inspect provider/job configuration. The media form has no complete job monitor. |
 
 ## Screenshot and verification record

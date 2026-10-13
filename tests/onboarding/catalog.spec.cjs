@@ -3,7 +3,7 @@ const AxeBuilder = require('@axe-core/playwright').default;
 const { execFileSync } = require('node:child_process');
 const { existsSync } = require('node:fs');
 const path = require('node:path');
-const { guide, expectStep, startChimera, createProject, saveScene } = require('./helpers.cjs');
+const { guide, expectStep, startChimera, createProject, saveScene, reloadAuthoring } = require('./helpers.cjs');
 const unique = name => `${name} ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`;
 const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAE0lEQVR4nGP8//8/AwMDEwMYAAAkBgMBXaJOiAAAAABJRU5ErkJggg==', 'base64');
 function pptx() {
@@ -56,7 +56,7 @@ test('every catalog journey opens a visible target in a prepared project', async
   await write(page, id, `scenes/${sceneId}`, { imageAssets: [p.storyboard.assets.find(a => a.kind === 'image').id], audioAssets: [p.storyboard.assets.find(a => a.kind === 'audio').id] }, 'patch');
   const template = await page.request.post('/api/templates', { multipart: { file: { name: 'fixture.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer: pptx() } } });
   expect(template.ok()).toBe(true);
-  await page.unroute('**/api/projects'); await page.reload();
+  await page.unroute('**/api/projects'); await reloadAuthoring(page);
   await expect(page.getByRole('heading', { name: (await readProject(page, id)).title, exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Review tools', exact: true }).click();
   await page.getByRole('button', { name: 'Guided review', exact: true }).click();
@@ -84,16 +84,16 @@ test('editing waits for a real save, preserves failed drafts, and has independen
   const id = await seed(page); await choose(page, 'Edit scene content and settings');
   await page.getByRole('textbox', { name: 'Scene title', exact: true }).fill('Edited by walkthrough');
   await page.route('**/api/projects/*/scenes/*', r => r.fulfill({ status: 409, json: { detail: 'Conflict' } }));
-  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await page.getByRole('button', { name: 'Save scene', exact: true }).click();
   await expectStep(page, 'Edit scene content and settings');
   await expect(page.getByRole('textbox', { name: 'Scene title', exact: true })).toHaveValue('Edited by walkthrough');
   await page.keyboard.press('Escape'); await expect(guide(page)).toHaveCount(0);
   await page.getByRole('button', { name: 'Resume walkthrough', exact: true }).click();
   await page.unroute('**/api/projects/*/scenes/*');
-  await page.getByRole('button', { name: 'Save changes', exact: true }).click(); await finish(page);
+  await page.getByRole('button', { name: 'Save scene', exact: true }).click(); await finish(page);
   expect((await readProject(page, id)).storyboard.scenes[0].title).toBe('Edited by walkthrough');
   await choose(page, 'Upload images or audio'); await guide(page).getByRole('button', { name: 'Pause guide' }).click();
-  await page.unroute('**/api/projects'); await page.reload();
+  await page.unroute('**/api/projects'); await reloadAuthoring(page);
   await expect(page.getByRole('heading', { name: (await readProject(page, id)).title, exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Start / resume walkthrough', exact: true }).click();
   await expectStep(page, 'Upload images or audio');
@@ -103,10 +103,14 @@ test('editing waits for a real save, preserves failed drafts, and has independen
 
 test('media upload, attachment, credit and image description confirm persisted outcomes', async ({ page }) => {
   const id = await seed(page); await choose(page, 'Upload images or audio');
-  await page.getByLabel('Upload media', { exact: true }).setInputFiles({ name: 'guide.png', mimeType: 'image/png', buffer: image }); await finish(page);
+  await page.getByLabel('Add media', { exact: true }).setInputFiles({ name: 'guide.png', mimeType: 'image/png', buffer: image }); await finish(page);
   await choose(page, 'Attach or detach media'); await page.getByRole('button', { name: 'Attach to scene', exact: true }).click(); await finish(page);
   await choose(page, 'Save media attribution'); await page.getByLabel('Attribution / credit').fill('Practice illustration, local fixture'); await page.getByRole('button', { name: 'Save credit' }).click(); await finish(page);
-  await choose(page, 'Describe scene images'); await page.getByLabel('Alternative text').fill('A practice fixture'); await page.getByRole('button', { name: 'Save', exact: true }).click(); await finish(page);
+  await choose(page, 'Describe scene images');
+  const descriptions = page.getByRole('dialog', { name: 'Image descriptions' });
+  const sceneDescription = descriptions.getByRole('region', { name: 'Scene 1: Practice content' });
+  await sceneDescription.getByRole('textbox', { name: 'Alternative text' }).fill('A practice fixture');
+  await sceneDescription.getByRole('button', { name: 'Save', exact: true }).click(); await finish(page);
   const p = await readProject(page, id); const asset = p.storyboard.assets[0];
   expect(p.storyboard.scenes[0].imageAssets).toContain(asset.id); expect(asset.attributionText).toContain('Practice illustration');
   expect(p.storyboard.scenes[0].imageAltText[asset.id]).toBe('A practice fixture');
@@ -115,7 +119,7 @@ test('media upload, attachment, credit and image description confirm persisted o
 for (const [type, name] of [['single-choice', 'Single-choice question'], ['multiple-response', 'Multiple-answer question'], ['true-false', 'True / false question'], ['ordering', 'Ordering question'], ['drag-drop', 'Drag-and-drop question'], ['matching', 'Matching question'], ['short-answer', 'Short-answer question']]) {
   test(`${name} guide completes only after its matching question is saved`, async ({ page }) => {
     const id = await seed(page); await write(page, id, 'scenes', { title: 'Assessment practice', sceneType: 'assessment' });
-    await page.unroute('**/api/projects'); await page.reload(); await expect(page.getByRole('button', { name: /Assessment practice assessment/ })).toBeVisible();
+    await page.unroute('**/api/projects'); await reloadAuthoring(page); await expect(page.getByRole('button', { name: /Assessment practice assessment/ })).toBeVisible();
     await choose(page, name);
     if (type === 'single-choice') {
       await page.getByRole('combobox', { name: /^Question type/ }).selectOption('true-false');
@@ -185,25 +189,40 @@ test('templates upload, edit, replace and assign; PowerPoint import saves real s
   await choose(page, 'Edit template details'); await page.getByLabel('Template name', { exact: true }).fill(editedName); await page.getByRole('button', { name: 'Save template', exact: true }).click(); await finish(page);
   await choose(page, 'Replace a template source'); await page.getByRole('article').filter({ hasText: editedName }).getByLabel('Replace template PowerPoint').setInputFiles({ name: 'replacement.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer: deck }); await finish(page);
   await choose(page, 'Assign a template to a scene'); await page.getByRole('combobox', { name: /^Scene layout/ }).selectOption('template');
-  const select = page.getByRole('dialog').getByRole('combobox', { name: /^Template/ }); const templateId = await select.locator('option').nth(1).getAttribute('value');
-  await select.selectOption(templateId); await page.getByRole('button', { name: 'Save changes', exact: true }).click(); await finish(page);
+  await page.getByRole('tab', { name: 'Details', exact: true }).click();
+  const select = page.getByRole('dialog').getByRole('combobox', { name: 'Template', exact: true }); const templateId = await select.locator('option').nth(1).getAttribute('value');
+  await select.selectOption(templateId); await page.getByRole('button', { name: 'Save scene', exact: true }).click(); await finish(page);
   expect((await readProject(page, id)).storyboard.scenes[0].templateId).toBe(templateId);
-  await choose(page, 'Import PowerPoint'); await page.getByLabel('Import PowerPoint', { exact: true }).setInputFiles({ name: 'course.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer: deck }); await finish(page);
+  await choose(page, 'Import PowerPoint');
+  const [importResponse] = await Promise.all([
+    page.waitForResponse(response => response.url().endsWith(`/api/projects/${id}/source`) && response.request().method() === 'POST', { timeout: 45000 }),
+    page.getByLabel('Import PowerPoint', { exact: true }).setInputFiles({ name: 'course.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer: deck }),
+  ]);
+  expect(importResponse.ok()).toBe(true);
+  await finish(page);
   expect((await readProject(page, id)).hasSourceDeck).toBe(true);
 });
 
-test('both SCORM profiles, reports, Word and portable backup confirm real downloads', async ({ page }) => {
+test('both SCORM profiles, reports, Word and Chimera storyboard confirm real downloads', async ({ page }) => {
   test.setTimeout(60000); await seed(page);
   for (const [name, button, suffix] of [
     ['Build SCORM 2004', 'Build SCORM 2004', /scorm2004.zip$/],
     ['Build SCORM 1.2', 'Build SCORM 1.2', /scorm12.zip$/],
     ['Download a SCORM build report', 'Report 2004', /build-report.json$/],
-    ['Export an editable Word storyboard', 'Download Word document', /storyboard.docx$/],
-    ['Download a portable backup', 'Download portable backup', /backup.zip$/],
+    ['Download Chimera storyboard', 'Download Chimera storyboard', /backup.zip$/],
   ]) {
     await choose(page, name); const download = page.waitForEvent('download'); await page.getByRole('button', { name: button, exact: true }).click(); expect((await download).suggestedFilename()).toMatch(suffix); await finish(page);
     await page.getByRole('button', { name: 'Close export', exact: true }).click();
   }
+  await choose(page, 'Export an editable Word storyboard');
+  for (const [format, suffix] of [['sme', /sme-master\.docx$/], ['full', /full-storyboard\.docx$/]]) {
+    await page.getByLabel('Word storyboard format').selectOption(format);
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download Word document', exact: true }).click();
+    expect((await download).suggestedFilename()).toMatch(suffix);
+  }
+  await finish(page);
+  await page.getByRole('button', { name: 'Close export', exact: true }).click();
 });
 
 test('restore guides retain confirmation and advance after successful JSON and ZIP restoration', async ({ page }) => {
@@ -216,14 +235,14 @@ test('restore guides retain confirmation and advance after successful JSON and Z
   page.once('dialog', d => d.accept()); await page.getByLabel('Restore JSON', { exact: true }).setInputFiles(file); await finish(page);
   await page.getByRole('button', { name: 'Close export', exact: true }).click();
   const backup = await page.request.get(`/api/projects/${id}/backup.zip`); expect(backup.ok()).toBe(true);
-  await choose(page, 'Restore a portable backup'); page.once('dialog', d => d.accept());
-  await page.getByLabel('Restore portable backup', { exact: true }).setInputFiles({ name: 'restore.zip', mimeType: 'application/zip', buffer: await backup.body() }); await finish(page);
+  await choose(page, 'Restore Chimera storyboard'); page.once('dialog', d => d.accept());
+  await page.getByLabel('Restore Chimera storyboard', { exact: true }).setInputFiles({ name: 'restore.zip', mimeType: 'application/zip', buffer: await backup.body() }); await finish(page);
   expect((await readProject(page, id)).storyboard.scenes[0].title).toBe('Practice content');
 });
 
 test('reordering, audio requirements, export threshold and deletion persist only after confirmation', async ({ page }) => {
   const id = await seed(page); await write(page, id, 'scenes', { title: 'Second scene' });
-  await page.unroute('**/api/projects'); await page.reload(); await expect(page.getByRole('button', { name: /Second scene content/ })).toBeVisible();
+  await page.unroute('**/api/projects'); await reloadAuthoring(page); await expect(page.getByRole('button', { name: /Second scene content/ })).toBeVisible();
   await choose(page, 'Reorder scenes'); await page.getByRole('button', { name: 'Move Practice content down', exact: true }).click(); await finish(page);
   expect((await readProject(page, id)).storyboard.scenes[1].title).toBe('Practice content');
   await choose(page, 'Set the package size warning'); await page.getByRole('spinbutton', { name: 'Package warning threshold in MB' }).fill('250'); await page.getByRole('heading', { name: 'Export course', exact: true }).click(); await finish(page);
@@ -236,8 +255,8 @@ test('catalog search is usable in a narrow dark window', async ({ page }) => {
   await seed(page); await page.setViewportSize({ width: 600, height: 900 }); await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.getByRole('button', { name: 'Settings', exact: true }).click(); await page.getByRole('radio', { name: 'Dark', exact: true }).check();
   await page.getByRole('button', { name: 'Review tools', exact: true }).click(); await page.getByRole('button', { name: 'Guided review' }).click(); await page.getByText(/^All functionality walkthroughs/).click();
-  await page.getByRole('searchbox', { name: 'Find a walkthrough' }).fill('backup');
-  await expect(page.getByRole('button', { name: 'Start Download a portable backup' })).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Find a walkthrough' }).fill('storyboard');
+  await expect(page.getByRole('button', { name: 'Start Download Chimera storyboard' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect((await new AxeBuilder({ page }).include('.golden-path-dialog').analyze()).violations).toEqual([]);
   await page.screenshot({ path: test.info().outputPath('walkthrough-catalog.png') });

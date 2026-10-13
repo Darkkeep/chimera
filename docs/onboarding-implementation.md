@@ -19,12 +19,12 @@ The independent demo now lives in [Darkkeep/onboarding](https://github.com/Darkk
 
 ## Walkthrough catalog
 
-Open **Review tools ? Guided review ? All functionality walkthroughs**. Search by task name (for example, audio, questions, backup), then choose a walkthrough. The sidebar **Start / resume walkthrough** resumes the last selected task. Each of the 48 walkthroughs has independent browser-local progress for the selected project; **Practiced**, **Paused**, and **Ended with skips** describe practice history rather than project readiness.
+Open **Review tools ? Guided review ? All functionality walkthroughs**. Search by task name (for example, audio, questions, storyboard), then choose a walkthrough. The sidebar **Start / resume walkthrough** resumes the last selected task. Each of the 48 walkthroughs has independent browser-local progress for the selected project; **Practiced**, **Paused**, and **Ended with skips** describe practice history rather than project readiness.
 
 | Functionality | Walkthroughs and outcomes |
 | --- | --- |
 | Projects and workspace | First project/scene, project selection, Light/Dark/System appearance |
-| Scene authoring | PowerPoint import, text/notes/action/type/layout/required settings, saved ordering, explicitly confirmed deletion |
+| Scene authoring | PowerPoint import, text/notes/action/type/layout/required settings in the unified Details/Canvas editor, saved ordering, explicitly confirmed deletion |
 | Templates | PPTX upload, name/description save, source replacement, saved scene assignment |
 | Media | Image/audio upload, attach/detach, attribution save, required playback, alt text/decorative save |
 | Assessments | Separate save journeys for single-choice, multiple-answer, true/false, ordering, drag/drop, matching and short-answer; attempts/score/weight/remediation; confirmed removal; QTI item export |
@@ -32,8 +32,8 @@ Open **Review tools ? Guided review ? All functionality walkthroughs**. Search b
 | Course review | Saved completion rules, successfully loaded validation followed by acknowledgment of authoring/production findings |
 | Enhancement | Reference upload, preview/explicit submission, cancel/retry jobs, edit/accept/reject/reverse suggestion decisions |
 | Generated media | Image/narration candidate review and approve/reject, explicit regeneration |
-| Exports | SCORM 2004 and 1.2, build reports, Word/answer-key choice, QTI test, JSON, portable backup, saved size warning |
-| Restore | JSON and portable ZIP restoration after the existing user confirmation and successful API response |
+| Exports | SCORM 2004 and 1.2, build reports, Word/answer-key choice, QTI test, JSON, Chimera storyboard archive, saved size warning |
+| Restore | JSON and Chimera storyboard ZIP restoration after the existing user confirmation and successful API response |
 | Management | My Work project health, approvals, identity/policy and audit activity review |
 
 Action steps wait for their handler's successful outcome, including the project scope and scene identity where applicable. Question-type journeys also require the matching saved type. Prerequisites block with Retry/Skip/Pause when required content is absent. Preparation opens existing views/forms; it never performs a save, accepts a destructive confirmation or starts a provider run. Review steps use Next for explicit acknowledgment. Escape pauses the guide; open dialogs offer Resume walkthrough without clearing drafts. Changing projects or tasks preserves separate progress.
@@ -41,6 +41,10 @@ Action steps wait for their handler's successful outcome, including the project 
 The new catalog reuses the existing Guided review rows and controls. The reusable package and independent vanilla demo retain their framework-independent contract.
 
 ## Run verification
+
+Chimera now opens on My Work after launch and refresh. Authoring reload checks explicitly choose Resume authoring before resuming a guide; this does not reset task/project progress. The media file picker is Add media, while the existing upload outcome identifier remains unchanged. Candidate review remains available when creation is collapsed or AI is unavailable. Settings > AI connection is a separate permission-aware dialog, not a provider call triggered by a walkthrough.
+
+The 2026-10-07 Chromium run passed 56 tests across the existing catalog/recovery workflows and My Work, Media Library, and AI connection regression specs. AI setting tests use inert mocked keys/responses and isolated server workspaces. `npm run test:management` runs the 18 My Work checks; `npm run test:onboarding -- --project chromium` runs the full Chromium suite. These results do not assert current Firefox/WebKit or live-provider qualification.
 
 Install backend requirements into your active Python environment. The browser fixture uses the root `.venv` Python when present, otherwise `python` on Windows or `python3` elsewhere. Override with `CHIMERA_TEST_PYTHON` if needed.
 

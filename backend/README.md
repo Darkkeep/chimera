@@ -1,5 +1,7 @@
 # Chimera backend
 
+Authentication profiles, hosted sign-in/recovery, project membership, and authenticated review links are documented in the [deployment guide](../docs/authentication-deployments.md). Set `CHIMERA_DEPLOYMENT_PROFILE=darkrogue` for password authentication, or `encarta` for the intentionally disabled integration profile. Unimplemented providers never fall back to local identity. The hosted frontend and local HTTPS qualification are implemented; real Linux/Nginx server qualification awaits the deferred connection details.
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -9,13 +11,15 @@ uvicorn app.main:app --reload --port 8000
 
 The API stores projects under `workspace/projects` by default. Set `CHIMERA_WORKSPACE` to use another location.
 
-Rendered slide previews require LibreOffice with `soffice` available on `PATH`. If it is unavailable, PPTX import still extracts slide content and reports that previews could not be generated.
+Rendered slide previews require LibreOffice. Windows users can extract LibreOffice Portable into `tools/LibreOfficePortable` at the repository root without a system installation; Chimera detects `App/libreoffice/program/soffice.exe` there automatically. Alternatively, set `CHIMERA_LIBREOFFICE_PATH` to the full executable path before starting the backend. Discovery prefers that explicit setting, then the project portable copy, then `PATH` and standard Windows installation folders. An invalid explicit setting disables discovery rather than silently selecting a different installation. See the root README for portable setup. If LibreOffice is unavailable, PPTX import still extracts slide content and reports that previews could not be generated.
 
 Enhancement references accept PDF, DOCX, PPTX, TXT, and Markdown files up to 25 MB. Originals and extracted page/slide/paragraph/line passages are stored as versioned project references, separately from learner media. Scanned PDFs without extractable text are marked as failed and cannot be selected for a grounded enhancement run; OCR is not currently provided.
 
 Enhancement jobs are persisted under each project and resume queued or interrupted work when the API starts. Jobs snapshot the storyboard revision and exact reference versions; a changed storyboard prevents proposal creation. Jobs can be cancelled and retried. They create pending proposals only; only the existing author decision endpoint can apply a proposal.
 
-To enable provider submission, configure these environment variables on the API server, never in frontend settings:
+To enable provider submission, use **Settings > AI connection** as the local operator or a shared-installation administrator. The approved OpenAI preset stores keys in the server account's OS credential store through `keyring`; no plaintext fallback is permitted. Other authenticated users see status only. See [AI connection](../docs/ai-connection.md) for service-account provisioning, safe connection tests, request limits, and deployment restrictions.
+
+Alternatively, configure these environment variables on the API server. Do not put credentials in frontend source or browser storage:
 
 ```powershell
 $env:CHIMERA_AI_BASE_URL = "https://your-provider.example/v1"
@@ -25,7 +29,7 @@ $env:CHIMERA_AI_PROVIDER = "provider-label"
 $env:CHIMERA_AI_INPUT_USD_PER_MILLION = "0.50"
 ```
 
-The adapter uses an OpenAI-compatible chat-completions endpoint with JSON output. Cost is an approximate input-only estimate based on payload length and the optional configured input rate; provider-specific usage and output costs are not yet reported. Without provider settings, authors can inspect the exact submission preview but cannot submit a run. The backend currently executes jobs in daemon worker threads and persists enough state for restart recovery; use one API deployment over the shared workspace and do not expose this unauthenticated development API to untrusted users.
+The adapter uses an OpenAI-compatible chat-completions endpoint with JSON output. Saved settings override environment configuration; disconnect blocks environment fallback until a new connection is saved. Text and media providers share connection resolution. Submitted jobs record a connection revision, not credentials: a changed connection requires queued work to be resubmitted, while an already-running request retains its captured connection. Redirects are rejected. Daily request counts are durable and concurrency is bounded within one API process; use a single-worker deployment. Request limits are not a spending budget. Cost estimates remain input-only; set provider-account spending controls separately. Without provider settings, authors can inspect the submission preview but cannot submit. Keep anonymous local operation bound to loopback; shared use requires the hosted authentication profile.
 
 Platform tracking is controlled by `CHIMERA_EVENT_TRACKING_MODE`: `local` (the default) retains classified events in each project's `audit/events.jsonl`, `centralized` also queues events in `audit/event-queue.jsonl` for delivery by the configured tracking adapter, and `disabled` suppresses product events while retaining audit events. Set `CHIMERA_EVENT_TRACKING_URL` for the centralized service endpoint and use the delivery adapter's bounded retry policy. Tracking is not required for authoring, review, or export.
 
@@ -44,14 +48,16 @@ Scenes can be deleted with `DELETE /api/projects/{project_id}/scenes/{scene_id}`
 
 SCORM package assembly and report persistence serialize with storyboard writes, and a build is rejected if its captured revision changes. The workspace uses a filesystem lock to coordinate processes sharing that workspace; all API workers must use the same reliable local filesystem.
 
-Editable Word storyboard export is available at `GET /api/projects/{project_id}/storyboard.docx`. Add `?include_answer_key=true` only when an authoring copy should contain answer keys; they are excluded by default. The DOCX records the source revision and includes editable scene content, authoring notes, assessment specifications, media references, image previews, accessibility text, and attribution.
+Editable Word storyboard exports are available at `GET /api/projects/{project_id}/storyboard-sme.docx` and `/api/projects/{project_id}/storyboard-full.docx`. SME Master uses editable landscape scene pages proportioned and organized to match `Visual_Slide_Storyboard_Template.pptx`; Full starts from `Multimedia_Instructional_Storyboard_Template.docx`, includes those SME pages in a landscape section, and adds detailed scene records in portrait. Attached image assets appear as compact thumbnails in their identifying Media-table rows. Both use `?include_answer_key=true` only when an authoring copy should contain answers; keys are excluded by default. The legacy `/storyboard.docx` endpoint remains available.
 
 The local identity directory is exposed at `GET /api/identity/context`. It materializes the single-user actor, installation, team, and all supported platform roles. Team authentication and membership management can replace this directory without changing storyboard or export records.
 
-Actor resolution is behind the `IdentityProvider` adapter in `backend/app/auth.py`. The active implementation is local-only; no fake login or insecure header-based authentication is enabled. Encarta is scaffolded as an explicit fail-closed Team Mode provider; it requires `CHIMERA_ENCARTA_URL` and a real Encarta token/claims validation implementation before it can authenticate requests. OIDC, SAML, or another enterprise provider can use the same adapter contract.
+Actor resolution is behind the `IdentityProvider` adapter in `backend/app/auth.py`. Local single-user and built-in hosted account authentication are implemented; no fake login or insecure header-based authentication is enabled. Encarta is an explicit fail-closed provider and requires a real token/claims validation implementation. OIDC, SAML, or another enterprise provider can use the same adapter contract.
 
-Local management contracts are available at `GET/PATCH /api/identity/policy`, `GET/POST /api/projects/{project_id}/members`, and `GET /api/management/project-health`. They provide the single-user foundation for organization policy, project membership, and project health; team authentication and centralized administration remain future adapters.
+Management contracts include `GET/PATCH /api/identity/policy`, project membership routes, and `GET /api/management/project-health`. Hosted project access and account administration are implemented; Encarta and multi-organisation hosting remain separate scope. Health exposes categorized blockers, findings, readiness, and stage/edit permissions. `PATCH /api/projects/{project_id}/production-stage` persists a manual workflow label in project metadata without revising the storyboard or certifying approval/publication.
 
 Installation choices are represented by `OrganizationPolicy` and exposed read-only at `GET /api/installation/config`. An installation workflow should collect identity provider, tenancy, user provisioning, tracking mode, analytics identity, review access, administrator content visibility, audit retention, and data residency before enabling team mode. The local default is single-user, local identity, single organization, invitation provisioning, local tracking, no external review, and local data residency. These choices are persisted with the identity directory rather than inferred from individual projects.
 
 The first management read models are `GET /api/management/my-work` and `GET /api/management/audit?offset=0&limit=100`. My Work summarizes local project health, pending approvals, unresolved comments, and publication blockers. Audit access is bounded and policy-controlled; malformed event lines are skipped rather than breaking the management view.
+
+`GET /api/ai-connection` returns safe status/models/limits and management permission. `PUT /api/ai-connection`, `POST /api/ai-connection/test`, and `POST /api/ai-connection/disconnect` require installation-administrator authority in shared deployments and an allowed request origin. Validation errors redact submitted secrets. `GET /api/projects/{project_id}/media-generation-capability` supplies provider configuration and generation permission without credentials. Installation metadata and usage counters live under `identity`; OS credentials are outside project archives.

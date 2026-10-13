@@ -100,14 +100,68 @@ PLAYER_JS = r'''(() => {
         const remediation = form.querySelector("[data-remediation]");
         if (remediation) remediation.addEventListener("click", () => { state.remediation = { assessmentSceneId: scene.id, remediationSceneId: remediation.dataset.remediation }; state.current = state.scenes.findIndex(item => item.id === remediation.dataset.remediation); save(); render(); });
     }
-  function render() {
+    let visualObserver = null;
+    function renderVisualScene(scene, body) {
+        const layout = scene.visualLayout;
+        const frame = document.createElement("div");
+        frame.className = "visual-stage-frame";
+        frame.style.cssText = `position:relative;width:100%;overflow:hidden;aspect-ratio:${layout.width}/${layout.height}`;
+        const stage = document.createElement("div");
+        stage.style.cssText = `position:absolute;left:0;top:0;transform-origin:top left;width:${layout.width}px;height:${layout.height}px`;
+        stage.style.backgroundColor = layout.backgroundColor;
+        const background = window.__CHIMERA_ASSETS[layout.backgroundAsset];
+        if (background) { stage.style.backgroundImage = `url("${background.path}")`; stage.style.backgroundSize = "100% 100%"; }
+        layout.elements.forEach(element => {
+            const node = document.createElement("div");
+            node.className = "visual-element";
+            node.style.cssText = `position:absolute;left:${element.x}px;top:${element.y}px;width:${element.width}px;height:${element.height}px;transform:rotate(${element.rotation}deg);overflow:hidden`;
+            if (element.kind === "text") {
+                node.textContent = element.text;
+                node.style.fontSize = `${element.fontSize}px`;
+                node.style.fontFamily = element.fontFamily;
+                node.style.color = element.color;
+                node.style.fontWeight = element.bold ? "700" : "400";
+                node.style.fontStyle = element.italic ? "italic" : "normal";
+                node.style.textAlign = element.align;
+                node.style.whiteSpace = "pre-wrap";
+                node.style.overflowWrap = "anywhere";
+                node.style.lineHeight = "1.2";
+            } else if (element.kind === "shape") {
+                const shape = document.createElement("img");
+                shape.className = "visual-shape";
+                shape.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(element.shapeSvg || "")}`;
+                shape.alt = "";
+                shape.setAttribute("role", "presentation");
+                shape.style.cssText = "display:block;width:100%;height:100%;overflow:visible";
+                node.style.overflow = "visible";
+                node.appendChild(shape);
+            } else {
+                const asset = window.__CHIMERA_ASSETS[element.assetId];
+                if (!asset) return;
+                const image = document.createElement("img");
+                image.src = asset.path;
+                image.alt = (scene.decorativeImages || []).includes(element.assetId) ? "" : (scene.imageAltText || {})[element.assetId] || asset.filename;
+                const [left, top, right, bottom] = element.crop || [0,0,0,0];
+                image.style.cssText = `position:absolute;max-width:none;width:${100/(1-left-right)}%;height:${100/(1-top-bottom)}%;left:${-left*100/(1-left-right)}%;top:${-top*100/(1-top-bottom)}%;object-fit:fill`;
+                node.appendChild(image);
+            }
+            stage.appendChild(node);
+        });
+        frame.appendChild(stage); body.appendChild(frame);
+        visualObserver = new ResizeObserver(() => { stage.style.transform = `scale(${frame.clientWidth/layout.width})`; });
+        visualObserver.observe(frame);
+    }
+    function render() {
     const scene = state.scenes[state.current];
     if (!scene) return;
     state.visited.add(scene.id);
     document.querySelector("#scene-title").textContent = scene.title;
     const body = document.querySelector("#scene-body");
-    body.innerHTML = (state.remediation && state.remediation.remediationSceneId === scene.id ? `<button type="button" data-return-assessment>Return to question</button>` : "") + text(scene);
-    if (scene.previewImage) {
+    if (visualObserver) { visualObserver.disconnect(); visualObserver = null; }
+    const visual = scene.visualLayout && scene.visualLayout.enabled;
+    body.innerHTML = (state.remediation && state.remediation.remediationSceneId === scene.id ? `<button type="button" data-return-assessment>Return to question</button>` : "") + (visual ? "" : text(scene));
+    if (visual) renderVisualScene(scene, body);
+    if (!visual && scene.previewImage) {
         const slideImage = document.createElement("img");
         slideImage.src = scene.previewImage;
         slideImage.alt = `Slide ${scene.sourceSlide || state.current + 1}: ${scene.title || "Untitled scene"}`;
@@ -125,17 +179,21 @@ PLAYER_JS = r'''(() => {
     const returnButton = document.querySelector("[data-return-assessment]");
     if (returnButton) returnButton.addEventListener("click", () => { state.current = state.scenes.findIndex(item => item.id === state.remediation.assessmentSceneId); state.remediation = null; save(); render(); });
     const media = document.querySelector("#scene-media"); media.innerHTML = "";
-    (scene.imageAssets || []).forEach(id => { const asset = window.__CHIMERA_ASSETS[id]; if (!asset) return; const image = document.createElement("img"); image.src = asset.path; image.alt = scene.decorativeImages.includes(id) ? "" : (scene.imageAltText[id] || asset.filename); image.setAttribute("role", image.alt ? "img" : "presentation"); image.addEventListener("error", () => runtimeStatus(`Media could not be loaded: ${asset.filename}`)); media.appendChild(image); });
+    (visual ? [] : scene.imageAssets || []).forEach(id => { const asset = window.__CHIMERA_ASSETS[id]; if (!asset) return; const image = document.createElement("img"); image.src = asset.path; image.alt = scene.decorativeImages.includes(id) ? "" : (scene.imageAltText[id] || asset.filename); image.setAttribute("role", image.alt ? "img" : "presentation"); image.addEventListener("error", () => runtimeStatus(`Media could not be loaded: ${asset.filename}`)); media.appendChild(image); });
     (scene.audioAssets || []).forEach(id => { const asset = window.__CHIMERA_ASSETS[id]; if (!asset) return; const audio = document.createElement("audio"); audio.controls = true; audio.preload = "metadata"; audio.src = asset.path; audio.addEventListener("error", () => runtimeStatus(`Audio could not be loaded: ${asset.filename}`)); if (scene.audioRequired) audio.addEventListener("ended", () => { state.completedAudio.add(`${scene.id}:${id}`); save(); finish(); }); media.appendChild(audio); });
     const status = document.querySelector("#scene-status"); status.textContent = `${state.current + 1} / ${state.scenes.length}`;
     document.querySelector("#previous").disabled = state.current === 0;
     document.querySelector("#next").disabled = state.current === state.scenes.length - 1;
+    document.querySelector("#contents").value = String(state.current);
     finish();
   }
   async function start() {
         api = findApi(); if (!api) runtimeStatus("Preview mode: no LMS tracking connection detected."); if (api) { api.Initialize(""); const location = Number(api.GetValue("cmi.location")); if (Number.isInteger(location) && location >= 0) state.current = location; try { const saved = JSON.parse(api.GetValue("cmi.suspend_data") || "{}"); (saved.visited || []).forEach(id => state.visited.add(id)); (saved.completedAudio || []).forEach(key => state.completedAudio.add(key)); state.assessments = saved.assessments || {}; state.remediation = saved.remediation || null; } catch (_) {} }
     const response = await fetch("storyboard.json"); const storyboard = await response.json(); state.scenes = storyboard.scenes || []; state.completionSettings = storyboard.completionSettings || state.completionSettings;
     window.__CHIMERA_ASSETS = Object.fromEntries((storyboard.assets || []).map(asset => [asset.id, { ...asset, path: asset.path }]));
+    const contents = document.querySelector("#contents");
+    state.scenes.forEach((scene, index) => { const option = document.createElement("option"); option.value = String(index); option.textContent = `${index + 1}. ${scene.title}`; contents.appendChild(option); });
+    contents.addEventListener("change", () => { state.current = Number(contents.value); state.remediation = null; save(); render(); });
     document.querySelector("#previous").onclick = () => { state.current -= 1; save(); render(); };
     document.querySelector("#next").onclick = () => { state.current += 1; save(); render(); };
     document.querySelector("#course-title").textContent = storyboard.title || "Chimera course";
@@ -150,7 +208,7 @@ PLAYER_JS = r'''(() => {
 PLAYER_HTML = '''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Chimera course</title>
 <style>body{margin:0;background:#f4f5f1;color:#26352c;font:16px system-ui,sans-serif}main{max-width:960px;margin:0 auto;padding:32px 20px}header{border-bottom:1px solid #ccd5cc;margin-bottom:24px}h1{font-size:28px;margin:0 0 20px}h2{font-size:24px}#scene-body{line-height:1.6}#scene-media{display:grid;gap:16px;margin:24px 0}#scene-media img{max-width:100%;max-height:520px;object-fit:contain;background:#fff}audio{width:100%}.controls{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:28px}.controls button{border:1px solid #52685a;background:#fff;color:#26352c;padding:10px 16px;border-radius:4px;font:inherit}.controls button:disabled{opacity:.45}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}</style></head>
-<body><main><header><h1 id="course-title">Loading course...</h1><p id="scene-status" aria-live="polite"></p><p id="runtime-status" role="status" aria-live="polite"></p></header><article aria-labelledby="scene-title"><h2 id="scene-title"></h2><div id="scene-body"></div><div id="scene-assessment"></div><div id="scene-media"></div></article><nav class="controls" aria-label="Scene navigation"><button id="previous" type="button">Previous</button><span class="sr-only">Scene navigation</span><button id="next" type="button">Next</button></nav></main><script src="player.js"></script></body></html>'''
+<body><main><header><h1 id="course-title">Loading course...</h1><p id="scene-status" aria-live="polite"></p><p id="runtime-status" role="status" aria-live="polite"></p><label for="contents">Contents</label> <select id="contents" aria-label="Contents" style="max-width:100%;padding:8px;font:inherit"></select></header><article aria-labelledby="scene-title"><h2 id="scene-title"></h2><div id="scene-body"></div><div id="scene-assessment"></div><div id="scene-media"></div></article><nav class="controls" aria-label="Scene navigation"><button id="previous" type="button">Previous</button><span class="sr-only">Scene navigation</span><button id="next" type="button">Next</button></nav></main><script src="player.js"></script></body></html>'''
 
 
 def _scorm_12_player() -> str:

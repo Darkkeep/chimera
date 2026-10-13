@@ -1,0 +1,7 @@
+.course-preview-contents-toggle { align-self: flex-start; margin: 10px 24px 0; }
+.course-preview-contents { position: absolute; top: 125px; bottom: 24px; left: 24px; z-index: 2; width: min(340px, calc(100% - 48px)); overflow: auto; padding: 12px; background: var(--theme-panel, #fff); color: var(--ink, #24332a); border: 1px solid var(--line, #849087); box-shadow: 0 8px 24px #0003; border-radius: 4px; }
+.course-preview-contents-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.course-preview-contents > button { display: grid; grid-template-columns: 28px minmax(0, 1fr) 18px; gap: 8px; width: 100%; padding: 10px 8px; text-align: left; border: 0; border-bottom: 1px solid var(--line, #ccd5cc); background: transparent; color: inherit; cursor: pointer; font: 12px Manrope, sans-serif; }
+.course-preview-contents > button[aria-current], .course-preview-contents > button:hover { background: var(--theme-selected, #e3efdf); }
+.course-preview-contents > button span { overflow-wrap: anywhere; }
+.course-preview-contents button:focus-visible { outline: 2px solid var(--accent, #236ed5); outline-offset: -2px; }

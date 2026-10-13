@@ -31,3 +31,7 @@
     inset: auto auto 16px 16px;
   }
 }
+
+.visual-editor > .onboarding-card {
+  inset: auto auto 20px 20px;
+}

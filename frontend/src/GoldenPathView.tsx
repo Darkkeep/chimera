@@ -106,7 +106,7 @@ export function GoldenPathView({ onStartWalkthrough, onSelectWalkthrough, walkth
       <button type="button" className="button button-accent" onClick={onStartWalkthrough}>Start / resume walkthrough</button>
       <details><summary>All functionality walkthroughs ({chimeraJourneys.length})</summary>
         <p>Choose a task. Saves and downloads advance only on success; review steps need acknowledgment. Pause preserves forms. Some tasks require existing content or a configured provider.</p>
-        <label>Find a walkthrough<input type="search" value={walkthroughQuery} onChange={event => setWalkthroughQuery(event.target.value)} placeholder="e.g. audio, questions, backup" /></label>
+        <label>Find a walkthrough<input type="search" value={walkthroughQuery} onChange={event => setWalkthroughQuery(event.target.value)} placeholder="e.g. audio, questions, storyboard" /></label>
         {visibleJourneys.length === 0 && <p role="status">No matching walkthroughs. Try a different task name.</p>}
         <ol className="golden-path-steps">{visibleJourneys.map((journey, index) => <li className="golden-path-step" key={journey.id}>
           <span className="golden-path-number">{index + 1}</span>

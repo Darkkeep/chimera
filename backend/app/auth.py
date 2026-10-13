@@ -7,6 +7,7 @@ from fastapi import HTTPException, Request
 
 from .identity import IdentityDirectory, LocalIdentityDirectory
 from .platform import ActorContext
+from .deployment import installation_policy
 
 
 class IdentityProvider(Protocol):
@@ -80,25 +81,38 @@ class AdapterIdentityProvider:
         return actor.model_copy(update={"actorDisplayName": user.displayName})
 
 
+class UnconfiguredIdentityProvider:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def resolve(self, request: Request) -> ActorContext:
+        raise RuntimeError(f"{self.name} identity validation is not implemented for this deployment")
+
+
 def get_identity_provider() -> IdentityProvider:
     from .storage import ROOT
 
     directory = LocalIdentityDirectory(ROOT)
-    policy = directory.policy()
+    policy = installation_policy(directory)
     if policy.tenancyMode != "single-organization":
         raise RuntimeError("Only single-organization deployments are implemented")
     if policy.deploymentMode == "team" and (policy.allowGuestReviewers or policy.reviewAccess == "invited-guests"):
         raise RuntimeError("Guest review is not enabled for the team pilot")
     if policy.identityProvider == "encarta":
         return EncartaIdentityProvider(directory)
-    if policy.identityProvider == "local":
+    if policy.identityProvider == "builtin":
+        from .password_auth import AccountStore, PasswordIdentityProvider
+        return PasswordIdentityProvider(AccountStore(ROOT))
+    if policy.identityProvider == "local" and policy.deploymentMode == "single-user":
         return LocalIdentityProvider(directory)
     if policy.identityProvider == "adapter" and _session_adapter is not None:
         return AdapterIdentityProvider(directory, _session_adapter)
-    raise RuntimeError("Selected identity provider is not configured for this deployment")
+    return UnconfiguredIdentityProvider(policy.identityProvider)
 
 
 def resolve_actor_context(request: Request) -> ActorContext:
+    if getattr(request.state, "actor", None) is not None:
+        return request.state.actor
     try:
         return get_identity_provider().resolve(request)
     except RuntimeError as error:

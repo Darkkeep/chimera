@@ -38,10 +38,10 @@ Use short task-specific walkthroughs, typically four to eight steps, instead of 
 | MVP | First project and first scene | User creates a project, creates or imports content, saves a scene, and sees the saved content after reload. Manual scene creation is the default path; PowerPoint import is an alternative branch. |
 | MVP | Preview and validate | User opens learner preview, returns to authoring, runs validation, and inspects findings or a clean result. Completing the journey does not imply the course passed validation. |
 | Next | Attach media and describe images | Saved asset association and alt text/decorative designation appear in project state. |
-| Next | Export and backup | User chooses the intended export profile, observes build/download success, and learns the distinction between portable backup and JSON. Do not imply LMS qualification from a download. |
+| Next | Export and archive | User chooses the intended export profile, observes build/download success, and learns the distinction between a Chimera storyboard and JSON. Do not imply LMS qualification from a download. |
 | Later | Assessments, templates, comments, AI enhancement | Saved outcomes for each task. AI paths appear only when availability is known and require explicit user submission/acceptance; use inert fixtures in automated tests. |
 
-Keep deletion and restore outside the initial tour. If added later, guide users through the existing confirmations and backup instructions without automatically confirming destructive operations.
+Keep deletion and restore outside the initial tour. If added later, guide users through the existing confirmations and Chimera storyboard instructions without automatically confirming destructive operations.
 
 ## Runtime design
 

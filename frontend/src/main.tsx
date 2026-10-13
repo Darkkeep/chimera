@@ -9,11 +9,12 @@ import "./workspace.css";
 import "./appearance.css";
 import "./brand.css";
 import { initializeAppearance } from "./AppearanceSelector";
+import { AuthGate } from "./AuthGate";
 
 initializeAppearance();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <AuthGate><App /></AuthGate>
   </StrictMode>,
 );

@@ -1,4 +1,5 @@
 import json
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -52,7 +53,7 @@ class ProjectMembershipCreate(BaseModel):
 
 class OrganizationPolicy(BaseModel):
     deploymentMode: Literal["single-user", "team"] = "single-user"
-    identityProvider: Literal["local", "encarta", "oidc", "saml", "adapter"] = "local"
+    identityProvider: Literal["local", "encarta", "oidc", "saml", "adapter", "builtin"] = "local"
     tenancyMode: Literal["single-organization", "multi-organization"] = "single-organization"
     userProvisioning: Literal["invitation", "directory-sync", "invitation-and-sync"] = "invitation"
     trackingMode: Literal["disabled", "local", "centralized"] = "local"
@@ -191,7 +192,17 @@ class LocalIdentityDirectory:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_name(f".{self.path.name}.{uuid.uuid4().hex}.tmp")
         temporary.write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
-        temporary.replace(self.path)
+        try:
+            for attempt in range(6):
+                try:
+                    temporary.replace(self.path)
+                    break
+                except PermissionError:
+                    if attempt == 5:
+                        raise
+                    time.sleep(0.02 * (attempt + 1))
+        finally:
+            temporary.unlink(missing_ok=True)
 
 
 class RoleBasedAuthorizationPolicy:
@@ -204,6 +215,7 @@ class RoleBasedAuthorizationPolicy:
         "template.view": {"author", "instructional-designer", "administrator"},
         "project.create": {"author", "instructional-designer", "administrator"},
         "project.mutate": {"author", "instructional-designer", "administrator"},
+        "project.delete": {"author", "instructional-designer", "administrator"},
         "project.settings.update": {"author", "instructional-designer", "administrator"},
         "project.restore": {"author", "instructional-designer", "administrator"},
         "project.import": {"author", "instructional-designer", "administrator"},

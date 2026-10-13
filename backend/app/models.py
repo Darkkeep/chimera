@@ -7,6 +7,56 @@ class ProjectCreate(BaseModel):
     title: str = Field(min_length=1, max_length=120)
 
 
+class SceneElement(BaseModel):
+    id: str = Field(min_length=1, max_length=120)
+    kind: Literal["text", "image", "shape"]
+    x: float = Field(ge=-10000, le=10000, allow_inf_nan=False)
+    y: float = Field(ge=-10000, le=10000, allow_inf_nan=False)
+    width: float = Field(gt=0, le=10000, allow_inf_nan=False)
+    height: float = Field(gt=0, le=10000, allow_inf_nan=False)
+    rotation: float = Field(default=0, ge=-360, le=360, allow_inf_nan=False)
+    text: str = Field(default="", max_length=50000)
+    assetId: str | None = None
+    fontSize: float = Field(default=24, ge=1, le=500, allow_inf_nan=False)
+    fontFamily: str = Field(default="sans-serif", max_length=200)
+    color: str = Field(default="#202020", pattern=r"^#[0-9a-fA-F]{6}$")
+    bold: bool = False
+    italic: bool = False
+    align: Literal["left", "center", "right"] = "left"
+    crop: list[float] = Field(default_factory=lambda: [0, 0, 0, 0], min_length=4, max_length=4)
+    shapeSvg: str | None = Field(default=None, max_length=100000)
+    shapeName: str | None = Field(default=None, max_length=100)
+    source: Literal["slide", "layout", "master", "manual"] = "manual"
+    locked: bool = False
+
+    @model_validator(mode="after")
+    def validate_element(self) -> "SceneElement":
+        if self.kind == "image" and not self.assetId:
+            raise ValueError("Image elements require an asset reference")
+        if self.kind == "shape" and not self.shapeSvg:
+            raise ValueError("Shape elements require vector geometry")
+        if any(not 0 <= value < 1 for value in self.crop) or self.crop[0] + self.crop[2] >= 1 or self.crop[1] + self.crop[3] >= 1:
+            raise ValueError("Image crop must leave a visible image")
+        return self
+
+
+class SceneLayout(BaseModel):
+    version: Literal[1] = 1
+    enabled: bool = False
+    width: float = Field(default=1280, gt=0, le=10000, allow_inf_nan=False)
+    height: float = Field(default=720, gt=0, le=10000, allow_inf_nan=False)
+    backgroundColor: str = Field(default="#ffffff", pattern=r"^#[0-9a-fA-F]{6}$")
+    backgroundAsset: str | None = None
+    elements: list[SceneElement] = Field(default_factory=list, max_length=2000)
+    warnings: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_identifiers(self) -> "SceneLayout":
+        if len({element.id for element in self.elements}) != len(self.elements):
+            raise ValueError("Scene element identifiers must be unique")
+        return self
+
+
 class SceneCreate(BaseModel):
     title: str = Field(default="New scene", min_length=1, max_length=120)
     sceneType: Literal["content", "title", "assessment", "media", "interaction", "summary"] = "content"
@@ -31,6 +81,8 @@ def normalize_assessment_item_type(data: object) -> object:
 
 
 class SceneUpdate(BaseModel):
+    visualLayout: SceneLayout | None = None
+    backgroundAsset: str | None = None
     title: str | None = Field(default=None, min_length=1, max_length=120)
     extractedText: list[str] | None = None
     actionDescription: str | None = Field(default=None, max_length=5000)
@@ -351,6 +403,7 @@ class EnhancementJob(BaseModel):
     id: str
     projectId: str
     sourceRevision: int
+    aiConnectionRevision: str | None = None
     scope: Literal["selected-scenes", "whole-course"]
     sceneIds: list[str]
     goal: str
@@ -445,6 +498,7 @@ class MediaGenerationJob(BaseModel):
     id: str
     projectId: str
     sourceRevision: int
+    aiConnectionRevision: str | None = None
     sceneId: str
     kind: Literal["image", "narration"]
     purpose: str
@@ -527,6 +581,7 @@ class AssetAttributionUpdate(BaseModel):
 
 class Scene(BaseModel):
     id: str
+    visualLayout: SceneLayout | None = None
     sourceSlide: int | None = None
     title: str
     sceneType: Literal["content", "title", "assessment", "media", "interaction", "summary"] = "content"
@@ -591,6 +646,13 @@ class Storyboard(BaseModel):
     assets: list[ExtractedAsset] = Field(default_factory=list)
 
 
+ProductionStage = Literal["not-set", "draft", "in-production", "in-review", "approved", "published"]
+
+
+class ProductionStageUpdate(BaseModel):
+    productionStage: ProductionStage
+
+
 class ProjectSummary(BaseModel):
     id: str
     title: str
@@ -599,10 +661,16 @@ class ProjectSummary(BaseModel):
     hasSourceDeck: bool
     installationId: str = "local-installation"
     ownerId: str = "local-user"
+    productionStage: ProductionStage = "not-set"
 
 
 class ProjectDetail(ProjectSummary):
     storyboard: Storyboard
+
+
+class TrashedProject(ProjectSummary):
+    trashedAt: str
+    expiresAt: str
 
 
 EnhancementProposalResult.model_rebuild()
