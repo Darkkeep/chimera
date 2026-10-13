@@ -3,11 +3,11 @@ import type { ReactNode } from "react";
 import type { Project, Scene } from "./App";
 import "./visual-scene.css";
 
-export type SceneElement = { id: string; kind: "text" | "image"; x: number; y: number; width: number; height: number; rotation: number; text: string; assetId: string | null; fontSize: number; fontFamily: string; color: string; bold: boolean; italic: boolean; align: "left" | "center" | "right"; crop: number[]; source: "slide" | "layout" | "master" | "manual"; locked: boolean };
+export type SceneElement = { id: string; kind: "text" | "image" | "shape"; x: number; y: number; width: number; height: number; rotation: number; text: string; assetId: string | null; fontSize: number; fontFamily: string; color: string; bold: boolean; italic: boolean; align: "left" | "center" | "right"; crop: number[]; shapeSvg: string | null; shapeName: string | null; source: "slide" | "layout" | "master" | "manual"; locked: boolean };
 export type SceneLayout = { version: 1; enabled: boolean; width: number; height: number; backgroundColor: string; backgroundAsset: string | null; elements: SceneElement[]; warnings: string[] };
 
 export function newElement(kind: "text" | "image", changes: Partial<SceneElement> = {}): SceneElement {
-  return { id: crypto.randomUUID(), kind, x: 40, y: 40, width: kind === "text" ? 400 : 240, height: kind === "text" ? 100 : 180, rotation: 0, text: kind === "text" ? "New text" : "", assetId: null, fontSize: 28, fontFamily: "sans-serif", color: "#202020", bold: false, italic: false, align: "left", crop: [0, 0, 0, 0], source: "manual", locked: false, ...changes };
+  return { id: crypto.randomUUID(), kind, x: 40, y: 40, width: kind === "text" ? 400 : 240, height: kind === "text" ? 100 : 180, rotation: 0, text: kind === "text" ? "New text" : "", assetId: null, fontSize: 28, fontFamily: "sans-serif", color: "#202020", bold: false, italic: false, align: "left", crop: [0, 0, 0, 0], shapeSvg: null, shapeName: null, source: "manual", locked: false, ...changes };
 }
 
 export function initialLayout(scene: Scene): SceneLayout {
@@ -16,6 +16,7 @@ export function initialLayout(scene: Scene): SceneLayout {
 
 export function ElementContent({ element, project, scene }: { element: SceneElement; project: Project; scene: Scene }) {
   if (element.kind === "text") return <div className="visual-text" style={{ fontSize: element.fontSize, fontFamily: element.fontFamily, color: element.color, fontWeight: element.bold ? 700 : 400, fontStyle: element.italic ? "italic" : "normal", textAlign: element.align }}>{element.text}</div>;
+  if (element.kind === "shape") return <img className="visual-shape" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(element.shapeSvg || "")}`} alt="" aria-hidden="true" draggable={false} />;
   const asset = project.storyboard.assets.find(item => item.id === element.assetId);
   const [left, top, right, bottom] = element.crop;
   return <div className="visual-image"><img draggable={false} src={`/api/projects/${project.id}/assets/${element.assetId}`} alt={scene.decorativeImages.includes(element.assetId || "") ? "" : scene.imageAltText[element.assetId || ""] || asset?.filename || "Scene image"} style={{ width: `${100 / (1 - left - right)}%`, height: `${100 / (1 - top - bottom)}%`, left: `${-left * 100 / (1 - left - right)}%`, top: `${-top * 100 / (1 - top - bottom)}%` }} /></div>;

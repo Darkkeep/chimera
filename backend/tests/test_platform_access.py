@@ -62,7 +62,7 @@ class PlatformAccessTests(unittest.TestCase):
         headers = {'X-Test-Actor': 'reviewer'}
         before = len(self.audit())
         self.assertEqual(self.client.post(base + '/scenes', headers=headers, json={'title': 'Denied'}).status_code, 403)
-        for suffix in ('/storyboard.docx', '/backup.zip', '/scorm-12.zip', '/storyboard/export', '/scenes/fake/assessment.qti.xml'):
+        for suffix in ('/storyboard.docx', '/storyboard-sme.docx', '/storyboard-full.docx', '/backup.zip', '/scorm-12.zip', '/storyboard/export', '/scenes/fake/assessment.qti.xml'):
             self.assertEqual(self.get(base + suffix, 'reviewer').status_code, 403)
         self.assertEqual(self.client.post(base + '/enhancement-proposals/fake/decision', headers=headers, json={'decision': 'accept'}).status_code, 403)
         self.assertEqual(len(self.audit()), before)
@@ -117,8 +117,13 @@ class PlatformAccessTests(unittest.TestCase):
         self.assertEqual(event['actorId'], 'author')
         self.assertEqual(event['eventClass'], 'security')
         self.assertEqual(len(self.audit()), before + 1)
+        for suffix in ('/storyboard-sme.docx', '/storyboard-full.docx'):
+            response = self.get(f'/api/projects/{self.project.id}' + suffix)
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(self.audit()[-1]['metadata']['action'], 'project.export')
+        self.assertEqual(len(self.audit()), before + 3)
         self.assertEqual(self.get(f'/api/projects/{self.project.id}/assessment.qti.zip').status_code, 422)
-        self.assertEqual(len(self.audit()), before + 1)
+        self.assertEqual(len(self.audit()), before + 3)
 
     def test_unmapped_routes_and_unknown_actions_deny_by_default(self):
         policy = main.get_authorization_policy()

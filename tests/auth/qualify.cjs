@@ -76,7 +76,8 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   await page.screenshot({path:path.join(output,'recovery-desktop.png'),fullPage:true});
   await page.getByRole('button',{name:'Back to sign in',exact:true}).click();
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(output,'login-mobile.png'),fullPage:true});
-  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  const mobileOverflow=await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth);
+  assert.equal(mobileOverflow,true);
   await page.setViewportSize({width:1536,height:1024});
   await login('operator@example.test',password);await page.getByLabel('Workspace navigation').getByText('Test Operator',{exact:true}).waitFor();
   const cookies=await context.cookies();const session=cookies.find(c=>c.name==='__Host-chimera-session');assert(session&&session.secure&&session.httpOnly&&session.sameSite==='Strict');
@@ -101,7 +102,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   await login('operator@example.test',replacement);await page.getByLabel('Workspace navigation').getByText('Test Operator',{exact:true}).waitFor();
   page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Sign out',exact:true}).click();await page.getByRole('heading',{name:'Sign in to Chimera'}).waitFor();
   assert.deepEqual(errors,[]);
-  const results={https:true,invalidPassword:true,login:true,secureCookie:true,recoveryGuidance:true,passwordReset:true,projectMembers:true,authenticatedReview:true,reviewerIsolation:true,comment:true,sessionExpiry:true,logout:true,mobileOverflow:false,axeViolations:accessibility.violations.length,javascriptErrors:errors,scope:'Isolated HTTPS proxy, disposable workspace and accounts; not live darkrogue.io'};
+  const results={https:true,invalidPassword:true,login:true,secureCookie:true,recoveryGuidance:true,passwordReset:true,projectMembers:true,authenticatedReview:true,reviewerIsolation:true,comment:true,sessionExpiry:true,logout:true,mobileOverflow,axeViolations:accessibility.violations.length,javascriptErrors:errors,scope:'Isolated HTTPS proxy, disposable workspace and accounts; not live darkrogue.io'};
   fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(results,null,2));console.log(JSON.stringify(results,null,2));
 } )().catch(async error=>{if(currentPage)await currentPage.screenshot({path:path.join(output,'failure.png'),fullPage:true}).catch(()=>{});console.error(error.message);process.exitCode=1;}).finally(async()=>{
   if(browser)await browser.close();

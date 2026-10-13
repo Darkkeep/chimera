@@ -9,7 +9,7 @@ class ProjectCreate(BaseModel):
 
 class SceneElement(BaseModel):
     id: str = Field(min_length=1, max_length=120)
-    kind: Literal["text", "image"]
+    kind: Literal["text", "image", "shape"]
     x: float = Field(ge=-10000, le=10000, allow_inf_nan=False)
     y: float = Field(ge=-10000, le=10000, allow_inf_nan=False)
     width: float = Field(gt=0, le=10000, allow_inf_nan=False)
@@ -24,6 +24,8 @@ class SceneElement(BaseModel):
     italic: bool = False
     align: Literal["left", "center", "right"] = "left"
     crop: list[float] = Field(default_factory=lambda: [0, 0, 0, 0], min_length=4, max_length=4)
+    shapeSvg: str | None = Field(default=None, max_length=100000)
+    shapeName: str | None = Field(default=None, max_length=100)
     source: Literal["slide", "layout", "master", "manual"] = "manual"
     locked: bool = False
 
@@ -31,6 +33,8 @@ class SceneElement(BaseModel):
     def validate_element(self) -> "SceneElement":
         if self.kind == "image" and not self.assetId:
             raise ValueError("Image elements require an asset reference")
+        if self.kind == "shape" and not self.shapeSvg:
+            raise ValueError("Shape elements require vector geometry")
         if any(not 0 <= value < 1 for value in self.crop) or self.crop[0] + self.crop[2] >= 1 or self.crop[1] + self.crop[3] >= 1:
             raise ValueError("Image crop must leave a visible image")
         return self
@@ -662,6 +666,11 @@ class ProjectSummary(BaseModel):
 
 class ProjectDetail(ProjectSummary):
     storyboard: Storyboard
+
+
+class TrashedProject(ProjectSummary):
+    trashedAt: str
+    expiresAt: str
 
 
 EnhancementProposalResult.model_rebuild()

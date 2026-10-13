@@ -11,6 +11,7 @@ async function mockWorkspace(page, options = {}) {
   while (projects.length < (options.projectCount || 0)) projects.push(project(`project-${projects.length + 1}`, `Project ${projects.length + 1}`));
   let stage = 'draft';
   let referenceUploads = 0;
+  const trash = [];
   await page.addInitScript(() => localStorage.setItem('chimera.activeProjectId', 'alpha'));
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url());
@@ -30,12 +31,30 @@ async function mockWorkspace(page, options = {}) {
       }
       return json(projects);
     }
+    if (path === '/api/trash/projects') return json(trash);
+    const trashAction = path.match(/^\/api\/projects\/([^/]+)\/(trash|restore)$/);
+    if (trashAction && route.request().method() === 'POST') {
+      const [, projectId, action] = trashAction;
+      if (action === 'trash') {
+        const index = projects.findIndex(item => item.id === projectId);
+        if (index < 0) return route.fulfill({ status: 404, json: { detail: 'Not found' } });
+        const [removed] = projects.splice(index, 1);
+        const trashed = { ...removed, trashedAt: '2026-10-13T10:00:00Z', expiresAt: '2026-11-12T10:00:00Z' };
+        trash.push(trashed);
+        return json({ projectId, title: removed.title, trashedAt: trashed.trashedAt, expiresAt: trashed.expiresAt });
+      }
+      const index = trash.findIndex(item => item.id === projectId);
+      if (index < 0) return route.fulfill({ status: 404, json: { detail: 'Not found' } });
+      const [restored] = trash.splice(index, 1);
+      projects.push(project(projectId, restored.title));
+      return json(projects.at(-1));
+    }
     if (path === '/api/templates') return json([]);
     if (path === '/api/identity/context') return json({ actor: { actorDisplayName: 'Local user', actorId: 'local-user', installationId: 'local-installation' }, memberships: [{ role: 'author' }, { role: 'instructional-designer' }, { role: 'administrator' }], policy: { deploymentMode: 'single-user', trackingMode: 'local', auditRetentionDays: 365 } });
     if (path === '/api/management/audit') return json({ events: options.events || [] });
     if (path === '/api/management/project-health') {
       if (options.healthFailure) return route.fulfill({ status: 503, json: { detail: 'Unavailable' } });
-      return json(projects.map(item => ({ projectId: item.id, title: item.title, revision: 1, sceneCount: 0, pendingProposals: 0, unresolvedComments: 0, publicationBlockers: 2, authoringWarnings: 1, updatedAt: item.updatedAt, productionStage: stage, productionPassed: false, canEdit: !options.readOnly, canSetStage: !options.readOnly,
+      return json(projects.map(item => ({ projectId: item.id, title: item.title, revision: 1, sceneCount: 0, pendingProposals: 0, unresolvedComments: 0, publicationBlockers: 2, authoringWarnings: 1, updatedAt: item.updatedAt, productionStage: stage, productionPassed: false, canEdit: !options.readOnly, canSetStage: !options.readOnly, canTrash: !options.readOnly,
         blockerCounts: { 'missing-asset-file': 1, 'missing-media-attribution': 1 }, blockers: [{ code: 'missing-asset-file', message: 'Restore or remove the missing asset: image.png.', sceneTitle: null }, { code: 'missing-media-attribution', message: 'Complete attribution for image.png before production release.', sceneTitle: 'image.png' }] })));
     }
     if (path.endsWith('/production-stage')) {
@@ -282,4 +301,27 @@ test('production stage persists through the API without revising the storyboard'
   const persisted = await request.get(`/api/projects/${project.id}`);
   expect((await persisted.json()).productionStage).toBe('in-production');
   expect((await request.patch(`/api/projects/${project.id}/production-stage`, { data: { productionStage: 'unknown' } })).status()).toBe(422);
+});
+
+test('moves a project to trash from My Work after title confirmation and restores it', async ({ page }) => {
+  await mockWorkspace(page);
+  await page.goto('/');
+  const alphaRow = page.locator('.health-row').filter({ hasText: 'Alpha course' });
+  await alphaRow.getByRole('button', { name: 'Move to trash', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Move project to trash?' });
+  const confirmation = dialog.getByRole('checkbox', { name: 'Are you sure you about that?', exact: true });
+  await expect(dialog.getByRole('button', { name: 'Move to trash', exact: true })).toBeDisabled();
+  await confirmation.check();
+  await dialog.getByRole('button', { name: 'Move to trash', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.health-row').filter({ hasText: 'Alpha course' })).toHaveCount(0);
+  await expect(page.getByLabel('Switch project').locator('option', { hasText: 'Alpha course' })).toHaveCount(0);
+  await expect(page.getByRole('status')).toContainText('Alpha course moved to trash');
+  await page.getByRole('button', { name: 'Trash', exact: true }).click();
+  const trashedRow = page.locator('.trash-table tbody tr').filter({ hasText: 'Alpha course' });
+  await expect(trashedRow).toBeVisible();
+  await trashedRow.getByRole('button', { name: 'Restore', exact: true }).click();
+  await expect(trashedRow).toHaveCount(0);
+  await expect(page.locator('.health-row').filter({ hasText: 'Alpha course' })).toBeVisible();
+  await expect(page.getByLabel('Switch project').locator('option', { hasText: 'Alpha course' })).toHaveCount(1);
 });

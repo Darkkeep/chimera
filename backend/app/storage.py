@@ -1,26 +1,28 @@
-import json
 import hashlib
+import json
 import mimetypes
 import os
-import json
-import hashlib
-import mimetypes
-import os
+import shutil
 import re
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import RLock, local
 from typing import Iterator, Literal
 from .models import ProductionStageUpdate
 from .ai_connection import connection_status
-from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalChange, EnhancementProposalChangeCreate, EnhancementProposalCreate, EnhancementProposalDecisionRecord, ExportSettings, ExtractedAsset, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, ReferencePassage, ReferenceResource, ReferenceResourceVersion, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewCommentReply, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate
+from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalChange, EnhancementProposalChangeCreate, EnhancementProposalCreate, EnhancementProposalDecisionRecord, ExportSettings, ExtractedAsset, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, ReferencePassage, ReferenceResource, ReferenceResourceVersion, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewCommentReply, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate, TrashedProject
 ROOT = Path(os.environ.get("CHIMERA_WORKSPACE", Path(__file__).resolve().parents[2] / "workspace"))
 from .platform import DurableEventSink, LOCAL_ACTOR, ActorContext, PlatformEvent, get_actor_context, get_correlation_id
 PROJECTS = ROOT / "projects"
 _storyboard_write_lock = RLock()
 _storyboard_transaction_state = local()
+PROJECT_TRASH_RETENTION_DAYS = 30
+
+
+def project_trash_path() -> Path:
+    return PROJECTS / ".trash"
 
 
 class StoryboardRevisionConflict(Exception):
@@ -201,6 +203,8 @@ def read_project(project_id: str) -> ProjectDetail:
         if not project_file.exists() or not storyboard_file.exists():
             raise FileNotFoundError(project_id)
         metadata = json.loads(project_file.read_text(encoding="utf-8"))
+        if metadata.get("trashedAt"):
+            raise FileNotFoundError(project_id)
         storyboard = Storyboard.model_validate(json.loads(storyboard_file.read_text(encoding="utf-8")))
         return ProjectDetail(
             **metadata,
@@ -285,13 +289,128 @@ def list_projects() -> list[ProjectSummary]:
         return []
     projects = []
     for path in sorted(PROJECTS.iterdir()):
-        if path.is_dir():
+        if path.is_dir() and not path.name.startswith("."):
             try:
                 project = read_project(path.name)
                 projects.append(ProjectSummary(**project.model_dump(exclude={"storyboard"})))
             except (FileNotFoundError, ValueError):
                 continue
     return projects
+
+
+def _read_trash_metadata(path: Path) -> tuple[dict[str, object], Storyboard]:
+    project_root = path / "project"
+    metadata = json.loads((project_root / "project.json").read_text(encoding="utf-8"))
+    lifecycle = json.loads((path / "trash.json").read_text(encoding="utf-8"))
+    storyboard = Storyboard.model_validate_json((project_root / "storyboard.json").read_text(encoding="utf-8"))
+    if not lifecycle.get("trashedAt") or not lifecycle.get("expiresAt"):
+        raise FileNotFoundError(path.name)
+    return {**metadata, "trashedAt": lifecycle["trashedAt"], "trashExpiresAt": lifecycle["expiresAt"]}, storyboard
+
+
+def _purge_expired_projects(now: datetime | None = None) -> int:
+    trash_root = project_trash_path()
+    if not trash_root.is_dir():
+        return 0
+    current = now or datetime.now(timezone.utc)
+    purged = 0
+    for path in trash_root.iterdir():
+        if not path.is_dir():
+            continue
+        try:
+            metadata, _ = _read_trash_metadata(path)
+            if datetime.fromisoformat(str(metadata["trashExpiresAt"])) <= current:
+                shutil.rmtree(path)
+                purged += 1
+        except (OSError, ValueError, KeyError):
+            continue
+    return purged
+
+
+def list_trashed_projects(now: datetime | None = None) -> list[TrashedProject]:
+    with storyboard_transaction():
+        _purge_expired_projects(now)
+        trash_root = project_trash_path()
+        if not trash_root.is_dir():
+            return []
+        projects = []
+        for path in sorted(trash_root.iterdir()):
+            if not path.is_dir():
+                continue
+            try:
+                metadata, storyboard = _read_trash_metadata(path)
+                projects.append(TrashedProject(
+                    id=str(metadata["id"]),
+                    title=str(metadata["title"]),
+                    sceneCount=len(storyboard.scenes),
+                    updatedAt=str(metadata["updatedAt"]),
+                    hasSourceDeck=any((path / "project" / "original").iterdir()),
+                    installationId=str(metadata.get("installationId", "local-installation")),
+                    ownerId=str(metadata.get("ownerId", "local-user")),
+                    productionStage=metadata.get("productionStage", "not-set"),
+                    trashedAt=str(metadata["trashedAt"]),
+                    expiresAt=str(metadata["trashExpiresAt"]),
+                ))
+            except (OSError, ValueError, KeyError):
+                continue
+        return projects
+
+
+def trash_project(project_id: str) -> TrashedProject:
+    if Path(project_id).name != project_id or project_id in {".", ".."}:
+        raise FileNotFoundError(project_id)
+    with storyboard_transaction():
+        project = read_project(project_id)
+        active_jobs = [
+            job for job in [*list_enhancement_jobs(project_id), *list_media_generation_jobs(project_id)]
+            if job.status in {"queued", "running"}
+        ]
+        if active_jobs:
+            raise RuntimeError("Wait for queued or running generation jobs to finish before moving this project to trash.")
+        source = project_path(project_id)
+        destination = project_trash_path() / project_id
+        if destination.exists():
+            raise FileExistsError(project_id)
+        timestamp = datetime.now(timezone.utc)
+        expires = timestamp + timedelta(days=PROJECT_TRASH_RETENTION_DAYS)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.mkdir(parents=True, exist_ok=False)
+        project_destination = destination / "project"
+        try:
+            source.replace(project_destination)
+            manifest = {
+                "trashedAt": timestamp.isoformat(),
+                "expiresAt": expires.isoformat(),
+            }
+            temporary = destination / f".trash-{uuid.uuid4().hex}.tmp"
+            temporary.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+            temporary.replace(destination / "trash.json")
+        except OSError:
+            if project_destination.exists() and not source.exists():
+                project_destination.replace(source)
+            shutil.rmtree(destination, ignore_errors=True)
+            raise
+        return next(item for item in list_trashed_projects(now=timestamp) if item.id == project_id)
+
+
+def restore_trashed_project(project_id: str, now: datetime | None = None) -> ProjectDetail:
+    if Path(project_id).name != project_id or project_id in {".", ".."}:
+        raise FileNotFoundError(project_id)
+    with storyboard_transaction():
+        _purge_expired_projects(now)
+        source = project_trash_path() / project_id
+        if not source.is_dir():
+            raise FileNotFoundError(project_id)
+        metadata, _ = _read_trash_metadata(source)
+        if datetime.fromisoformat(str(metadata["trashExpiresAt"])) <= (now or datetime.now(timezone.utc)):
+            shutil.rmtree(source)
+            raise FileNotFoundError(project_id)
+        destination = project_path(project_id)
+        if destination.exists():
+            raise FileExistsError(project_id)
+        (source / "project").replace(destination)
+        shutil.rmtree(source, ignore_errors=True)
+        return read_project(project_id)
 
 
 def persist_imported_assets(project_id: str, staging_root: Path, assets: list[ExtractedAsset]) -> None:
@@ -461,8 +580,11 @@ def update_scene(project_id: str, scene_id: str, data: SceneUpdate, expected_rev
             validate_visual_assets(updated_scene, {asset.id: asset for asset in current.storyboard.assets})
             if "visualLayout" in updates and updated_scene.visualLayout and updated_scene.visualLayout.enabled:
                 visual_image_ids = [element.assetId for element in updated_scene.visualLayout.elements if element.kind == "image"]
+                visual_text = [element.text for element in updated_scene.visualLayout.elements if element.kind == "text" and element.text.strip()]
+                if visual_text and visual_text[0] == updated_scene.title:
+                    visual_text = visual_text[1:]
                 updated_scene = updated_scene.model_copy(update={
-                    "extractedText": [element.text for element in updated_scene.visualLayout.elements if element.kind == "text" and element.text.strip()],
+                    "extractedText": visual_text,
                     "imageAssets": list(dict.fromkeys([*updated_scene.imageAssets, *visual_image_ids])),
                     "backgroundAsset": updated_scene.visualLayout.backgroundAsset,
                 })

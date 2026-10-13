@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from PIL import Image
 from pptx import Presentation
 from pptx.dml.color import RGBColor
+from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.util import Inches
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.oxml.ns import qn
@@ -22,6 +23,67 @@ from backend.app.scorm import PLAYER_JS, _scorm_12_player
 
 
 class VisualLayoutTests(unittest.TestCase):
+    def test_preset_shapes_and_zero_extent_connectors_are_extracted_as_vectors(self):
+        deck = Presentation()
+        slide = deck.slides.add_slide(deck.slide_layouts[6])
+        parallelogram = slide.shapes.add_shape(MSO_SHAPE.PARALLELOGRAM, Inches(1), Inches(1), Inches(3), Inches(1))
+        parallelogram.fill.solid()
+        parallelogram.fill.fore_color.rgb = RGBColor(30, 120, 180)
+        parallelogram.line.color.rgb = RGBColor(10, 40, 70)
+        slide.shapes.add_shape(MSO_SHAPE.CLOUD, Inches(5), Inches(5), Inches(2), Inches(1))
+        custom = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(1), Inches(5), Inches(2), Inches(1))
+        shape_properties = custom._element.find(qn("p:spPr"))
+        preset = shape_properties.find(qn("a:prstGeom"))
+        shape_properties.remove(preset)
+        custom_geometry = OxmlElement("a:custGeom")
+        for name in ("avLst", "gdLst", "ahLst", "cxnLst"):
+            custom_geometry.append(OxmlElement(f"a:{name}"))
+        rect = OxmlElement("a:rect")
+        for name, value in (("l", "0"), ("t", "0"), ("r", "100"), ("b", "100")):
+            rect.set(name, value)
+        custom_geometry.append(rect)
+        path_list = OxmlElement("a:pathLst")
+        path_node = OxmlElement("a:path")
+        path_node.set("w", "100")
+        path_node.set("h", "100")
+        move = OxmlElement("a:moveTo")
+        point = OxmlElement("a:pt")
+        point.set("x", "50")
+        point.set("y", "0")
+        move.append(point)
+        path_node.append(move)
+        for x, y in ((100, 100), (0, 100), (50, 0)):
+            line_to = OxmlElement("a:lnTo")
+            point = OxmlElement("a:pt")
+            point.set("x", str(x))
+            point.set("y", str(y))
+            line_to.append(point)
+            path_node.append(line_to)
+        path_node.append(OxmlElement("a:close"))
+        path_list.append(path_node)
+        custom_geometry.append(path_list)
+        shape_properties.append(custom_geometry)
+        slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, Inches(1), Inches(3), Inches(5), Inches(3))
+        slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, Inches(6), Inches(1), Inches(6), Inches(4))
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "shapes.pptx"
+            deck.save(source)
+            scenes, assets = extract_presentation(source, Path(folder))
+        layout = scenes[0].visualLayout
+        vector_shapes = [element for element in layout.elements if element.kind == "shape"]
+        self.assertEqual(len(assets), 0)
+        self.assertEqual(len(vector_shapes), 5)
+        self.assertIn("polygon", vector_shapes[0].shapeSvg)
+        self.assertIn("#1E78B4", vector_shapes[0].shapeSvg.upper())
+        self.assertIn('preserveAspectRatio="none"', vector_shapes[0].shapeSvg)
+        self.assertIn("<rect", vector_shapes[1].shapeSvg)
+        self.assertTrue(any("editable approximation" in warning for warning in layout.warnings))
+        self.assertIn("<path", vector_shapes[2].shapeSvg)
+        self.assertTrue(all("<path" in element.shapeSvg for element in vector_shapes[3:]))
+        self.assertTrue(all('stroke="none"' not in element.shapeSvg for element in vector_shapes[3:]))
+        self.assertTrue(all(element.width > 0 and element.height > 0 for element in vector_shapes))
+        self.assertFalse(any("Parallelogram" in warning or "Connector" in warning for warning in layout.warnings))
+
     def test_inherited_picture_background_and_slide_override(self):
         deck = Presentation()
         slide = deck.slides.add_slide(deck.slide_layouts[6])
@@ -84,6 +146,25 @@ class VisualLayoutTests(unittest.TestCase):
         self.assertEqual(text.text, "Editable text")
         self.assertFalse(layout.enabled)
 
+    def test_identical_image_assets_are_shared_across_extracted_slides(self):
+        deck = Presentation()
+        image = io.BytesIO()
+        Image.new("RGB", (30, 20), "red").save(image, format="PNG")
+        image_bytes = image.getvalue()
+        for _ in range(2):
+            slide = deck.slides.add_slide(deck.slide_layouts[6])
+            slide.shapes.add_picture(io.BytesIO(image_bytes), Inches(1), Inches(1), Inches(2))
+            slide.shapes.add_picture(io.BytesIO(image_bytes), Inches(4), Inches(1), Inches(2))
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "deck.pptx"
+            deck.save(source)
+            scenes, assets = extract_presentation(source, Path(folder))
+        self.assertEqual(len(assets), 1)
+        self.assertEqual(scenes[0].imageAssets, [assets[0].id])
+        self.assertEqual(scenes[1].imageAssets, [assets[0].id])
+        self.assertEqual([element.assetId for element in scenes[0].visualLayout.elements if element.kind == "image"], [assets[0].id, assets[0].id])
+        self.assertEqual([element.assetId for element in scenes[1].visualLayout.elements if element.kind == "image"], [assets[0].id, assets[0].id])
+
     def test_legacy_scene_remains_unchanged(self):
         scene = Scene(id="old", title="Old scene", previewImage="renders/slide.png")
         self.assertIsNone(scene.visualLayout)
@@ -125,6 +206,8 @@ class VisualLayoutTests(unittest.TestCase):
             self.assertIn("if (!visual && scene.previewImage)", runtime)
             self.assertIn("node.textContent = element.text", runtime)
             self.assertIn("element.crop", runtime)
+            self.assertIn('element.kind === "shape"', runtime)
+            self.assertIn("element.shapeSvg", runtime)
             self.assertIn('document.querySelector("#contents")', runtime)
 
     def test_modal_text_changes_update_enabled_layout(self):

@@ -8,6 +8,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from PIL import Image
 from pptx import Presentation
+from pptx.dml.color import RGBColor
+from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.oxml.xmlchemy import OxmlElement
 from pptx.oxml.ns import qn
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
@@ -62,6 +64,10 @@ def fixture() -> None:
             properties.append(fill)
             background_node.append(properties)
             master._element.find(qn("p:cSld")).insert(0, background_node)
+            parallelogram = slide.shapes.add_shape(MSO_SHAPE.PARALLELOGRAM, Inches(8), Inches(1), Inches(3), Inches(1.5))
+            parallelogram.fill.solid()
+            parallelogram.fill.fore_color.rgb = RGBColor(30, 120, 180)
+            slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, Inches(8), Inches(3), Inches(11), Inches(3))
     source = root / "original" / "source-deck.pptx"
     presentation.save(source)
     scenes, assets = extract_presentation(source, root)

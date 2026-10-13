@@ -126,6 +126,15 @@ PLAYER_JS = r'''(() => {
                 node.style.whiteSpace = "pre-wrap";
                 node.style.overflowWrap = "anywhere";
                 node.style.lineHeight = "1.2";
+            } else if (element.kind === "shape") {
+                const shape = document.createElement("img");
+                shape.className = "visual-shape";
+                shape.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(element.shapeSvg || "")}`;
+                shape.alt = "";
+                shape.setAttribute("role", "presentation");
+                shape.style.cssText = "display:block;width:100%;height:100%;overflow:visible";
+                node.style.overflow = "visible";
+                node.appendChild(shape);
             } else {
                 const asset = window.__CHIMERA_ASSETS[element.assetId];
                 if (!asset) return;

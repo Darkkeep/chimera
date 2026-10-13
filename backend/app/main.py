@@ -20,19 +20,21 @@ from .backup import build_project_archive, restore_project_archive
 from .enhancement_jobs import cancel_enhancement_job, preview_enhancement_submission, recover_enhancement_jobs, retry_enhancement_job, start_enhancement_job
 from .identity import IdentitySnapshot, LocalIdentityDirectory, OrganizationPolicy, ProjectMembership, ProjectMembershipCreate, RoleBasedAuthorizationPolicy
 from .media_generation import cancel_media_generation_job, recover_media_generation_jobs, regenerate_candidate, retry_media_generation_job, start_media_generation_job
-from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalCreate, EnhancementProposalDecision, EnhancementProposalResult, ExportSettings, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, ReferenceResource, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewReplyCreate, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate, ValidationReport
+from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalCreate, EnhancementProposalDecision, EnhancementProposalResult, ExportSettings, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, ReferenceResource, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewReplyCreate, Scene, SceneCreate, SceneElement, SceneLayout, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate, ValidationReport
 from .platform import ActorContext, AuditEventPage, AuthorizationPolicy, DurableEventSink, PlatformEvent, LOCAL_ACTOR, REQUEST_ACTOR, action_context, get_actor_context, get_correlation_id, read_audit_events
 from .references import SUPPORTED_REFERENCE_EXTENSIONS, extract_reference_passages
 from .render import render_slides
 from .qti import assessment_item_xml, assessment_test_package
 from .scorm import persist_scorm_12_build, persist_scorm_build, read_scorm_report
-from .storage import ROOT, EnhancementProposalConflict, StoryboardRevisionConflict, add_project_asset, add_review_reply, approve_generated_candidate, create_enhancement_job, create_enhancement_proposal, create_media_generation_job, create_project, create_review_comment, create_scene, create_template, decide_enhancement_proposal, decide_review_comment, delete_scene, list_enhancement_jobs, list_enhancement_proposals, list_generated_candidates, list_media_generation_jobs, list_projects, list_reference_resources, list_review_comments, list_templates, project_path, read_enhancement_job, read_generated_candidate, read_media_generation_job, read_project, persist_imported_assets, persist_slide_previews, reorder_scenes, replace_storyboard, replace_template_source, save_reference_resource, slugify, storyboard_transaction, update_from_import, update_project_asset_attribution, update_project_completion_settings, update_project_export_settings, update_generated_candidate, update_media_generation_job, update_scene, update_template
+from .storage import ROOT, EnhancementProposalConflict, StoryboardRevisionConflict, add_project_asset, add_review_reply, approve_generated_candidate, create_enhancement_job, create_enhancement_proposal, create_media_generation_job, create_project, create_review_comment, create_scene, create_template, decide_enhancement_proposal, decide_review_comment, delete_scene, list_enhancement_jobs, list_enhancement_proposals, list_generated_candidates, list_media_generation_jobs, list_projects, list_reference_resources, list_review_comments, list_templates, project_path, read_enhancement_job, read_generated_candidate, read_media_generation_job, read_project, read_template, persist_imported_assets, persist_slide_previews, reorder_scenes, replace_storyboard, replace_template_source, save_reference_resource, slugify, storyboard_transaction, update_from_import, update_project_asset_attribution, update_project_completion_settings, update_project_export_settings, update_generated_candidate, update_media_generation_job, update_scene, update_template, validate_visual_assets, write_project_metadata, write_storyboard, template_path
 from .validation import validate_project
 from .models import ProductionStageUpdate
+from .models import TrashedProject
 from .storage import update_project_production_stage
+from .storage import now_iso
 from .media_generation import media_provider_configured
 from .ai_connection import ConnectionRevision, ConnectionUpdate, connection_status, disconnect_connection, save_connection, test_connection
-from .word_export import DOCX_MEDIA_TYPE, build_storyboard_docx
+from .word_export import DOCX_MEDIA_TYPE, FULL_TEMPLATE_PATH, SME_TEMPLATE_PATH, TemplateArtworkError, build_full_storyboard_docx, build_sme_storyboard_docx, build_storyboard_docx
 from .deployment import cors_origins, installation_policy, public_origin
 from .password_auth import AccountStore, COOKIE, HostedAuthorizationPolicy, LoginRequest, ResetPasswordRequest, ReviewInvitationRequest, SESSION_SECONDS, require_origin
 
@@ -52,6 +54,7 @@ ROUTE_ACTIONS = {
     "patch_project_production_stage": "project.settings.update", "get_project_readiness": "project.metadata.view",
     "patch_project_asset_attribution": "media.manage", "patch_project_completion_settings": "project.settings.update",
     "patch_project_export_settings": "project.settings.update", "get_enhancement_proposals": "project.view",
+    "trash_project": "project.delete", "restore_project": "project.restore", "get_trashed_projects": "project.list",
     "get_review_comments": "project.view", "post_review_comment": "review.comment.create",
     "post_review_reply": "review.reply.create", "post_review_comment_decision": "review.comment.resolve",
     "post_enhancement_proposal": "enhancement.proposal.create", "post_enhancement_proposal_decision": "enhancement.proposal.decide",
@@ -69,7 +72,8 @@ ROUTE_ACTIONS = {
     "export_qti_assessment_item": "project.export", "export_qti_assessment_test": "project.export",
     "export_scorm_2004": "project.export", "export_scorm_12": "project.export", "get_scorm_report": "project.export",
     "export_storyboard": "project.export", "export_project_backup": "project.export", "import_project_backup": "project.restore",
-    "export_storyboard_docx": "project.export", "import_storyboard": "project.import", "post_project_asset": "media.manage",
+    "export_storyboard_docx": "project.export", "export_sme_storyboard_docx": "project.export", "export_full_storyboard_docx": "project.export",
+    "import_storyboard": "project.import", "post_project_asset": "media.manage",
     "get_project_asset": "project.view", "get_slide_render": "project.view", "post_scene": "scene.manage",
     "patch_scene": "scene.manage", "delete_project_scene": "scene.manage", "extract_scene_layout": "scene.manage",
     "put_scene_order": "scene.manage", "upload_source": "project.import",
@@ -86,6 +90,12 @@ def get_authorization_policy() -> AuthorizationPolicy:
 
 def _hosted_request_action(request: Request) -> str:
     path = request.url.path
+    if path.endswith("/trash") and request.method == "POST":
+        return "project.delete"
+    if path.endswith("/restore") and request.method == "POST":
+        return "project.restore"
+    if path == "/api/trash/projects":
+        return "workspace.view"
     if path.startswith("/api/ai-connection"):
         return "identity.self" if request.method == "GET" else "admin.policy.manage"
     if path.startswith("/api/identity/") and request.method == "GET" or path == "/api/installation/config":
@@ -182,8 +192,8 @@ async def _require_request_access(
     with action_context(context):
         yield
         if request.method != "GET" or action == "project.export":
-            root = project_path(project_id) if project_id else ROOT
-            event_class = "security" if action in {"project.export", "project.restore", "project.membership.manage", "admin.policy.manage", "enhancement.proposal.decide", "review.comment.resolve"} else "operational"
+            root = ROOT if action == "project.delete" or getattr(request.scope.get("route"), "name", "") == "restore_project" else project_path(project_id) if project_id else ROOT
+            event_class = "security" if action in {"project.export", "project.delete", "project.restore", "project.membership.manage", "admin.policy.manage", "enhancement.proposal.decide", "review.comment.resolve"} else "operational"
             DurableEventSink(root).record(PlatformEvent(
                 eventName="api.action_completed", installationId=context.installationId,
                 actorId=context.actorId, actorDisplayName=context.actorDisplayName,
@@ -494,6 +504,7 @@ def get_project_health() -> list[dict[str, object]]:
             "blockers": [issue.model_dump() for issue in blockers],
             "canEdit": get_authorization_policy().allows(get_actor_context(), "scene.manage", summary.id),
             "canSetStage": get_authorization_policy().allows(get_actor_context(), "project.settings.update", summary.id),
+            "canTrash": project.ownerId == get_actor_context().actorId or get_authorization_policy().allows(get_actor_context(), "project.membership.manage", summary.id) or get_authorization_policy().allows(get_actor_context(), "project.membership.manage"),
             "updatedAt": summary.updatedAt,
         })
     return health
@@ -522,6 +533,59 @@ def get_audit_events(project_id: str | None = None, offset: int = 0, limit: int 
 @app.get("/api/projects", response_model=list[ProjectSummary])
 def get_projects() -> list[ProjectSummary]:
     return [project for project in list_projects() if get_authorization_policy().allows(get_actor_context(), "project.metadata.view", project.id)]
+
+
+@app.get("/api/trash/projects", response_model=list[TrashedProject])
+def get_trashed_projects() -> list[TrashedProject]:
+    from .storage import list_trashed_projects
+
+    actor = get_actor_context()
+    policy = get_authorization_policy()
+    return [
+        project for project in list_trashed_projects()
+        if project.ownerId == actor.actorId or policy.allows(actor, "project.membership.manage", project.id)
+    ]
+
+
+@app.post("/api/projects/{project_id}/trash", status_code=200)
+def trash_project(project_id: str) -> dict[str, object]:
+    from .storage import trash_project as move_project_to_trash
+
+    actor = get_actor_context()
+    policy = get_authorization_policy()
+    try:
+        project = read_project(project_id)
+        is_administrator = policy.allows(actor, "project.membership.manage", project_id) or policy.allows(actor, "project.membership.manage")
+        if project.ownerId != actor.actorId and not is_administrator:
+            raise HTTPException(status_code=403, detail="Only the project owner or an administrator can move this project to trash.")
+        trashed = move_project_to_trash(project_id)
+        return {"projectId": project_id, "title": trashed.title, "trashedAt": trashed.trashedAt, "expiresAt": trashed.expiresAt}
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except FileExistsError as error:
+        raise HTTPException(status_code=409, detail="A trashed project with this identifier already exists.") from error
+
+
+@app.post("/api/projects/{project_id}/restore", response_model=ProjectDetail)
+def restore_project(project_id: str) -> ProjectDetail:
+    from .storage import list_trashed_projects, restore_trashed_project
+
+    actor = get_actor_context()
+    policy = get_authorization_policy()
+    try:
+        trash_item = next((item for item in list_trashed_projects() if item.id == project_id), None)
+        if trash_item is None:
+            raise FileNotFoundError(project_id)
+        is_administrator = policy.allows(actor, "project.membership.manage", project_id) or policy.allows(actor, "project.membership.manage")
+        if trash_item.ownerId != actor.actorId and not is_administrator:
+            raise HTTPException(status_code=403, detail="Only the project owner or an administrator can restore this project.")
+        return restore_trashed_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Trashed project not found or its recovery period has expired.") from error
+    except FileExistsError as error:
+        raise HTTPException(status_code=409, detail="A project with this identifier already exists.") from error
 
 
 @app.get("/api/templates", response_model=list[TemplateRecord])
@@ -1212,6 +1276,34 @@ def export_storyboard_docx(project_id: str, include_answer_key: bool = False) ->
     )
 
 
+def _export_template_storyboard(project_id: str, include_answer_key: bool, full: bool) -> Response:
+    template_path = FULL_TEMPLATE_PATH if full else SME_TEMPLATE_PATH
+    if not template_path.is_file() or not SME_TEMPLATE_PATH.is_file():
+        raise HTTPException(status_code=503, detail="Storyboard export template is unavailable")
+    try:
+        with storyboard_transaction():
+            project = read_project(project_id)
+            builder = build_full_storyboard_docx if full else build_sme_storyboard_docx
+            content = builder(project, include_answer_key)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except TemplateArtworkError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    label = "full-storyboard" if full else "sme-master"
+    filename = f"{slugify(project.title)}-{label}.docx"
+    return Response(content=content, media_type=DOCX_MEDIA_TYPE, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@app.get("/api/projects/{project_id}/storyboard-sme.docx")
+def export_sme_storyboard_docx(project_id: str, include_answer_key: bool = False) -> Response:
+    return _export_template_storyboard(project_id, include_answer_key, full=False)
+
+
+@app.get("/api/projects/{project_id}/storyboard-full.docx")
+def export_full_storyboard_docx(project_id: str, include_answer_key: bool = False) -> Response:
+    return _export_template_storyboard(project_id, include_answer_key, full=True)
+
+
 @app.put("/api/projects/{project_id}/storyboard/import", response_model=ProjectDetail)
 def import_storyboard(project_id: str, data: Storyboard, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
     try:
@@ -1288,7 +1380,11 @@ def get_slide_render(project_id: str, filename: str) -> FileResponse:
 @app.post("/api/projects/{project_id}/scenes", response_model=ProjectDetail, status_code=201)
 def post_scene(project_id: str, data: SceneCreate, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
     try:
-        return create_scene(project_id, data, _expected_revision(if_match))
+        project = create_scene(project_id, data, _expected_revision(if_match))
+        if data.layoutMode in {"native", "template"}:
+            scene = project.storyboard.scenes[-1]
+            return patch_scene(project_id, scene.id, SceneUpdate(layoutMode=data.layoutMode, templateId=data.templateId), str(project.storyboard.revision))
+        return project
     except StoryboardRevisionConflict as error:
         raise _revision_conflict(error) from error
     except FileNotFoundError as error:
@@ -1297,10 +1393,137 @@ def post_scene(project_id: str, data: SceneCreate, if_match: Annotated[str | Non
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
+def _native_scene_layout(scene: Scene) -> SceneLayout:
+    lines = [text for text in [scene.title, *scene.extractedText] if text.strip()]
+    height = min(10000, max(720, 170 + len(lines) * 96))
+    elements = [
+        SceneElement(
+            id=f"native-text-{index}",
+            kind="text",
+            source="manual",
+            text=text,
+            x=72,
+            y=80 + index * 96,
+            width=1136,
+            height=80,
+            fontSize=28,
+            fontFamily="Aptos",
+            color="#202020",
+        )
+        for index, text in enumerate(lines)
+    ]
+    return SceneLayout(enabled=True, width=1280, height=height, backgroundColor="#ffffff", elements=elements)
+
+
+def _apply_template_scene_layout(project_id: str, scene_id: str, data: SceneUpdate, expected_revision: int | None) -> ProjectDetail:
+    current = read_project(project_id)
+    _check_expected_revision(expected_revision, current.storyboard.revision)
+    original_scene = next((item for item in current.storyboard.scenes if item.id == scene_id), None)
+    if original_scene is None:
+        raise KeyError(scene_id)
+    updates = data.model_dump(exclude_unset=True)
+    candidate = Scene.model_validate({**original_scene.model_dump(), **updates})
+    if not candidate.templateId:
+        raise ValueError("Choose a template before applying the Template layout.")
+    record = read_template(candidate.templateId)
+    template_source = template_path(record.id) / "template.pptx"
+    project_root = project_path(project_id)
+    with tempfile.TemporaryDirectory(prefix=".template-layout-", dir=project_root) as temporary:
+        staging = Path(temporary)
+        template_scenes, extracted_assets = extract_presentation(template_source, staging)
+        template_scene = template_scenes[0] if template_scenes else None
+        if template_scene is None or template_scene.visualLayout is None:
+            raise ValueError("The selected template has no usable first slide.")
+        layout = template_scene.visualLayout.model_copy(deep=True)
+        template_text = [element for element in layout.elements if element.kind == "text" and element.source == "slide"]
+        scene_text = [candidate.title, *candidate.extractedText]
+        for index, element in enumerate(template_text):
+            if index < len(scene_text):
+                element.text = scene_text[index]
+            else:
+                layout.elements.remove(element)
+        for index, text in enumerate(scene_text[len(template_text):], start=len(template_text)):
+            layout.elements.append(SceneElement(
+                id=f"template-text-{index}",
+                kind="text",
+                source="manual",
+                text=text,
+                x=64,
+                y=64 + index * 96,
+                width=layout.width - 128,
+                height=80,
+                fontSize=38 if index == 0 else 26,
+                fontFamily="Aptos",
+                color="#202020",
+            ))
+        layout.enabled = True
+        candidate = candidate.model_copy(update={"visualLayout": layout, "backgroundAsset": layout.backgroundAsset})
+        needed_asset_ids = {element.assetId for element in layout.elements if element.kind == "image" and element.assetId}
+        if layout.backgroundAsset:
+            needed_asset_ids.add(layout.backgroundAsset)
+        imported_assets = [asset for asset in extracted_assets if asset.id in needed_asset_ids]
+        combined_assets = {asset.id: asset for asset in current.storyboard.assets}
+        combined_assets.update({asset.id: asset for asset in imported_assets})
+        validate_visual_assets(candidate, combined_assets)
+        updated_scenes = [candidate if item.id == scene_id else item for item in current.storyboard.scenes]
+        storyboard = current.storyboard.model_copy(update={"scenes": updated_scenes, "assets": list(combined_assets.values())})
+        with storyboard_transaction():
+            latest = read_project(project_id)
+            _check_expected_revision(expected_revision, latest.storyboard.revision)
+            if imported_assets:
+                persist_imported_assets(project_id, staging, imported_assets)
+            write_storyboard(project_root, storyboard, expected_revision or latest.storyboard.revision)
+            write_project_metadata(project_root, {"id": project_id, "title": latest.title, "updatedAt": now_iso()})
+        return read_project(project_id)
+
+
 @app.patch("/api/projects/{project_id}/scenes/{scene_id}", response_model=ProjectDetail)
 def patch_scene(project_id: str, scene_id: str, data: SceneUpdate, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
     try:
-        return update_scene(project_id, scene_id, data, _expected_revision(if_match))
+        expected = _expected_revision(if_match)
+        current = read_project(project_id)
+        scene = next((item for item in current.storyboard.scenes if item.id == scene_id), None)
+        if scene is None:
+            raise KeyError(scene_id)
+        requested_mode = data.layoutMode or scene.layoutMode
+        requested_template = data.templateId if "templateId" in data.model_fields_set else scene.templateId
+        mode_changed = requested_mode != scene.layoutMode
+        template_changed = requested_template != scene.templateId
+        if requested_mode == "template" and (mode_changed or template_changed or scene.visualLayout is None):
+            return _apply_template_scene_layout(project_id, scene_id, data, expected)
+        if (mode_changed and requested_mode == "native") or (requested_mode == "native" and scene.visualLayout is None):
+            native_scene = scene.model_copy(update={
+                "title": data.title if "title" in data.model_fields_set else scene.title,
+                "extractedText": data.extractedText if "extractedText" in data.model_fields_set else scene.extractedText,
+            })
+            data = data.model_copy(update={"visualLayout": _native_scene_layout(native_scene)})
+        elif (mode_changed and requested_mode == "hybrid") or (requested_mode == "hybrid" and not (scene.visualLayout and scene.visualLayout.enabled)):
+            if data.visualLayout is not None:
+                layout = data.visualLayout.model_copy(deep=True)
+                layout.enabled = True
+                data = data.model_copy(update={"visualLayout": layout})
+            else:
+                if scene.sourceSlide is not None and (scene.visualLayout is None or mode_changed):
+                    extracted = extract_scene_layout(project_id, scene_id, str(expected) if expected is not None else None, refresh=mode_changed)
+                    current = extracted
+                    expected = extracted.storyboard.revision
+                    scene = next(item for item in current.storyboard.scenes if item.id == scene_id)
+                hybrid_scene = scene.model_copy(update={
+                    "title": data.title if "title" in data.model_fields_set else scene.title,
+                    "extractedText": data.extractedText if "extractedText" in data.model_fields_set else scene.extractedText,
+                })
+                layout = scene.visualLayout.model_copy(deep=True) if scene.visualLayout else _native_scene_layout(hybrid_scene)
+                layout.enabled = True
+                data = data.model_copy(update={"visualLayout": layout})
+        elif data.layoutMode == "fidelity" and scene.visualLayout is not None and scene.visualLayout.enabled:
+            layout = scene.visualLayout.model_copy(deep=True)
+            layout.enabled = False
+            data = data.model_copy(update={"visualLayout": layout})
+        if requested_mode in {"hybrid", "native", "template"} and data.visualLayout is not None and not data.visualLayout.enabled:
+            layout = data.visualLayout.model_copy(deep=True)
+            layout.enabled = True
+            data = data.model_copy(update={"visualLayout": layout})
+        return update_scene(project_id, scene_id, data, expected)
     except StoryboardRevisionConflict as error:
         raise _revision_conflict(error) from error
     except FileNotFoundError as error:
@@ -1324,7 +1547,7 @@ def delete_project_scene(project_id: str, scene_id: str, if_match: Annotated[str
 
 
 @app.post("/api/projects/{project_id}/scenes/{scene_id}/extract-layout", response_model=ProjectDetail)
-def extract_scene_layout(project_id: str, scene_id: str, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
+def extract_scene_layout(project_id: str, scene_id: str, if_match: Annotated[str | None, Header()] = None, refresh: bool = False) -> ProjectDetail:
     from .storage import write_storyboard
 
     try:
@@ -1334,7 +1557,7 @@ def extract_scene_layout(project_id: str, scene_id: str, if_match: Annotated[str
         scene = next((item for item in current.storyboard.scenes if item.id == scene_id), None)
         if scene is None:
             raise HTTPException(status_code=404, detail="Scene not found")
-        if scene.visualLayout is not None:
+        if scene.visualLayout is not None and not refresh:
             return current
         source = project_path(project_id) / "original" / "source-deck.pptx"
         if not source.is_file() or scene.sourceSlide is None:

@@ -1,5 +1,6 @@
 import base64
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from threading import Event
 import hashlib
 import io
@@ -18,12 +19,13 @@ from PIL import Image
 from docx import Document
 from pydantic import ValidationError
 from pptx import Presentation
+from pptx.dml.color import RGBColor
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.util import Inches
 from unittest.mock import patch
 
-from backend.app import backup, enhancement_jobs, main, media_generation, references, storage
-from backend.app.models import AssessmentChoice, AssessmentPair, AssessmentSettings, AssetAttributionUpdate, CourseCompletionSettings, DragDropAssessment, EnhancementJobCreate, EnhancementProposalCreate, EnhancementProposalResult, ExportSettings, MatchingAssessment, MediaGenerationJobCreate, MultipleResponseAssessment, OrderingAssessment, ProjectCreate, ReviewCommentCreate, ReviewCommentDecision, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, ShortAnswerAssessment, SingleChoiceAssessment, Storyboard, TemplateUpdate, TrueFalseAssessment
+from backend.app import backup, enhancement_jobs, main, media_generation, references, storage, word_export
+from backend.app.models import AssessmentChoice, AssessmentPair, AssessmentSettings, AssetAttributionUpdate, CourseCompletionSettings, DragDropAssessment, EnhancementJobCreate, EnhancementProposalCreate, EnhancementProposalResult, ExportSettings, MatchingAssessment, MediaGenerationJobCreate, MultipleResponseAssessment, OrderingAssessment, ProjectCreate, ReviewCommentCreate, ReviewCommentDecision, ReviewReplyCreate, Scene, SceneCreate, SceneElement, SceneLayout, SceneOrder, SceneUpdate, ShortAnswerAssessment, SingleChoiceAssessment, Storyboard, TemplateUpdate, TrueFalseAssessment
 from backend.app.render import render_slides
 from backend.app.scorm import _compatibility_checks
 
@@ -1232,6 +1234,13 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
         self.assertIn("The equipment", all_text)
         self.assertNotIn("Answer key", all_text)
         self.assertTrue(any("Scene ID" in cell.text for table in document.tables for row in table.rows for cell in row.cells))
+        media_table = next(table for table in document.tables if len(table.columns) == 5 and table.rows[0].cells[1].text == "Preview")
+        available_width = document.sections[0].page_width - document.sections[0].left_margin - document.sections[0].right_margin
+        self.assertEqual(sum(column.width for column in media_table.columns), available_width)
+        image_row = next(row for row in media_table.rows[1:] if "inspection.png" in row.cells[2].text)
+        self.assertTrue(image_row.cells[1]._tc.xpath(".//w:drawing"))
+        self.assertLessEqual(document.inline_shapes[0].width, Inches(0.55))
+        self.assertLessEqual(document.inline_shapes[0].height, Inches(0.42))
         with ZipFile(io.BytesIO(response.body)) as package:
             self.assertTrue(any(name.startswith("word/media/") for name in package.namelist()))
 
@@ -1243,9 +1252,95 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
         saved_text = storage.read_project(project.id).storyboard.scenes[0].extractedText[0]
         self.assertIn("\x00", saved_text)
 
+        sme_response = main.export_sme_storyboard_docx(project.id)
+        self.assertIn("editable-storyboard-sme-master.docx", sme_response.headers["content-disposition"])
+        sme_document = Document(io.BytesIO(sme_response.body))
+        self.assertGreater(sme_document.sections[0].page_width, sme_document.sections[0].page_height)
+        sme_text = "\n".join(paragraph.text for paragraph in sme_document.paragraphs)
+        sme_text += "\n" + "\n".join(cell.text for table in sme_document.tables for row in table.rows for cell in row.cells)
+        self.assertIn("SME Master - Editable storyboard", sme_text)
+        self.assertIn("WHAT THE LEARNER SEES", sme_text)
+        self.assertIn("WHAT THEY HEAR", sme_text)
+        self.assertIn("Inspection: café", sme_text)
+        self.assertIn("Learner text with Unicode: naïve façade. Safe continuation.", sme_text)
+        self.assertNotIn("Answer key", sme_text)
+        title_run = sme_document.tables[0].cell(0, 0).paragraphs[0].runs[0]
+        self.assertEqual(title_run.font.name, "Bitstream Charter")
+        self.assertEqual(str(title_run.font.color.rgb), "17283D")
+        label_run = sme_document.tables[3].cell(0, 0).paragraphs[0].runs[0]
+        self.assertEqual(str(label_run.font.color.rgb), "365B83")
+        visual_cell = sme_document.tables[3].cell(0, 0).tables[0].cell(0, 0)
+        self.assertEqual(visual_cell._tc.xpath("./w:tcPr/w:shd/@w:fill"), ["FFFFFF"])
+        self.assertEqual(visual_cell._tc.xpath("./w:tcPr/w:tcBorders/w:top/@w:color"), ["CCD4DD"])
+        sme_drawings = sme_document._element.body.xpath(".//w:drawing")
+        self.assertEqual(len(sme_drawings), 1)
+        self.assertLessEqual(sme_document.inline_shapes[0].width, Inches(0.55))
+        self.assertLessEqual(sme_document.inline_shapes[0].height, Inches(0.42))
+
+        background_path = Path(self.temp_dir.name) / "master-background.png"
+        Image.new("RGB", (48, 30), color=(255, 255, 255)).save(background_path)
+        with patch("backend.app.word_export._extract_master_artwork", return_value=background_path):
+            full_response = main.export_full_storyboard_docx(project.id)
+        self.assertIn("editable-storyboard-full-storyboard.docx", full_response.headers["content-disposition"])
+        full_document = Document(io.BytesIO(full_response.body))
+        landscape_sections = [section for section in full_document.sections if section.page_width > section.page_height]
+        self.assertEqual(len(landscape_sections), 1)
+        landscape_section = landscape_sections[0]
+        self.assertTrue(landscape_section.header._element.xpath(".//wp:anchor[@behindDoc='1']"))
+        self.assertFalse(full_document.sections[-1].header.is_linked_to_previous)
+        self.assertFalse(full_document.sections[-1].header._element.xpath(".//wp:anchor[@behindDoc='1']"))
+        self.assertGreater(full_document.sections[-1].page_height, full_document.sections[-1].page_width)
+        full_text = "\n".join(paragraph.text for paragraph in full_document.paragraphs)
+        full_text += "\n" + "\n".join(cell.text for table in full_document.tables for row in table.rows for cell in row.cells)
+        self.assertIn("Multimedia Instructional Storyboard Template", full_text)
+        self.assertIn("Structured handoff field contract", full_text)
+        self.assertIn("SME Master - Editable storyboard", full_text)
+        self.assertIn("Detailed Chimera scene records", full_text)
+        self.assertIn("Inspection: café", full_text)
+
+        with patch("backend.app.word_export._extract_master_artwork", side_effect=word_export.TemplateArtworkError("Master art render failed")):
+            with self.assertRaises(HTTPException) as unavailable:
+                main.export_sme_storyboard_docx(project.id)
+        self.assertEqual(unavailable.exception.status_code, 503)
+
         with self.assertRaises(HTTPException) as missing:
             main.export_storyboard_docx("missing-project")
         self.assertEqual(missing.exception.status_code, 404)
+
+    def test_sme_master_artwork_is_extracted_and_used_as_page_background(self) -> None:
+        presentation = Presentation(str(word_export.SME_TEMPLATE_PATH))
+        source_slide = presentation.slides[1]
+        artwork_shape = next(shape for shape in source_slide.shapes if not getattr(shape, "text", "").strip())
+        master = presentation.slide_masters[0]
+        master.shapes._spTree.insert_element_before(deepcopy(artwork_shape._element), "p:extLst")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary_path = Path(temporary)
+            template_path = temporary_path / "master-template.pptx"
+            presentation.save(template_path)
+            render_root = temporary_path / "rendered"
+
+            def render_master_only(source: Path, output_root: Path):
+                sanitized = Presentation(str(source))
+                self.assertTrue(all(not slide.shapes for slide in sanitized.slides))
+                self.assertEqual(len(sanitized.slide_masters[0].shapes), 1)
+                image_path = output_root / "renders" / "slide-002.png"
+                image_path.parent.mkdir(parents=True)
+                Image.new("RGB", (48, 30), color=(255, 255, 255)).save(image_path)
+                return {2: "renders/slide-002.png"}, None
+
+            with patch("backend.app.word_export.render_slides", side_effect=render_master_only):
+                artwork = word_export._extract_master_artwork(template_path, 1, render_root)
+
+            self.assertIsNotNone(artwork)
+            document = Document()
+            word_export._set_section_artwork(document.sections[0], artwork)
+            output = io.BytesIO()
+            document.save(output)
+            reopened = Document(io.BytesIO(output.getvalue()))
+            self.assertTrue(reopened.sections[0].header._element.xpath(".//wp:anchor[@behindDoc='1']"))
+            with ZipFile(io.BytesIO(output.getvalue())) as package:
+                self.assertIn("word/media/image1.png", package.namelist())
 
     def test_scorm_build_aborts_if_storyboard_changes_during_package_assembly(self) -> None:
         project = storage.create_project(ProjectCreate(title="Changing SCORM course"))
@@ -1520,6 +1615,69 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
         with self.assertRaises(ValueError):
             storage.reorder_scenes(project.id, [second.id, second.id])
 
+    def test_scene_layout_mode_switches_prepare_the_selected_rendering(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Scene rendering modes"))
+        project = storage.create_scene(project.id, SceneCreate(title="Scene title", extractedText=["Learner content"], layoutMode="fidelity"))
+        scene = project.storyboard.scenes[0]
+        source_deck = Presentation()
+        source_slide = source_deck.slides.add_slide(source_deck.slide_layouts[6])
+        source_slide.slide_layout.slide_master.background.fill.solid()
+        source_slide.slide_layout.slide_master.background.fill.fore_color.rgb = RGBColor(18, 52, 86)
+        source_slide.shapes.add_textbox(Inches(1), Inches(1), Inches(8), Inches(1)).text = "Source title"
+        source_slide.shapes.add_textbox(Inches(1), Inches(2), Inches(8), Inches(1)).text = "Source body"
+        source_path = storage.project_path(project.id) / "original" / "source-deck.pptx"
+        source_path.parent.mkdir(parents=True, exist_ok=True)
+        source_deck.save(source_path)
+        source_scene = scene.model_copy(update={"sourceSlide": 1})
+        project = storage.update_from_import(project.id, [source_scene], [])
+
+        hybrid = main.patch_scene(project.id, scene.id, SceneUpdate(layoutMode="hybrid"), if_match=str(project.storyboard.revision))
+        hybrid_scene = hybrid.storyboard.scenes[0]
+        self.assertTrue(hybrid_scene.visualLayout.enabled)
+        self.assertEqual(hybrid_scene.visualLayout.backgroundColor, "#123456")
+
+        fidelity = main.patch_scene(project.id, scene.id, SceneUpdate(layoutMode="fidelity"), if_match=str(hybrid.storyboard.revision))
+        self.assertFalse(fidelity.storyboard.scenes[0].visualLayout.enabled)
+
+        native = main.patch_scene(project.id, scene.id, SceneUpdate(layoutMode="native"), if_match=str(fidelity.storyboard.revision))
+        native_scene = native.storyboard.scenes[0]
+        self.assertTrue(native_scene.visualLayout.enabled)
+        self.assertEqual(native_scene.visualLayout.backgroundColor, "#ffffff")
+        self.assertEqual([element.text for element in native_scene.visualLayout.elements], ["Scene title", "Learner content"])
+
+        template_deck = Presentation()
+        template_slide = template_deck.slides.add_slide(template_deck.slide_layouts[6])
+        template_slide.slide_layout.slide_master.background.fill.solid()
+        template_slide.slide_layout.slide_master.background.fill.fore_color.rgb = RGBColor(12, 34, 56)
+        template_slide.shapes.add_textbox(Inches(1), Inches(1), Inches(8), Inches(1)).text = "Template placeholder"
+        template_content = io.BytesIO()
+        template_deck.save(template_content)
+        template = storage.create_template("Blue template", "A test template", "blue.pptx", template_content.getvalue())
+        templated = main.patch_scene(
+            project.id,
+            scene.id,
+            SceneUpdate(layoutMode="template", templateId=template.id),
+            if_match=str(native.storyboard.revision),
+        )
+        templated_scene = templated.storyboard.scenes[0]
+        self.assertTrue(templated_scene.visualLayout.enabled)
+        self.assertEqual(templated_scene.visualLayout.backgroundColor, "#0C2238")
+        template_text = [element.text for element in templated_scene.visualLayout.elements if element.kind == "text"]
+        self.assertIn("Scene title", template_text)
+        self.assertIn("Learner content", template_text)
+        self.assertNotIn("Template placeholder", template_text)
+
+        restored_hybrid = main.patch_scene(
+            project.id,
+            scene.id,
+            SceneUpdate(layoutMode="hybrid", templateId=None),
+            if_match=str(templated.storyboard.revision),
+        )
+        restored_scene = restored_hybrid.storyboard.scenes[0]
+        self.assertTrue(restored_scene.visualLayout.enabled)
+        self.assertEqual(restored_scene.visualLayout.backgroundColor, "#123456")
+        self.assertNotIn("Template placeholder", [element.text for element in restored_scene.visualLayout.elements if element.kind == "text"])
+
     def test_scene_delete_archives_revision_and_clears_remediation_target(self) -> None:
         project = storage.create_project(ProjectCreate(title="Delete scene course"))
         project = storage.create_scene(project.id, SceneCreate(title="Remediation lesson"))
@@ -1627,7 +1785,7 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
             await main.post_project_asset(project.id, UploadFile(filename="script.exe", file=io.BytesIO(b"no")))
         self.assertEqual(raised.exception.status_code, 400)
 
-    async def test_media_attribution_draft_is_allowed_but_blocks_production(self) -> None:
+    async def test_image_attribution_pending_warns_but_allows_production_export(self) -> None:
         project = storage.create_project(ProjectCreate(title="Attribution gate"))
         project = storage.create_scene(project.id, SceneCreate(title="Image credits"))
         image_buffer = io.BytesIO()
@@ -1639,11 +1797,24 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
         asset = project.storyboard.assets[0]
         self.assertEqual(asset.attributionStatus, "draft")
         self.assertEqual(asset.attributionText, "")
+        project = main.patch_scene(project.id, project.storyboard.scenes[0].id, SceneUpdate(imageAssets=[asset.id]))
         self.assertTrue(main.get_project_validation(project.id, target="authoring").passed)
 
+        word_response = main.export_storyboard_docx(project.id)
+        word_document = Document(io.BytesIO(word_response.body))
+        self.assertTrue(any("Attribution Pending" in cell.text for table in word_document.tables for row in table.rows for cell in row.cells))
+
         production_report = main.get_project_validation(project.id, target="production")
-        self.assertFalse(production_report.passed)
-        self.assertIn("missing-media-attribution", {issue.code for issue in production_report.issues})
+        attribution_issue = next(issue for issue in production_report.issues if issue.code == "missing-media-attribution")
+        self.assertEqual(attribution_issue.severity, "warning")
+        self.assertIn("Attribution Pending", attribution_issue.message)
+        self.assertTrue(production_report.passed)
+        for export in (main.export_scorm_2004(project.id), main.export_scorm_12(project.id)):
+            self.assertEqual(export.status_code, 200)
+        for profile in ("scorm2004", "scorm12"):
+            report = json.loads((storage.project_path(project.id) / "reports" / f"build-{profile}.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["buildStatus"], "passed-with-warnings")
+            self.assertTrue(any("Attribution Pending" in warning for warning in report["warnings"]))
 
         draft_with_credit = main.patch_project_asset_attribution(
             project.id,
@@ -1654,7 +1825,7 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
             ),
         )
         self.assertEqual(draft_with_credit.storyboard.assets[0].attributionStatus, "draft")
-        self.assertFalse(main.get_project_validation(project.id, target="production").passed)
+        self.assertTrue(main.get_project_validation(project.id, target="production").passed)
 
         updated = main.patch_project_asset_attribution(
             project.id,
@@ -1671,6 +1842,17 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
         self.assertEqual(exported["assets"][0]["attributionStatus"], "complete")
         self.assertEqual(exported["assets"][0]["attributionText"], saved_asset.attributionText)
         self.assertTrue(main.get_project_validation(project.id, target="production").passed)
+
+    async def test_incomplete_audio_attribution_still_blocks_production(self) -> None:
+        project = storage.create_project(ProjectCreate(title="Audio attribution gate"))
+        project = await main.post_project_asset(
+            project.id,
+            UploadFile(filename="voice.mp3", file=io.BytesIO(b"ID3\x04\x00\x00\x00\x00\x00\x00voice")),
+        )
+        report = main.get_project_validation(project.id, target="production")
+        attribution_issue = next(issue for issue in report.issues if issue.code == "missing-media-attribution")
+        self.assertEqual(attribution_issue.severity, "error")
+        self.assertFalse(report.passed)
 
 
 if __name__ == "__main__":

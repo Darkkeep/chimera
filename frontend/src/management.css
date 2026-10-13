@@ -45,6 +45,20 @@
 .health-project-link span { min-width: 0; overflow-wrap: anywhere; }
 .health-project-link svg { flex-shrink: 0; margin-top: 2px; }
 .health-project-link:hover { text-decoration: underline; }
+.project-trash-action { display: inline-flex; align-items: center; gap: 5px; margin-top: 9px; padding: 5px 8px; font-size: 11px; }
+.trash-table th:nth-child(1) { width: 40%; }
+.trash-table th:nth-child(2), .trash-table th:nth-child(3) { width: 22%; }
+.trash-table th:nth-child(4) { width: 16%; }
+.project-trash-dialog { width: min(480px, calc(100vw - 32px)); }
+.project-trash-dialog > p { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.trash-backup-link { display: inline-flex; align-items: center; margin-top: 4px; font-size: 12px; }
+.project-trash-backup-note { margin-top: 6px; font-size: 11px !important; }
+.project-trash-confirm { display: grid; gap: 7px; color: var(--ink); font-size: 12px; font-weight: 600; }
+.project-trash-confirm input { padding: 9px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--theme-input, #fff); color: var(--ink); font: inherit; }
+.project-trash-checkbox { display: flex; align-items: center; gap: 9px; margin-top: 12px; color: var(--ink); font-size: 12px; }
+.project-trash-checkbox > input[type="checkbox"] { width: 16px; min-width: 16px; max-width: 16px; height: 16px; flex: 0 0 16px; padding: 0; margin: 0; accent-color: var(--accent); }
+.button-danger { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #a43f39; border-radius: 4px; padding: 8px 11px; background: #a43f39; color: #fff; font: 600 12px Manrope, sans-serif; cursor: pointer; }
+.button-danger:disabled { opacity: .5; cursor: not-allowed; }
 .health-table small { display: block; font-size: 11px; line-height: 1.5; color: var(--muted); margin-top: 6px; }
 .health-table select { max-width: 100%; width: 100%; min-height: 34px; border: 1px solid var(--line); border-radius: 4px; padding: 6px; font-size: 12px; color: var(--ink); background: var(--theme-input, #fff); }
 .health-blockers summary { cursor: pointer; color: var(--theme-danger, #a03333); }

@@ -215,6 +215,7 @@ class RoleBasedAuthorizationPolicy:
         "template.view": {"author", "instructional-designer", "administrator"},
         "project.create": {"author", "instructional-designer", "administrator"},
         "project.mutate": {"author", "instructional-designer", "administrator"},
+        "project.delete": {"author", "instructional-designer", "administrator"},
         "project.settings.update": {"author", "instructional-designer", "administrator"},
         "project.restore": {"author", "instructional-designer", "administrator"},
         "project.import": {"author", "instructional-designer", "administrator"},

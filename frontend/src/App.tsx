@@ -27,6 +27,7 @@ import { useSession } from "./AuthGate";
 import { ProjectAccessPanel } from "./ProjectAccessPanel";
 import { ReviewLinkView } from "./ReviewLinkView";
 import { SceneVisualEditor } from "./SceneVisualEditor";
+import type { SceneEditSettings } from "./SceneVisualEditor";
 import { SceneSurface } from "./SceneSurface";
 import type { SceneLayout } from "./SceneSurface";
 
@@ -91,6 +92,7 @@ export function App() {
   const [showManagement, setShowManagement] = useState(true);
   const managementButtonRef = useRef<HTMLButtonElement>(null);
   const [includeWordAnswerKey, setIncludeWordAnswerKey] = useState(false);
+  const [wordExportFormat, setWordExportFormat] = useState<"sme" | "full">("sme");
   const [draggingSceneId, setDraggingSceneId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -135,12 +137,12 @@ export function App() {
     questionCount: project.storyboard.scenes.filter(s => s.assessmentItem).length,
     hasImages: project.storyboard.scenes.some(s => s.imageAssets.length > 0),
     hasAudio: Boolean(project.storyboard.scenes[selectedScene]?.audioAssets.length) };
-  const currentSurface = sceneDraft ? "scene.edit" : isCreating ? "project.name" : templateDraft ? "templates.edit" :
+  const currentSurface = visualSceneId || sceneDraft ? "scene.edit" : isCreating ? "project.name" : templateDraft ? "templates.edit" :
     showExport ? "export.panel" : showPreview ? "preview.content" : showAssessmentEditor ? "assessment.editor" :
     showCompletionSettings ? "review.completion" : showEnhancementReview ? "review.enhancement" :
     showAccessibility ? "review.accessibility" : showValidation ? "review.validation" :
     showGoldenPath ? "catalog" : showManagement ? "workspace.management" : activeView;
-  const hasOpenForm = Boolean(sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showCompletionSettings || showEnhancementReview || showAccessibility || showValidation);
+  const hasOpenForm = Boolean(visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showCompletionSettings || showEnhancementReview || showAccessibility || showValidation);
   guideNavigate.current = (step) => {
     const target = step.target;
     if (!target) return;
@@ -275,6 +277,37 @@ export function App() {
       return false;
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleProjectTrashed(projectId: string) {
+    const response = await fetch("/api/projects");
+    if (!response.ok) throw new Error("Project list could not be refreshed.");
+    const availableProjects = await response.json() as ProjectSummary[];
+    setProjects(availableProjects);
+    if (project.id !== projectId) return;
+    window.localStorage.removeItem("chimera.activeProjectId");
+    setProject(emptyProject);
+    setSelectedScene(0);
+    setPermissions({ canEdit: !session, canExport: !session, canManageMembers: false, canEnhance: !session });
+    setReadiness(null);
+    if (availableProjects.length) {
+      const next = [...availableProjects].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+      const nextResponse = await fetch(`/api/projects/${next.id}`);
+      if (!nextResponse.ok) throw new Error("Another project could not be opened.");
+      applyProject(await nextResponse.json() as Project);
+    }
+  }
+
+  async function handleProjectsRestored(projectId: string) {
+    const response = await fetch("/api/projects");
+    if (!response.ok) throw new Error("Project list could not be refreshed.");
+    const availableProjects = await response.json() as ProjectSummary[];
+    setProjects(availableProjects);
+    if (!project.id) {
+      const restoredResponse = await fetch(`/api/projects/${projectId}`);
+      if (!restoredResponse.ok) throw new Error("Restored project could not be opened.");
+      applyProject(await restoredResponse.json() as Project);
     }
   }
 
@@ -490,12 +523,12 @@ export function App() {
     setBusy(true); setError(""); setFeedback("");
     try {
       const response = await fetch(`/api/projects/${project.id}/backup.zip`);
-      if (!response.ok) throw new Error("Project backup could not be exported.");
+      if (!response.ok) throw new Error("Chimera storyboard could not be exported.");
       const downloadUrl = window.URL.createObjectURL(await response.blob());
       const link = document.createElement("a"); link.href = downloadUrl; link.download = `${project.id}-backup.zip`; document.body.appendChild(link); link.click(); link.remove(); window.URL.revokeObjectURL(downloadUrl);
-      setFeedback("Portable project backup downloaded.");
+      setFeedback("Chimera storyboard downloaded.");
       reportOnboardingOutcome("export.backup", project.id);
-    } catch (backupError) { setError(backupError instanceof Error ? backupError.message : "Project backup could not be exported."); }
+    } catch (backupError) { setError(backupError instanceof Error ? backupError.message : "Chimera storyboard could not be exported."); }
     finally { setBusy(false); }
   }
 
@@ -506,23 +539,23 @@ export function App() {
     setFeedback("");
     try {
       const query = includeWordAnswerKey ? "?include_answer_key=true" : "";
-      const response = await fetch(`/api/projects/${project.id}/storyboard.docx${query}`);
+      const response = await fetch(`/api/projects/${project.id}/storyboard-${wordExportFormat}.docx${query}`);
       if (!response.ok) {
         const detail = await response.json().catch(() => null) as { detail?: string } | null;
-        throw new Error(detail?.detail || "Editable Word storyboard could not be exported.");
+        throw new Error(detail?.detail || "Word storyboard could not be exported.");
       }
       const downloadUrl = window.URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = `${project.id}-storyboard.docx`;
+      link.download = `${project.id}-${wordExportFormat === "sme" ? "sme-master" : "full-storyboard"}.docx`;
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(downloadUrl);
-      setFeedback("Editable Word storyboard downloaded.");
+      setFeedback(`${wordExportFormat === "sme" ? "SME Master" : "Full storyboard"} downloaded.`);
       reportOnboardingOutcome("export.word", project.id);
     } catch (exportError) {
-      setError(exportError instanceof Error ? exportError.message : "Editable Word storyboard could not be exported.");
+      setError(exportError instanceof Error ? exportError.message : "Word storyboard could not be exported.");
     } finally {
       setBusy(false);
     }
@@ -706,16 +739,16 @@ export function App() {
     const input = event.currentTarget;
     const file = input.files?.[0];
     if (!file || !project.id || busy) return;
-    if (!window.confirm(`Restore the portable backup into "${project.title}"? The current project is preserved only after the archive passes validation.`)) { input.value = ""; return; }
+    if (!window.confirm(`Restore the Chimera storyboard into "${project.title}"? The current project is preserved only after the archive passes validation.`)) { input.value = ""; return; }
     setBusy(true); setError(""); setFeedback("");
     try {
       const form = new FormData(); form.append("file", file);
       const response = await fetch(`/api/projects/${project.id}/backup/restore`, { method: "POST", body: form });
       const detail = await response.json().catch(() => null) as Project & { detail?: string } | null;
-      if (!response.ok) throw new Error(detail?.detail || "Project backup could not be restored.");
-      applyProject(detail as Project); setFeedback("Portable project backup restored.");
+      if (!response.ok) throw new Error(detail?.detail || "Chimera storyboard could not be restored.");
+      applyProject(detail as Project); setFeedback("Chimera storyboard restored.");
       reportOnboardingOutcome("export.restore-backup", project.id);
-    } catch (restoreError) { setError(restoreError instanceof Error ? restoreError.message : "Project backup could not be restored."); }
+    } catch (restoreError) { setError(restoreError instanceof Error ? restoreError.message : "Chimera storyboard could not be restored."); }
     finally { input.value = ""; setBusy(false); }
   }
 
@@ -790,7 +823,7 @@ export function App() {
     if (!sceneToEdit || busy) return;
     setError("");
     setSelectedScene(scenes.findIndex((item) => item.id === sceneToEdit.id));
-    setSceneDraft({ id: sceneToEdit.id, title: sceneToEdit.title, screenText: sceneToEdit.extractedText.join("\n"), actionDescription: sceneToEdit.actionDescription, notes: sceneToEdit.notes, required: sceneToEdit.required, audioRequired: sceneToEdit.audioRequired, sceneType: sceneToEdit.sceneType, layoutMode: sceneToEdit.layoutMode, templateId: sceneToEdit.templateId || "" });
+    setVisualSceneId(sceneToEdit.id);
   }
 
   async function saveScene() {
@@ -834,10 +867,21 @@ export function App() {
     }
   }
 
-  async function saveVisualScene(layout: SceneLayout) {
-    const response = await fetch(`/api/projects/${project.id}/scenes/${visualSceneId}`, { method: "PATCH", headers: storyboardWriteHeaders(project.storyboard.revision), body: JSON.stringify({ visualLayout: layout }) });
+  async function saveVisualScene(layout: SceneLayout, settings: SceneEditSettings) {
+    const sourceScene = scenes.find(item => item.id === visualSceneId);
+    const { canvasEdited, ...sceneSettings } = settings;
+    const refreshSourceLayout = !canvasEdited && settings.layoutMode === "hybrid" && Boolean(sourceScene?.sourceSlide) && sourceScene?.layoutMode !== "hybrid";
+    const sceneUpdate: Record<string, unknown> = {
+      ...sceneSettings,
+      templateId: settings.templateId || null,
+      visualLayout: layout,
+    };
+    if (refreshSourceLayout) delete sceneUpdate.visualLayout;
+    const response = await fetch(`/api/projects/${project.id}/scenes/${visualSceneId}`, { method: "PATCH", headers: storyboardWriteHeaders(project.storyboard.revision), body: JSON.stringify(sceneUpdate) });
     if (!response.ok) throw new Error(revisionConflictMessage(response.status) || "Visual scene could not be saved.");
     applyProject(await response.json() as Project);
+    reportOnboardingOutcome("scene.updated", project.id, visualSceneId || undefined);
+    if (settings.layoutMode === "template") reportOnboardingOutcome("scene.template-saved", project.id, visualSceneId || undefined);
   }
 
   async function extractVisualScene(): Promise<SceneLayout> {
@@ -927,7 +971,7 @@ export function App() {
     </aside>
     {showAIConnection && <AIConnectionPanel onClose={() => setShowAIConnection(false)} />}
     <main className="main-content" id="workspace-content" tabIndex={-1}>
-      {showManagement ? <ManagementView busy={busy || restoringProject} canCreateProject={canCreateProject} onCreateProject={() => setIsCreating(true)} canResume={Boolean(project.id)} onOpenProject={(projectId) => switchProject(projectId, true)} onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} /> : showProjectAccess ? <ProjectAccessPanel project={project} onClose={() => setShowProjectAccess(false)} /> : !permissions.canEdit && session && project.id ? <section className="project-access-panel"><h1>{project.title}</h1><p>You have review access to this project.</p><button className="button button-dark" onClick={() => setShowPreview(true)}>Open course review</button></section> : <>
+      {showManagement ? <ManagementView busy={busy || restoringProject} canCreateProject={canCreateProject} onCreateProject={() => setIsCreating(true)} canResume={Boolean(project.id)} onOpenProject={(projectId) => switchProject(projectId, true)} onProjectTrashed={handleProjectTrashed} onProjectsRestored={handleProjectsRestored} onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} /> : showProjectAccess ? <ProjectAccessPanel project={project} onClose={() => setShowProjectAccess(false)} /> : !permissions.canEdit && session && project.id ? <section className="project-access-panel"><h1>{project.title}</h1><p>You have review access to this project.</p><button className="button button-dark" onClick={() => setShowPreview(true)}>Open course review</button></section> : <>
       <header className="topbar">
         <div className="project-heading"><p className="eyebrow">COURSE AUTHORING / {activeView === "storyboard" ? "STORYBOARD" : activeView === "media" ? "MEDIA LIBRARY" : "TEMPLATES"}</p><h1 title={project.title}>{project.title || "Your workspace"}</h1></div>
         <div className="top-actions"><span className="save-state" role="status">{busy ? "Working…" : project.id ? <><Check size={14} /> Saved locally</> : "Local authoring"}</span><button className="button button-outline" onClick={() => setShowPreview(true)} disabled={!project.id || !scenes.length || busy}><Play size={15} /> Preview course</button><button className="button button-accent" onClick={() => setShowExport(true)} disabled={!project.id || busy}><Download size={15} /> Export</button></div>
@@ -954,8 +998,7 @@ export function App() {
         </section>
         <section data-onboarding="scene.saved" className={`canvas-panel ${scene?.visualLayout?.enabled ? "visual-active" : ""}`} aria-label="Selected scene">{scene ? <>
           <div className="scene-context-header">
-            <button className="button button-accent" onClick={() => beginSceneEdit()} disabled={busy}><Pencil size={16} /> Edit scene</button>
-            <button className="button button-outline" onClick={() => setVisualSceneId(scene.id)} disabled={busy || !permissions.canEdit}><Layers3 size={16} /> Edit canvas</button>
+            <button className="button button-accent" onClick={() => beginSceneEdit()} disabled={busy || !permissions.canEdit}><Pencil size={16} /> Edit scene</button>
             <div className="scene-context-title"><h2>{scene.title}</h2><span>Scene {selectedScene + 1} of {scenes.length} · {scene.required ? "Required" : "Optional"}</span></div>
           </div>
           {scene.visualLayout?.enabled && <div className="visual-authoring-surface"><SceneSurface project={project} scene={scene} /></div>}
@@ -977,14 +1020,14 @@ export function App() {
     </main>
 
     {showExport && <EditorDialog labelledBy="export-title" className="export-dialog" onClose={() => setShowExport(false)} busy={busy}>
-      <div data-onboarding="export.panel" className="modal-head"><div><p className="eyebrow">DELIVER & BACK UP</p><h2 id="export-title">Export course</h2></div><button className="icon-button" onClick={() => setShowExport(false)} disabled={busy} aria-label="Close export"><X size={19} /></button></div>
+      <div data-onboarding="export.panel" className="modal-head"><div><p className="eyebrow">DELIVER & EXPORT</p><h2 id="export-title">Export course</h2></div><button className="icon-button" onClick={() => setShowExport(false)} disabled={busy} aria-label="Close export"><X size={19} /></button></div>
       <p className="export-project-name">{project.title}</p>
       <section className="export-section"><h3>Learning management system</h3><p>Build a portable course package for your LMS.</p><div className="export-actions"><button className="button button-accent" onClick={() => void exportScorm2004()} disabled={busy}><Download size={16} /> Build SCORM 2004</button><button className="button button-outline" onClick={() => void exportScorm12()} disabled={busy}>Build SCORM 1.2</button></div>
         <label className="package-threshold"><span>Warn when a package exceeds</span><input aria-label="Package warning threshold in MB" type="number" min="1" max="4096" key={`${project.id}-${project.storyboard.exportSettings.packageWarningThresholdMB}`} defaultValue={project.storyboard.exportSettings.packageWarningThresholdMB} onBlur={(event) => { if (event.currentTarget.validity.valid && event.currentTarget.value !== "") void updatePackageWarningThreshold(Number(event.currentTarget.value)); else event.currentTarget.value = String(project.storyboard.exportSettings.packageWarningThresholdMB); }} disabled={busy} /><span>MB</span></label>
         <div className="export-actions report-actions"><button className="button button-outline" onClick={() => void downloadScormReport("scorm2004")} disabled={busy}>Report 2004 <Download size={14} /></button><button className="button button-outline" onClick={() => void downloadScormReport("scorm12")} disabled={busy}>Report 1.2 <Download size={14} /></button></div>
       </section>
-      <section className="export-section"><h3>Storyboard backup</h3><p>Save or restore storyboard data and asset references. Media files are stored separately.</p><div className="export-actions"><button className="button button-outline" onClick={() => void exportStoryboard()} disabled={busy}><Download size={15} /> Download JSON</button><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`}><img src={restoreIcon} alt="" width="16" height="16" /> Restore JSON<input type="file" aria-label="Restore JSON" accept="application/json,.json" onChange={importStoryboard} disabled={busy} /></label></div><div className="export-actions"><button className="button button-accent" onClick={() => void exportProjectBackup()} disabled={busy}><Download size={15} /> Download portable backup</button><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`}><Upload size={15} /> Restore portable backup<input type="file" aria-label="Restore portable backup" accept="application/zip,.zip" onChange={importProjectBackup} disabled={busy} /></label></div></section>
-      <section className="export-section"><h3>Editable Word storyboard</h3><p>Download editable scene text, production notes, media references, and assessment specifications.</p><label className="word-answer-key"><input type="checkbox" checked={includeWordAnswerKey} onChange={(event) => setIncludeWordAnswerKey(event.target.checked)} disabled={busy} /><span>Include answer keys (authoring material)</span></label><button className="button button-outline" onClick={() => void exportWordStoryboard()} disabled={busy}><FileText size={15} /> Download Word document</button></section>
+      <section className="export-section"><h3>Chimera storyboard</h3><p>Save or restore the complete project, including media, review records, and history.</p><div className="export-actions"><button className="button button-outline" onClick={() => void exportStoryboard()} disabled={busy}><Download size={15} /> Download JSON</button><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`}><img src={restoreIcon} alt="" width="16" height="16" /> Restore JSON<input type="file" aria-label="Restore JSON" accept="application/json,.json" onChange={importStoryboard} disabled={busy} /></label></div><div className="export-actions"><button className="button button-accent" onClick={() => void exportProjectBackup()} disabled={busy}><Download size={15} /> Download Chimera storyboard</button><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`}><Upload size={15} /> Restore Chimera storyboard<input type="file" aria-label="Restore Chimera storyboard" accept="application/zip,.zip" onChange={importProjectBackup} disabled={busy} /></label></div></section>
+      <section className="export-section"><h3>Editable Word storyboard</h3><p>Choose a slide-like SME Master or the integrated Full storyboard.</p><label className="word-answer-key word-format-select"><span>Format</span><select aria-label="Word storyboard format" value={wordExportFormat} onChange={(event) => setWordExportFormat(event.target.value as "sme" | "full")} disabled={busy}><option value="sme">SME Master</option><option value="full">Full storyboard</option></select></label><label className="word-answer-key"><input type="checkbox" checked={includeWordAnswerKey} onChange={(event) => setIncludeWordAnswerKey(event.target.checked)} disabled={busy} /><span>Include answer keys (authoring material)</span></label><button className="button button-outline" onClick={() => void exportWordStoryboard()} disabled={busy}><FileText size={15} /> Download Word document</button></section>
       {assessmentItemCount >= 2 && <section className="export-section"><h3>Assessment test</h3><p>Export all authored questions together as a QTI 2.1 test.</p><button className="button button-outline" onClick={() => void exportAssessmentTest()} disabled={busy}><ClipboardList size={15} /> Download QTI test</button></section>}
       {error && <p className="export-error" role="alert">{error}</p>}{feedback && <p className="export-feedback" role="status">{feedback}</p>}{busy && <p role="status">Working…</p>}
     </EditorDialog>}
@@ -994,7 +1037,7 @@ export function App() {
     {showAccessibility && <AccessibilityView projectId={project.id} revision={project.storyboard.revision} scenes={scenes} assets={project.storyboard.assets} onClose={() => setShowAccessibility(false)} onProjectUpdated={applyProject} />}
     {showGoldenPath && <GoldenPathView walkthroughStatuses={Object.fromEntries(Object.entries(guides).map(([id, guide]) => [id, guide.controller.snapshot().status]))} onStartWalkthrough={() => startOnboarding()} onSelectWalkthrough={id => startOnboarding(id)} project={project} onClose={() => setShowGoldenPath(false)} onCreateProject={() => { setShowGoldenPath(false); setIsCreating(true); }} onOpenStoryboard={() => { setShowGoldenPath(false); setActiveView("storyboard"); }} onOpenMedia={() => { setShowGoldenPath(false); setActiveView("media"); }} onOpenAccessibility={() => { setShowGoldenPath(false); setShowAccessibility(true); }} onOpenPreview={() => { setShowGoldenPath(false); if (project.id) setShowPreview(true); }} onRunValidation={() => { setShowGoldenPath(false); setShowValidation(true); }} />}
     {showPreview && project.id && <CoursePreview project={project} onClose={() => setShowPreview(false)} canEnhance={permissions.canEnhance} />}
-    {visualSceneId && scenes.find(item => item.id === visualSceneId) && <SceneVisualEditor key={`${project.id}:${visualSceneId}`} project={project} scene={scenes.find(item => item.id === visualSceneId)!} onClose={() => setVisualSceneId(null)} onSave={saveVisualScene} onExtract={extractVisualScene} />}
+    {visualSceneId && scenes.find(item => item.id === visualSceneId) && <SceneVisualEditor key={`${project.id}:${visualSceneId}`} project={project} scene={scenes.find(item => item.id === visualSceneId)!} templates={templates} onClose={() => setVisualSceneId(null)} onSave={saveVisualScene} onExtract={extractVisualScene} />}
     {showAssessmentEditor && project.id && scene?.sceneType === "assessment" && <AssessmentEditor projectId={project.id} projectTitle={project.title} revision={project.storyboard.revision} scene={scene} scenes={scenes}
       onClose={() => setShowAssessmentEditor(false)}
       onProjectUpdated={applyProject}
