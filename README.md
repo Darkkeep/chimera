@@ -66,6 +66,10 @@ Use the [single-user deployment checklist](docs/single-user-deployment-checklist
 
 Editable Word storyboard export is available from **Export**. Choose **SME Master** for editable landscape scene pages styled after the visual slide template, or **Full storyboard** for the Multimedia Instructional template with the SME pages and detailed scene records included. Scene text, tables, and production details remain editable Word content; answer keys are excluded unless explicitly selected.
 
+## License
+
+Chimera is licensed under the [MIT License](LICENSE). Third-party components retain their own licenses; for example, the vendored `@guided-workflows/onboarding` package is ISC-licensed, with its license included in the package tarball.
+
 ## Verify changes
 
 From the repository root, run the backend suite with `python -m unittest discover -s backend/tests`, build with `npm --prefix frontend run build`, and run Chromium workflows with `npm run test:onboarding -- --project chromium`. `npm run test:management` targets My Work. The browser suites use temporary workspaces and inert AI responses, not real provider credentials. Hosted HTTPS verification remains `npm run test:auth` after the frontend build.

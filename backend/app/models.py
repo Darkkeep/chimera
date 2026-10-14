@@ -374,6 +374,51 @@ class ReferenceResource(BaseModel):
     versions: list[ReferenceResourceVersion]
 
 
+class CourseDraftRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=4000)
+    resourceIds: list[str] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode="after")
+    def validate_resource_ids(self) -> "CourseDraftRequest":
+        if len(set(self.resourceIds)) != len(self.resourceIds):
+            raise ValueError("Reference resource IDs must be unique")
+        return self
+
+
+class SceneDraftRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=3000)
+
+
+class GeneratedSceneDraft(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    sceneType: Literal["content", "title", "assessment", "media", "interaction", "summary"] = "content"
+    extractedText: list[str] = Field(default_factory=list, max_length=40)
+    actionDescription: str = Field(default="", max_length=5000)
+    narration: str = Field(default="", max_length=10000)
+    notes: str = Field(default="", max_length=10000)
+    required: bool = True
+
+
+class CourseContentDraft(BaseModel):
+    scenes: list[GeneratedSceneDraft] = Field(min_length=1, max_length=20)
+
+
+class SceneContentDraft(GeneratedSceneDraft):
+    visualLayout: SceneLayout
+
+    @model_validator(mode="after")
+    def validate_visual_layout(self) -> "SceneContentDraft":
+        layout = self.visualLayout
+        if not layout.enabled or layout.width != 1280 or layout.height != 720 or layout.backgroundColor.lower() == "#ffffff" or len(layout.elements) > 24:
+            raise ValueError("Generated scene layouts must use an enabled 1280 by 720 canvas, a designed background, and at most 24 elements")
+        for element in layout.elements:
+            if element.kind != "text" or not element.text.strip():
+                raise ValueError("Generated scene layouts may contain non-empty text elements only")
+            if element.x < 0 or element.y < 0 or element.x + element.width > layout.width or element.y + element.height > layout.height:
+                raise ValueError("Generated scene text elements must fit within the canvas")
+        return self
+
+
 class EnhancementJobCreate(BaseModel):
     scope: Literal["selected-scenes", "whole-course"]
     sceneIds: list[str] = Field(default_factory=list, max_length=500)
@@ -565,6 +610,7 @@ SceneUpdate.model_rebuild()
 class ExtractedAsset(BaseModel):
     id: str
     kind: Literal["image", "audio"]
+    role: Literal["content", "background"] = "content"
     filename: str
     contentType: str
     sizeBytes: int

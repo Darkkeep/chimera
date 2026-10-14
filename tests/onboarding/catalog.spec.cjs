@@ -188,7 +188,7 @@ test('templates upload, edit, replace and assign; PowerPoint import saves real s
   await page.getByLabel('Upload PPTX template', { exact: true }).setInputFiles({ name: 'practice.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer: deck }); await finish(page);
   await choose(page, 'Edit template details'); await page.getByLabel('Template name', { exact: true }).fill(editedName); await page.getByRole('button', { name: 'Save template', exact: true }).click(); await finish(page);
   await choose(page, 'Replace a template source'); await page.getByRole('article').filter({ hasText: editedName }).getByLabel('Replace template PowerPoint').setInputFiles({ name: 'replacement.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer: deck }); await finish(page);
-  await choose(page, 'Assign a template to a scene'); await page.getByRole('combobox', { name: /^Scene layout/ }).selectOption('template');
+  await choose(page, 'Assign a template to a scene'); await page.getByRole('combobox', { name: /^Rendering mode/ }).selectOption('template');
   await page.getByRole('tab', { name: 'Details', exact: true }).click();
   const select = page.getByRole('dialog').getByRole('combobox', { name: 'Template', exact: true }); const templateId = await select.locator('option').nth(1).getAttribute('value');
   await select.selectOption(templateId); await page.getByRole('button', { name: 'Save scene', exact: true }).click(); await finish(page);

@@ -15,6 +15,7 @@ from PIL import Image, UnidentifiedImageError
 from pptx import Presentation
 
 from .ingest import extract_presentation
+from .content_generation import generate_course_draft, generate_scene_draft
 from .auth import resolve_actor_context
 from .backup import build_project_archive, restore_project_archive
 from .enhancement_jobs import cancel_enhancement_job, preview_enhancement_submission, recover_enhancement_jobs, retry_enhancement_job, start_enhancement_job
@@ -26,9 +27,9 @@ from .references import SUPPORTED_REFERENCE_EXTENSIONS, extract_reference_passag
 from .render import render_slides
 from .qti import assessment_item_xml, assessment_test_package
 from .scorm import persist_scorm_12_build, persist_scorm_build, read_scorm_report
-from .storage import ROOT, EnhancementProposalConflict, StoryboardRevisionConflict, add_project_asset, add_review_reply, approve_generated_candidate, create_enhancement_job, create_enhancement_proposal, create_media_generation_job, create_project, create_review_comment, create_scene, create_template, decide_enhancement_proposal, decide_review_comment, delete_scene, list_enhancement_jobs, list_enhancement_proposals, list_generated_candidates, list_media_generation_jobs, list_projects, list_reference_resources, list_review_comments, list_templates, project_path, read_enhancement_job, read_generated_candidate, read_media_generation_job, read_project, read_template, persist_imported_assets, persist_slide_previews, reorder_scenes, replace_storyboard, replace_template_source, save_reference_resource, slugify, storyboard_transaction, update_from_import, update_project_asset_attribution, update_project_completion_settings, update_project_export_settings, update_generated_candidate, update_media_generation_job, update_scene, update_template, validate_visual_assets, write_project_metadata, write_storyboard, template_path
+from .storage import ROOT, EnhancementProposalConflict, StoryboardRevisionConflict, add_project_asset, add_review_reply, approve_generated_candidate, create_enhancement_job, create_enhancement_proposal, create_media_generation_job, create_project, create_review_comment, create_scene, create_scenes, create_template, decide_enhancement_proposal, decide_review_comment, delete_scene, list_enhancement_jobs, list_enhancement_proposals, list_generated_candidates, list_media_generation_jobs, list_projects, list_reference_resources, list_review_comments, list_templates, project_path, read_enhancement_job, read_generated_candidate, read_media_generation_job, read_project, read_template, persist_imported_assets, persist_slide_previews, reorder_scenes, replace_storyboard, replace_template_source, save_reference_resource, slugify, storyboard_transaction, update_from_import, update_project_asset_attribution, update_project_completion_settings, update_project_export_settings, update_generated_candidate, update_media_generation_job, update_scene, update_template, validate_visual_assets, write_project_metadata, write_storyboard, template_path
 from .validation import validate_project
-from .models import ProductionStageUpdate
+from .models import CourseDraftRequest, CourseContentDraft, SceneDraftRequest, SceneContentDraft, ProductionStageUpdate
 from .models import TrashedProject
 from .storage import update_project_production_stage
 from .storage import now_iso
@@ -68,6 +69,8 @@ ROUTE_ACTIONS = {
     "post_generated_candidate_rejection": "media.candidate.manage", "post_generated_candidate_regeneration": "media.job.create",
     "get_generated_candidate_asset": "project.view", "post_enhancement_job_preview": "enhancement.job.create",
     "post_enhancement_job": "enhancement.job.create", "get_enhancement_job": "project.view",
+    "generate_course_content_draft": "enhancement.job.create", "generate_scene_content_draft": "enhancement.job.create",
+    "apply_course_content_draft": "enhancement.job.create",
     "post_enhancement_job_cancel": "enhancement.job.manage", "post_enhancement_job_retry": "enhancement.job.manage",
     "export_qti_assessment_item": "project.export", "export_qti_assessment_test": "project.export",
     "export_scorm_2004": "project.export", "export_scorm_12": "project.export", "get_scorm_report": "project.export",
@@ -90,6 +93,8 @@ def get_authorization_policy() -> AuthorizationPolicy:
 
 def _hosted_request_action(request: Request) -> str:
     path = request.url.path
+    if "/content-drafts/" in path or path.endswith("/content-draft"):
+        return "enhancement.job.create"
     if path.endswith("/trash") and request.method == "POST":
         return "project.delete"
     if path.endswith("/restore") and request.method == "POST":
@@ -1393,6 +1398,52 @@ def post_scene(project_id: str, data: SceneCreate, if_match: Annotated[str | Non
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
+@app.post("/api/projects/{project_id}/content-drafts/course", response_model=CourseContentDraft)
+def generate_course_content_draft(project_id: str, data: CourseDraftRequest) -> CourseContentDraft:
+    try:
+        project = read_project(project_id)
+        return generate_course_draft(project, data.prompt, data.resourceIds)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project or selected course reference not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.post("/api/projects/{project_id}/content-drafts/course/apply", response_model=ProjectDetail)
+def apply_course_content_draft(project_id: str, data: CourseContentDraft, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
+    expected_revision = _expected_revision(if_match)
+    if expected_revision is None:
+        raise HTTPException(status_code=428, detail="An If-Match storyboard revision is required")
+    try:
+        return create_scenes(project_id, [SceneCreate(**scene.model_dump()) for scene in data.scenes], expected_revision)
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found or a referenced template is unavailable") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.post("/api/projects/{project_id}/scenes/{scene_id}/content-draft", response_model=SceneContentDraft)
+def generate_scene_content_draft(project_id: str, scene_id: str, data: SceneDraftRequest) -> SceneContentDraft:
+    try:
+        project = read_project(project_id)
+        scene = next((item for item in project.storyboard.scenes if item.id == scene_id), None)
+        if scene is None:
+            raise HTTPException(status_code=404, detail="Scene not found")
+        return generate_scene_draft(project, scene, data.prompt)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
 def _native_scene_layout(scene: Scene) -> SceneLayout:
     lines = [text for text in [scene.title, *scene.extractedText] if text.strip()]
     height = min(10000, max(720, 170 + len(lines) * 96))
@@ -1491,7 +1542,7 @@ def patch_scene(project_id: str, scene_id: str, data: SceneUpdate, if_match: Ann
         template_changed = requested_template != scene.templateId
         if requested_mode == "template" and (mode_changed or template_changed or scene.visualLayout is None):
             return _apply_template_scene_layout(project_id, scene_id, data, expected)
-        if (mode_changed and requested_mode == "native") or (requested_mode == "native" and scene.visualLayout is None):
+        if (mode_changed and requested_mode == "native") or (requested_mode == "native" and scene.visualLayout is None and data.visualLayout is None):
             native_scene = scene.model_copy(update={
                 "title": data.title if "title" in data.model_fields_set else scene.title,
                 "extractedText": data.extractedText if "extractedText" in data.model_fields_set else scene.extractedText,

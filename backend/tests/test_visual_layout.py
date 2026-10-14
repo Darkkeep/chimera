@@ -1,8 +1,10 @@
 import unittest
 import io
 import tempfile
+import zipfile
 from copy import deepcopy
 from pathlib import Path
+from xml.etree import ElementTree
 
 from pydantic import ValidationError
 from PIL import Image
@@ -16,6 +18,7 @@ from pptx.oxml.xmlchemy import OxmlElement
 
 from backend.app.models import Scene, SceneElement, SceneLayout
 from backend.app.ingest import extract_presentation
+from backend.app.pptx_layout import extract_master_layout
 from backend.app import main, storage
 from backend.app.models import ProjectCreate, SceneUpdate
 from unittest.mock import patch
@@ -23,6 +26,101 @@ from backend.app.scorm import PLAYER_JS, _scorm_12_player
 
 
 class VisualLayoutTests(unittest.TestCase):
+    def test_import_deduplicates_master_backdrops_and_includes_unused_masters(self):
+        deck = Presentation()
+        slide = deck.slides.add_slide(deck.slide_layouts[6])
+        master = deck.slide_masters[0]
+        master.background.fill.solid()
+        master.background.fill.fore_color.rgb = RGBColor(12, 34, 56)
+        artwork = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(3), Inches(1))
+        artwork.text = "Brand & <identity>"
+        master.shapes._spTree.append(deepcopy(artwork._element))
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "masters.pptx"
+            deck.save(source)
+            with zipfile.ZipFile(source) as archive:
+                entries = {name: archive.read(name) for name in archive.namelist()}
+            presentation_xml = ElementTree.fromstring(entries["ppt/presentation.xml"])
+            relationships = ElementTree.fromstring(entries["ppt/_rels/presentation.xml.rels"])
+            content_types = ElementTree.fromstring(entries["[Content_Types].xml"])
+            for number in (2, 3):
+                master_xml = ElementTree.fromstring(entries["ppt/slideMasters/slideMaster1.xml"])
+                master_xml.find(qn("p:cSld")).set("name", f"Copied master {number}")
+                if number == 3:
+                    master_xml.find(".//" + qn("p:bg") + "//" + qn("a:srgbClr")).set("val", "AA5500")
+                part_name = f"ppt/slideMasters/slideMaster{number}.xml"
+                entries[part_name] = ElementTree.tostring(master_xml)
+                entries[f"ppt/slideMasters/_rels/slideMaster{number}.xml.rels"] = entries["ppt/slideMasters/_rels/slideMaster1.xml.rels"]
+                ElementTree.SubElement(relationships, "{http://schemas.openxmlformats.org/package/2006/relationships}Relationship", {
+                    "Id": f"rIdMaster{number}", "Type": RT.SLIDE_MASTER, "Target": f"slideMasters/slideMaster{number}.xml",
+                })
+                ElementTree.SubElement(presentation_xml.find(qn("p:sldMasterIdLst")), qn("p:sldMasterId"), {
+                    "id": str(2147483648 + number), qn("r:id"): f"rIdMaster{number}",
+                })
+                ElementTree.SubElement(content_types, "{http://schemas.openxmlformats.org/package/2006/content-types}Override", {
+                    "PartName": "/" + part_name, "ContentType": "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml",
+                })
+            entries["ppt/presentation.xml"] = ElementTree.tostring(presentation_xml)
+            entries["ppt/_rels/presentation.xml.rels"] = ElementTree.tostring(relationships)
+            entries["[Content_Types].xml"] = ElementTree.tostring(content_types)
+            with zipfile.ZipFile(source, "w") as archive:
+                for name, content in entries.items():
+                    archive.writestr(name, content)
+            self.assertEqual(len(Presentation(source).slide_masters), 3)
+            scenes, assets = extract_presentation(source, Path(folder))
+            backgrounds = [asset for asset in assets if asset.role == "background"]
+            self.assertEqual(len(backgrounds), 2)
+            self.assertEqual([asset.filename for asset in backgrounds], ["Master background 1.svg", "Master background 3.svg"])
+            self.assertTrue(all(asset.id not in scenes[0].imageAssets for asset in backgrounds))
+            for asset in backgrounds:
+                content = (Path(folder) / asset.path).read_bytes()
+                self.assertIn(b"Brand &amp; &lt;identity&gt;", content)
+                self.assertNotIn(b"Click to edit", content)
+                ElementTree.fromstring(content)
+            self.assertIn(b"#AA5500", (Path(folder) / backgrounds[1].path).read_bytes())
+            _, repeated_assets = extract_presentation(source, Path(folder))
+            self.assertEqual([asset.id for asset in backgrounds], [asset.id for asset in repeated_assets if asset.role == "background"])
+
+    def test_master_backdrop_embeds_picture_bytes_and_vector_artwork(self):
+        deck = Presentation()
+        slide = deck.slides.add_slide(deck.slide_layouts[6])
+        image = io.BytesIO()
+        Image.new("RGB", (20, 20), "blue").save(image, format="PNG")
+        picture = slide.shapes.add_picture(io.BytesIO(image.getvalue()), Inches(1), Inches(1), Inches(2))
+        master = deck.slide_masters[0]
+        image_xml = deepcopy(picture._element)
+        blip = image_xml.find(".//" + qn("a:blip"))
+        image_part = slide.part.rels[blip.get(qn("r:embed"))].target_part
+        blip.set(qn("r:embed"), master.part.relate_to(image_part, RT.IMAGE))
+        master.shapes._spTree.append(image_xml)
+        shape = slide.shapes.add_shape(MSO_SHAPE.PARALLELOGRAM, Inches(4), Inches(1), Inches(2), Inches(2))
+        master.shapes._spTree.append(deepcopy(shape._element))
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "artwork.pptx"
+            deck.save(source)
+            _, assets = extract_presentation(source, Path(folder))
+            background = next(asset for asset in assets if asset.role == "background")
+            content = (Path(folder) / background.path).read_bytes()
+        self.assertIn(b"data:image/png;base64,", content)
+        self.assertIn(b"polygon", content)
+        self.assertNotIn(b"/api/", content)
+
+    def test_master_only_layout_excludes_placeholders_layout_and_slide_content(self):
+        deck = Presentation()
+        slide = deck.slides.add_slide(deck.slide_layouts[6])
+        master = slide.slide_layout.slide_master
+        master.background.fill.solid()
+        master.background.fill.fore_color.rgb = RGBColor(12, 34, 56)
+        artwork = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(3), Inches(1))
+        artwork.text = "Master artwork"
+        master.shapes._spTree.append(deepcopy(artwork._element))
+        artwork.text = "Slide content"
+        slide.slide_layout.shapes._spTree.append(deepcopy(artwork._element))
+        layout = extract_master_layout(deck, master, lambda relationship: self.fail("No images expected"))
+        self.assertEqual(layout.backgroundColor, "#0C2238")
+        self.assertEqual([element.text for element in layout.elements], ["Master artwork"])
+        self.assertTrue(all(element.source == "master" for element in layout.elements))
+
     def test_preset_shapes_and_zero_extent_connectors_are_extracted_as_vectors(self):
         deck = Presentation()
         slide = deck.slides.add_slide(deck.slide_layouts[6])
@@ -71,7 +169,8 @@ class VisualLayoutTests(unittest.TestCase):
             scenes, assets = extract_presentation(source, Path(folder))
         layout = scenes[0].visualLayout
         vector_shapes = [element for element in layout.elements if element.kind == "shape"]
-        self.assertEqual(len(assets), 0)
+        self.assertEqual(len([asset for asset in assets if asset.role == "content"]), 0)
+        self.assertEqual(len([asset for asset in assets if asset.role == "background"]), 1)
         self.assertEqual(len(vector_shapes), 5)
         self.assertIn("polygon", vector_shapes[0].shapeSvg)
         self.assertIn("#1E78B4", vector_shapes[0].shapeSvg.upper())
@@ -138,7 +237,7 @@ class VisualLayoutTests(unittest.TestCase):
             scenes, assets = extract_presentation(source, Path(folder))
         layout = scenes[0].visualLayout
         self.assertEqual(layout.backgroundColor, "#0C2238")
-        self.assertEqual(len(assets), 1)
+        self.assertEqual(len([asset for asset in assets if asset.role == "content"]), 1)
         self.assertEqual(len([element for element in layout.elements if element.kind == "image"]), 3)
         self.assertTrue(layout.elements[0].locked)
         text = next(element for element in layout.elements if element.kind == "text")
@@ -159,7 +258,7 @@ class VisualLayoutTests(unittest.TestCase):
             source = Path(folder) / "deck.pptx"
             deck.save(source)
             scenes, assets = extract_presentation(source, Path(folder))
-        self.assertEqual(len(assets), 1)
+        self.assertEqual(len([asset for asset in assets if asset.role == "content"]), 1)
         self.assertEqual(scenes[0].imageAssets, [assets[0].id])
         self.assertEqual(scenes[1].imageAssets, [assets[0].id])
         self.assertEqual([element.assetId for element in scenes[0].visualLayout.elements if element.kind == "image"], [assets[0].id, assets[0].id])

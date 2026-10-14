@@ -21,7 +21,7 @@ The saved implementation was reapplied to the current working tree, including it
 - Enhancement references, submission previews, background jobs, and broader proposal review.
 - Generated image/narration candidate controls and explicit approval.
 - Scene discussion during playback.
-- Portable project backup/restore.
+- Chimera storyboard archive/restore.
 - My Work, readiness indicators, local identity/audit foundations, scene deletion, and revision checks.
 - The export/enhancement build plan and deployment checklist.
 
@@ -39,10 +39,10 @@ The recovered changes remain uncommitted in the working tree. They must be inclu
 
 - Backend: `python -m unittest discover -s backend/tests -v` — **67 tests passed**.
 - Frontend: `npm run build` — **passed**, including TypeScript and the Vite production bundle.
-- Browser: restored Word/backup controls, reference upload and submission preview, proposal editing/acceptance, media candidate controls, scene commenting/resolution, My Work, and assessment playback were inspected or exercised against isolated demonstration data.
+- Browser: restored Word/storyboard archive controls, reference upload and submission preview, proposal editing/acceptance, media candidate controls, scene commenting/resolution, My Work, and assessment playback were inspected or exercised against isolated demonstration data.
 - The illustrated guide was refreshed from the recovered interface. No real authoring projects were modified during browser verification.
-- Isolated API smoke check: Word document downloaded (43,398 bytes), portable backup downloaded (46,328 bytes), and backup manifest validated. The SCORM smoke build was correctly blocked by the demonstration assets' unfinished attribution.
-- The existing backend on port 8000 advertised both recovered Word and portable-backup routes after restoration.
+- Isolated API smoke check: Word document downloaded (43,398 bytes), Chimera storyboard downloaded (46,328 bytes), and its manifest validated. The SCORM smoke build was correctly blocked by the demonstration assets' unfinished attribution.
+- The existing backend on port 8000 advertised both recovered Word and storyboard archive routes after restoration.
 
 The initial sandboxed test/build attempts encountered Windows temporary-directory and subprocess permission errors. The same checks passed with the required permissions; no source workaround was introduced for those environment errors.
 

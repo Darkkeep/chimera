@@ -130,6 +130,15 @@ button:disabled, .button.disabled { opacity: .48; cursor: not-allowed; }
 .project-design-documents li span { min-width: 0; overflow-wrap: anywhere; }
 .project-design-documents-status { margin: 12px 0 0; }
 .notice { margin: 12px 20px 0; align-items: center; gap: 15px; line-height: 1.6; border-radius: 5px; }
+.course-draft-prompt { display: grid; gap: 6px; color: var(--ink); font-size: 12px; font-weight: 600; }
+.course-draft-prompt textarea, .course-draft-scene :is(input:not([type="checkbox"]), textarea) { width: 100%; min-width: 0; box-sizing: border-box; padding: 9px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--theme-input, #fff); color: var(--ink); font: 400 13px Manrope, sans-serif; }
+.course-draft-prompt textarea, .course-draft-scene textarea { resize: vertical; line-height: 1.5; }
+.course-draft-review { display: grid; gap: 14px; max-height: min(72dvh, 740px); overflow-y: auto; }
+.course-draft-scenes { display: grid; gap: 10px; max-height: 42dvh; overflow-y: auto; padding-right: 4px; }
+.course-draft-scene { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 4px; }
+.course-draft-scene > label { display: grid; gap: 6px; min-width: 0; color: var(--ink); font-size: 12px; font-weight: 600; }
+.course-draft-scene > .course-draft-include { display: flex; align-items: center; gap: 8px; }
+.course-draft-include input { width: 16px; height: 16px; accent-color: var(--accent); }
 .success-notice { border-color: #c5decf; background: #eff8f2; color: #326146; }
 .modal-backdrop { z-index: 40; padding: 16px; background: #10243e99; }
 .modal { border-radius: 8px; padding: 26px; box-shadow: 0 20px 70px #10243e33; max-height: calc(100dvh - 32px); overflow-y: auto; }

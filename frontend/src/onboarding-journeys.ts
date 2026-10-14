@@ -12,7 +12,7 @@ type Task = [string, string, string, string, string?, ((c: Context) => boolean)?
 const tasks: Task[] = [
   ['workspace', 'Choose a project', 'workspace.project', 'Use the project selector to open a course. Walkthrough progress is separate for each project. Check the selected course, then Next.', undefined, always],
   ['import-deck', 'Import PowerPoint', 'storyboard.import', 'Choose a readable PPTX with Import PowerPoint. Slides become scenes with text and speaker notes. Previews require LibreOffice. Wait for the import to finish.', 'deck.imported'],
-  ['edit-scene', 'Edit scene content and settings', 'scene.edit', 'Review title, on-screen text, action description, speaker notes, scene type, layout and required status in Details. Choose Save scene.', 'scene.updated', scene],
+  ['edit-scene', 'Edit scene content and settings', 'scene.edit', 'Review title, on-screen text, action description, speaker notes, scene type, rendering mode and required status in Details. Choose Save scene.', 'scene.updated', scene],
   ['order-scenes', 'Reorder scenes', 'storyboard.list', 'Use a scene’s up/down arrows or drag grip. Wait for the new order to save. You need at least two scenes.', 'scene.reordered', c => Number(c.sceneCount) > 1],
   ['delete-scene', 'Delete a scene', 'storyboard.list', 'Practice only on expendable content. The trash button opens a confirmation; deletion can clear remediation links. Cancel keeps the scene. Skip if you do not want to delete.', 'scene.deleted', scene],
   ['upload-media', 'Upload images or audio', 'media.library', 'Choose Add media and a supported image or audio file. The file is added to the selected project library; attachment is a separate action.', 'media.uploaded'],
@@ -23,7 +23,7 @@ const tasks: Task[] = [
   ['upload-template', 'Upload a scene template', 'templates.library', 'Choose Upload PPTX template and a readable presentation. Wait for the reusable template to appear in the library.', 'template.uploaded', always],
   ['edit-template', 'Edit template details', 'templates.edit', 'Edit the template name and description, then Save template.', 'template.saved', c => Number(c.templateCount) > 0],
   ['replace-template', 'Replace a template source', 'templates.library', 'Use Replace PPTX on the intended template and select its replacement. Existing scene references keep the template ID.', 'template.replaced', c => Number(c.templateCount) > 0],
-  ['use-template', 'Assign a template to a scene', 'scene.edit', 'In Details, set Scene layout to Template and choose a template, then choose Save scene. The other layouts are Fidelity, Hybrid and Native.', 'scene.template-saved', c => scene(c) && Number(c.templateCount) > 0],
+  ['use-template', 'Assign a template to a scene', 'scene.edit', 'In Details, set Rendering mode to Template and choose a template, then choose Save scene. The other modes are Fidelity, Hybrid and Native.', 'scene.template-saved', c => scene(c) && Number(c.templateCount) > 0],
   ...([
     ['single-choice', 'Single-choice question', 'Enter at least two choices and select the one correct answer.'],
     ['multiple-response', 'Multiple-answer question', 'Enter choices and select every correct answer.'],

@@ -534,6 +534,32 @@ def create_scene(project_id: str, data: SceneCreate, expected_revision: int | No
     return read_project(project_id)
 
 
+def create_scenes(project_id: str, scenes: list[SceneCreate], expected_revision: int) -> ProjectDetail:
+    path = project_path(project_id)
+    current = read_project(project_id)
+    created_scenes = []
+    for data in scenes:
+        validate_scene_template(data.layoutMode, data.templateId)
+        created_scenes.append(Scene(
+            id=f"scene-{uuid.uuid4().hex[:8]}",
+            title=data.title,
+            sceneType=data.sceneType,
+            extractedText=data.extractedText,
+            actionDescription=data.actionDescription,
+            layoutMode=data.layoutMode,
+            templateId=data.templateId,
+            required=data.required,
+            audioRequired=data.audioRequired,
+            narration=data.narration,
+            notes=data.notes,
+        ))
+    storyboard = current.storyboard.model_copy(update={"scenes": [*current.storyboard.scenes, *created_scenes]})
+    write_storyboard(path, storyboard, expected_revision)
+    metadata = {"id": project_id, "title": current.title, "updatedAt": now_iso()}
+    write_project_metadata(path, metadata)
+    return read_project(project_id)
+
+
 def validate_visual_assets(scene: Scene, assets: dict[str, ExtractedAsset]) -> None:
     references = {scene.backgroundAsset} if scene.backgroundAsset else set()
     if scene.visualLayout:
