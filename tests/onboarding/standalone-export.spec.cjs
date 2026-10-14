@@ -68,7 +68,7 @@ test('standalone export runs directly from an extracted local folder without net
   const archivePath = testInfo.outputPath('course.zip');
   const extractedPath = testInfo.outputPath('local course');
   await download.saveAs(archivePath);
-  const python = path.resolve(process.platform === 'win32' ? '.venv/Scripts/python.exe' : '.venv/bin/python');
+  const python = require('./python.cjs');
   execFileSync(python, ['-m', 'zipfile', '-e', archivePath, extractedPath]);
   const context = await browser.newContext({
     offline: !(process.platform === 'win32' && testInfo.project.name === 'webkit'),

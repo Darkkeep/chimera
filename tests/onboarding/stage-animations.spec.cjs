@@ -2,6 +2,7 @@ const { test, expect } = require('@playwright/test');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
+const python = require('./python.cjs');
 
 test('animation authoring persists phases and Preview plays the scene timeline accessibly', async ({ page, request }, testInfo) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -107,7 +108,7 @@ for (const profile of ['scorm-2004', 'scorm-12']) {
     await fs.mkdir(directory, { recursive: true });
     const archivePath = testInfo.outputPath('course.zip');
     await fs.writeFile(archivePath, await response.body());
-    execFileSync(path.resolve(process.platform === 'win32' ? '.venv/Scripts/python.exe' : '.venv/bin/python'), ['-m', 'zipfile', '-e', archivePath, directory]);
+    execFileSync(python, ['-m', 'zipfile', '-e', archivePath, directory]);
     await page.route('http://chimera-player.test/**', async route => {
       const filename = new URL(route.request().url()).pathname.slice(1) || 'index.html';
       if (!['index.html', 'storyboard.json', 'player.js'].includes(filename)) return route.abort();

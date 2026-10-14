@@ -2,6 +2,7 @@ const { test, expect } = require('@playwright/test');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
+const python = require('./python.cjs');
 
 for (const profile of ['scorm-12', 'scorm-2004']) {
   for (const type of ['single-choice', 'matching', 'short-answer']) {
@@ -21,7 +22,7 @@ for (const profile of ['scorm-12', 'scorm-2004']) {
       const archive = testInfo.outputPath('retry.zip');
       const directory = testInfo.outputPath('retry');
       await fs.writeFile(archive, await response.body());
-      execFileSync(path.resolve(process.platform === 'win32' ? '.venv/Scripts/python.exe' : '.venv/bin/python'), ['-m', 'zipfile', '-e', archive, directory]);
+      execFileSync(python, ['-m', 'zipfile', '-e', archive, directory]);
       await page.route('http://retry.test/**', async route => {
         const file = new URL(route.request().url()).pathname.slice(1) || 'index.html';
         expect(['index.html', 'player.js', 'storyboard.json'].includes(file)).toBeTruthy();

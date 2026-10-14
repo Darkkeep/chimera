@@ -2,6 +2,7 @@ const { test, expect } = require('@playwright/test');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
+const python = require('./python.cjs');
 
 for (const profile of ['scorm-12', 'scorm-2004']) {
   test(`${profile} asks before restoring or resetting learner progress`, async ({ page, request }, testInfo) => {
@@ -15,7 +16,7 @@ for (const profile of ['scorm-12', 'scorm-2004']) {
     const directory = testInfo.outputPath('course');
     await fs.mkdir(directory, { recursive: true });
     await fs.writeFile(archive, await response.body());
-    execFileSync(path.resolve(process.platform === 'win32' ? '.venv/Scripts/python.exe' : '.venv/bin/python'), ['-m', 'zipfile', '-e', archive, directory]);
+    execFileSync(python, ['-m', 'zipfile', '-e', archive, directory]);
     await page.route('http://resume.test/**', async route => {
       const filename = new URL(route.request().url()).pathname.slice(1) || 'index.html';
       if (!['index.html', 'player.js', 'storyboard.json'].includes(filename)) return route.abort();
