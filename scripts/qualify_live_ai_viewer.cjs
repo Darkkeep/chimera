@@ -50,7 +50,7 @@ const path = require('node:path');
     await expect(incorrect).toContainText('Score 0%');
     await incorrect.getByRole('button', { name: 'Close feedback', exact: true }).click();
     await preview.getByLabel('False', { exact: true }).check();
-    await preview.getByRole('button', { name: 'Try again', exact: true }).click();
+    await preview.getByRole('button', { name: 'Check answer', exact: true }).click();
     const correct = page.getByRole('dialog', { name: 'Correct', exact: true });
     await expect(correct).toContainText('Score 100%');
     await correct.getByRole('button', { name: 'Close feedback', exact: true }).click();

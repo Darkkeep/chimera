@@ -52,6 +52,10 @@ test('all assessment types answer inside the Stage without saved layouts', async
       await expect(preview.locator('.assessment-stage-region')).toContainText('multiple-response question');
       await preview.getByRole('button', { name: 'Return to question', exact: true }).click();
       await expect(question).toContainText('single-choice question');
+      await question.getByRole('button', { name: 'Try again', exact: true }).click();
+      await expect(question.getByLabel('Start operation', { exact: true })).not.toBeChecked();
+      await expect(question.getByRole('button', { name: 'Check answer', exact: true })).toBeDisabled();
+      await expect(question.getByLabel('Inspect equipment', { exact: true })).toBeFocused();
       await question.getByLabel('Inspect equipment', { exact: true }).check();
     }
     if (item.type === 'multiple-response') {
@@ -69,7 +73,7 @@ test('all assessment types answer inside the Stage without saved layouts', async
     }
     if (item.type === 'drag-drop') await question.getByRole('combobox', { name: 'Match for Inspect equipment', exact: true }).selectOption('target');
     if (item.type === 'short-answer') await question.getByRole('textbox', { name: 'Your answer', exact: true }).fill('Inspect');
-    await question.getByRole('button', { name: item.type === 'single-choice' ? 'Try again' : 'Check answer', exact: true }).click();
+    await question.getByRole('button', { name: 'Check answer', exact: true }).click();
     const feedback = page.getByRole('dialog', { name: 'Correct', exact: true });
     await expect(feedback).toContainText('Score 100%');
     await feedback.getByRole('button', { name: 'Close feedback', exact: true }).click();

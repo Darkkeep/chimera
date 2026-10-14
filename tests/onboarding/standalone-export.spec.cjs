@@ -120,8 +120,11 @@ test('standalone export runs directly from an extracted local folder without net
     await expect(localPage.locator('#scene-title')).toHaveText('Welcome locally');
     await localPage.getByRole('button', { name: 'Return to question', exact: true }).click();
     await expect(localPage.locator('#scene-title')).toHaveText('Knowledge check');
-    await localPage.getByLabel('True', { exact: true }).check();
     await localPage.getByRole('button', { name: 'Try again', exact: true }).click();
+    await expect(localPage.getByLabel('False', { exact: true })).not.toBeChecked();
+    await expect(localPage.getByRole('button', { name: 'Check answer', exact: true })).toBeDisabled();
+    await localPage.getByLabel('True', { exact: true }).check();
+    await localPage.getByRole('button', { name: 'Check answer', exact: true }).click();
     const feedback = localPage.getByRole('dialog', { name: 'Correct', exact: true });
     await expect(feedback).toContainText('Score: 100%');
     await expect(feedback.getByRole('button', { name: 'Close feedback', exact: true })).toBeFocused();

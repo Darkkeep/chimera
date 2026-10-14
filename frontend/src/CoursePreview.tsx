@@ -255,6 +255,11 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
     const current = assessmentResults[scene.id] ?? createEmptyAssessmentResult(item, settings);
     const hasResponse = current.response.length > 0 || Object.keys(current.matches).length > 0 || current.textResponse.trim().length > 0;
     if (!hasResponse || current.isCorrect === true || current.attempts >= settings.maxAttempts) return;
+    if (current.isCorrect === false) {
+      setAssessmentResults(results => ({ ...results, [scene.id]: { ...createEmptyAssessmentResult(item, settings), attempts: current.attempts } }));
+      requestAnimationFrame(() => document.querySelector<HTMLElement>('.course-preview-assessment fieldset input, .course-preview-assessment fieldset select, .course-preview-assessment fieldset button')?.focus());
+      return;
+    }
     setAssessmentResults((results) => ({
       ...results,
       [scene.id]: {
@@ -376,7 +381,7 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
               })()}
               {item.type === "short-answer" && <label className="course-preview-short-answer">Your answer<input type="text" maxLength={1000} value={result.textResponse} onChange={(event) => setAssessmentResults((current) => ({ ...current, [scene.id]: { ...(current[scene.id] ?? createEmptyAssessmentResult(item, settings)), textResponse: event.target.value, isCorrect: null } }))} /></label>}
             </fieldset>
-            <div className="course-preview-assessment-actions"><button type="button" className="course-preview-nav-button next" onClick={() => submitAssessment(item)} disabled={!(result.response.length || Object.keys(result.matches).length || result.textResponse.trim()) || assessmentPassed || attemptsExhausted}>{assessmentPassed ? "Passed" : attemptsExhausted ? "Attempts used" : result.attempts ? "Try again" : "Check answer"}</button>{result.attempts > 0 && result.isCorrect !== null && <button type="button" data-view-feedback className="course-preview-nav-button" onClick={() => setFeedbackSceneId(scene.id)}>View feedback</button>}</div>
+            <div className="course-preview-assessment-actions"><button type="button" className="course-preview-nav-button next" onClick={() => submitAssessment(item)} disabled={!(result.response.length || Object.keys(result.matches).length || result.textResponse.trim()) || assessmentPassed || attemptsExhausted}>{assessmentPassed ? "Passed" : attemptsExhausted ? "Attempts used" : result.isCorrect === false ? "Try again" : "Check answer"}</button>{result.attempts > 0 && result.isCorrect !== null && <button type="button" data-view-feedback className="course-preview-nav-button" onClick={() => setFeedbackSceneId(scene.id)}>View feedback</button>}</div>
           </section>;
         })()} />}
         {scene.audioAssets.map((audioId) => {

@@ -35,3 +35,17 @@ Use a graded SCORM activity and a learner attempt:
 Raw requests, accepted responses, viewer results, screenshots, package, and build report are retained under `workspace/qualification-live-2026-10-14/`. The regression for unsaved context checks consistent titles and verifies the original saved scene remains intact.
 
 The final full backend regression passed 190 tests. The live viewer replay script passed, the runtime harness passed, and patch whitespace checks were clean.
+
+## LMS retry finding and replacement package
+
+The operator reported that after an incorrect answer, clicking **Try again** left the scene unchanged. Local reproduction of the original exact ZIP in Chromium, Firefox, and WebKit confirmed that the old button submitted the still-selected wrong answer and consumed another attempt; changing the answer before clicking it did score the new response. This exposed a mismatch between the label and expected retry behavior.
+
+**Try again** now clears the failed response, matches, and typed text; preserves the number of attempts already used; and focuses the first answer control. The button then becomes **Check answer** and remains disabled until a new response is entered. Resetting for a retry does not grade or consume an attempt. Learners may also edit their answer directly, which changes the action to Check answer. Passed or exhausted questions cannot be reset by this action. Preview, standalone playback, and both SCORM profiles share these semantics. The cleared SCORM retry state persists when the same attempt is closed and resumed.
+
+Replacement SCORM 1.2 package: `workspace/qualification-live-2026-10-14/lms-scorm12-retry-fix.zip`.
+
+SHA-256: `48a8c510e5a191946bac07842b03b48fbe56fe2a4698ba35d49e89d400fddb99`.
+
+The original package is retained for traceability. External acceptance of the replacement remains pending; upload the replacement and use a fresh learner attempt to avoid state already exhausted in the earlier package. Retest wrong answer → close feedback → Try again → select Equipment → Check answer, along with resume, Start over, and Gradebook completion.
+
+Retry verification: 190 backend tests and the frontend build passed. All 24 targeted browser checks passed across Chromium, Firefox, and WebKit: both SCORM profiles with radio, matching, and short-answer retries, persisted cleared state after resume, successful second-attempt scoring, Preview question types, and standalone playback. Backend restarted and returned HTTP 200.

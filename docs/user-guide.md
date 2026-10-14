@@ -456,6 +456,8 @@ Preview progress is stored in this browser, separately from a learner's LMS sess
 | 2 | Use **Next**, **Previous**, or a scene navigation dot. Play attached audio with its player controls. | You review scene order, content, and media; required progress updates. | <a href="user-guide/images/preview-navigation.png"><img src="user-guide/images/preview-navigation.png" alt="preview navigation controls" width="240"></a><br><a href="user-guide/images/preview-audio.png"><img src="user-guide/images/preview-audio.png" alt="preview audio controls" width="240"></a> |
 | 3 | Use **Read slide text** when shown for a rendered imported slide. Click **Exit preview** to return to authoring. | You can inspect extracted text and resume editing. | <a href="user-guide/images/slide-transcript.png"><img src="user-guide/images/slide-transcript.png" alt="slide transcript controls" width="240"></a><br><a href="user-guide/images/preview-header.png"><img src="user-guide/images/preview-header.png" alt="preview header controls" width="240"></a> |
 
+After an incorrect answer, close feedback and choose **Try again** to clear the response without using another attempt. Enter a new answer and choose **Check answer** to grade it. You can also change the answer directly; the action then becomes Check answer. Completed or exhausted questions retain their attempt limits.
+
 ### Test an assessment in preview
 
 | Step | Action | Result | Control image |
