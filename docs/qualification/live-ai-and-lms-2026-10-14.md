@@ -16,7 +16,7 @@ The content remains a draft: the course's widget-selection paragraphs repeat the
 
 ## LMS handoff
 
-The operator requested the package and will conduct the external LMS test. External results are pending.
+The operator conducted the external LMS test. The replacement package's retry, Continue, Start over, and Gradebook score/completion checks passed by operator attestation, as recorded below.
 
 Package: `workspace/qualification-live-2026-10-14/lms-scorm12-qualification.zip`.
 
@@ -46,8 +46,10 @@ Replacement SCORM 1.2 package: `workspace/qualification-live-2026-10-14/lms-scor
 
 SHA-256: `48a8c510e5a191946bac07842b03b48fbe56fe2a4698ba35d49e89d400fddb99`.
 
-The original package is retained for traceability. External acceptance of the replacement remains pending; upload the replacement and use a fresh learner attempt to avoid state already exhausted in the earlier package. Retest wrong answer → close feedback → Try again → select Equipment → Check answer, along with resume, Start over, and Gradebook completion.
+The original package is retained for traceability. The replacement received operator acceptance for retry, resume, Start over, and Gradebook score/completion. The tested sequence was wrong answer → close feedback → Try again → select Equipment → Check answer, followed by the remaining LMS checks.
 
 Retry verification: 190 backend tests and the frontend build passed. All 24 targeted browser checks passed across Chromium, Firefox, and WebKit: both SCORM profiles with radio, matching, and short-answer retries, persisted cleared state after resume, successful second-attempt scoring, Preview question types, and standalone playback. Backend restarted and returned HTTP 200.
 
 Operator acceptance, 2026-10-14: following delivery of the replacement package, the operator reported **“it worked!”** This confirms the reported Try again issue is resolved in the operator's LMS test by attestation. Resume choice, Start over, and Gradebook score/completion were not separately confirmed in this reply and remain open for this package.
+
+Follow-up acceptance, 2026-10-14: asked specifically whether **Continue**, **Start over**, and **Gradebook score/completion** also worked, the operator replied **“yes to all.”** All requested LMS acceptance checks for the replacement SCORM 1.2 package are now passed by operator attestation. No independent LMS inspection or screenshot evidence was collected; the exact LMS activity and grading settings were not supplied. This acceptance applies to the delivered replacement fixture and does not certify every course, profile, or LMS configuration.

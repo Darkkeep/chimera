@@ -1,5 +1,9 @@
 # SCORM Compatibility Checklist
 
+## Replacement-package LMS acceptance: 2026-10-14
+
+The operator confirmed the retry fix worked, then explicitly confirmed Continue, Start over, and Gradebook score/completion with **“yes to all.”** The replacement SCORM 1.2 fixture passed the requested external LMS checks by operator attestation. Package SHA-256: `48a8c510e5a191946bac07842b03b48fbe56fe2a4698ba35d49e89d400fddb99`. See [live AI and LMS qualification](qualification/live-ai-and-lms-2026-10-14.md) for the package, sequence, earlier retry finding, and evidence limits. The prior failed/open results below describe earlier packages and are retained as history.
+
 ## PNutII Tracking Requalification: 2026-10-14
 
 - Subsequent operator retest: "It all worked," with a request to offer Continue or Start over instead of automatic resume. This records successful resume/score/completion by operator attestation for the retested package; its exact hash and profile were not supplied. The earlier failed attempt below remains historical.
