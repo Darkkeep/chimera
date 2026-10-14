@@ -1,1 +1,18 @@
+.course-preview-content > h1.course-preview-title-on-stage {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+.course-preview-motion-controls {
+	display: flex;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 12px;
+}
 .course-preview-dots{scrollbar-width:none}.course-preview-dots::-webkit-scrollbar{display:none}.course-preview-progress.course-complete>span{color:#d9edbf}.course-preview-progress.course-complete .course-preview-progress-track>span{background:#a7d46d}.course-preview-audio.required-audio{padding:12px;border:1px solid #e2e8d9;border-radius:4px;background:#f7f9f4}.course-preview-audio.required-audio span{font-weight:700;color:#415941}.course-preview-assessment{margin-top:26px;padding:22px;border:1px solid #dfe4da;border-left:3px solid #729052;border-radius:4px;background:#fbfcf9}.course-preview-assessment-kicker{margin-bottom:9px;color:#788675;font:500 10px 'DM Mono',monospace;letter-spacing:.8px}.course-preview-assessment h2{margin:0 0 15px;color:#24332a;font-size:18px;line-height:1.4}.course-preview-assessment fieldset{display:grid;gap:8px;margin:0;padding:0;border:0}.course-preview-assessment legend{margin-bottom:8px;color:#68766c;font-size:11px}.course-preview-answer{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border:1px solid #dfe3db;border-radius:4px;background:#fff;color:#35443a;font-size:13px;line-height:1.5;cursor:pointer}.course-preview-answer.selected{border-color:#76955e;background:#f1f6eb}.course-preview-answer input{flex:0 0 auto;margin:2px 0 0;accent-color:#41674f}.course-preview-assessment-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px}.course-preview-assessment-actions .course-preview-nav-button.next{justify-self:auto}.course-preview-assessment-score{font:10px 'DM Mono',monospace}.course-preview-assessment-score.correct,.course-preview-assessment-feedback.correct{color:#486632}.course-preview-assessment-score.incorrect,.course-preview-assessment-feedback.incorrect{color:#963c32}.course-preview-assessment-feedback{margin:12px 0 0;padding:10px 12px;border-radius:3px;background:#f0f5e9;font-size:12px;line-height:1.55}.course-preview-assessment-feedback.incorrect{background:#fbefec}@media(max-width:600px){.course-preview-assessment{margin-top:18px;padding:16px}.course-preview-assessment h2{font-size:16px}}

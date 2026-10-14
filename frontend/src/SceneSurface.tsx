@@ -2,9 +2,24 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { Project, Scene } from "./App";
 import "./visual-scene.css";
+import { AssessmentStageContent } from "./AssessmentStageContent";
+import "./assessment-stage.css";
+import "../../backend/app/static/assessment-surface.css";
+import { playStageAnimations } from "../../backend/app/static/stage-animations.js";
 
-export type SceneElement = { id: string; kind: "text" | "image" | "shape"; x: number; y: number; width: number; height: number; rotation: number; text: string; assetId: string | null; fontSize: number; fontFamily: string; color: string; bold: boolean; italic: boolean; align: "left" | "center" | "right"; crop: number[]; shapeSvg: string | null; shapeName: string | null; source: "slide" | "layout" | "master" | "manual"; locked: boolean };
-export type SceneLayout = { version: 1; enabled: boolean; width: number; height: number; backgroundColor: string; backgroundAsset: string | null; elements: SceneElement[]; warnings: string[] };
+export type AnimationStep = { effect: string; durationMs: number; delayMs: number; iterations?: number };
+export type ElementAnimations = { entrance: AnimationStep; presentation: AnimationStep; exit: AnimationStep };
+
+export type SceneElement = { id: string; kind: "text" | "image" | "shape"; x: number; y: number; width: number; height: number; rotation: number; text: string; assetId: string | null; fontSize: number; fontFamily: string; color: string; bold: boolean; italic: boolean; align: "left" | "center" | "right"; crop: number[]; shapeSvg: string | null; shapeName: string | null; source: "slide" | "layout" | "master" | "manual"; locked: boolean; animations?: ElementAnimations | null };
+export type AssessmentRegion = { x: number; y: number; width: number; height: number };
+export type SceneLayout = { version: 1; enabled: boolean; width: number; height: number; backgroundColor: string; backgroundAsset: string | null; elements: SceneElement[]; warnings: string[]; assessmentRegion?: AssessmentRegion | null };
+
+export function assessmentRegion(layout: SceneLayout, title?: string): AssessmentRegion {
+  const heading = layout.elements.find(element => element.kind === "text" && element.text.trim() === title?.trim());
+  const x = Math.max(0, Math.min(heading?.x ?? layout.width * 0.05, layout.width * 0.9));
+  const y = Math.max(0, Math.min(heading?.y ?? layout.height * 0.05, layout.height * 0.9));
+  return layout.assessmentRegion || { x, y, width: Math.min(heading?.width ?? layout.width * 0.9, layout.width - x - layout.width * 0.05), height: Math.max(1, Math.min(layout.height * 0.7, layout.height - y - layout.height * 0.05)) };
+}
 
 export function newElement(kind: "text" | "image", changes: Partial<SceneElement> = {}): SceneElement {
   return { id: crypto.randomUUID(), kind, x: 40, y: 40, width: kind === "text" ? 400 : 240, height: kind === "text" ? 100 : 180, rotation: 0, text: kind === "text" ? "New text" : "", assetId: null, fontSize: 28, fontFamily: "sans-serif", color: "#202020", bold: false, italic: false, align: "left", crop: [0, 0, 0, 0], shapeSvg: null, shapeName: null, source: "manual", locked: false, ...changes };
@@ -22,7 +37,7 @@ export function ElementContent({ element, project, scene }: { element: SceneElem
   return <div className="visual-image"><img draggable={false} src={`/api/projects/${project.id}/assets/${element.assetId}`} alt={scene.decorativeImages.includes(element.assetId || "") ? "" : scene.imageAltText[element.assetId || ""] || asset?.filename || "Scene image"} style={{ width: `${100 / (1 - left - right)}%`, height: `${100 / (1 - top - bottom)}%`, left: `${-left * 100 / (1 - left - right)}%`, top: `${-top * 100 / (1 - top - bottom)}%` }} /></div>;
 }
 
-export function ScaledStage({ layout, projectId, children }: { layout: SceneLayout; projectId: string; children: (scale: number) => ReactNode }) {
+export function ScaledStage({ layout, projectId, children, assessment }: { layout: SceneLayout; projectId: string; children: (scale: number) => ReactNode; assessment?: ReactNode }) {
   const container = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   useEffect(() => {
@@ -31,11 +46,20 @@ export function ScaledStage({ layout, projectId, children }: { layout: SceneLayo
     return () => observer.disconnect();
   }, []);
   const scale = width ? width / layout.width : 1;
-  return <div ref={container} className="visual-stage-frame" style={{ aspectRatio: `${layout.width} / ${layout.height}` }}><div className="visual-stage" style={{ width: layout.width, height: layout.height, transform: `scale(${scale})`, backgroundColor: layout.backgroundColor, backgroundImage: layout.backgroundAsset ? `url(/api/projects/${projectId}/assets/${layout.backgroundAsset})` : undefined }}>{children(scale)}</div></div>;
+  return <div ref={container} className={`visual-stage-frame ${assessment ? "assessment-stage-frame" : ""}`} style={{ aspectRatio: `${layout.width} / ${layout.height}` }}><div className="visual-stage" style={{ width: layout.width, height: layout.height, transform: `scale(${scale})`, backgroundColor: layout.backgroundColor, backgroundImage: layout.backgroundAsset ? `url(/api/projects/${projectId}/assets/${layout.backgroundAsset})` : undefined }}>{children(scale)}</div>{assessment}</div>;
 }
 
-export function SceneSurface({ project, scene }: { project: Project; scene: Scene }) {
-  const layout = scene.visualLayout;
+export function SceneSurface({ project, scene, assessment, animate = false }: { project: Project; scene: Scene; assessment?: ReactNode; animate?: boolean }) {
+  const animationRoot = useRef<HTMLDivElement>(null);
+  const animationSignature = JSON.stringify(scene.visualLayout?.elements.map(element => ({ id: element.id, animations: element.animations })) || []);
+  useEffect(() => {
+    if (!animate || !animationRoot.current) return;
+    return playStageAnimations(animationRoot.current, JSON.parse(animationSignature));
+  }, [scene.id, animate, animationSignature]);
+  const layout = scene.assessmentItem ? initialLayout(scene) : scene.visualLayout;
   if (!layout) return null;
-  return <ScaledStage layout={layout} projectId={project.id}>{() => layout.elements.map(element => <div key={element.id} className="visual-element" style={{ position: "absolute", left: element.x, top: element.y, width: element.width, height: element.height, transform: `rotate(${element.rotation}deg)` }}><ElementContent element={element} project={project} scene={scene} /></div>)}</ScaledStage>;
+  const region = assessmentRegion(scene.visualLayout || layout, scene.title);
+  const question = scene.assessmentItem ? <div className="assessment-stage-region" style={{ left: `${region.x / layout.width * 100}%`, marginTop: `${region.y / layout.width * 100}%`, width: `${region.width / layout.width * 100}%` }}>{assessment ?? <AssessmentStageContent item={scene.assessmentItem} />}</div> : undefined;
+  const elements = layout.elements.filter(element => !(scene.assessmentItem && element.kind === "text" && element.text.trim() === scene.title.trim()));
+  return <div ref={animationRoot}><ScaledStage layout={layout} projectId={project.id} assessment={question}>{() => elements.map(element => <div key={element.id} data-scene-element={element.id} className="visual-element" style={{ position: "absolute", left: element.x, top: element.y, width: element.width, height: element.height, transform: `rotate(${element.rotation}deg)` }}><ElementContent element={element} project={project} scene={scene} /></div>)}</ScaledStage></div>;
 }

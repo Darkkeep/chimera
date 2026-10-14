@@ -28,11 +28,13 @@ import { ProjectAccessPanel } from "./ProjectAccessPanel";
 import { ReviewLinkView } from "./ReviewLinkView";
 import { SceneVisualEditor } from "./SceneVisualEditor";
 import type { GeneratedSceneDraft, SceneEditSettings } from "./SceneVisualEditor";
+import { AssessmentDraftPreview } from "./AssessmentDraftPreview";
+import { AssessmentsEditor } from "./AssessmentsEditor";
 import { SceneSurface } from "./SceneSurface";
 import type { SceneLayout } from "./SceneSurface";
 
 type LayoutMode = "fidelity" | "hybrid" | "native" | "template";
-type SceneType = "content" | "title" | "assessment" | "media" | "interaction" | "summary";
+type SceneType = "content" | "title" | "question" | "media" | "interaction" | "summary";
 export type AssessmentChoice = { identifier: string; text: string };
 export type AssessmentPair = { sourceIdentifier: string; targetIdentifier: string };
 type AssessmentBase = { identifier: string; prompt: string; correctFeedback: string; incorrectFeedback: string };
@@ -51,7 +53,8 @@ export type ExportSettings = { packageWarningThresholdMB: number };
 export type Scene = { visualLayout?: SceneLayout | null; backgroundAsset?: string | null; id: string; sourceSlide: number | null; title: string; sceneType: SceneType; layoutMode: LayoutMode; templateId: string | null; required: boolean; audioRequired: boolean; assessmentItem: AssessmentItem | null; assessmentSettings: AssessmentSettings | null; extractedText: string[]; actionDescription: string; narration: string; imageAssets: string[]; imageAltText: Record<string, string>; decorativeImages: string[]; audioAssets: string[]; previewImage: string | null; renderWarning: string | null; sourceAnimationXml: string | null; sourceTransitionXml: string | null; notes: string };
 export type Asset = { id: string; kind: "image" | "audio"; role?: "content" | "background"; filename: string; contentType: string; sizeBytes: number; sha256: string; path: string; attributionText: string; attributionStatus: "draft" | "complete" };
 export type ProjectSummary = { id: string; title: string; sceneCount: number; updatedAt: string; hasSourceDeck: boolean };
-export type Project = ProjectSummary & { storyboard: { revision: number; scenes: Scene[]; assets: Asset[]; completionSettings: CourseCompletionSettings; exportSettings: ExportSettings } };
+export type Assessment = { id: string; title: string; questionSceneIds: string[] };
+export type Project = ProjectSummary & { storyboard: { revision: number; scenes: Scene[]; assets: Asset[]; assessments?: Assessment[]; completionSettings: CourseCompletionSettings; exportSettings: ExportSettings } };
 type SceneDraft = { id: string | null; title: string; screenText: string; actionDescription: string; notes: string; required: boolean; audioRequired: boolean; sceneType: SceneType; layoutMode: LayoutMode; templateId: string };
 type Template = { id: string; title: string; description: string; filename: string; sizeBytes: number; updatedAt: string };
 type TemplateDraft = { id: string; title: string; description: string };
@@ -91,6 +94,7 @@ export function App() {
   const [showPreview, setShowPreview] = useState(false);
   const [showAssessmentEditor, setShowAssessmentEditor] = useState(false);
   const [showCompletionSettings, setShowCompletionSettings] = useState(false);
+  const [showAssessments, setShowAssessments] = useState(false);
   const [showEnhancementReview, setShowEnhancementReview] = useState(false);
   const [showReviewTools, setShowReviewTools] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -140,16 +144,16 @@ export function App() {
   guideContext.current = { ...guideContext.current, projectId: project.id, sceneCount: project.storyboard.scenes.length,
     assetCount: project.storyboard.assets.length, templateCount: templates.length,
     selectedSceneId: project.storyboard.scenes[selectedScene]?.id,
-    assessmentSceneId: project.storyboard.scenes[selectedScene]?.sceneType === "assessment" ? project.storyboard.scenes[selectedScene].id : project.storyboard.scenes.find(s => s.sceneType === "assessment")?.id,
+    assessmentSceneId: project.storyboard.scenes[selectedScene]?.sceneType === "question" ? project.storyboard.scenes[selectedScene].id : project.storyboard.scenes.find(s => s.sceneType === "question")?.id,
     questionCount: project.storyboard.scenes.filter(s => s.assessmentItem).length,
     hasImages: project.storyboard.scenes.some(s => s.imageAssets.length > 0),
     hasAudio: Boolean(project.storyboard.scenes[selectedScene]?.audioAssets.length) };
   const currentSurface = visualSceneId || sceneDraft ? "scene.edit" : isCreating ? "project.name" : templateDraft ? "templates.edit" :
     showExport ? "export.panel" : showPreview ? "preview.content" : showAssessmentEditor ? "assessment.editor" :
-    showCompletionSettings ? "review.completion" : showEnhancementReview ? "review.enhancement" :
+    showAssessments ? "review.assessments" : showCompletionSettings ? "review.completion" : showEnhancementReview ? "review.enhancement" :
     showAccessibility ? "review.accessibility" : showValidation ? "review.validation" :
     showGoldenPath ? "catalog" : showManagement ? "workspace.management" : activeView;
-  const hasOpenForm = Boolean(visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showCompletionSettings || showEnhancementReview || showAccessibility || showValidation);
+  const hasOpenForm = Boolean(visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showAccessibility || showValidation);
   guideNavigate.current = (step) => {
     const target = step.target;
     if (!target) return;
@@ -220,7 +224,7 @@ export function App() {
   }
 
   function applyProject(updatedProject: Project) {
-    setProject(updatedProject);
+    setProject({ ...updatedProject, storyboard: { ...updatedProject.storyboard, scenes: updatedProject.storyboard.scenes.map(scene => String(scene.sceneType) === "assessment" ? { ...scene, sceneType: "question" } : scene) } });
     if (!updatedProject.id) return;
     window.localStorage.setItem("chimera.activeProjectId", updatedProject.id);
     const summary: ProjectSummary = {
@@ -274,6 +278,7 @@ export function App() {
       setShowAssessmentEditor(false);
       setVisualSceneId(null);
       setShowCompletionSettings(false);
+      setShowAssessments(false);
       setShowEnhancementReview(false);
       setShowExport(false);
       setShowProjectAccess(false);
@@ -603,6 +608,33 @@ export function App() {
     }
   }
 
+  async function exportStandalone() {
+    if (!project.id || busy) return;
+    setBusy(true);
+    setError("");
+    setFeedback("");
+    try {
+      const response = await fetch(`/api/projects/${project.id}/standalone.zip`);
+      if (!response.ok) {
+        const detail = await response.json().catch(() => null) as { detail?: string } | null;
+        throw new Error(detail?.detail || "Standalone course could not be built.");
+      }
+      const downloadUrl = window.URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `${project.id}-standalone.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      setFeedback("Standalone course built and downloaded.");
+    } catch (buildError) {
+      setError(buildError instanceof Error ? buildError.message : "Standalone course could not be built.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function exportScorm2004() {
     if (!project.id || busy) return;
     setBusy(true);
@@ -901,11 +933,11 @@ export function App() {
     if (settings.layoutMode === "template") reportOnboardingOutcome("scene.template-saved", project.id, visualSceneId || undefined);
   }
 
-  async function generateSceneContentDraft(prompt: string): Promise<GeneratedSceneDraft> {
+  async function generateSceneContentDraft(prompt: string, currentScene: Partial<Scene>): Promise<GeneratedSceneDraft> {
     const response = await fetch(`/api/projects/${project.id}/scenes/${visualSceneId}/content-draft`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt, currentScene }),
     });
     const result = await response.json().catch(() => null) as (GeneratedSceneDraft & { detail?: string }) | null;
     if (!response.ok || !result) throw new Error(result?.detail || "Scene draft could not be generated.");
@@ -1037,6 +1069,7 @@ export function App() {
           <button onClick={() => setShowAccessibility(true)} disabled={!project.id || busy}><Accessibility size={16} /> Check image descriptions</button>
           <button onClick={() => setShowValidation(true)} disabled={!project.id || busy}><ShieldCheck size={16} /> Validate storyboard</button>
           <button onClick={() => setShowCompletionSettings(true)} disabled={!project.id || busy}><Settings2 size={16} /> Completion rules</button>
+          <button onClick={() => setShowAssessments(true)} disabled={!project.id || busy || !permissions.canEdit}><ClipboardList size={16} /> Assessments</button>
           <button onClick={() => setShowEnhancementReview(true)} disabled={!project.id || busy}><Sparkles size={16} /> Review suggestions</button>
         </div>}
       </div>
@@ -1079,11 +1112,12 @@ export function App() {
             <button className="button button-accent" onClick={() => beginSceneEdit()} disabled={busy || !permissions.canEdit}><Pencil size={16} /> Edit scene</button>
             <div className="scene-context-title"><h2>{scene.title}</h2><span>Scene {selectedScene + 1} of {scenes.length} · {scene.required ? "Required" : "Optional"}</span></div>
           </div>
-          {scene.visualLayout?.enabled && <div className="visual-authoring-surface"><SceneSurface project={project} scene={scene} /></div>}
-          <div className="canvas-body"><div className="canvas-meta"><span>SCENE {String(selectedScene + 1).padStart(2, "0")} · {scene.sceneType.toUpperCase()}</span><span>{scene.layoutMode === "template" ? templates.find((template) => template.id === scene.templateId)?.title || "TEMPLATE LAYOUT" : `${scene.layoutMode.toUpperCase()} LAYOUT`}{scene.sourceSlide ? ` · SOURCE SLIDE ${scene.sourceSlide}` : " · NEW SCENE"}</span></div><div className="slide-canvas">{scene.previewImage ? <img className="slide-preview" src={`/api/projects/${project.id}/${scene.previewImage}`} alt={scene.sourceSlide ? `Rendered source slide ${scene.sourceSlide}` : scene.title} /> : <><div className="canvas-grid" /><div className="slide-label">{scene.title}</div><div className="slide-subtitle">{scene.extractedText.join(" · ") || "No additional slide text extracted"}</div></>}<div className="canvas-chip">{scene.previewImage ? "SOURCE SLIDE PREVIEW" : `${scene.layoutMode.toUpperCase()} LAYOUT`}</div></div><div className="canvas-footer"><div><strong>{scene.title}</strong><span>Speaker notes: {scene.notes || "None extracted"}</span><span>{scene.imageAssets.length} images / {scene.audioAssets.length} audio files{scene.sourceAnimationXml ? " / Native animation captured" : ""}{scene.sourceTransitionXml ? " / Transition captured" : ""}</span>{scene.renderWarning && <span className="render-warning">{scene.renderWarning}</span>}</div></div>{(scene.imageAssets.length > 0 || scene.audioAssets.length > 0) && <div className="scene-media-strip">{scene.imageAssets.map((assetId) => { const asset = project.storyboard.assets.find((item) => item.id === assetId); return asset ? <img key={assetId} src={`/api/projects/${project.id}/assets/${assetId}`} alt={asset.filename} title={asset.filename} /> : null; })}{scene.audioAssets.map((assetId) => { const asset = project.storyboard.assets.find((item) => item.id === assetId); return asset ? <div className="scene-audio" key={assetId}><span>{asset.filename}</span><audio controls preload="metadata" src={`/api/projects/${project.id}/assets/${assetId}`} /></div> : null; })}</div>}{scene.sceneType === "assessment" && <section className="assessment-authoring-launch" aria-label="Scene assessment">
+          {scene.sceneType === "question" && <section className="assessment-authoring-launch" aria-label="Scene question">
             <div><strong>{scene.assessmentItem ? "Question authored" : "Add a knowledge check"}</strong><span>Author a question and set its scoring rules.</span></div>
             <button className="button button-outline" onClick={() => setShowAssessmentEditor(true)} disabled={busy}><ClipboardList size={15} />{scene.assessmentItem ? "Edit question" : "Create question"}</button>
           </section>}
+          {(scene.visualLayout?.enabled || scene.assessmentItem) && <div className="visual-authoring-surface"><SceneSurface project={project} scene={scene} /></div>}
+          <div className="canvas-body"><div className="canvas-meta"><span>SCENE {String(selectedScene + 1).padStart(2, "0")} · {scene.sceneType.toUpperCase()}</span><span>{scene.layoutMode === "template" ? templates.find((template) => template.id === scene.templateId)?.title || "TEMPLATE LAYOUT" : `${scene.layoutMode.toUpperCase()} LAYOUT`}{scene.sourceSlide ? ` · SOURCE SLIDE ${scene.sourceSlide}` : " · NEW SCENE"}</span></div><div className="slide-canvas">{scene.previewImage ? <img className="slide-preview" src={`/api/projects/${project.id}/${scene.previewImage}`} alt={scene.sourceSlide ? `Rendered source slide ${scene.sourceSlide}` : scene.title} /> : <><div className="canvas-grid" /><div className="slide-label">{scene.title}</div><div className="slide-subtitle">{scene.extractedText.join(" · ") || "No additional slide text extracted"}</div></>}<div className="canvas-chip">{scene.previewImage ? "SOURCE SLIDE PREVIEW" : `${scene.layoutMode.toUpperCase()} LAYOUT`}</div></div><div className="canvas-footer"><div><strong>{scene.title}</strong><span>Speaker notes: {scene.notes || "None extracted"}</span><span>{scene.imageAssets.length} images / {scene.audioAssets.length} audio files{scene.sourceAnimationXml ? " / Native animation captured" : ""}{scene.sourceTransitionXml ? " / Transition captured" : ""}</span>{scene.renderWarning && <span className="render-warning">{scene.renderWarning}</span>}</div></div>{(scene.imageAssets.length > 0 || scene.audioAssets.length > 0) && <div className="scene-media-strip">{scene.imageAssets.map((assetId) => { const asset = project.storyboard.assets.find((item) => item.id === assetId); return asset ? <img key={assetId} src={`/api/projects/${project.id}/assets/${assetId}`} alt={asset.filename} title={asset.filename} /> : null; })}{scene.audioAssets.map((assetId) => { const asset = project.storyboard.assets.find((item) => item.id === assetId); return asset ? <div className="scene-audio" key={assetId}><span>{asset.filename}</span><audio controls preload="metadata" src={`/api/projects/${project.id}/assets/${assetId}`} /></div> : null; })}</div>}
           {scene.audioAssets.length > 0 && <section data-onboarding="scene.audio" className="audio-requirement-setting"><label><input type="checkbox" checked={scene.audioRequired} onChange={(event) => void setSceneAudioRequired(event.target.checked)} disabled={busy} /><span><strong>Require attached audio to finish</strong><small>Learners must play every attached track to the end.</small></span></label></section>}
           </div></> : <div className="canvas-empty"><div className="brand-emblem"><BrandMark /></div><span className="brand-signature">Distinct parts. Deliberate design. Powerful learning.</span><strong>{project.id ? "Your storyboard starts here" : "Build your next learning experience"}</strong><span>{project.id ? "Bring in a PowerPoint or start with a blank scene." : "Create a project to organize scenes, media, and assessments."}</span>
           <div className="empty-start-actions">{project.id ? <><label className={`button button-accent upload-control ${busy ? "disabled" : ""}`}><FileUp size={16} /> Import PowerPoint<input type="file" aria-label="Import PowerPoint" accept=".pptx" onChange={uploadDeck} disabled={busy} /></label><button className="button button-outline" onClick={beginSceneCreate} disabled={busy}><Plus size={16} /> Add scene</button></> : <button className="button button-accent" onClick={() => setIsCreating(true)}><Plus size={16} /> Create project</button>}</div></div>}</section>
@@ -1104,19 +1138,21 @@ export function App() {
         <label className="package-threshold"><span>Warn when a package exceeds</span><input aria-label="Package warning threshold in MB" type="number" min="1" max="4096" key={`${project.id}-${project.storyboard.exportSettings.packageWarningThresholdMB}`} defaultValue={project.storyboard.exportSettings.packageWarningThresholdMB} onBlur={(event) => { if (event.currentTarget.validity.valid && event.currentTarget.value !== "") void updatePackageWarningThreshold(Number(event.currentTarget.value)); else event.currentTarget.value = String(project.storyboard.exportSettings.packageWarningThresholdMB); }} disabled={busy} /><span>MB</span></label>
         <div className="export-actions report-actions"><button className="button button-outline" onClick={() => void downloadScormReport("scorm2004")} disabled={busy}>Report 2004 <Download size={14} /></button><button className="button button-outline" onClick={() => void downloadScormReport("scorm12")} disabled={busy}>Report 1.2 <Download size={14} /></button></div>
       </section>
+      <section className="export-section"><h3>Standalone course</h3><div className="export-actions"><button className="button button-outline" onClick={() => void exportStandalone()} disabled={busy}><Download size={15} /> Download standalone ZIP</button></div></section>
       <section className="export-section"><h3>Chimera storyboard</h3><p>Save or restore the complete project, including media, review records, and history.</p><div className="export-actions"><button className="button button-outline" onClick={() => void exportStoryboard()} disabled={busy}><Download size={15} /> Download JSON</button><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`}><img src={restoreIcon} alt="" width="16" height="16" /> Restore JSON<input type="file" aria-label="Restore JSON" accept="application/json,.json" onChange={importStoryboard} disabled={busy} /></label></div><div className="export-actions"><button className="button button-accent" onClick={() => void exportProjectBackup()} disabled={busy}><Download size={15} /> Download Chimera storyboard</button><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`}><Upload size={15} /> Restore Chimera storyboard<input type="file" aria-label="Restore Chimera storyboard" accept="application/zip,.zip" onChange={importProjectBackup} disabled={busy} /></label></div></section>
       <section className="export-section"><h3>Editable Word storyboard</h3><p>Choose a slide-like SME Master or the integrated Full storyboard.</p><label className="word-answer-key word-format-select"><span>Format</span><select aria-label="Word storyboard format" value={wordExportFormat} onChange={(event) => setWordExportFormat(event.target.value as "sme" | "full")} disabled={busy}><option value="sme">SME Master</option><option value="full">Full storyboard</option></select></label><label className="word-answer-key"><input type="checkbox" checked={includeWordAnswerKey} onChange={(event) => setIncludeWordAnswerKey(event.target.checked)} disabled={busy} /><span>Include answer keys (authoring material)</span></label><button className="button button-outline" onClick={() => void exportWordStoryboard()} disabled={busy}><FileText size={15} /> Download Word document</button></section>
       {assessmentItemCount >= 2 && <section className="export-section"><h3>Assessment test</h3><p>Export all authored questions together as a QTI 2.1 test.</p><button className="button button-outline" onClick={() => void exportAssessmentTest()} disabled={busy}><ClipboardList size={15} /> Download QTI test</button></section>}
       {error && <p className="export-error" role="alert">{error}</p>}{feedback && <p className="export-feedback" role="status">{feedback}</p>}{busy && <p role="status">Working…</p>}
     </EditorDialog>}
     {showCompletionSettings && <CompletionSettingsEditor project={project} onClose={() => setShowCompletionSettings(false)} onProjectUpdated={applyProject} />}
+    {showAssessments && permissions.canEdit && <AssessmentsEditor key={project.id} project={project} canExport={permissions.canExport} onClose={() => setShowAssessments(false)} onProjectUpdated={applyProject} />}
     {showEnhancementReview && <EnhancementReviewView project={project} onClose={() => setShowEnhancementReview(false)} onProjectUpdated={applyProject} />}
     {showValidation && <ValidationView projectId={project.id} onClose={() => setShowValidation(false)} onOpenScene={(sceneId, issueCode) => { const index = scenes.findIndex((item) => item.id === sceneId); setShowValidation(false); if (index >= 0) setSelectedScene(index); if (issueCode === "missing-image-alt-text") setShowAccessibility(true); else if (issueCode === "missing-assessment-item") setShowAssessmentEditor(true); else setActiveView("storyboard"); }} />}
     {showAccessibility && <AccessibilityView projectId={project.id} revision={project.storyboard.revision} scenes={scenes} assets={project.storyboard.assets} onClose={() => setShowAccessibility(false)} onProjectUpdated={applyProject} />}
     {showGoldenPath && <GoldenPathView walkthroughStatuses={Object.fromEntries(Object.entries(guides).map(([id, guide]) => [id, guide.controller.snapshot().status]))} onStartWalkthrough={() => startOnboarding()} onSelectWalkthrough={id => startOnboarding(id)} project={project} onClose={() => setShowGoldenPath(false)} onCreateProject={() => { setShowGoldenPath(false); setIsCreating(true); }} onOpenStoryboard={() => { setShowGoldenPath(false); setActiveView("storyboard"); }} onOpenMedia={() => { setShowGoldenPath(false); setActiveView("media"); }} onOpenAccessibility={() => { setShowGoldenPath(false); setShowAccessibility(true); }} onOpenPreview={() => { setShowGoldenPath(false); if (project.id) setShowPreview(true); }} onRunValidation={() => { setShowGoldenPath(false); setShowValidation(true); }} />}
     {showPreview && project.id && <CoursePreview project={project} onClose={() => setShowPreview(false)} canEnhance={permissions.canEnhance} />}
     {visualSceneId && scenes.find(item => item.id === visualSceneId) && <SceneVisualEditor key={`${project.id}:${visualSceneId}`} initialPanel={sceneEditorPanel} project={project} scene={scenes.find(item => item.id === visualSceneId)!} templates={templates} onClose={() => setVisualSceneId(null)} onSave={saveVisualScene} onExtract={extractVisualScene} onGenerate={generateSceneContentDraft} canGenerate={permissions.canEnhance} />}
-    {showAssessmentEditor && project.id && scene?.sceneType === "assessment" && <AssessmentEditor projectId={project.id} projectTitle={project.title} revision={project.storyboard.revision} scene={scene} scenes={scenes}
+    {showAssessmentEditor && project.id && scene?.sceneType === "question" && <AssessmentEditor projectId={project.id} projectTitle={project.title} revision={project.storyboard.revision} scene={scene} scenes={scenes}
       onClose={() => setShowAssessmentEditor(false)}
       onProjectUpdated={applyProject}
     />}
@@ -1139,10 +1175,11 @@ export function App() {
         {permissions.canEnhance ? <button type="button" className="button button-outline" disabled={busy || !coursePrompt.trim()} onClick={() => void generateCourseContentDraft()}><Sparkles size={15} />{busy ? "Generating…" : "Generate course draft"}</button> : <p className="project-design-documents-status">Your project role does not allow AI draft generation.</p>}
         {courseDraftError && <p className="visual-editor-error" role="alert">{courseDraftError}</p>}
         {courseDraft && <div className="course-draft-scenes" aria-label="Generated scenes for review">{courseDraft.map((draft, index) => <article className="course-draft-scene" key={`${index}:${draft.title}`}><label className="course-draft-include"><input type="checkbox" checked={draft.included} onChange={event => setCourseDraft(current => current?.map((item, itemIndex) => itemIndex === index ? { ...item, included: event.target.checked } : item) || null)} /><span>Include scene {index + 1}</span></label><label>Title<input maxLength={120} value={draft.title} onChange={event => setCourseDraft(current => current?.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item) || null)} /></label><label>On-screen text<textarea rows={4} value={draft.extractedText.join("\n")} onChange={event => setCourseDraft(current => current?.map((item, itemIndex) => itemIndex === index ? { ...item, extractedText: event.target.value.split(/\r?\n/) } : item) || null)} /></label><label>Action description<textarea rows={2} value={draft.actionDescription} onChange={event => setCourseDraft(current => current?.map((item, itemIndex) => itemIndex === index ? { ...item, actionDescription: event.target.value } : item) || null)} /></label><label>Narration<textarea rows={2} value={draft.narration} onChange={event => setCourseDraft(current => current?.map((item, itemIndex) => itemIndex === index ? { ...item, narration: event.target.value } : item) || null)} /></label><label>Speaker notes<textarea rows={2} value={draft.notes} onChange={event => setCourseDraft(current => current?.map((item, itemIndex) => itemIndex === index ? { ...item, notes: event.target.value } : item) || null)} /></label></article>)}</div>}
+        {courseDraft?.map((draft, index) => draft.assessmentItem && <AssessmentDraftPreview key={index} item={draft.assessmentItem} settings={draft.assessmentSettings} label={`Scene ${index + 1} assessment`} />)}
         <div className="modal-actions"><button type="button" className="button button-outline" disabled={busy} onClick={() => { setIsCreating(false); setTitle(""); setCreatedCourseForDraft(false); setCourseResourceIds([]); setCourseDraftError(""); setCoursePrompt(""); setCourseDraft(null); }}>Done</button>{courseDraft && <button type="button" className="button button-accent" disabled={busy || !courseDraft.some(item => item.included)} onClick={() => void applyCourseContentDraft()}><Check size={15} /> Add selected scenes</button>}</div>
       </section>}
     </EditorDialog>}
-    {sceneDraft && <EditorDialog onResumeWalkthrough={guidePaused ? () => onboarding.controller.start() : undefined} className="scene-editor" labelledBy="scene-editor-title" onClose={() => setSceneDraft(null)} busy={busy}><div className="modal-head"><div><p className="eyebrow">SCENE SETTINGS</p><h2 id="scene-editor-title">{sceneDraft.id ? "Edit scene" : "New scene"}</h2></div><button className="icon-button" onClick={() => setSceneDraft(null)} disabled={busy} aria-label="Close scene editor"><X size={18} /></button></div><label data-onboarding={sceneDraft.id ? "scene.edit" : "scene.form"}>Scene title<input value={sceneDraft.title} maxLength={120} onChange={(event) => setSceneDraft({ ...sceneDraft, title: event.target.value })} /></label><label>Scene type<select value={sceneDraft.sceneType} onChange={(event) => setSceneDraft({ ...sceneDraft, sceneType: event.target.value as SceneType })}><option value="content">Content</option><option value="title">Title</option><option value="assessment">Assessment</option><option value="media">Media</option><option value="interaction">Interaction</option><option value="summary">Summary</option></select></label><label>Scene layout<select value={sceneDraft.layoutMode} onChange={(event) => setSceneDraft({ ...sceneDraft, layoutMode: event.target.value as LayoutMode, templateId: event.target.value === "template" ? sceneDraft.templateId : "" })}><option value="fidelity">Fidelity</option><option value="hybrid">Hybrid</option><option value="native">Native</option><option value="template">Template</option></select></label>{sceneDraft.layoutMode === "template" && <label>Template<select value={sceneDraft.templateId} onChange={(event) => setSceneDraft({ ...sceneDraft, templateId: event.target.value })}><option value="">Choose a template</option>{templates.map((template) => <option value={template.id} key={template.id}>{template.title}</option>)}</select>{templates.length === 0 && <span className="field-hint">Upload a PPTX template in the Templates section first.</span>}</label>}<label>On-screen text<textarea rows={5} value={sceneDraft.screenText} onChange={(event) => setSceneDraft({ ...sceneDraft, screenText: event.target.value })} /></label><label>Action description<textarea rows={3} maxLength={5000} value={sceneDraft.actionDescription} onChange={(event) => setSceneDraft({ ...sceneDraft, actionDescription: event.target.value })} placeholder="Describe movement, interaction, or timed actions shown in this scene" /></label><label>Speaker notes<textarea rows={4} value={sceneDraft.notes} onChange={(event) => setSceneDraft({ ...sceneDraft, notes: event.target.value })} /></label>
+    {sceneDraft && <EditorDialog onResumeWalkthrough={guidePaused ? () => onboarding.controller.start() : undefined} className="scene-editor" labelledBy="scene-editor-title" onClose={() => setSceneDraft(null)} busy={busy}><div className="modal-head"><div><p className="eyebrow">SCENE SETTINGS</p><h2 id="scene-editor-title">{sceneDraft.id ? "Edit scene" : "New scene"}</h2></div><button className="icon-button" onClick={() => setSceneDraft(null)} disabled={busy} aria-label="Close scene editor"><X size={18} /></button></div><label data-onboarding={sceneDraft.id ? "scene.edit" : "scene.form"}>Scene title<input value={sceneDraft.title} maxLength={120} onChange={(event) => setSceneDraft({ ...sceneDraft, title: event.target.value })} /></label><label>Scene type<select value={sceneDraft.sceneType} onChange={(event) => setSceneDraft({ ...sceneDraft, sceneType: event.target.value as SceneType })}><option value="content">Content</option><option value="title">Title</option><option value="question">Question</option><option value="media">Media</option><option value="interaction">Interaction</option><option value="summary">Summary</option></select></label><label>Scene layout<select value={sceneDraft.layoutMode} onChange={(event) => setSceneDraft({ ...sceneDraft, layoutMode: event.target.value as LayoutMode, templateId: event.target.value === "template" ? sceneDraft.templateId : "" })}><option value="fidelity">Fidelity</option><option value="hybrid">Hybrid</option><option value="native">Native</option><option value="template">Template</option></select></label>{sceneDraft.layoutMode === "template" && <label>Template<select value={sceneDraft.templateId} onChange={(event) => setSceneDraft({ ...sceneDraft, templateId: event.target.value })}><option value="">Choose a template</option>{templates.map((template) => <option value={template.id} key={template.id}>{template.title}</option>)}</select>{templates.length === 0 && <span className="field-hint">Upload a PPTX template in the Templates section first.</span>}</label>}<label>On-screen text<textarea rows={5} value={sceneDraft.screenText} onChange={(event) => setSceneDraft({ ...sceneDraft, screenText: event.target.value })} /></label><label>Action description<textarea rows={3} maxLength={5000} value={sceneDraft.actionDescription} onChange={(event) => setSceneDraft({ ...sceneDraft, actionDescription: event.target.value })} placeholder="Describe movement, interaction, or timed actions shown in this scene" /></label><label>Speaker notes<textarea rows={4} value={sceneDraft.notes} onChange={(event) => setSceneDraft({ ...sceneDraft, notes: event.target.value })} /></label>
       <label className="required-toggle"><input type="checkbox" checked={sceneDraft.required} onChange={(event) => setSceneDraft({ ...sceneDraft, required: event.target.checked })} /> Required scene</label>
       {error && <p className="export-error" role="alert">{error}</p>}<div className="modal-actions"><button className="button button-outline" onClick={() => setSceneDraft(null)} disabled={busy}>Cancel</button><button className="button button-accent" onClick={saveScene} disabled={busy || !sceneDraft.title.trim() || (sceneDraft.layoutMode === "template" && !sceneDraft.templateId)}>{sceneDraft.id ? "Save changes" : "Create scene"} <Check size={15} /></button></div></EditorDialog>}
       {templateDraft && <EditorDialog className="scene-editor" labelledBy="template-editor-title" onClose={() => setTemplateDraft(null)} busy={busy}><div data-onboarding="templates.edit" className="modal-head"><div><p className="eyebrow">TEMPLATE LIBRARY</p><h2 id="template-editor-title">Edit template</h2></div><button className="icon-button" onClick={() => setTemplateDraft(null)} disabled={busy} aria-label="Close template editor"><X size={18} /></button></div><label>Template name<input value={templateDraft.title} maxLength={120} onChange={(event) => setTemplateDraft({ ...templateDraft, title: event.target.value })} /></label><label>Description<textarea rows={4} value={templateDraft.description} maxLength={1000} onChange={(event) => setTemplateDraft({ ...templateDraft, description: event.target.value })} /></label>

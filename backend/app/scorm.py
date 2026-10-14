@@ -27,18 +27,33 @@ SCORM_12_ADLCP_NAMESPACE = "http://www.adlnet.org/xsd/adlcp_rootv1p2"
 SCORM_12_XSI_NAMESPACE = "http://www.w3.org/2001/XMLSchema-instance"
 
 
-PLAYER_JS = r'''(() => {
+ANIMATION_RUNTIME = (Path(__file__).parent / "static" / "stage-animations.js").read_text(encoding="utf-8").replace("export function playStageAnimations", "function playStageAnimations")
+ASSESSMENT_SURFACE_CSS = (Path(__file__).parent / "static" / "assessment-surface.css").read_text(encoding="utf-8")
+
+PLAYER_JS = ANIMATION_RUNTIME + r'''
+(() => {
     const state = { scenes: [], completionSettings: { passingScore: 80, includeOptionalAssessments: false }, current: 0, visited: new Set(), completedAudio: new Set(), assessments: {}, remediation: null, startedAt: Date.now() };
   let api = null;
+        let resumeChoicePending = false;
     let lmsWarningShown = false;
     function runtimeStatus(message) { const status = document.querySelector("#runtime-status"); if (status) status.textContent = message; }
   function findApi() {
-    let view = window;
-    while (view && view.parent && view.parent !== view) { view = view.parent; if (view.API_1484_11) return view.API_1484_11; }
-    return window.API_1484_11 || null;
+        const pending = [window];
+        const visited = new Set();
+        while (pending.length && visited.size < 100) {
+                const view = pending.shift();
+                if (!view || visited.has(view)) continue;
+                visited.add(view);
+                try { if (view.API_1484_11) return view.API_1484_11; } catch (_) {}
+                try { if (view.parent && view.parent !== view) pending.push(view.parent); } catch (_) {}
+                try { if (view.opener) pending.push(view.opener); } catch (_) {}
+        }
+        return null;
   }
-    function call(name, value) { if (!api) return ""; try { return api[name](...value); } catch (_) { if (!lmsWarningShown) { lmsWarningShown = true; runtimeStatus("LMS tracking is unavailable; progress will not be reported."); } return ""; } }
+        function call(name, value) { if (!api) return ""; try { const result = api[name](...value); if (result === false || result === "false") { lmsWarningShown = true; runtimeStatus(`LMS rejected ${name}; progress or grades may not be saved. Check the LMS launch and grading settings.`); } return result; } catch (_) { if (!lmsWarningShown) { lmsWarningShown = true; runtimeStatus("LMS tracking is unavailable; progress will not be reported."); } return ""; } }
   function save() {
+        if (resumeChoicePending) return;
+        call("SetValue", ["cmi.exit", "suspend"]);
     call("SetValue", ["cmi.location", String(state.current)]);
         call("SetValue", ["cmi.suspend_data", JSON.stringify({ current: state.current, visited: [...state.visited], completedAudio: [...state.completedAudio], assessments: state.assessments, remediation: state.remediation })]);
     call("Commit", [""]); 
@@ -63,9 +78,26 @@ PLAYER_JS = r'''(() => {
         if (item.type === "ordering") controls = choiceList.map((choice, index) => `<label>${index + 1}. <select data-order-index="${index}" ${disabled ? "disabled" : ""}><option value="">Choose</option>${choiceList.map(option => `<option value="${escapeHtml(option.identifier)}" ${result.response[index] === option.identifier ? "selected" : ""}>${escapeHtml(option.text)}</option>`).join("")}</select></label>`).join("");
         if (item.type === "matching" || item.type === "drag-drop") { const sources = item.type === "matching" ? item.leftItems : item.draggables; const targets = item.type === "matching" ? item.rightItems : item.targets; controls = sources.map(source => `<label>${escapeHtml(source.text)} <select data-match-source="${escapeHtml(source.identifier)}" ${disabled ? "disabled" : ""}><option value="">Choose a match</option>${targets.map(target => `<option value="${escapeHtml(target.identifier)}" ${result.matches[source.identifier] === target.identifier ? "selected" : ""}>${escapeHtml(target.text)}</option>`).join("")}</select></label>`).join(""); }
         if (item.type === "short-answer") controls = `<label>Your answer <input data-text-response maxlength="1000" value="${escapeHtml(result.textResponse)}" ${disabled ? "disabled" : ""}></label>`;
-        const outcome = result.attempts ? `<p>${result.isCorrect ? escapeHtml(item.correctFeedback) : escapeHtml(item.incorrectFeedback)} Score: ${result.isCorrect ? 100 : 0}% (${result.attempts}/${settings(scene).maxAttempts} attempts).</p>` : "";
-        const remediation = result.isCorrect === false && settings(scene).remediationSceneId ? `<button type="button" data-remediation="${escapeHtml(settings(scene).remediationSceneId)}">Review lesson</button>` : "";
-        return `<section class="assessment"><h3>${escapeHtml(item.prompt)}</h3><form id="assessment-form">${controls}<button type="submit" ${disabled ? "disabled" : ""}>${result.attempts ? "Try again" : "Check answer"}</button>${outcome}${remediation}</form></section>`;
+        const feedback = result.attempts && result.isCorrect !== null ? `<button type="button" data-view-feedback>View feedback</button>` : "";
+        return `<section class="assessment"><h3>${escapeHtml(item.prompt)}</h3><form id="assessment-form">${controls}<button type="submit" ${disabled ? "disabled" : ""}>${result.isCorrect === true ? "Passed" : result.attempts >= settings(scene).maxAttempts ? "Attempts used" : result.attempts ? "Try again" : "Check answer"}</button>${feedback}</form></section>`;
+    }
+    function showAssessmentFeedback(scene) {
+        const result = state.assessments[scene.id];
+        if (!result || result.isCorrect === null) return;
+        const correct = result.isCorrect === true;
+        const config = settings(scene);
+        const dialog = document.createElement("dialog");
+        dialog.className = "assessment-feedback-dialog";
+        dialog.setAttribute("aria-labelledby", "assessment-feedback-title");
+        dialog.innerHTML = `<h2 id="assessment-feedback-title">${correct ? "Correct" : "Not correct"}</h2><p class="assessment-feedback-message ${correct ? "correct" : "incorrect"}">${escapeHtml(correct ? scene.assessmentItem.correctFeedback : scene.assessmentItem.incorrectFeedback)}</p><p>Score: ${correct ? 100 : 0}% (${result.attempts}/${config.maxAttempts} attempts). Pass ${config.passingScore}%.</p>${!correct && result.attempts >= config.maxAttempts ? "<p>Attempts exhausted.</p>" : ""}${!correct && config.remediationSceneId ? '<button type="button" data-feedback-review>Review lesson</button>' : ''}<button type="button" data-close-feedback autofocus>Close feedback</button>`;
+        document.body.appendChild(dialog);
+        const close = () => { dialog.close(); };
+        dialog.querySelector("[data-close-feedback]").onclick = close;
+        dialog.addEventListener("close", () => { dialog.remove(); const target = document.querySelector("[data-view-feedback]"); if (target) target.focus(); }, { once: true });
+        const review = dialog.querySelector("[data-feedback-review]");
+        if (review) review.onclick = () => { close(); state.remediation = { assessmentSceneId: scene.id, remediationSceneId: config.remediationSceneId }; state.current = state.scenes.findIndex(item => item.id === config.remediationSceneId); save(); render(); };
+        dialog.showModal();
+        dialog.querySelector("[data-close-feedback]").focus();
     }
     function finish() {
         const required = state.scenes.filter(scene => scene.required);
@@ -96,11 +128,17 @@ PLAYER_JS = r'''(() => {
         form.querySelectorAll("[data-match-source]").forEach(input => input.addEventListener("change", () => { const matches = { ...current().matches, [input.dataset.matchSource]: input.value }; state.assessments[scene.id] = { ...current(), matches, isCorrect: null }; }));
         const textInput = form.querySelector("[data-text-response]");
         if (textInput) textInput.addEventListener("input", () => { state.assessments[scene.id] = { ...current(), textResponse: textInput.value, isCorrect: null }; });
-        form.addEventListener("submit", event => { event.preventDefault(); const result = current(); const hasResponse = result.response.length || Object.keys(result.matches).length || result.textResponse.trim().length; if (!hasResponse || result.isCorrect === true || result.attempts >= settings(scene).maxAttempts) return; state.assessments[scene.id] = { ...result, attempts: result.attempts + 1, isCorrect: assessmentCorrect(scene.assessmentItem, result) }; render(); });
+        form.addEventListener("submit", event => { event.preventDefault(); const result = current(); const hasResponse = result.response.length || Object.keys(result.matches).length || result.textResponse.trim().length; if (!hasResponse || result.isCorrect === true || result.attempts >= settings(scene).maxAttempts) return; state.assessments[scene.id] = { ...result, attempts: result.attempts + 1, isCorrect: assessmentCorrect(scene.assessmentItem, result) }; render(); showAssessmentFeedback(scene); });
+        const feedback = form.querySelector("[data-view-feedback]");
+        if (feedback) feedback.onclick = () => showAssessmentFeedback(scene);
         const remediation = form.querySelector("[data-remediation]");
         if (remediation) remediation.addEventListener("click", () => { state.remediation = { assessmentSceneId: scene.id, remediationSceneId: remediation.dataset.remediation }; state.current = state.scenes.findIndex(item => item.id === remediation.dataset.remediation); save(); render(); });
     }
     let visualObserver = null;
+    let stopStageAnimations = null;
+    let animationSceneId = null;
+    let sceneEnteredAt = 0;
+    let motionEnabled = true;
     function renderVisualScene(scene, body) {
         const layout = scene.visualLayout;
         const frame = document.createElement("div");
@@ -112,8 +150,10 @@ PLAYER_JS = r'''(() => {
         const background = window.__CHIMERA_ASSETS[layout.backgroundAsset];
         if (background) { stage.style.backgroundImage = `url("${background.path}")`; stage.style.backgroundSize = "100% 100%"; }
         layout.elements.forEach(element => {
+            if (scene.assessmentItem && element.kind === "text" && element.text.trim() === scene.title.trim()) return;
             const node = document.createElement("div");
             node.className = "visual-element";
+            node.setAttribute("data-scene-element", element.id);
             node.style.cssText = `position:absolute;left:${element.x}px;top:${element.y}px;width:${element.width}px;height:${element.height}px;transform:rotate(${element.rotation}deg);overflow:hidden`;
             if (element.kind === "text") {
                 node.textContent = element.text;
@@ -148,18 +188,41 @@ PLAYER_JS = r'''(() => {
             stage.appendChild(node);
         });
         frame.appendChild(stage); body.appendChild(frame);
+        if (scene.assessmentItem) {
+            const heading = layout.elements.find(element => element.kind === "text" && element.text.trim() === scene.title.trim());
+            const x = Math.max(0, Math.min(heading?.x ?? layout.width * 0.05, layout.width * 0.9));
+            const y = Math.max(0, Math.min(heading?.y ?? layout.height * 0.05, layout.height * 0.9));
+            const region = layout.assessmentRegion || { x, y, width: Math.min(heading?.width ?? layout.width * 0.9, layout.width - x - layout.width * 0.05) };
+            const question = document.createElement("div");
+            question.className = "assessment-stage-region";
+            question.setAttribute("aria-label", "Assessment question");
+            frame.classList.add("assessment-stage-frame");
+            question.style.cssText = `position:relative;box-sizing:border-box;overflow:visible;z-index:2001;left:${region.x/layout.width*100}%;margin-top:${region.y/layout.width*100}%;width:${region.width/layout.width*100}%;font-family:sans-serif;overflow-wrap:anywhere`;
+            question.innerHTML = assessmentHtml(scene);
+            frame.appendChild(question);
+        }
         visualObserver = new ResizeObserver(() => { stage.style.transform = `scale(${frame.clientWidth/layout.width})`; });
         visualObserver.observe(frame);
+        if (motionEnabled && layout.elements.some(element => element.animations)) stopStageAnimations = playStageAnimations(frame, layout.elements, Date.now() - sceneEnteredAt);
     }
     function render() {
-    const scene = state.scenes[state.current];
+    let scene = state.scenes[state.current];
     if (!scene) return;
+    if (stopStageAnimations) { stopStageAnimations(); stopStageAnimations = null; }
+    if (animationSceneId !== scene.id) { animationSceneId = scene.id; sceneEnteredAt = Date.now(); }
+    if (scene.assessmentItem && !scene.visualLayout?.enabled) {
+        scene = { ...scene, visualLayout: scene.visualLayout ? { ...scene.visualLayout, enabled: true } : { version: 1, enabled: true, width: 1280, height: 720, backgroundColor: "#ffffff", backgroundAsset: scene.backgroundAsset || null,
+            assessmentRegion: scene.visualLayout?.assessmentRegion || null,
+            elements: [{ id: "assessment-title", kind: "text", x: 60, y: 40, width: 1160, height: 100, text: scene.title, fontSize: 40, fontFamily: "sans-serif", color: "#202020", rotation: 0, align: "left" }] } };
+    }
     state.visited.add(scene.id);
     document.querySelector("#scene-title").textContent = scene.title;
     const body = document.querySelector("#scene-body");
     if (visualObserver) { visualObserver.disconnect(); visualObserver = null; }
     const visual = scene.visualLayout && scene.visualLayout.enabled;
-    body.innerHTML = (state.remediation && state.remediation.remediationSceneId === scene.id ? `<button type="button" data-return-assessment>Return to question</button>` : "") + (visual ? "" : text(scene));
+    const nativeSlide = !visual && !scene.previewImage && scene.layoutMode === "native";
+    document.querySelector("#scene-title").className = nativeSlide || scene.assessmentItem ? "sr-only" : "";
+    body.innerHTML = (state.remediation && state.remediation.remediationSceneId === scene.id ? `<button type="button" data-return-assessment>Return to question</button>` : "") + (visual ? "" : nativeSlide ? `<section class="native-slide" aria-label="Scene content"><h3>${escapeHtml(scene.title)}</h3><div>${text(scene)}</div></section>` : text(scene));
     if (visual) renderVisualScene(scene, body);
     if (!visual && scene.previewImage) {
         const slideImage = document.createElement("img");
@@ -174,7 +237,7 @@ PLAYER_JS = r'''(() => {
         slideImage.addEventListener("error", () => { runtimeStatus("Slide preview could not be loaded; slide text remains available below."); slideImage.remove(); });
         body.prepend(slideImage);
     }
-    document.querySelector("#scene-assessment").innerHTML = assessmentHtml(scene);
+    document.querySelector("#scene-assessment").innerHTML = visual && scene.assessmentItem ? "" : assessmentHtml(scene);
     bindAssessment(scene);
     const returnButton = document.querySelector("[data-return-assessment]");
     if (returnButton) returnButton.addEventListener("click", () => { state.current = state.scenes.findIndex(item => item.id === state.remediation.assessmentSceneId); state.remediation = null; save(); render(); });
@@ -185,21 +248,58 @@ PLAYER_JS = r'''(() => {
     document.querySelector("#previous").disabled = state.current === 0;
     document.querySelector("#next").disabled = state.current === state.scenes.length - 1;
     document.querySelector("#contents").value = String(state.current);
+    document.querySelector("#motion").hidden = !scene.visualLayout?.elements.some(element => element.animations && Object.values(element.animations).some(phase => phase.effect !== "none"));
+    document.querySelector("#motion").textContent = motionEnabled ? "Stop motion" : "Play motion";
     finish();
   }
   async function start() {
-        api = findApi(); if (!api) runtimeStatus("Preview mode: no LMS tracking connection detected."); if (api) { api.Initialize(""); const location = Number(api.GetValue("cmi.location")); if (Number.isInteger(location) && location >= 0) state.current = location; try { const saved = JSON.parse(api.GetValue("cmi.suspend_data") || "{}"); (saved.visited || []).forEach(id => state.visited.add(id)); (saved.completedAudio || []).forEach(key => state.completedAudio.add(key)); state.assessments = saved.assessments || {}; state.remediation = saved.remediation || null; } catch (_) {} }
-    const response = await fetch("storyboard.json"); const storyboard = await response.json(); state.scenes = storyboard.scenes || []; state.completionSettings = storyboard.completionSettings || state.completionSettings;
+                const localCourse = window.__CHIMERA_STORYBOARD;
+                api = localCourse ? null : findApi(); if (!api) runtimeStatus(localCourse ? "Local course: progress is kept only while this page is open." : "Preview mode: no LMS tracking connection detected."); if (api) { const initialized = call("Initialize", [""]); if (initialized !== true && initialized !== "true") { runtimeStatus("LMS initialization failed; progress and grades will not be saved."); api = null; } else { runtimeStatus("Connected to LMS tracking."); const location = Number(call("GetValue", ["cmi.location"])); if (Number.isInteger(location) && location >= 0) state.current = location; try { const saved = JSON.parse(call("GetValue", ["cmi.suspend_data"]) || "{}"); (saved.visited || []).forEach(id => state.visited.add(id)); (saved.completedAudio || []).forEach(key => state.completedAudio.add(key)); state.assessments = saved.assessments || {}; state.remediation = saved.remediation || null; } catch (_) {} } }
+        const storyboard = localCourse || await (await fetch("storyboard.json")).json(); state.scenes = storyboard.scenes || []; state.completionSettings = storyboard.completionSettings || state.completionSettings;
     window.__CHIMERA_ASSETS = Object.fromEntries((storyboard.assets || []).map(asset => [asset.id, { ...asset, path: asset.path }]));
+    if (!Number.isInteger(state.current) || state.current < 0 || state.current >= state.scenes.length) state.current = 0;
     const contents = document.querySelector("#contents");
     state.scenes.forEach((scene, index) => { const option = document.createElement("option"); option.value = String(index); option.textContent = `${index + 1}. ${scene.title}`; contents.appendChild(option); });
     contents.addEventListener("change", () => { state.current = Number(contents.value); state.remediation = null; save(); render(); });
     document.querySelector("#previous").onclick = () => { state.current -= 1; save(); render(); };
     document.querySelector("#next").onclick = () => { state.current += 1; save(); render(); };
+    document.querySelector("#motion").onclick = () => { motionEnabled = !motionEnabled; sceneEnteredAt = Date.now(); render(); };
     document.querySelector("#course-title").textContent = storyboard.title || "Chimera course";
+    const hasSavedProgress = state.current > 0 || state.visited.size > 0 || state.completedAudio.size > 0 || Object.keys(state.assessments).length > 0 || state.remediation;
+    if (api && hasSavedProgress) {
+        const resumeDialog = document.createElement("dialog");
+        if (typeof resumeDialog.showModal === "function") {
+            resumeChoicePending = true;
+            resumeDialog.id = "resume-dialog";
+            resumeDialog.setAttribute("aria-labelledby", "resume-title");
+            resumeDialog.setAttribute("aria-describedby", "resume-location resume-policy");
+            resumeDialog.innerHTML = `<h2 id="resume-title">Continue your course?</h2><p id="resume-location">Scene ${state.current + 1} of ${state.scenes.length}: ${escapeHtml(state.scenes[state.current]?.title || "Course start")}</p><p id="resume-policy">Continue with your saved progress, or start over to reset this course's answers, attempts, and progress. This does not create a new LMS attempt; LMS grading rules still apply.</p><div class="controls"><button id="resume-restart" type="button">Start over</button><button id="resume-continue" type="button" autofocus>Continue</button></div>`;
+            document.body.appendChild(resumeDialog);
+            await new Promise(resolve => {
+                resumeDialog.addEventListener("cancel", event => event.preventDefault());
+                document.querySelector("#resume-continue").onclick = resolve;
+                document.querySelector("#resume-restart").onclick = () => {
+                    state.current = 0;
+                    state.visited.clear();
+                    state.completedAudio.clear();
+                    state.assessments = {};
+                    state.remediation = null;
+                    resolve();
+                };
+                resumeDialog.showModal();
+                document.querySelector("#resume-continue").focus();
+            });
+            resumeDialog.close();
+            resumeDialog.remove();
+            resumeChoicePending = false;
+        }
+    }
     render();
   }
-  window.addEventListener("beforeunload", () => { save(); if (api) { api.SetValue("cmi.session_time", "PT" + Math.floor((Date.now() - state.startedAt) / 1000) + "S"); api.Terminate(""); } });
+    let terminated = false;
+    function endSession() { if (terminated) return; save(); if (api) { call("SetValue", ["cmi.session_time", "PT" + Math.floor((Date.now() - state.startedAt) / 1000) + "S"]); call("Commit", [""]); call("Terminate", [""]); } terminated = true; }
+    window.addEventListener("pagehide", endSession);
+    window.addEventListener("beforeunload", endSession);
   start().catch(error => { document.querySelector("#scene-body").textContent = `Course could not be loaded: ${error.message}`; });
 })();
 '''
@@ -207,8 +307,15 @@ PLAYER_JS = r'''(() => {
 
 PLAYER_HTML = '''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Chimera course</title>
+<style>.assessment-stage-frame{display:flow-root;box-sizing:border-box;padding-bottom:12px}@media(max-width:600px){.assessment-stage-frame{min-height:0!important}}</style>
+<style>#resume-dialog{box-sizing:border-box;width:min(520px,calc(100% - 32px));max-height:90vh;overflow:auto;border:1px solid #52685a;border-radius:6px;padding:24px;background:#fff;color:#26352c;font:16px/1.5 system-ui,sans-serif}#resume-dialog::backdrop{background:rgba(0,0,0,.55)}#resume-dialog h2{margin-top:0}#resume-dialog .controls{flex-wrap:wrap}#resume-dialog button{min-height:44px}</style>
+<style>.assessment-stage-region h3{font-size:24px;margin:0 0 20px}.assessment-stage-region label{display:block;margin:12px 0}.assessment-stage-region button,.assessment-stage-region input,.assessment-stage-region select{font:inherit}.assessment-stage-region button{padding:8px 16px;margin:16px 0}.assessment-stage-region input[type=radio],.assessment-stage-region input[type=checkbox]{width:22px;height:22px}@media(max-width:600px){.assessment-stage-frame{min-height:600px;aspect-ratio:auto!important}}</style>
+<style>.native-slide{box-sizing:border-box;width:100%;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:center;gap:24px;padding:48px 56px;border:1px solid #ccd5cc;background:#fff;overflow-wrap:anywhere}.native-slide h3{margin:0;font-size:32px;line-height:1.25}.native-slide p{margin:0 0 16px;font-size:20px;line-height:1.6}.native-slide p:last-child{margin-bottom:0}@media(max-width:600px){.native-slide{padding:28px 24px;gap:20px}.native-slide h3{font-size:24px}.native-slide p{font-size:18px}}</style>
 <style>body{margin:0;background:#f4f5f1;color:#26352c;font:16px system-ui,sans-serif}main{max-width:960px;margin:0 auto;padding:32px 20px}header{border-bottom:1px solid #ccd5cc;margin-bottom:24px}h1{font-size:28px;margin:0 0 20px}h2{font-size:24px}#scene-body{line-height:1.6}#scene-media{display:grid;gap:16px;margin:24px 0}#scene-media img{max-width:100%;max-height:520px;object-fit:contain;background:#fff}audio{width:100%}.controls{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:28px}.controls button{border:1px solid #52685a;background:#fff;color:#26352c;padding:10px 16px;border-radius:4px;font:inherit}.controls button:disabled{opacity:.45}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}</style></head>
-<body><main><header><h1 id="course-title">Loading course...</h1><p id="scene-status" aria-live="polite"></p><p id="runtime-status" role="status" aria-live="polite"></p><label for="contents">Contents</label> <select id="contents" aria-label="Contents" style="max-width:100%;padding:8px;font:inherit"></select></header><article aria-labelledby="scene-title"><h2 id="scene-title"></h2><div id="scene-body"></div><div id="scene-assessment"></div><div id="scene-media"></div></article><nav class="controls" aria-label="Scene navigation"><button id="previous" type="button">Previous</button><span class="sr-only">Scene navigation</span><button id="next" type="button">Next</button></nav></main><script src="player.js"></script></body></html>'''
+<body><main><header><h1 id="course-title">Loading course...</h1><p id="scene-status" aria-live="polite"></p><p id="runtime-status" role="status" aria-live="polite"></p><label for="contents">Contents</label> <select id="contents" aria-label="Contents" style="max-width:100%;padding:8px;font:inherit"></select></header><article aria-labelledby="scene-title"><h2 id="scene-title"></h2><div id="scene-body"></div><div id="scene-assessment"></div><div id="scene-media"></div></article><nav class="controls" aria-label="Scene navigation"><button id="previous" type="button">Previous</button><button id="motion" type="button" hidden>Stop motion</button><span class="sr-only">Scene navigation</span><button id="next" type="button">Next</button></nav></main><script src="player.js"></script></body></html>'''
+
+
+PLAYER_HTML = PLAYER_HTML.replace("</head>", f"<style>{ASSESSMENT_SURFACE_CSS}</style></head>")
 
 
 def _scorm_12_player() -> str:
@@ -220,6 +327,8 @@ def _scorm_12_player() -> str:
     player = player.replace("api.Commit", "api.LMSCommit")
     player = player.replace("api.Terminate", "api.LMSFinish")
     player = player.replace('"cmi.location"', '"cmi.core.lesson_location"')
+    player = player.replace('"cmi.exit"', '"cmi.core.exit"')
+    player = player.replace('"PT" + Math.floor((Date.now() - state.startedAt) / 1000) + "S"', 'new Date(Date.now() - state.startedAt).toISOString().slice(11, 19)')
     player = player.replace('"cmi.completion_status", complete ? "completed" : "incomplete"', '"cmi.core.lesson_status", complete ? "completed" : "incomplete"')
     player = player.replace('call("SetValue", ["cmi.success_status", complete ? (passed ? "passed" : "failed") : "unknown"]);', 'call("SetValue", ["cmi.core.lesson_status", complete ? (passed ? "passed" : "failed") : "incomplete"]);')
     player = player.replace('"cmi.score.min"', '"cmi.core.score.min"')
@@ -259,7 +368,7 @@ def _compatibility_checks(package: bytes, profile: str) -> list[dict[str, object
     local_hrefs = [href for href in hrefs if not urlsplit(href).scheme and not urlsplit(href).netloc]
     safe_hrefs = all(not Path(href).is_absolute() and ".." not in Path(href).parts for href in local_hrefs)
     profile_token_found = (
-        "API_1484_11" in runtime if profile.startswith("SCORM 2004") else "window.API || null" in runtime
+        "API_1484_11" in runtime if profile.startswith("SCORM 2004") else "view.API" in runtime
     )
     return [
         {"name": "manifest-at-root", "passed": manifest_present},

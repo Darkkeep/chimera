@@ -1,9 +1,13 @@
 import { useRef, useState } from "react";
 import { Rnd } from "react-rnd";
-import { AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignHorizontalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, AlignVerticalJustifyStart, ArrowDown, ArrowUp, Check, Copy, ImagePlus, Lock, Plus, Redo2, Sparkles, Trash2, Undo2, Unlock, X } from "lucide-react";
+import { AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignHorizontalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, AlignVerticalJustifyStart, ArrowDown, ArrowUp, Check, Copy, ImagePlus, Lock, Play, Plus, Redo2, Sparkles, Square, Trash2, Undo2, Unlock, X } from "lucide-react";
 import type { Project, Scene } from "./App";
 import { EditorDialog } from "./EditorDialog";
-import { ElementContent, initialLayout, newElement, ScaledStage } from "./SceneSurface";
+import { AssessmentDraftPreview } from "./AssessmentDraftPreview";
+import { assessmentRegion, ElementContent, initialLayout, newElement, ScaledStage, SceneSurface } from "./SceneSurface";
+import { alignExitTiming, AnimationControls, defaultAnimations } from "./AnimationControls";
+import { fitLayoutText, textFitMessage } from "./text-fit";
+import { AssessmentStageContent } from "./AssessmentStageContent";
 import type { SceneElement, SceneLayout } from "./SceneSurface";
 
 export type SceneEditSettings = {
@@ -17,6 +21,8 @@ export type SceneEditSettings = {
   notes: string;
   required: boolean;
   audioRequired: boolean;
+  assessmentItem: Scene["assessmentItem"];
+  assessmentSettings: Scene["assessmentSettings"];
   canvasEdited: boolean;
 };
 
@@ -28,6 +34,8 @@ export type GeneratedSceneDraft = {
   narration: string;
   notes: string;
   required: boolean;
+  assessmentItem?: Scene["assessmentItem"];
+  assessmentSettings?: Scene["assessmentSettings"];
   visualLayout: SceneLayout;
 };
 function syncSceneText(layout: SceneLayout, scene: Scene, title: string, screenText: string, generatedLayout = false): SceneLayout {
@@ -48,11 +56,12 @@ function syncSceneText(layout: SceneLayout, scene: Scene, title: string, screenT
   return next;
 }
 
-export function SceneVisualEditor({ project, scene, templates, onClose, onSave, onExtract, onGenerate, canGenerate, initialPanel = "canvas" }: { project: Project; scene: Scene; templates: { id: string; title: string }[]; onClose: () => void; onSave: (layout: SceneLayout, settings: SceneEditSettings) => Promise<void>; onExtract: () => Promise<SceneLayout>; onGenerate: (prompt: string) => Promise<GeneratedSceneDraft>; canGenerate: boolean; initialPanel?: "canvas" | "details" }) {
+export function SceneVisualEditor({ project, scene, templates, onClose, onSave, onExtract, onGenerate, canGenerate, initialPanel = "canvas" }: { project: Project; scene: Scene; templates: { id: string; title: string }[]; onClose: () => void; onSave: (layout: SceneLayout, settings: SceneEditSettings) => Promise<void>; onExtract: () => Promise<SceneLayout>; onGenerate: (prompt: string, currentScene: Partial<Scene>) => Promise<GeneratedSceneDraft>; canGenerate: boolean; initialPanel?: "canvas" | "details" }) {
   const [history, setHistory] = useState<SceneLayout[]>(() => [initialLayout(scene)]);
   const [cursor, setCursor] = useState(0);
   const [selection, setSelection] = useState<string | null>(null);
   const [sourceVisible, setSourceVisible] = useState(false);
+  const [motionPreview, setMotionPreview] = useState(0);
   const [editingText, setEditingText] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -70,15 +79,25 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
   const [notes, setNotes] = useState(scene.notes);
   const [required, setRequired] = useState(scene.required);
   const [audioRequired, setAudioRequired] = useState(scene.audioRequired);
+  const [assessmentItem, setAssessmentItem] = useState(scene.assessmentItem);
+  const [assessmentSettings, setAssessmentSettings] = useState(scene.assessmentSettings);
   const [scenePrompt, setScenePrompt] = useState("");
   const [generatingDraft, setGeneratingDraft] = useState(false);
   const [draftError, setDraftError] = useState("");
   const textInput = useRef<HTMLTextAreaElement>(null);
   const layout = history[cursor];
+  const questionRegion = assessmentRegion(layout, title);
   const selected = layout.elements.find(element => element.id === selection);
   const images = project.storyboard.assets.filter(asset => asset.kind === "image");
   const [imageId, setImageId] = useState("");
   function commit(next: SceneLayout) {
+    setMotionPreview(0);
+    if (next.assessmentRegion) {
+      const region = next.assessmentRegion;
+      const width = Math.min(region.width, next.width);
+      const height = Math.min(region.height, next.height);
+      next = { ...next, assessmentRegion: { width, height, x: Math.max(0, Math.min(region.x, next.width - width)), y: Math.max(0, Math.min(region.y, next.height - height)) } };
+    }
     setCanvasEdited(true);
     const nextHistory = [...history.slice(0, cursor + 1), next].slice(-100);
     setHistory(nextHistory); setCursor(nextHistory.length - 1);
@@ -122,10 +141,16 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
       const savedMode = layoutMode === "fidelity" && canvasEdited ? "hybrid" : layoutMode;
       const updatedLayout = sceneTextDirty ? syncSceneText(layout, scene, title.trim(), screenText, generatedLayoutApplied) : structuredClone(layout);
       updatedLayout.enabled = savedMode !== "fidelity";
+      if (updatedLayout.enabled) {
+        const checked = await fitLayoutText(updatedLayout);
+        if (checked.issues.length) throw new Error(textFitMessage(checked.issues));
+      }
       await onSave(updatedLayout, {
         title: title.trim(), sceneType, layoutMode: savedMode, templateId,
         extractedText: screenText.split(/\r?\n/).map(text => text.trim()).filter(Boolean),
         actionDescription: actionDescription.trim(), narration, notes, required, audioRequired,
+        assessmentItem: sceneType === "question" ? assessmentItem : null,
+        assessmentSettings: sceneType === "question" ? assessmentSettings : null,
         canvasEdited: canvasEdited || JSON.stringify(layout) !== JSON.stringify(initialLayout(scene)),
       });
       onClose();
@@ -137,7 +162,18 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
     if (!scenePrompt.trim() || generatingDraft || busy) return;
     setGeneratingDraft(true);
     setDraftError("");
-    try { applyGeneratedDraft(await onGenerate(scenePrompt.trim())); }
+    try {
+      const draft = await onGenerate(scenePrompt.trim(), {
+        title: title.trim(), sceneType, layoutMode, templateId: templateId || null,
+        extractedText: screenText.split(/\r?\n/).map(text => text.trim()).filter(Boolean),
+        actionDescription, narration, notes, required, audioRequired,
+        assessmentItem, assessmentSettings,
+        visualLayout: sceneTextDirty ? syncSceneText(layout, scene, title.trim(), screenText, generatedLayoutApplied) : layout,
+      });
+      const fitted = await fitLayoutText(draft.visualLayout, true);
+      applyGeneratedDraft({ ...draft, visualLayout: fitted.layout });
+      if (fitted.issues.length) setError(textFitMessage(fitted.issues));
+    }
     catch (issue) { setDraftError(issue instanceof Error ? issue.message : "Scene draft could not be generated."); }
     finally { setGeneratingDraft(false); }
   }
@@ -156,6 +192,8 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
     setNarration(draft.narration);
     setNotes(draft.notes);
     setRequired(draft.required);
+    setAssessmentItem(draft.assessmentItem === undefined ? assessmentItem : draft.assessmentItem);
+    setAssessmentSettings(draft.assessmentSettings === undefined ? assessmentSettings : draft.assessmentSettings);
     setSceneTextDirty(true);
     setLayoutMode("native");
     setTemplateId("");
@@ -168,6 +206,27 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
       <button type="button" role="tab" aria-selected={panel === "details"} onClick={() => setPanel("details")}>Details</button>
     </div>
     {panel === "canvas" && <div className="visual-editor-toolbar" role="toolbar" aria-label="Stage content tools">
+      <button type="button" className="button button-outline" disabled={busy || sourceVisible} onClick={async () => {
+        setBusy(true); setError("");
+        try {
+          const current = sceneTextDirty ? syncSceneText(layout, scene, title.trim(), screenText, generatedLayoutApplied) : layout;
+          const fitted = await fitLayoutText(current, true);
+          commit(fitted.layout);
+          if (fitted.issues.length) setError(textFitMessage(fitted.issues));
+        } catch (issue) { setError(issue instanceof Error ? issue.message : "Text could not be measured."); }
+        finally { setBusy(false); }
+      }}><Check size={16} />Fit text</button>
+      <button type="button" className="icon-button" title="Preview animations" aria-label="Preview animations" disabled={busy || sourceVisible} onClick={() => setMotionPreview(current => current + 1)}><Play size={18} /></button>
+      {motionPreview > 0 && <button type="button" className="icon-button" title="Stop animation preview" aria-label="Stop animation preview" onClick={() => setMotionPreview(0)}><Square size={18} /></button>}
+      <button type="button" className="icon-button" title="Stagger text entrances" aria-label="Stagger text entrances" disabled={busy || sourceVisible} onClick={() => {
+        let textIndex = 0;
+        const currentLayout = sceneTextDirty ? syncSceneText(layout, scene, title.trim(), screenText, generatedLayoutApplied) : layout;
+        commit({ ...currentLayout, elements: currentLayout.elements.map(element => {
+          if (element.kind !== "text" || element.locked) return element;
+          const animations = alignExitTiming({ ...(element.animations || defaultAnimations()), entrance: { effect: "bounce", durationMs: 600, delayMs: Math.min(59000, textIndex++ * 150) } });
+          return animations.exit.delayMs > 60000 ? element : { ...element, animations };
+        }) });
+      }}><Sparkles size={18} /></button>
       <button type="button" className="icon-button" title="Add text" aria-label="Add text" disabled={busy || sourceVisible} onClick={() => { const element = newElement("text"); commit({ ...layout, elements: [...layout.elements, element] }); setSelection(element.id); }}><Plus size={18} /></button>
       <button type="button" className="icon-button" title="Undo" aria-label="Undo" disabled={busy || cursor === 0} onClick={() => setCursor(cursor - 1)}><Undo2 size={18} /></button>
       <button type="button" className="icon-button" title="Redo" aria-label="Redo" disabled={busy || cursor === history.length - 1} onClick={() => setCursor(cursor + 1)}><Redo2 size={18} /></button>
@@ -179,6 +238,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
     {error && <p className="visual-editor-error" role="alert">{error}</p>}
     {panel === "canvas" && layout.warnings.length > 0 && <details className="visual-editor-warnings"><summary>{layout.warnings.length} import limitations</summary><ul>{layout.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></details>}
     {panel === "details" ? <div className="visual-scene-details">
+      {sceneType === "question" && assessmentItem && <AssessmentDraftPreview item={assessmentItem} settings={assessmentSettings} />}
       {canGenerate && <section className="scene-ai-draft" aria-label="Draft this scene with AI">
         <label>Scene prompt<textarea aria-label="Scene prompt" rows={2} maxLength={3000} value={scenePrompt} onChange={event => setScenePrompt(event.target.value)} placeholder="Describe how this scene should change" /></label>
         <button type="button" className="button button-outline" disabled={!scenePrompt.trim() || generatingDraft || busy} onClick={() => void generateSceneDraft()}><Sparkles size={14} />{generatingDraft ? "Generating draft…" : "Generate scene + layout draft"}</button>
@@ -186,7 +246,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
       </section>}
       <div className="visual-scene-details-grid">
         <label data-onboarding="scene.edit">Scene title<input value={title} maxLength={120} onChange={event => { setTitle(event.target.value); setSceneTextDirty(true); }} /></label>
-        <label>Scene type<select value={sceneType} onChange={event => setSceneType(event.target.value as Scene["sceneType"])}>{[["content", "Content"], ["title", "Title"], ["assessment", "Assessment"], ["media", "Media"], ["interaction", "Interaction"], ["summary", "Summary"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label>Scene type<select value={sceneType} onChange={event => setSceneType(event.target.value as Scene["sceneType"])}>{[["content", "Content"], ["title", "Title"], ["question", "Question"], ["media", "Media"], ["interaction", "Interaction"], ["summary", "Summary"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <label>Rendering mode<select aria-label="Rendering mode" value={layoutMode} onChange={event => { const value = event.target.value as Scene["layoutMode"]; setLayoutMode(value); if (value !== "template") setTemplateId(""); }}>{[["fidelity", "Fidelity"], ["hybrid", "Hybrid"], ["native", "Native"], ["template", "Template"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         {layoutMode === "template" && <label>Template<select value={templateId} onChange={event => setTemplateId(event.target.value)}><option value="">Choose a template</option>{templates.map(template => <option value={template.id} key={template.id}>{template.title}</option>)}</select>{templates.length === 0 && <span className="field-hint">Upload a PPTX template in Templates before assigning one.</span>}</label>}
         <label className="visual-scene-details-wide">On-screen text<textarea rows={5} maxLength={50000} value={screenText} onChange={event => { setScreenText(event.target.value); setSceneTextDirty(true); }} /></label>
@@ -198,12 +258,20 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
       </div>
     </div> : <div className="visual-editor-workspace">
       <div className="visual-editor-canvas" onDragOver={event => { if (event.dataTransfer.types.includes("application/x-chimera-image")) event.preventDefault(); }} onDrop={event => { event.preventDefault(); if (sourceVisible || busy) return; const frame = event.currentTarget.querySelector(".visual-stage-frame")?.getBoundingClientRect(); if (frame) addImage(event.dataTransfer.getData("application/x-chimera-image"), (event.clientX - frame.left) * layout.width / frame.width, (event.clientY - frame.top) * layout.height / frame.height); }}>
-        {sourceVisible ? <img className="visual-source" src={`/api/projects/${project.id}/${scene.previewImage}`} alt={`Source slide ${scene.sourceSlide}`} /> : <ScaledStage layout={layout} projectId={project.id}>{scale => layout.elements.map((element, index) => <Rnd key={element.id} scale={scale} position={{ x: element.x, y: element.y }} size={{ width: element.width, height: element.height }} lockAspectRatio={element.kind === "text"} resizeHandleClasses={{ bottomRight: "visual-resize-handle-se" }} disableDragging={busy || element.locked || editingText === element.id} enableResizing={!busy && !element.locked && editingText !== element.id} minWidth={20} minHeight={20} style={{ zIndex: index }} onDragStart={() => setSelection(element.id)} onDragStop={(_, data) => commit({ ...layout, elements: layout.elements.map(item => item.id === element.id ? { ...item, x: data.x, y: data.y } : item) })} onResizeStart={() => setSelection(element.id)} onResizeStop={(_, __, reference, ___, position) => commit({ ...layout, elements: layout.elements.map(item => item.id === element.id ? { ...item, ...position, width: parseFloat(reference.style.width), height: parseFloat(reference.style.height) } : item) })}>
+        {motionPreview > 0 ? <SceneSurface key={motionPreview} project={project} scene={{ ...scene, title, sceneType, assessmentItem, visualLayout: { ...(sceneTextDirty ? syncSceneText(layout, scene, title.trim(), screenText, generatedLayoutApplied) : layout), enabled: true } }} animate /> : sourceVisible ? <img className="visual-source" src={`/api/projects/${project.id}/${scene.previewImage}`} alt={`Source slide ${scene.sourceSlide}`} /> : <ScaledStage layout={layout} projectId={project.id}>{scale => <>{layout.elements.map((element, index) => <Rnd key={element.id} scale={scale} position={{ x: element.x, y: element.y }} size={{ width: element.width, height: element.height }} lockAspectRatio={element.kind === "text"} resizeHandleClasses={{ bottomRight: "visual-resize-handle-se" }} disableDragging={busy || element.locked || editingText === element.id} enableResizing={!busy && !element.locked && editingText !== element.id} minWidth={20} minHeight={20} style={{ zIndex: index }} onDragStart={() => setSelection(element.id)} onDragStop={(_, data) => commit({ ...layout, elements: layout.elements.map(item => item.id === element.id ? { ...item, x: data.x, y: data.y } : item) })} onResizeStart={() => setSelection(element.id)} onResizeStop={(_, __, reference, ___, position) => commit({ ...layout, elements: layout.elements.map(item => item.id === element.id ? { ...item, ...position, width: parseFloat(reference.style.width), height: parseFloat(reference.style.height) } : item) })}>
           <div role={editingText === element.id ? undefined : "button"} tabIndex={editingText === element.id ? undefined : 0} aria-label={`${element.kind === "text" ? element.text.slice(0, 50) || "Empty text" : "Image"} element`} aria-pressed={editingText === element.id ? undefined : selection === element.id} className={`visual-element visual-editable ${selection === element.id ? "is-selected" : ""}`} style={{ transform: `rotate(${element.rotation}deg)` }} onClick={() => setSelection(element.id)} onDoubleClick={() => { setSelection(element.id); if (element.kind === "text" && !element.locked && !busy) setEditingText(element.id); }} onKeyDown={event => { if (event.target instanceof HTMLTextAreaElement) return; setSelection(element.id); if (element.locked || busy) return; if (event.key === "Enter" && element.kind === "text") { event.preventDefault(); setEditingText(element.id); return; } const step = event.shiftKey ? 10 : 1; const moves: Record<string, {x:number;y:number}> = {ArrowLeft:{x:-step,y:0},ArrowRight:{x:step,y:0},ArrowUp:{x:0,y:-step},ArrowDown:{x:0,y:step}}; if (moves[event.key]) { event.preventDefault(); commit({ ...layout, elements: layout.elements.map(item => item.id === element.id ? { ...item, x:item.x+moves[event.key].x, y:item.y+moves[event.key].y } : item) }); } }}>{editingText === element.id ? <textarea autoFocus aria-label="Edit canvas text" className="visual-inline-text" value={element.text} maxLength={50000} style={{fontSize:element.fontSize,fontFamily:element.fontFamily,color:"#202020",backgroundColor:"#fff"}} onChange={event => commit({...layout,elements:layout.elements.map(item => item.id === element.id ? {...item,text:event.target.value} : item)})} onBlur={() => setEditingText(null)} onKeyDown={event => { if(event.key === "Escape") { event.stopPropagation(); setEditingText(null); } }} /> : <ElementContent element={element} project={project} scene={scene} />}</div>
-        </Rnd>)}</ScaledStage>}
+        </Rnd>)}{sceneType === "question" && assessmentItem && <Rnd scale={scale} bounds="parent" position={{ x: questionRegion.x, y: questionRegion.y }} size={{ width: questionRegion.width, height: questionRegion.height }} minWidth={120} minHeight={80} disableDragging={busy} enableResizing={!busy} style={{ zIndex: 2001 }} onDragStop={(_, data) => commit({ ...layout, assessmentRegion: { ...questionRegion, x: data.x, y: data.y } })} onResizeStop={(_, __, reference, ___, position) => commit({ ...layout, assessmentRegion: { ...position, width: parseFloat(reference.style.width), height: parseFloat(reference.style.height) } })}>
+          <div className="assessment-stage-region" aria-label="Assessment component" style={{ inset: 0, width: "100%", height: "100%" }}><AssessmentStageContent item={assessmentItem} /></div>
+        </Rnd>}</>}</ScaledStage>}
         <section className="visual-attached-images" aria-label="Stage image content"><h3>Content</h3><div>{images.filter(asset => scene.imageAssets.includes(asset.id)).map(asset => <button type="button" key={asset.id} title={asset.filename} aria-label={`Add ${asset.filename}`} draggable={!busy} disabled={busy || sourceVisible} onDragStart={event => event.dataTransfer.setData("application/x-chimera-image", asset.id)} onClick={() => addImage(asset.id)}><img src={`/api/projects/${project.id}/assets/${asset.id}`} alt={asset.filename} /></button>)}</div><div className="visual-library-picker"><select aria-label="Image from media library" value={imageId} onChange={event => setImageId(event.target.value)}><option value="">Media library</option>{images.map(asset => <option key={asset.id} value={asset.id}>{asset.filename}</option>)}</select><button type="button" className="icon-button" title="Add selected image" aria-label="Add selected image" disabled={!imageId || busy || sourceVisible} onClick={() => addImage(imageId)}><ImagePlus size={18} /></button></div></section>
       </div>
       <aside className="visual-inspector" aria-label="Element properties">
+        {selected && <AnimationControls animations={selected.animations} onChange={animations => update({ animations })} disabled={busy || selected.locked || sourceVisible} />}
+        {sceneType === "question" && assessmentItem && <section aria-label="Question placement"><h3>Question</h3><fieldset disabled={busy || sourceVisible}><div className="visual-numbers">{(["x", "y", "width", "height"] as const).map(field => <label key={field}>{field}<input type="number" aria-label={`Question ${field}`} min={field === "width" || field === "height" ? 1 : 0} value={Math.round(questionRegion[field])} onChange={event => {
+          const value = event.target.valueAsNumber;
+          const next = { ...questionRegion, [field]: value };
+          if (Number.isFinite(value) && next.x >= 0 && next.y >= 0 && next.width > 0 && next.height > 0 && next.x + next.width <= layout.width && next.y + next.height <= layout.height) commit({ ...layout, assessmentRegion: next });
+        }} /></label>)}</div></fieldset></section>}
         <section aria-label="Stage settings"><h3>Stage</h3><fieldset disabled={busy || sourceVisible}>
           <label>Stage size<select aria-label="Stage size" value={layout.width === 1280 && layout.height === 720 ? "wide" : layout.width === 960 && layout.height === 720 ? "standard" : layout.width === 720 && layout.height === 720 ? "square" : "custom"} onChange={event => { const sizes: Record<string, [number, number]> = { wide: [1280, 720], standard: [960, 720], square: [720, 720] }; const size = sizes[event.target.value]; if (size) commit({ ...layout, width: size[0], height: size[1] }); }}><option value="wide">Widescreen (16:9)</option><option value="standard">Standard (4:3)</option><option value="square">Square (1:1)</option><option value="custom" disabled>Custom</option></select></label>
           <div className="visual-numbers">{(["width", "height"] as const).map(field => <label key={field}>Stage {field}<input type="number" required aria-label={`Stage ${field}`} min={1} max={10000} value={layout[field]} onChange={event => { const value = event.target.valueAsNumber; if (Number.isFinite(value) && value >= 1 && value <= 10000) commit({ ...layout, [field]: value }); }} /></label>)}</div>

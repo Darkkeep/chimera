@@ -27,10 +27,13 @@ from .references import SUPPORTED_REFERENCE_EXTENSIONS, extract_reference_passag
 from .render import render_slides
 from .qti import assessment_item_xml, assessment_test_package
 from .scorm import persist_scorm_12_build, persist_scorm_build, read_scorm_report
+from .standalone import build_standalone_course
 from .storage import ROOT, EnhancementProposalConflict, StoryboardRevisionConflict, add_project_asset, add_review_reply, approve_generated_candidate, create_enhancement_job, create_enhancement_proposal, create_media_generation_job, create_project, create_review_comment, create_scene, create_scenes, create_template, decide_enhancement_proposal, decide_review_comment, delete_scene, list_enhancement_jobs, list_enhancement_proposals, list_generated_candidates, list_media_generation_jobs, list_projects, list_reference_resources, list_review_comments, list_templates, project_path, read_enhancement_job, read_generated_candidate, read_media_generation_job, read_project, read_template, persist_imported_assets, persist_slide_previews, reorder_scenes, replace_storyboard, replace_template_source, save_reference_resource, slugify, storyboard_transaction, update_from_import, update_project_asset_attribution, update_project_completion_settings, update_project_export_settings, update_generated_candidate, update_media_generation_job, update_scene, update_template, validate_visual_assets, write_project_metadata, write_storyboard, template_path
 from .validation import validate_project
 from .models import CourseDraftRequest, CourseContentDraft, SceneDraftRequest, SceneContentDraft, ProductionStageUpdate
 from .models import TrashedProject
+from .models import AssessmentGroup, AssessmentGroupWrite
+from .storage import save_assessment_group
 from .storage import update_project_production_stage
 from .storage import now_iso
 from .media_generation import media_provider_configured
@@ -73,7 +76,11 @@ ROUTE_ACTIONS = {
     "apply_course_content_draft": "enhancement.job.create",
     "post_enhancement_job_cancel": "enhancement.job.manage", "post_enhancement_job_retry": "enhancement.job.manage",
     "export_qti_assessment_item": "project.export", "export_qti_assessment_test": "project.export",
+    "get_assessments": "project.view", "post_assessment": "project.settings.update",
+    "patch_assessment": "project.settings.update", "delete_assessment": "project.settings.update",
+    "export_qti_assessment_group": "project.export",
     "export_scorm_2004": "project.export", "export_scorm_12": "project.export", "get_scorm_report": "project.export",
+    "export_standalone": "project.export",
     "export_storyboard": "project.export", "export_project_backup": "project.export", "import_project_backup": "project.restore",
     "export_storyboard_docx": "project.export", "export_sme_storyboard_docx": "project.export", "export_full_storyboard_docx": "project.export",
     "import_storyboard": "project.import", "post_project_asset": "media.manage",
@@ -164,7 +171,7 @@ def _hosted_request_action(request: Request) -> str:
         return "project.import"
     if "/assets" in path:
         return "media.manage"
-    if "/completion-settings" in path or "/export-settings" in path or path.endswith("/production-stage"):
+    if "/completion-settings" in path or "/export-settings" in path or path.endswith("/production-stage") or "/assessments" in path:
         return "project.settings.update"
     if "/scenes" in path:
         return "scene.manage"
@@ -739,6 +746,45 @@ def patch_project_export_settings(project_id: str, settings: ExportSettings, if_
         raise HTTPException(status_code=404, detail="Project not found") from error
 
 
+@app.get("/api/projects/{project_id}/assessments", response_model=list[AssessmentGroup])
+def get_assessments(project_id: str) -> list[AssessmentGroup]:
+    try:
+        return read_project(project_id).storyboard.assessments
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+
+
+def _save_assessment(project_id: str, data: AssessmentGroupWrite | None, assessment_id: str | None, if_match: str | None) -> ProjectDetail:
+    expected = _expected_revision(if_match)
+    if expected is None:
+        raise HTTPException(status_code=428, detail="An If-Match storyboard revision is required")
+    try:
+        return save_assessment_group(project_id, data, expected, assessment_id)
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Assessment not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/projects/{project_id}/assessments", response_model=ProjectDetail)
+def post_assessment(project_id: str, data: AssessmentGroupWrite, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
+    return _save_assessment(project_id, data, None, if_match)
+
+
+@app.patch("/api/projects/{project_id}/assessments/{assessment_id}", response_model=ProjectDetail)
+def patch_assessment(project_id: str, assessment_id: str, data: AssessmentGroupWrite, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
+    return _save_assessment(project_id, data, assessment_id, if_match)
+
+
+@app.delete("/api/projects/{project_id}/assessments/{assessment_id}", response_model=ProjectDetail)
+def delete_assessment(project_id: str, assessment_id: str, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
+    return _save_assessment(project_id, None, assessment_id, if_match)
+
+
 @app.get("/api/projects/{project_id}/enhancement-proposals", response_model=list[EnhancementProposal])
 def get_enhancement_proposals(project_id: str) -> list[EnhancementProposal]:
     try:
@@ -1160,6 +1206,26 @@ def export_qti_assessment_item(project_id: str, scene_id: str) -> Response:
     )
 
 
+@app.get("/api/projects/{project_id}/assessments/{assessment_id}/assessment.qti.zip")
+def export_qti_assessment_group(project_id: str, assessment_id: str) -> Response:
+    try:
+        project = read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    group = next((group for group in project.storyboard.assessments if group.id == assessment_id), None)
+    if group is None:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    scenes = {scene.id: scene for scene in project.storyboard.scenes}
+    questions = [scenes[scene_id] for scene_id in group.questionSceneIds if scenes[scene_id].assessmentItem is not None]
+    if len(questions) < 2:
+        raise HTTPException(status_code=422, detail="Assessment QTI export requires at least two authored question scenes in this group")
+    try:
+        package = assessment_test_package(questions, group.title)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return Response(content=package, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{slugify(group.title)}-assessment.qti.zip"'})
+
+
 @app.get("/api/projects/{project_id}/assessment.qti.zip")
 def export_qti_assessment_test(project_id: str) -> Response:
     try:
@@ -1173,6 +1239,22 @@ def export_qti_assessment_test(project_id: str) -> Response:
     filename = f"{slugify(project.title)}-assessment.qti.zip"
     return Response(
         content=package,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/api/projects/{project_id}/standalone.zip")
+def export_standalone(project_id: str) -> Response:
+    try:
+        project = read_project(project_id)
+        content, filename = build_standalone_course(project)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return Response(
+        content=content,
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
@@ -1435,6 +1517,8 @@ def generate_scene_content_draft(project_id: str, scene_id: str, data: SceneDraf
         scene = next((item for item in project.storyboard.scenes if item.id == scene_id), None)
         if scene is None:
             raise HTTPException(status_code=404, detail="Scene not found")
+        if data.currentScene is not None:
+            scene = Scene.model_validate({**scene.model_dump(mode="json"), **data.currentScene.model_dump(mode="json", exclude_unset=True)})
         return generate_scene_draft(project, scene, data.prompt)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error

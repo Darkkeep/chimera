@@ -1,0 +1,23 @@
+.assessments-editor { width: min(760px, calc(100vw - 32px)); }
+.assessments-heading, .assessments-list > li, .assessments-questions > li { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.assessments-heading { flex-wrap: wrap; margin: 12px 0; }
+.assessments-heading h3, .assessments-draft h3 { margin: 0; font-size: 16px; }
+.assessments-list, .assessments-questions { list-style: none; margin: 0; padding: 0; }
+.assessments-list > li, .assessments-questions > li { padding: 12px 0; border-bottom: 1px solid var(--border, #d6dade); }
+.assessments-list > li { flex-wrap: wrap; }
+.assessments-description { display: grid; gap: 4px; min-width: 0; flex: 1 1 180px; overflow-wrap: anywhere; }
+.assessments-description span, .assessments-question small { font-size: 12px; color: var(--text-muted, #59646c); }
+.assessments-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; flex-shrink: 0; }
+.assessments-draft { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border, #d6dade); }
+.assessments-draft fieldset { border: 0; padding: 12px 0 0; margin: 0; min-width: 0; }
+.assessments-questions { max-height: 340px; overflow: auto; }
+.assessments-questions .assessments-question { display: flex; flex-direction: row; align-items: center; gap: 10px; min-width: 0; margin: 0; flex: 1; }
+.assessments-question input { width: 18px; height: 18px; flex-shrink: 0; margin: 0; }
+.assessments-question span { overflow-wrap: anywhere; min-width: 0; }
+.assessments-question small { display: block; margin-top: 3px; }
+.course-preview-assessments { margin: 20px 0; padding: 16px 0; border-block: 1px solid var(--border, #d6dade); }
+.course-preview-assessments h2 { font-size: 16px; margin: 0 0 8px; }
+.course-preview-assessments ul { list-style: none; margin: 0; padding: 0; }
+.course-preview-assessments li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; padding: 8px 0; font-size: 13px; }
+.course-preview-assessments strong { overflow-wrap: anywhere; min-width: 0; }
+@media (max-width: 520px) { .assessments-list .assessments-actions { width: 100%; } }

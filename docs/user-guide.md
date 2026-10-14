@@ -325,6 +325,16 @@ Current question scoring is binary: 0% or 100%. Course score weights affect the 
 | 2 | Set **Maximum attempts**, **Passing score**, **Course score weight**, and an optional **Remediation scene**. | Attempts, scoring contribution, and review destination are specified. | <a href="user-guide/images/assessment-rules.png"><img src="user-guide/images/assessment-rules.png" alt="assessment rules controls" width="240"></a> |
 | 3 | Click **Save question**. | The question and its rules are saved. | <a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
+### Create and edit Assessments
+
+Choose **Question** as the scene type when creating a question scene. Older courses that use the `assessment` scene type load as Question scenes automatically. Use **Create question** or **Edit question** above the selected scene Stage to author its prompt, answers, feedback, and scoring.
+
+An Assessment is a named, ordered collection of Question scenes. Open **Review tools → Assessments**, choose **Create assessment**, enter a title, select questions, and use the arrow controls to set their order. Choose **Save assessment** to persist the collection. Empty collections can be saved as drafts. Use the saved collection's **Edit** control to change its title, membership, or order.
+
+**Download QTI test** exports the collection's authored questions in the selected order; at least two authored questions are required. Preview shows each collection's answered count and weighted score. Grouping does not change course completion settings or count a question twice in the course score.
+
+Deleting an Assessment retains its Question scenes. Deleting a Question scene removes its membership from all Assessments. Remove a Question from its collections before changing its scene type. If another author saves first, reload the latest storyboard and review your retained draft before saving again. Collections are included in storyboard JSON and project backups.
+
 ### Remove an assessment question
 
 | Step | Action | Result | Control image |
@@ -512,6 +522,8 @@ Open Export for the intended saved project. Export uses saved content, not unsav
 
 ### Build a SCORM package
 
+When the LMS returns saved progress, the exported player asks whether to **Continue** at the saved scene or **Start over**. Continue retains answers, attempts, and progress. Start over resets course-owned state and returns to the first scene; it does not create a new LMS attempt or guarantee clearing a previously recorded grade. LMS grading and attempt rules still apply. Closing the course before choosing leaves the saved bookmark unchanged. New launches without saved progress do not show this prompt. Standalone packages have no persistent resume state and are unaffected.
+
 LMS upload controls are outside Chimera and vary by platform. Verify launch, media, completion, score, and resume in the destination LMS.
 
 | Step | Action | Result | Control image |
@@ -528,6 +540,71 @@ A report may be absent before the first build. Verify its revision/date before t
 | --- | --- | --- | --- |
 | 1 | In Export, change **Warn when a package exceeds** and leave the field to save a valid value. | The warning threshold is saved in MB. | <a href="user-guide/images/scorm-export.png"><img src="user-guide/images/scorm-export.png" alt="scorm export controls" width="240"></a> |
 | 2 | After building the corresponding profile, click **Report 2004** or **Report 1.2**. | The latest available profile build report downloads. | <a href="user-guide/images/scorm-export.png"><img src="user-guide/images/scorm-export.png" alt="scorm export controls" width="240"></a> |
+
+### Fit Stage Text
+
+AI scene drafts are measured in the browser before review. If text overflows, Chimera first grows an unlocked, unrotated text box downward into available space without moving its origin or other elements. If necessary it reduces the font size, stopping at 18 px (or the original size if already smaller). Text and animation settings are preserved. Locked text is reported rather than changed.
+
+For an existing scene, select **Edit scene > Stage > Fit text**. The change is undoable and remains unsaved until **Save scene**. The command includes current On-screen text edits. If text still does not fit, the editor identifies it and blocks saving an enabled visual layout until the box or content is corrected. Fidelity-only scenes are not subject to this visual-layout save check.
+
+This is browser-measured overflow checking, not certification of visual quality. Inspect the Stage for existing overlaps, contrast, motion bounds, and reading order. Installed fonts can differ between the authoring and playback machines; recheck representative exported courses on their intended devices. Direct API updates do not run browser measurements.
+
+### Animate Stage Content
+
+Text, images, and shapes on an enabled visual Stage support three animation phases. These settings are editable scene data, not production notes, and run in the editor's motion preview, course Preview, SCORM 2004, SCORM 1.2, and standalone packages.
+
+1. Open **Edit scene > Stage** and select a text, image, or shape element.
+2. In the **Animation** inspector choose an **Entrance**, **Presentation**, or **Exit** effect and set its duration and delay. Use **None** to disable a phase.
+3. For text that dances into place, use the toolbar's **Stagger text entrances** command. It applies a 600 ms bounce entrance to each unlocked text block, adding 150 ms delay per block in element order. It includes the current On-screen text and leaves final positions unchanged.
+4. Select **Preview animations** to play the current unsaved timeline. Select it again to replay, or **Stop animation preview** to return to static editing. Changing an element also returns to editing. Generating or previewing does not save the scene.
+5. Choose **Save scene** and inspect **Preview course** before exporting. Previously downloaded packages must be exported again.
+
+Supported effects:
+
+| Phase | Effects | Timing |
+| --- | --- | --- |
+| Entrance | Fade, slide up, slide from left, zoom, bounce into place | Delay from scene entry; final position remains unchanged. |
+| Presentation | Pulse, sway, highlight | Delay after the entrance ends, or from scene entry if no entrance. Repeats 1-5 times. |
+| Exit | Fade out, slide down, slide to left, shrink out | Absolute scene time, after entrance and presentation finish. Not a transition triggered by Next or Previous. |
+
+Durations are 100-5,000 ms; delays are 0-60,000 ms. Exited elements stay visually hidden until scene re-entry or **Stop motion**. Keep important instructions visible unless the course intentionally requires their removal. Navigation is not delayed by animation. Effects restart when the learner re-enters a scene, not when an assessment result changes. Existing elements without animation settings remain static. Animations do not alter geometry, assessment answers, attempts, or completion rules.
+
+Learners can select **Stop motion** to immediately restore static content, and **Play motion** to restart. In Chimera Preview, **Replay motion** restarts the current scene's effects in one click without navigating, changing assessment answers, or saving the scene. Entrance and finite presentation effects settle into the final static layout, so use Replay when reviewing effects that finished before you could inspect them. Preview hides its separate page heading when the Stage already contains the same title; the accessible scene name remains available. The system's reduced-motion preference suppresses effects and reveals content immediately, including when the preference changes during playback. The assessment question component itself stays interactive and static; animation controls apply to text, image, and shape elements. Arbitrary motion paths, custom scripts/keyframes, click-triggered reveal sequences, audio synchronization, and PowerPoint animation playback are not implemented by these presets.
+
+Scene AI drafting receives the supported animation schema. For example, enter:
+
+> Animate the title and each On-screen text block into its final Stage position when the scene begins. Use staggered bounce entrances, 600 ms each, with 150 ms additional delay per block. Add one gentle sway after each entrance. Keep all final positions unchanged and do not add exits. Configure the visualLayout element animations, not just production notes.
+
+AI drafting returns a complete scene/layout draft, so inspect both its content and animation settings before saving. Model quality still requires review; the schema validates supported effects and timing, not the instructional appropriateness of motion.
+
+### Place an Assessment on the Stage
+
+An authored assessment appears as a question component on the scene Stage, not as a separate block beneath it. The component reads the existing question data; its prompt, choices, answer key, feedback, and scoring are not copied into ordinary text elements.
+
+1. Use **Create question** or **Edit question** above the scene preview to author the question.
+2. Open **Edit scene > Stage**. The question and learner choices appear on the canvas; correct answers are not revealed there.
+3. Drag or resize the question component, or use the **Question** inspector's position and size fields. The region must remain inside the Stage. Shrinking the Stage keeps the saved question region within its new bounds.
+4. Choose **Save scene**. Placement is saved separately from the question, and remains when the question is edited. Use the question editor to change question content; the Stage component is not an independent copy.
+5. Check **Preview course**. The on-stage controls support all seven question types with their existing attempts, scoring, feedback, and remediation behavior.
+
+Existing assessments without placement data receive a default origin matching the scene's title element, and the redundant Stage title is omitted. Explicitly saved positions remain in use. SCORM and standalone exports use the same authored origin and no longer duplicate the question below the Stage. The question panel grows with its content instead of adding an internal scrollbar; the page can scroll for long content. Learner question text uses a compact 16 px base and 20 px prompt, with native form inputs and reduced spacing. Authoring uses a non-interactive representation; use Preview to answer the question. QTI remains question-data-only and does not include Stage placement.
+
+Submitting an answer opens a feedback modal with the explanation, score, attempts, and a Review lesson action when remediation is configured. Close feedback or Escape returns to the question without closing Preview or changing the attempt count. View feedback reopens the last submitted result without submitting another answer. A changed, unsubmitted answer must be checked again before feedback is available. Correct answers and exhausted attempts remain locked according to the existing scoring rules. The platinum question panel retains its brushed finish, rounded corners, and lower-right shadow; modal feedback uses explicit high-contrast success/error colors in either theme.
+
+### Export a standalone local course
+
+1. Open **Export** and find **Standalone course**.
+2. Select **Download standalone ZIP**. The saved course must pass the same production validation as SCORM exports.
+3. Extract the entire ZIP into a folder. Do not run the course from inside the ZIP viewer.
+4. Open the extracted `index.html` in a modern browser. Keep its scripts, `assets`, and any `renders` folders together.
+
+The package contains its own player, course data, and media. It does not require Chimera, an LMS, an internet connection, or a local web server. The same directory can also be hosted on a static web server. Do not remove or rearrange packaged files.
+
+Navigation, visual layouts, attached images/audio, required-audio playback, and assessments use the existing course player. Assessment answers and progress last only while the page is open; reloading or reopening starts a new session. No results are sent to an LMS or saved as learner records. Use SCORM when persistent LMS tracking is required. Answer keys are present in the package, so this format is not appropriate for secure testing. Narration text does not create audio unless an audio file is attached.
+
+The ZIP includes `README.txt` launch instructions. Its `course-data.js` preloads course data without a browser fetch, allowing direct `file://` launches. `storyboard.json` is the published learner data, not a full authoring backup; speaker notes and production action descriptions are excluded.
+
+Standalone and SCORM exports share the same presentation. Saved visual layouts and source-slide previews are retained. Native scenes with neither an enabled visual layout nor a slide preview use a slide-style title-and-text fallback instead of unframed text. This fallback does not invent a designed layout or change the saved scene. Desktop content uses a 16:9 frame; longer content and narrow screens expand to keep text readable. Previously downloaded packages must be exported again to receive player updates.
 
 ### Export an editable Word storyboard
 

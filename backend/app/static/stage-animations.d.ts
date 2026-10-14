@@ -1,0 +1,1 @@
+export function playStageAnimations(root: HTMLElement, elements: readonly { id: string; animations?: unknown }[], elapsedMs?: number): () => void;

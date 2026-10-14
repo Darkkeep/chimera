@@ -164,6 +164,9 @@ class AIConnectionTests(unittest.TestCase):
             self.assertEqual(len(course.json()["scenes"]), 1)
             course_payload = json.loads(requests[-1]["messages"][1]["content"])
             self.assertEqual(course_payload["course"]["title"], "Drafted course")
+            self.assertEqual(course_payload["course"]["sceneSequence"][0]["id"], target_scene.id)
+            self.assertIn("completionSettings", course_payload["course"])
+            self.assertIn("scenes", course_payload["outputJsonSchema"]["properties"])
             self.assertEqual(course_payload["instruction"], "Create a concise course for new operators.")
             self.assertEqual(course_payload["references"][0]["passages"][0]["text"], "Use the local safety checklist before operation.")
 
@@ -175,19 +178,28 @@ class AIConnectionTests(unittest.TestCase):
                 "visualLayout": {
                     "enabled": True,
                     "backgroundColor": "#17324d",
-                    "elements": [{"id": "headline", "kind": "text", "x": 64, "y": 72, "width": 1120, "height": 160, "text": "Revised target lesson", "fontSize": 48, "color": "#ffffff", "bold": True}],
+                    "elements": [
+                        {"id": "headline", "kind": "text", "x": 64, "y": 72, "width": 1120, "height": 160, "text": "Revised target lesson", "fontSize": 48, "color": "#ffffff", "bold": True},
+                        {"id": "body", "kind": "text", "x": 64, "y": 300, "width": 1120, "height": 160, "text": "Use the checklist before starting.", "fontSize": 28, "color": "#ffffff"},
+                    ],
                 },
             }
             scene = client.post(
                 f"/api/projects/{project.id}/scenes/{target_scene.id}/content-draft",
-                json={"prompt": "Make this clearer for first-time learners."},
+                json={"prompt": "Make this clearer for first-time learners.", "currentScene": {"title": "Unsaved target lesson", "required": False, "notes": "Use current editor wording"}},
             )
             self.assertEqual(scene.status_code, 200, scene.text)
             scene_payload = json.loads(requests[-1]["messages"][1]["content"])
             self.assertEqual(scene_payload["targetScene"]["id"], target_scene.id)
-            self.assertEqual(scene_payload["targetScene"]["title"], "Target lesson")
+            self.assertEqual(scene_payload["targetScene"]["title"], "Unsaved target lesson")
+            self.assertFalse(scene_payload["targetScene"]["required"])
+            self.assertEqual(scene_payload["targetScene"]["notes"], "Use current editor wording")
+            self.assertIn("assessmentSettings", scene_payload["targetScene"])
+            self.assertIn("visualLayout", scene_payload["outputJsonSchema"]["properties"])
             self.assertEqual(scene_payload["instruction"], "Make this clearer for first-time learners.")
             self.assertEqual(scene_payload["outputSchema"]["visualLayout"]["width"], 1280)
+            self.assertIn("animations", scene_payload["outputJsonSchema"]["$defs"]["SceneElement"]["properties"])
+            self.assertIn("staggered bounce entrances", requests[-1]["messages"][0]["content"])
             self.assertTrue(scene.json()["visualLayout"]["enabled"])
             self.assertEqual(scene.json()["visualLayout"]["elements"][0]["text"], "Revised target lesson")
 
@@ -213,6 +225,7 @@ class AIConnectionTests(unittest.TestCase):
             "scenes": [
                 {"title": "Scene one", "extractedText": ["First scene content."], "narration": "First narration."},
                 {"title": "Scene two", "extractedText": ["Second scene content."], "notes": "Review notes."},
+                {"title": "Knowledge check", "sceneType": "assessment", "assessmentItem": {"type": "true-false", "identifier": "safety-check", "prompt": "Inspect equipment before operation.", "correctResponse": "true"}, "assessmentSettings": {"maxAttempts": 3}},
             ],
         }
         self.assertEqual(client.post(path, json=scenes).status_code, 428)
@@ -229,8 +242,10 @@ class AIConnectionTests(unittest.TestCase):
         self.assertEqual(accepted.status_code, 200, accepted.text)
         result = accepted.json()
         self.assertEqual(result["storyboard"]["revision"], project.storyboard.revision + 1)
-        self.assertEqual([scene["title"] for scene in result["storyboard"]["scenes"]], ["Scene one", "Scene two"])
+        self.assertEqual([scene["title"] for scene in result["storyboard"]["scenes"]], ["Scene one", "Scene two", "Knowledge check"])
         self.assertEqual(result["storyboard"]["scenes"][0]["narration"], "First narration.")
+        self.assertEqual(result["storyboard"]["scenes"][2]["assessmentItem"]["correctResponse"], "true")
+        self.assertEqual(result["storyboard"]["scenes"][2]["assessmentSettings"]["maxAttempts"], 3)
 
     def test_environment_key_is_not_reused_for_a_different_provider(self):
         with patch.dict(os.environ, {"CHIMERA_AI_BASE_URL": "https://other-provider.test/v1", "CHIMERA_AI_API_KEY": "other-secret", "CHIMERA_AI_MODEL": "other-model"}):

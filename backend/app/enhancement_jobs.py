@@ -4,11 +4,12 @@ import os
 import threading
 import urllib.error
 import urllib.request
-from typing import Protocol
+from typing import Protocol, get_args
 
-from .models import EnhancementJob, EnhancementJobCreate, EnhancementProposalCreate, EnhancementReferenceCitation
+from .models import CourseCompletionSettings, EnhancementField, EnhancementJob, EnhancementJobCreate, EnhancementProposalCreate, EnhancementReferenceCitation, SceneUpdate
 from .models import EnhancementResourceConflict
 from . import storage
+from .ai_context import course_context, scene_context
 from .ai_connection import connection_status, open_provider_request, request_budget, resolve_connection
 
 
@@ -44,7 +45,9 @@ class OpenAICompatibleProvider:
                         "a proposals array and resourceConflicts array. Each proposal has changes (targetSceneId, field, proposedValue), rationale, "
                         "and referenceCitations (resourceId, version, locator, excerpt). If supplied resources contradict, report each conflict "
                         "with an explanation and at least two exact source citations instead of choosing an authoritative answer. Use only supplied scene IDs, "
-                        "resource IDs, versions, and locators. Keep distinct suggestions separate; never apply changes."
+                        "resource IDs, versions, and locators. Use only allowedFields and match proposedValue to fieldValueSchemas; "
+                        "global fields require targetSceneId null. Preserve unchanged details and do not invent unsupported facts. "
+                        "Keep distinct suggestions separate; never apply changes."
                     ),
                 },
                 {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
@@ -105,23 +108,27 @@ def _load_job_context(job: EnhancementJob) -> tuple[dict[str, object], dict[tupl
             "passages": [passage.model_dump(mode="json") for passage in version.passages],
         })
         locator_text.update({(resource.id, version.version, passage.locator): passage.text for passage in version.passages})
-    selected_scenes = [
-        {
-            "id": scene.id,
-            "title": scene.title,
-            "sceneType": scene.sceneType,
-            "learnerText": scene.extractedText,
-            "actionDescription": scene.actionDescription,
-            "narration": scene.narration,
-            "assessmentItem": scene.assessmentItem.model_dump(mode="json") if scene.assessmentItem else None,
-        }
-        for scene in (scene_map[scene_id] for scene_id in job.sceneIds)
-    ]
+    selected_scenes = [scene_context(scene_map[scene_id]) for scene_id in job.sceneIds]
+    global_fields = {"sceneOrder", "storyboardTitle", "completionSettings"}
+    allowed_fields = [field for field in get_args(EnhancementField) if job.scope == "whole-course" or field not in global_fields]
+    scene_schema = SceneUpdate.model_json_schema()
     payload: dict[str, object] = {
         "goal": job.goal,
+        "course": course_context(project),
+        "scope": job.scope,
         "sourceRevision": job.sourceRevision,
         "scenes": selected_scenes,
         "references": selected_resources,
+        "allowedFields": allowed_fields,
+        "fieldValueSchemas": {
+            "$defs": scene_schema.get("$defs", {}),
+            "sceneFields": {field: schema for field, schema in scene_schema["properties"].items() if field in allowed_fields},
+            "globalFields": {
+                "sceneOrder": {"type": "array", "items": {"type": "string", "enum": job.sceneIds}, "minItems": len(job.sceneIds), "maxItems": len(job.sceneIds), "uniqueItems": True},
+                "storyboardTitle": {"type": "string", "minLength": 1, "maxLength": 120},
+                "completionSettings": CourseCompletionSettings.model_json_schema(),
+            } if job.scope == "whole-course" else {},
+        },
         "outputSchema": {
             "proposals": [{
                 "changes": [{"targetSceneId": "scene-id", "field": "supported proposal field", "proposedValue": "field value"}],

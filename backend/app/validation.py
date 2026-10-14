@@ -53,7 +53,7 @@ def validate_project(project: ProjectDetail, target: Literal["authoring", "produ
                 sceneTitle=scene.title,
             ))
 
-        if scene.sceneType == "assessment" and scene.assessmentItem is None:
+        if scene.sceneType == "question" and scene.assessmentItem is None:
             issues.append(ValidationIssue(
                 severity="warning",
                 code="missing-assessment-item",

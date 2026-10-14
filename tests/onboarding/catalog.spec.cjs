@@ -119,7 +119,7 @@ test('media upload, attachment, credit and image description confirm persisted o
 for (const [type, name] of [['single-choice', 'Single-choice question'], ['multiple-response', 'Multiple-answer question'], ['true-false', 'True / false question'], ['ordering', 'Ordering question'], ['drag-drop', 'Drag-and-drop question'], ['matching', 'Matching question'], ['short-answer', 'Short-answer question']]) {
   test(`${name} guide completes only after its matching question is saved`, async ({ page }) => {
     const id = await seed(page); await write(page, id, 'scenes', { title: 'Assessment practice', sceneType: 'assessment' });
-    await page.unroute('**/api/projects'); await reloadAuthoring(page); await expect(page.getByRole('button', { name: /Assessment practice assessment/ })).toBeVisible();
+    await page.unroute('**/api/projects'); await reloadAuthoring(page); await expect(page.getByRole('button', { name: /Assessment practice question/ })).toBeVisible();
     await choose(page, name);
     if (type === 'single-choice') {
       await page.getByRole('combobox', { name: /^Question type/ }).selectOption('true-false');

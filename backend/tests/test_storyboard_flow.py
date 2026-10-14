@@ -1388,7 +1388,7 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
             self.assertNotIn("actionDescription", exported_scene)
             self.assertNotIn("notes", exported_scene)
             player = package.read("player.js").decode("utf-8")
-            self.assertIn("window.API || null", player)
+            self.assertIn("view.API", player)
             self.assertIn("LMSInitialize", player)
             self.assertIn("LMSSetValue", player)
             self.assertIn('SetValue: "LMSSetValue"', player)
@@ -1608,7 +1608,7 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
         reordered = main.put_scene_order(project.id, SceneOrder(sceneIds=[second.id, first.id]))
 
         self.assertEqual([scene.id for scene in reordered.storyboard.scenes], [second.id, first.id])
-        self.assertEqual(reordered.storyboard.scenes[0].sceneType, "assessment")
+        self.assertEqual(reordered.storyboard.scenes[0].sceneType, "question")
         self.assertEqual(reordered.storyboard.scenes[0].layoutMode, "hybrid")
         snapshots = list((storage.project_path(project.id) / "history").glob("storyboard-*.json"))
         self.assertTrue(snapshots)

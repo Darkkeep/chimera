@@ -1,10 +1,57 @@
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
+
+
+SceneType = Annotated[
+    Literal["content", "title", "question", "media", "interaction", "summary"],
+    BeforeValidator(lambda value: "question" if value == "assessment" else value),
+]
 
 
 class ProjectCreate(BaseModel):
     title: str = Field(min_length=1, max_length=120)
+
+
+class EntranceAnimation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    effect: Literal["none", "fade", "slide-up", "slide-left", "zoom", "bounce"] = "none"
+    durationMs: int = Field(default=600, ge=100, le=5000)
+    delayMs: int = Field(default=0, ge=0, le=60000)
+
+
+class PresentationAnimation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    effect: Literal["none", "pulse", "sway", "highlight"] = "none"
+    durationMs: int = Field(default=800, ge=100, le=5000)
+    delayMs: int = Field(default=0, ge=0, le=60000)
+    iterations: int = Field(default=1, ge=1, le=5)
+
+
+class ExitAnimation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    effect: Literal["none", "fade", "slide-up", "slide-left", "zoom"] = "none"
+    durationMs: int = Field(default=400, ge=100, le=5000)
+    delayMs: int = Field(default=3000, ge=0, le=60000)
+
+
+class ElementAnimations(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    entrance: EntranceAnimation = Field(default_factory=EntranceAnimation)
+    presentation: PresentationAnimation = Field(default_factory=PresentationAnimation)
+    exit: ExitAnimation = Field(default_factory=ExitAnimation)
+
+    @model_validator(mode="after")
+    def validate_timeline(self) -> "ElementAnimations":
+        entrance_end = self.entrance.delayMs + self.entrance.durationMs if self.entrance.effect != "none" else 0
+        presentation_end = entrance_end + self.presentation.delayMs + self.presentation.durationMs * self.presentation.iterations if self.presentation.effect != "none" else entrance_end
+        if self.exit.effect != "none" and self.exit.delayMs < presentation_end:
+            raise ValueError("Exit must start after entrance and presentation animations finish")
+        return self
 
 
 class SceneElement(BaseModel):
@@ -28,6 +75,7 @@ class SceneElement(BaseModel):
     shapeName: str | None = Field(default=None, max_length=100)
     source: Literal["slide", "layout", "master", "manual"] = "manual"
     locked: bool = False
+    animations: ElementAnimations | None = None
 
     @model_validator(mode="after")
     def validate_element(self) -> "SceneElement":
@@ -40,6 +88,13 @@ class SceneElement(BaseModel):
         return self
 
 
+class AssessmentRegion(BaseModel):
+    x: float = Field(ge=0, le=10000, allow_inf_nan=False)
+    y: float = Field(ge=0, le=10000, allow_inf_nan=False)
+    width: float = Field(gt=0, le=10000, allow_inf_nan=False)
+    height: float = Field(gt=0, le=10000, allow_inf_nan=False)
+
+
 class SceneLayout(BaseModel):
     version: Literal[1] = 1
     enabled: bool = False
@@ -49,17 +104,21 @@ class SceneLayout(BaseModel):
     backgroundAsset: str | None = None
     elements: list[SceneElement] = Field(default_factory=list, max_length=2000)
     warnings: list[str] = Field(default_factory=list)
+    assessmentRegion: AssessmentRegion | None = None
 
     @model_validator(mode="after")
     def validate_identifiers(self) -> "SceneLayout":
         if len({element.id for element in self.elements}) != len(self.elements):
             raise ValueError("Scene element identifiers must be unique")
+        region = self.assessmentRegion
+        if region and (region.x + region.width > self.width or region.y + region.height > self.height):
+            raise ValueError("Assessment region must fit within the stage")
         return self
 
 
 class SceneCreate(BaseModel):
     title: str = Field(default="New scene", min_length=1, max_length=120)
-    sceneType: Literal["content", "title", "assessment", "media", "interaction", "summary"] = "content"
+    sceneType: SceneType = "content"
     layoutMode: Literal["fidelity", "hybrid", "native", "template"] = "native"
     templateId: str | None = None
     extractedText: list[str] = Field(default_factory=list)
@@ -68,6 +127,8 @@ class SceneCreate(BaseModel):
     notes: str = ""
     required: bool = True
     audioRequired: bool = False
+    assessmentItem: "AssessmentItem | None" = None
+    assessmentSettings: "AssessmentSettings | None" = None
 
 
 def normalize_assessment_item_type(data: object) -> object:
@@ -87,7 +148,7 @@ class SceneUpdate(BaseModel):
     extractedText: list[str] | None = None
     actionDescription: str | None = Field(default=None, max_length=5000)
     narration: str | None = Field(default=None, max_length=10000)
-    sceneType: Literal["content", "title", "assessment", "media", "interaction", "summary"] | None = None
+    sceneType: SceneType | None = None
     layoutMode: Literal["fidelity", "hybrid", "native", "template"] | None = None
     templateId: str | None = None
     imageAssets: list[str] | None = None
@@ -269,7 +330,16 @@ EnhancementField = Literal[
 ]
 
 
-class EnhancementProposalChangeCreate(BaseModel):
+class EnhancementSceneTypeValues(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_scene_type_values(cls, data: object) -> object:
+        if isinstance(data, dict) and data.get("field") == "sceneType":
+            return {key: "question" if key in {"proposedValue", "beforeValue"} and value == "assessment" else value for key, value in data.items()}
+        return data
+
+
+class EnhancementProposalChangeCreate(EnhancementSceneTypeValues):
     targetSceneId: str | None = None
     field: EnhancementField
     proposedValue: Any
@@ -286,7 +356,7 @@ class EnhancementReferenceCitation(BaseModel):
     excerpt: str | None = Field(default=None, max_length=2000)
 
 
-class EnhancementProposalCreate(BaseModel):
+class EnhancementProposalCreate(EnhancementSceneTypeValues):
     targetSceneId: str | None = None
     field: EnhancementField = "actionDescription"
     proposedValue: Any = None
@@ -307,7 +377,7 @@ class EnhancementProposalCreate(BaseModel):
         return self
 
 
-class EnhancementProposal(BaseModel):
+class EnhancementProposal(EnhancementSceneTypeValues):
     id: str
     targetSceneId: str | None = None
     field: EnhancementField = "actionDescription"
@@ -387,16 +457,29 @@ class CourseDraftRequest(BaseModel):
 
 class SceneDraftRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=3000)
+    currentScene: SceneUpdate | None = None
 
 
 class GeneratedSceneDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str = Field(min_length=1, max_length=120)
-    sceneType: Literal["content", "title", "assessment", "media", "interaction", "summary"] = "content"
+    sceneType: SceneType = "content"
     extractedText: list[str] = Field(default_factory=list, max_length=40)
     actionDescription: str = Field(default="", max_length=5000)
     narration: str = Field(default="", max_length=10000)
     notes: str = Field(default="", max_length=10000)
     required: bool = True
+    assessmentItem: AssessmentItem | None = None
+    assessmentSettings: AssessmentSettings | None = None
+
+    @model_validator(mode="after")
+    def validate_assessment(self) -> "GeneratedSceneDraft":
+        if self.sceneType == "question" and self.assessmentItem is None:
+            raise ValueError("Generated assessment scenes require a structured assessment item")
+        if self.sceneType != "question" and (self.assessmentItem is not None or self.assessmentSettings is not None):
+            raise ValueError("Assessment data requires an assessment scene")
+        return self
 
 
 class CourseContentDraft(BaseModel):
@@ -404,6 +487,7 @@ class CourseContentDraft(BaseModel):
 
 
 class SceneContentDraft(GeneratedSceneDraft):
+    extractedText: list[str] = Field(default_factory=list, max_length=23)
     visualLayout: SceneLayout
 
     @model_validator(mode="after")
@@ -411,6 +495,11 @@ class SceneContentDraft(GeneratedSceneDraft):
         layout = self.visualLayout
         if not layout.enabled or layout.width != 1280 or layout.height != 720 or layout.backgroundColor.lower() == "#ffffff" or len(layout.elements) > 24:
             raise ValueError("Generated scene layouts must use an enabled 1280 by 720 canvas, a designed background, and at most 24 elements")
+        if layout.backgroundAsset is not None:
+            raise ValueError("Generated text-only scene layouts cannot reference background assets")
+        expected_text = [self.title, *self.extractedText]
+        if [element.text.strip() for element in layout.elements] != [text.strip() for text in expected_text]:
+            raise ValueError("Generated scene layouts must contain the title followed by each learner-facing paragraph exactly once")
         for element in layout.elements:
             if element.kind != "text" or not element.text.strip():
                 raise ValueError("Generated scene layouts may contain non-empty text elements only")
@@ -630,7 +719,7 @@ class Scene(BaseModel):
     visualLayout: SceneLayout | None = None
     sourceSlide: int | None = None
     title: str
-    sceneType: Literal["content", "title", "assessment", "media", "interaction", "summary"] = "content"
+    sceneType: SceneType = "content"
     extractedText: list[str] = Field(default_factory=list)
     actionDescription: str = Field(default="", max_length=5000)
     narration: str = Field(default="", max_length=10000)
@@ -680,6 +769,23 @@ class SceneOrder(BaseModel):
     sceneIds: list[str] = Field(min_length=1)
 
 
+class AssessmentGroupWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=120)
+    questionSceneIds: list[str] = Field(max_length=500)
+
+    @model_validator(mode="after")
+    def validate_members(self) -> "AssessmentGroupWrite":
+        if len(set(self.questionSceneIds)) != len(self.questionSceneIds):
+            raise ValueError("Assessment question scene IDs must be unique")
+        return self
+
+
+class AssessmentGroup(AssessmentGroupWrite):
+    id: str
+
+
 class Storyboard(BaseModel):
     schemaVersion: str = "1.0"
     revision: int = Field(default=1, ge=1)
@@ -690,6 +796,17 @@ class Storyboard(BaseModel):
     exportSettings: ExportSettings = Field(default_factory=ExportSettings)
     scenes: list[Scene] = Field(default_factory=list)
     assets: list[ExtractedAsset] = Field(default_factory=list)
+    assessments: list[AssessmentGroup] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_assessments(self) -> "Storyboard":
+        if len({group.id for group in self.assessments}) != len(self.assessments):
+            raise ValueError("Assessment group IDs must be unique")
+        question_ids = {scene.id for scene in self.scenes if scene.sceneType == "question"}
+        for group in self.assessments:
+            if not set(group.questionSceneIds).issubset(question_ids):
+                raise ValueError("Assessment members must reference existing question scenes; remove grouped questions before changing their scene type")
+        return self
 
 
 ProductionStage = Literal["not-set", "draft", "in-production", "in-review", "approved", "published"]
@@ -720,6 +837,7 @@ class TrashedProject(ProjectSummary):
 
 
 EnhancementProposalResult.model_rebuild()
+SceneCreate.model_rebuild()
 
 
 class ValidationIssue(BaseModel):
