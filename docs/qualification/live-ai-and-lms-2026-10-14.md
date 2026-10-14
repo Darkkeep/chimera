@@ -49,3 +49,5 @@ SHA-256: `48a8c510e5a191946bac07842b03b48fbe56fe2a4698ba35d49e89d400fddb99`.
 The original package is retained for traceability. External acceptance of the replacement remains pending; upload the replacement and use a fresh learner attempt to avoid state already exhausted in the earlier package. Retest wrong answer → close feedback → Try again → select Equipment → Check answer, along with resume, Start over, and Gradebook completion.
 
 Retry verification: 190 backend tests and the frontend build passed. All 24 targeted browser checks passed across Chromium, Firefox, and WebKit: both SCORM profiles with radio, matching, and short-answer retries, persisted cleared state after resume, successful second-attempt scoring, Preview question types, and standalone playback. Backend restarted and returned HTTP 200.
+
+Operator acceptance, 2026-10-14: following delivery of the replacement package, the operator reported **“it worked!”** This confirms the reported Try again issue is resolved in the operator's LMS test by attestation. Resume choice, Start over, and Gradebook score/completion were not separately confirmed in this reply and remain open for this package.
