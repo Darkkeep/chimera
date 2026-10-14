@@ -9,6 +9,23 @@ from unittest.mock import patch
 
 
 class SceneDraftContractTests(unittest.TestCase):
+    def test_unsaved_target_metadata_overrides_saved_sequence_without_mutating_project(self):
+        saved = Scene(id="scene-1", title="Saved title", required=True,
+                      visualLayout={"elements": [{"id": "title", "kind": "text", "x": 0, "y": 0, "width": 100, "height": 80, "text": "Saved title"}]})
+        current = saved.model_copy(update={"title": "Unsaved title", "required": False})
+        project = ProjectDetail(id="course-1", title="Operators", sceneCount=1, updatedAt="now", hasSourceDeck=False,
+                                storyboard=Storyboard(projectId="course-1", title="Operators", scenes=[saved]))
+        with patch.object(content_generation, "_generate_json", return_value=self.draft(["Safety checklist", "Inspect equipment before operation."])) as provider, patch.object(storage, "list_reference_resources", return_value=[]):
+            content_generation.generate_scene_draft(project, current, "Animate the text")
+        payload = provider.call_args.args[0]
+        self.assertEqual(payload["targetScene"]["title"], "Unsaved title")
+        self.assertEqual(payload["course"]["sceneSequence"][0]["title"], "Unsaved title")
+        self.assertFalse(payload["course"]["sceneSequence"][0]["required"])
+        self.assertEqual(payload["targetScene"]["visualLayout"]["elements"][0]["text"], "Unsaved title")
+        self.assertEqual(project.storyboard.scenes[0].title, "Saved title")
+        self.assertTrue(project.storyboard.scenes[0].required)
+        self.assertEqual(saved.visualLayout.elements[0].text, "Saved title")
+
     def test_scene_revision_preserves_omitted_optional_fields_and_assessment(self):
         scene = Scene(id="scene-1", title="Safety checklist", sceneType="assessment", required=False,
                       narration="Existing narration", notes="Local policy note",

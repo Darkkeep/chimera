@@ -123,10 +123,22 @@ def generate_course_draft(project: ProjectDetail, prompt: str, resource_ids: lis
 
 
 def generate_scene_draft(project: ProjectDetail, scene: Scene, prompt: str) -> SceneContentDraft:
+    current_course = course_context(project)
+    current_course["sceneSequence"] = [
+        {**entry, "title": scene.title, "sceneType": scene.sceneType, "required": scene.required}
+        if entry["id"] == scene.id else entry
+        for entry in current_course["sceneSequence"]
+    ]
+    target_context = scene_context(scene)
+    saved_scene = next((saved for saved in project.storyboard.scenes if saved.id == scene.id), None)
+    if saved_scene and saved_scene.title != scene.title and target_context["visualLayout"]:
+        for element in target_context["visualLayout"]["elements"]:
+            if element["kind"] == "text" and element["text"].strip() == saved_scene.title.strip():
+                element["text"] = scene.title
     payload = {
-        "course": course_context(project),
+        "course": current_course,
         "instruction": prompt.strip(),
-        "targetScene": scene_context(scene),
+        "targetScene": target_context,
         "references": _current_reference_context(project.id, scene_id=scene.id),
         "outputJsonSchema": SceneContentDraft.model_json_schema(),
         "limits": {"maximumParagraphsPerScene": 23, "maximumLayoutElements": 24},
@@ -151,7 +163,7 @@ def generate_scene_draft(project: ProjectDetail, scene: Scene, prompt: str) -> S
         },
     }
     try:
-        result = _generate_json(payload, SCENE_SYSTEM_PROMPT)
+        result = _generate_json(payload, SCENE_SYSTEM_PROMPT + " The targetScene contains the latest editor values, including unsaved changes. Preserve its title and other metadata exactly unless the user's instruction explicitly requests changing them. Output examples describe structure, not replacement values.")
         if isinstance(result, dict):
             for field in ("sceneType", "actionDescription", "narration", "notes", "required"):
                 result.setdefault(field, getattr(scene, field))
