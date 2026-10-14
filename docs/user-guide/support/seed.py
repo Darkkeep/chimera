@@ -9,7 +9,7 @@ import sys
 import wave
 
 ROOT = Path(__file__).resolve().parents[3]
-DEMO = ROOT / "workspace" / "user-guide-restored"
+DEMO = Path(os.environ.get("CHIMERA_GUIDE_DIR", ROOT / "workspace" / "user-guide-restored"))
 if (DEMO / "data" / "projects").exists():
     raise SystemExit("Guide fixture already exists. Use it, or explicitly choose a fresh fixture directory.")
 os.environ["CHIMERA_WORKSPACE"] = str(DEMO / "data")

@@ -1,6 +1,6 @@
 # Chimera user guide
 
-Process-based instructions for Chimera. Screenshots refreshed 2026-10-08 from commit `4ade811` plus uncommitted working-tree updates. Captures use the isolated user-guide demonstration workspace and made no live AI requests or use of credentials. Historical source/recovery context is documented in the [recovery record](export-enhancement-recovery.md).
+Process-based instructions for Chimera, updated 2026-10-14 against commit `6641162`. Screenshots for changed authoring, assessment, playback, and export controls were refreshed for this update; the capture records identify earlier images retained for unchanged controls. Captures use the isolated user-guide demonstration workspace and made no live AI requests or use of credentials. Historical source/recovery context is documented in the [recovery record](export-enhancement-recovery.md).
 
 ## How to use this guide
 
@@ -14,7 +14,7 @@ My Work opens after normal launch/sign-in and refresh. It is first in the worksp
 
 **Working convention:** Select the intended project and scene before editing. Use the task's Save/Create/Accept control and wait for completion. Merely typing into a form does not save it. If a revision-conflict message appears, reload the project, inspect the latest values, and reapply the intended change. Do not assume unsaved form text will survive a reload.
 
-Optional interactive help is available under **Review tools ? Guided review ? All functionality walkthroughs**. Search the catalog and start the task you want to practice. The sidebar resumes your last selected walkthrough. Action steps wait for confirmed saves/downloads; review steps use Next. Escape pauses without clearing an open draft. Progress is browser-local and separate for each task/project; completing a walkthrough does not certify readiness. Restore/deletion confirmations and provider submissions remain your decisions.
+Optional interactive help is available under **Review tools > Guided review > All functionality walkthroughs**. Search the catalog and start the task you want to practice. The sidebar resumes your last selected walkthrough. Action steps wait for confirmed saves/downloads; review steps use Next. Escape pauses without clearing an open draft. Progress is browser-local and separate for each task/project; completing a walkthrough does not certify readiness. Restore/deletion confirmations and provider submissions remain your decisions.
 
 ## Processes
 
@@ -91,6 +91,16 @@ For an interactive first-scene walkthrough, choose **Start / resume walkthrough*
 
 Scene creation and edits are saved locally. History snapshots are maintained by the application; there is no general history browser or restore-history button documented in this interface.
 
+### Draft a course with AI
+
+Configure **Settings > AI connection** first. The course prompt generates text and structured questions; it does not create attached images or audio. Review generated facts and questions against your source documents.
+
+| Step | Action | Result | Control image |
+| --- | --- | --- | --- |
+| 1 | Choose **Create project**, enter the Course name, and use **Attach course design documents** to select the references that should ground the draft. Enter a **Course prompt** describing objectives, audience, sequence, and desired questions, then create the project. | The project is created and the Draft course scenes review opens. | <a href="user-guide/images/create-project.png"><img src="user-guide/images/create-project.png" alt="Course prompt and reference attachment controls" width="240"></a> |
+| 2 | Review the references and brief, then choose **Generate course draft**. | A proposed scene list appears. Generation does not add it to the storyboard. | <a href="user-guide/images/course-draft-prompt.png"><img src="user-guide/images/course-draft-prompt.png" alt="Course brief and Generate course draft control" width="240"></a> |
+| 3 | Inspect titles, learner text, narration, production notes, and any question answers/feedback/scoring. Edit or deselect scenes as needed, then choose **Add selected scenes**. | Selected scenes are saved after the storyboard revision check. Use the question editor for further question changes. | <a href="user-guide/images/course-draft-review.png"><img src="user-guide/images/course-draft-review.png" alt="Generated scenes review and Add selected scenes control" width="240"></a> |
+
 ### Import a PowerPoint storyboard
 
 Importing another deck updates the project from that deck. Download a Chimera storyboard first if the current authored work must be retained independently. Captured animation XML does not guarantee equivalent playback.
@@ -115,26 +125,74 @@ The **Edit scene** dialog combines scene details and canvas authoring. On-screen
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Select a scene, then click **Edit scene** or its pencil icon. | The unified scene editor opens on Details. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a><br><a href="user-guide/images/scene-sequence.png"><img src="user-guide/images/scene-sequence.png" alt="scene sequence controls" width="240"></a> |
-| 2 | In **Details**, update the title, type, layout, on-screen text, action description, speaker notes, or required status. Choose **Canvas** to edit the visual layout in the same dialog. | Both sections share one draft and one save action. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
+| 1 | Select a scene, then click **Edit scene** or its pencil icon. | The unified scene editor opens; choose Details to edit scene metadata. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a><br><a href="user-guide/images/scene-sequence.png"><img src="user-guide/images/scene-sequence.png" alt="scene sequence controls" width="240"></a> |
+| 2 | In **Details**, update the title, type, layout, on-screen text, action description, speaker notes, or required status. Choose **Stage** to edit the visual layout in the same dialog. | Both sections share one draft and one save action. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
 | 3 | Click **Save scene**; use **Cancel** to discard edits from either section. | Saved changes update the storyboard and its revision. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor Details controls" width="240"></a> |
 
-### Edit text and images on the canvas
+### Edit text and images on the Stage
 
-Open **Edit scene**, then choose **Canvas**. The canvas editor saves an editable layout; it does not paint over the flattened PowerPoint preview. Canvas edits to an imported slide use Hybrid rendering so the edited layers, rather than an unchanged flattened image, are shown.
+Open **Edit scene**, then choose **Stage**. The canvas editor saves an editable layout; it does not paint over the flattened PowerPoint preview. Canvas edits to an imported slide use Hybrid rendering so the edited layers, rather than an unchanged flattened image, are shown.
 
-![Unified scene editor Canvas tab](user-guide/images/scene-canvas-editor.png)
+![Unified scene editor Stage tab](user-guide/images/scene-canvas-editor.png)
 
 1. For an older imported scene, choose **Extract source layout** to recover positions and inherited artwork from the retained PPTX. This preserves scene IDs, notes, questions, review threads, existing assets, and authored text. The extracted layout remains inactive until **Save scene**. Cancelling keeps the extracted data but does not change playback.
 2. Double-click a text box, or focus it and press Enter, to edit its text directly. The **Text** field also edits the selected box. Drag boxes to move them, use resize handles, or enter exact position and size in the properties panel. Text resize handles preserve the box's current aspect ratio; image resize handles allow freeform sizing. Arrow keys move the focused element; Shift changes the step from one to ten slide-space units.
-3. Drag an **Attached images** thumbnail onto the canvas. Clicking the thumbnail adds it without dragging. The media-library selector can add other project images. Selecting an image exposes replacement and crop-reset controls.
+3. Drag a thumbnail from **Content** onto the Stage. Clicking the thumbnail adds it without dragging. The media-library selector can add other project images. Selecting an image exposes replacement and crop-reset controls.
 4. Use **Layers** to select overlapping or inherited content. Master and layout artwork starts locked; unlock it before editing. Toolbar controls add text, undo/redo, duplicate/delete elements, and change stacking order. Text properties include size, color, typeface, alignment, bold, and italic.
 5. Choose a background color or project image in the properties panel. Imported picture backgrounds and supported inherited master/layout images are available as project assets. **Source slide**, when available, temporarily shows the original flattened rendering for comparison.
 6. Choose **Save scene**, then check **Preview course**. The saved canvas replaces the source preview in authoring, preview, and both SCORM profiles. **Cancel** discards unsaved canvas changes.
 
 New imports capture editable text, images, common PowerPoint shapes, line connectors, custom freeform geometry, rotation, cropping, slide dimensions, inherited graphics, and solid/picture backgrounds. Byte-identical images are shared as one Media library asset while every source placement stays separate on the canvas. Most extracted shapes can be moved, resized, rotated, layered, locked, or deleted like other canvas elements; text inside a shape remains separately editable. The original preview remains available for comparison. Less-common preset geometry, gradients, group rotation, mixed text formatting, bullets, and some inherited styles may be approximated and are listed under **Import limitations**; charts and SmartArt remain unsupported objects. This is not full PowerPoint-equivalent editing.
 
-For a scene with an enabled visual layout, edits to **On-screen text** in the original metadata dialog also update the corresponding visual text boxes. The scene title remains the navigation label; use the canvas editor to change a title drawn on the slide.
+For a scene with an enabled visual layout, edits to **On-screen text** in the original metadata dialog also update the corresponding visual text boxes. Title and On-screen text changes are synchronized with matching visual text boxes when you save. Inspect the Stage before saving; manually composed text and custom placements still need review.
+
+### Fit Stage Text
+
+AI scene drafts are measured in the browser before review. If text overflows, Chimera first grows an unlocked, unrotated text box downward into available space without moving its origin or other elements. If necessary it reduces the font size, stopping at 18 px (or the original size if already smaller). Text and animation settings are preserved. Locked text is reported rather than changed.
+
+For an existing scene, select **Edit scene > Stage > Fit text**. The change is undoable and remains unsaved until **Save scene**. The command includes current On-screen text edits. If text still does not fit, the editor identifies it and blocks saving an enabled visual layout until the box or content is corrected. Fidelity-only scenes are not subject to this visual-layout save check.
+
+This is browser-measured overflow checking, not certification of visual quality. Inspect the Stage for existing overlaps, contrast, motion bounds, and reading order. Installed fonts can differ between the authoring and playback machines; recheck representative exported courses on their intended devices. Direct API updates do not run browser measurements.
+
+![Stage editor with Fit text](user-guide/images/text-fit.png)
+
+### Animate Stage Content
+
+Text, images, and shapes on an enabled visual Stage support three animation phases. These settings are editable scene data, not production notes, and run in the editor's motion preview, course Preview, SCORM 2004, SCORM 1.2, and standalone packages.
+
+1. Open **Edit scene > Stage** and select a text, image, or shape element.
+2. In the **Animation** inspector choose an **Entrance**, **Presentation**, or **Exit** effect and set its duration and delay. Use **None** to disable a phase.
+3. For text that dances into place, use the toolbar's **Stagger text entrances** command. It applies a 600 ms bounce entrance to each unlocked text block, adding 150 ms delay per block in element order. It includes the current On-screen text and leaves final positions unchanged.
+4. Select **Preview animations** to play the current unsaved timeline. Select it again to replay, or **Stop animation preview** to return to static editing. Changing an element also returns to editing. Generating or previewing does not save the scene.
+5. Choose **Save scene** and inspect **Preview course** before exporting. Previously downloaded packages must be exported again.
+
+Supported effects:
+
+| Phase | Effects | Timing |
+| --- | --- | --- |
+| Entrance | Fade, slide up, slide from left, zoom, bounce into place | Delay from scene entry; final position remains unchanged. |
+| Presentation | Pulse, sway, highlight | Delay after the entrance ends, or from scene entry if no entrance. Repeats 1-5 times. |
+| Exit | Fade out, slide down, slide to left, shrink out | Absolute scene time, after entrance and presentation finish. Not a transition triggered by Next or Previous. |
+
+Durations are 100-5,000 ms; delays are 0-60,000 ms. Exited elements stay visually hidden until scene re-entry or **Stop motion**. Keep important instructions visible unless the course intentionally requires their removal. Navigation is not delayed by animation. Effects restart when the learner re-enters a scene, not when an assessment result changes. Existing elements without animation settings remain static. Animations do not alter geometry, assessment answers, attempts, or completion rules.
+
+Learners can select **Stop motion** to immediately restore static content, and **Play motion** to restart. In Chimera Preview, **Replay motion** restarts the current scene's effects in one click without navigating, changing assessment answers, or saving the scene. Entrance and finite presentation effects settle into the final static layout, so use Replay when reviewing effects that finished before you could inspect them. Preview hides its separate page heading when the Stage already contains the same title; the accessible scene name remains available. The system's reduced-motion preference suppresses effects and reveals content immediately, including when the preference changes during playback. The assessment question component itself stays interactive and static; animation controls apply to text, image, and shape elements. Arbitrary motion paths, custom scripts/keyframes, click-triggered reveal sequences, audio synchronization, and PowerPoint animation playback are not implemented by these presets.
+
+Scene AI drafting receives the supported animation schema. For example, enter:
+
+> Animate the title and each On-screen text block into its final Stage position when the scene begins. Use staggered bounce entrances, 600 ms each, with 150 ms additional delay per block. Add one gentle sway after each entrance. Keep all final positions unchanged and do not add exits. Configure the visualLayout element animations, not just production notes.
+
+AI drafting returns a complete scene/layout draft, so inspect both its content and animation settings before saving. Model quality still requires review; the schema validates supported effects and timing, not the instructional appropriateness of motion.
+
+![Animation settings for a selected text element](user-guide/images/animation-inspector.png)
+
+### Revise a scene with AI
+
+Open **Edit scene > Details**, enter a **Scene prompt**, and choose **Generate scene + layout draft**. The request includes the current editor values, including unsaved text and title, the course sequence and completion rules, and relevant reference excerpts. The returned layout replaces the editor draft; inspect the Stage, optional status, notes, narration, question data, and animation settings before choosing **Save scene**. **Cancel** discards the editor draft.
+
+Scene drafting composes text on a 1280 × 720 Stage. It does not preserve every visual object or create images, audio, arbitrary scripts, or custom interactions. Attached assets are sent as metadata references rather than media binaries. A production action described in notes is not automatically implemented. Browser text fitting runs before review; unresolved overflow must be corrected before saving an enabled visual layout. Preservation and factual quality still need author review.
+
+Example prompt: “Clarify the three procedure steps without adding facts. Preserve the current title, required status, narration, and question scoring. Animate each text block with a staggered bounce entrance and leave it visible afterward.”
 
 ### Jump directly to another scene
 
@@ -257,27 +315,27 @@ A green **Ready for production** check means the media loaded, its attribution i
 
 ## 5. Author assessments
 
-Start each assessment task with a scene whose **Scene type** is **Assessment**. Set that type in Edit scene and save. Select **Create question** for a new question or **Edit question** for an existing one. The question editor supports seven types. Changing types replaces the type-specific question structure in the form; save only after checking the new content.
+A **Question** scene contains one authored question. An **Assessment** is a named, ordered collection of Question scenes. Start each question-authoring task with a scene whose **Scene type** is **Question**; older courses using the Assessment scene type load automatically as Question scenes. Set that type in Edit scene and save. Select **Create question** for a new question or **Edit question** for an existing one. The question editor supports seven types. Changing types replaces the type-specific question structure in the form; save only after checking the new content.
 
 ### Open or create an assessment question
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Edit the scene, choose **Assessment** under **Scene type**, and save. | The scene displays the question-authoring section. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
-| 2 | Click **Create question** or **Edit question** below the canvas. | The question editor opens. | <a href="user-guide/images/assessment-create.png"><img src="user-guide/images/assessment-create.png" alt="Create question control" width="240"></a><br><a href="user-guide/images/assessment-launch.png"><img src="user-guide/images/assessment-launch.png" alt="assessment launch controls" width="240"></a> |
+| 1 | Edit the scene, choose **Question** under **Scene type**, and save. | The scene displays the question-authoring section. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
+| 2 | Click **Create question** or **Edit question** above the Stage. | The question editor opens. | <a href="user-guide/images/assessment-create.png"><img src="user-guide/images/assessment-create.png" alt="Create question control" width="240"></a><br><a href="user-guide/images/assessment-launch.png"><img src="user-guide/images/assessment-launch.png" alt="assessment launch controls" width="240"></a> |
 
 ### Author a single-choice question
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Choose **Multiple choice ? one answer**, enter the **Question prompt** and answer text, and mark exactly one answer as correct. Use **Add answer choice** or the minus buttons as needed. | The question content and correct response are defined. | <a href="user-guide/images/question-single-choice.png"><img src="user-guide/images/question-single-choice.png" alt="question single choice controls" width="240"></a> |
+| 1 | Choose **Multiple choice · one answer**, enter the **Question prompt** and answer text, and mark exactly one answer as correct. Use **Add answer choice** or the minus buttons as needed. | The question content and correct response are defined. | <a href="user-guide/images/question-single-choice.png"><img src="user-guide/images/question-single-choice.png" alt="question single choice controls" width="240"></a> |
 | 2 | Enter **Correct feedback** and **Incorrect feedback**, then click **Save question**. | The question is saved to the scene. | <a href="user-guide/images/question-single-choice.png"><img src="user-guide/images/question-single-choice.png" alt="question single choice controls" width="240"></a><br><a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
 ### Author a multiple-correct question
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Choose **Multiple choice ? multiple answers**, enter the prompt and answer choices, and select the checkbox for every correct answer. | The question content and correct response are defined. | <a href="user-guide/images/question-multiple-response.png"><img src="user-guide/images/question-multiple-response.png" alt="question multiple response controls" width="240"></a> |
+| 1 | Choose **Multiple choice · multiple answers**, enter the prompt and answer choices, and select the checkbox for every correct answer. | The question content and correct response are defined. | <a href="user-guide/images/question-multiple-response.png"><img src="user-guide/images/question-multiple-response.png" alt="question multiple response controls" width="240"></a> |
 | 2 | Enter **Correct feedback** and **Incorrect feedback**, then click **Save question**. | The question is saved to the scene. | <a href="user-guide/images/question-multiple-response.png"><img src="user-guide/images/question-multiple-response.png" alt="question multiple response controls" width="240"></a><br><a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
 ### Author a true/false question
@@ -325,6 +383,22 @@ Current question scoring is binary: 0% or 100%. Course score weights affect the 
 | 2 | Set **Maximum attempts**, **Passing score**, **Course score weight**, and an optional **Remediation scene**. | Attempts, scoring contribution, and review destination are specified. | <a href="user-guide/images/assessment-rules.png"><img src="user-guide/images/assessment-rules.png" alt="assessment rules controls" width="240"></a> |
 | 3 | Click **Save question**. | The question and its rules are saved. | <a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
+### Place a question on the Stage
+
+An authored assessment appears as a question component on the scene Stage, not as a separate block beneath it. The component reads the existing question data; its prompt, choices, answer key, feedback, and scoring are not copied into ordinary text elements.
+
+1. Use **Create question** or **Edit question** above the scene preview to author the question.
+2. Open **Edit scene > Stage**. The question and learner choices appear on the canvas; correct answers are not revealed there.
+3. Drag or resize the question component, or use the **Question** inspector's position and size fields. The region must remain inside the Stage. Shrinking the Stage keeps the saved question region within its new bounds.
+4. Choose **Save scene**. Placement is saved separately from the question, and remains when the question is edited. Use the question editor to change question content; the Stage component is not an independent copy.
+5. Check **Preview course**. The on-stage controls support all seven question types with their existing attempts, scoring, feedback, and remediation behavior.
+
+Existing assessments without placement data receive a default origin matching the scene's title element, and the redundant Stage title is omitted. Explicitly saved positions remain in use. SCORM and standalone exports use the same authored origin and no longer duplicate the question below the Stage. The question panel grows with its content instead of adding an internal scrollbar; the page can scroll for long content. Learner question text uses a compact 16 px base and 20 px prompt, with native form inputs and reduced spacing. Authoring uses a non-interactive representation; use Preview to answer the question. QTI remains question-data-only and does not include Stage placement.
+
+Submitting an answer opens a feedback modal with the explanation, score, attempts, and a Review lesson action when remediation is configured. Close feedback or Escape returns to the question without closing Preview or changing the attempt count. View feedback reopens the last submitted result without submitting another answer. A changed, unsubmitted answer must be checked again before feedback is available. Correct answers and exhausted attempts remain locked according to the existing scoring rules. The platinum question panel retains its brushed finish, rounded corners, and lower-right shadow; modal feedback uses explicit high-contrast success/error colors in either theme.
+
+![Question placement in the Stage editor](user-guide/images/question-placement.png)
+
 ### Create and edit Assessments
 
 Choose **Question** as the scene type when creating a question scene. Older courses that use the `assessment` scene type load as Question scenes automatically. Use **Create question** or **Edit question** above the selected scene Stage to author its prompt, answers, feedback, and scoring.
@@ -334,6 +408,10 @@ An Assessment is a named, ordered collection of Question scenes. Open **Review t
 **Download QTI test** exports the collection's authored questions in the selected order; at least two authored questions are required. Preview shows each collection's answered count and weighted score. Grouping does not change course completion settings or count a question twice in the course score.
 
 Deleting an Assessment retains its Question scenes. Deleting a Question scene removes its membership from all Assessments. Remove a Question from its collections before changing its scene type. If another author saves first, reload the latest storyboard and review your retained draft before saving again. Collections are included in storyboard JSON and project backups.
+
+![Select and order questions in an Assessment](user-guide/images/assessments-editor.png)
+
+![Saved Assessment with edit, delete, and QTI download controls](user-guide/images/assessments-list.png)
 
 ### Remove an assessment question
 
@@ -416,7 +494,7 @@ A proposal can contain multiple related changes. Accept change applies that disp
 
 ## 8. Generate and approve media
 
-Select the target project and scene before opening Media library. Create a media candidate starts collapsed; expand its heading to access the form. Without AI configuration or generation permission, the section is greyed and generation/regeneration is disabled. Existing candidates remain reviewable. Approval attaches a candidate to its target scene; choose **Edit scene > Canvas** afterward to place supported image assets. A generation-cost preview and full media-job monitor are not provided.
+Select the target project and scene before opening Media library. Create a media candidate starts collapsed; expand its heading to access the form. Without AI configuration or generation permission, the section is greyed and generation/regeneration is disabled. Existing candidates remain reviewable. Approval attaches a candidate to its target scene; choose **Edit scene > Stage** afterward to place supported image assets. A generation-cost preview and full media-job monitor are not provided.
 
 ### Request an image candidate
 
@@ -458,11 +536,15 @@ Preview progress is stored in this browser, separately from a learner's LMS sess
 
 After an incorrect answer, close feedback and choose **Try again** to clear the response without using another attempt. Enter a new answer and choose **Check answer** to grade it. You can also change the answer directly; the action then becomes Check answer. Completed or exhausted questions retain their attempt limits.
 
+![Incorrect-answer feedback with the attempt count](user-guide/images/learner-feedback.png)
+
+![Try again action before clearing the previous response](user-guide/images/learner-retry.png)
+
 ### Test an assessment in preview
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Navigate to the assessment scene. Select an answer, enter text, order items, or match/drag items as appropriate. | A response is prepared. | <a href="user-guide/images/learner-question.png"><img src="user-guide/images/learner-question.png" alt="learner question controls" width="240"></a> |
+| 1 | Navigate to the Question scene. Select an answer, enter text, order items, or match/drag items as appropriate. | A response is prepared. | <a href="user-guide/images/learner-question.png"><img src="user-guide/images/learner-question.png" alt="learner question controls" width="240"></a> |
 | 2 | Click **Check answer**; use **Try again** when offered after an incorrect attempt. | Feedback, score, and attempt count appear. Correct answers or exhausted attempts disable further attempts. | <a href="user-guide/images/remediation.png"><img src="user-guide/images/remediation.png" alt="Try again control" width="240"></a><br><a href="user-guide/images/learner-result.png"><img src="user-guide/images/learner-result.png" alt="learner result controls" width="240"></a> |
 | 3 | If **Review lesson** is offered, follow it and use **Return to question** to resume. | The remediation path is exercised. | <a href="user-guide/images/return-question.png"><img src="user-guide/images/return-question.png" alt="Return to question control" width="240"></a><br><a href="user-guide/images/remediation.png"><img src="user-guide/images/remediation.png" alt="remediation controls" width="240"></a> |
 
@@ -520,7 +602,7 @@ Passing validation is not certification for every LMS. Pending suggestions and u
 
 ## 11. Export course deliverables
 
-Open Export for the intended saved project. Export uses saved content, not unsaved dialog edits or pending proposals. SCORM 2004 has recorded Blackboard verification for a specific artifact; consult the [compatibility checklist](scorm-compatibility-checklist.md) for the scope of testing.
+Open Export for the intended saved project. Export uses saved content, not unsaved dialog edits or pending proposals. Use the SCORM profile supported by your destination LMS. The current SCORM 1.2 test package passed retry, Continue, Start over, and Gradebook score/completion checks in the operator’s LMS on 2026-10-14; consult the [compatibility checklist](scorm-compatibility-checklist.md) for the tested package and evidence limits. This does not qualify every course or LMS configuration.
 
 ### Build a SCORM package
 
@@ -542,56 +624,6 @@ A report may be absent before the first build. Verify its revision/date before t
 | --- | --- | --- | --- |
 | 1 | In Export, change **Warn when a package exceeds** and leave the field to save a valid value. | The warning threshold is saved in MB. | <a href="user-guide/images/scorm-export.png"><img src="user-guide/images/scorm-export.png" alt="scorm export controls" width="240"></a> |
 | 2 | After building the corresponding profile, click **Report 2004** or **Report 1.2**. | The latest available profile build report downloads. | <a href="user-guide/images/scorm-export.png"><img src="user-guide/images/scorm-export.png" alt="scorm export controls" width="240"></a> |
-
-### Fit Stage Text
-
-AI scene drafts are measured in the browser before review. If text overflows, Chimera first grows an unlocked, unrotated text box downward into available space without moving its origin or other elements. If necessary it reduces the font size, stopping at 18 px (or the original size if already smaller). Text and animation settings are preserved. Locked text is reported rather than changed.
-
-For an existing scene, select **Edit scene > Stage > Fit text**. The change is undoable and remains unsaved until **Save scene**. The command includes current On-screen text edits. If text still does not fit, the editor identifies it and blocks saving an enabled visual layout until the box or content is corrected. Fidelity-only scenes are not subject to this visual-layout save check.
-
-This is browser-measured overflow checking, not certification of visual quality. Inspect the Stage for existing overlaps, contrast, motion bounds, and reading order. Installed fonts can differ between the authoring and playback machines; recheck representative exported courses on their intended devices. Direct API updates do not run browser measurements.
-
-### Animate Stage Content
-
-Text, images, and shapes on an enabled visual Stage support three animation phases. These settings are editable scene data, not production notes, and run in the editor's motion preview, course Preview, SCORM 2004, SCORM 1.2, and standalone packages.
-
-1. Open **Edit scene > Stage** and select a text, image, or shape element.
-2. In the **Animation** inspector choose an **Entrance**, **Presentation**, or **Exit** effect and set its duration and delay. Use **None** to disable a phase.
-3. For text that dances into place, use the toolbar's **Stagger text entrances** command. It applies a 600 ms bounce entrance to each unlocked text block, adding 150 ms delay per block in element order. It includes the current On-screen text and leaves final positions unchanged.
-4. Select **Preview animations** to play the current unsaved timeline. Select it again to replay, or **Stop animation preview** to return to static editing. Changing an element also returns to editing. Generating or previewing does not save the scene.
-5. Choose **Save scene** and inspect **Preview course** before exporting. Previously downloaded packages must be exported again.
-
-Supported effects:
-
-| Phase | Effects | Timing |
-| --- | --- | --- |
-| Entrance | Fade, slide up, slide from left, zoom, bounce into place | Delay from scene entry; final position remains unchanged. |
-| Presentation | Pulse, sway, highlight | Delay after the entrance ends, or from scene entry if no entrance. Repeats 1-5 times. |
-| Exit | Fade out, slide down, slide to left, shrink out | Absolute scene time, after entrance and presentation finish. Not a transition triggered by Next or Previous. |
-
-Durations are 100-5,000 ms; delays are 0-60,000 ms. Exited elements stay visually hidden until scene re-entry or **Stop motion**. Keep important instructions visible unless the course intentionally requires their removal. Navigation is not delayed by animation. Effects restart when the learner re-enters a scene, not when an assessment result changes. Existing elements without animation settings remain static. Animations do not alter geometry, assessment answers, attempts, or completion rules.
-
-Learners can select **Stop motion** to immediately restore static content, and **Play motion** to restart. In Chimera Preview, **Replay motion** restarts the current scene's effects in one click without navigating, changing assessment answers, or saving the scene. Entrance and finite presentation effects settle into the final static layout, so use Replay when reviewing effects that finished before you could inspect them. Preview hides its separate page heading when the Stage already contains the same title; the accessible scene name remains available. The system's reduced-motion preference suppresses effects and reveals content immediately, including when the preference changes during playback. The assessment question component itself stays interactive and static; animation controls apply to text, image, and shape elements. Arbitrary motion paths, custom scripts/keyframes, click-triggered reveal sequences, audio synchronization, and PowerPoint animation playback are not implemented by these presets.
-
-Scene AI drafting receives the supported animation schema. For example, enter:
-
-> Animate the title and each On-screen text block into its final Stage position when the scene begins. Use staggered bounce entrances, 600 ms each, with 150 ms additional delay per block. Add one gentle sway after each entrance. Keep all final positions unchanged and do not add exits. Configure the visualLayout element animations, not just production notes.
-
-AI drafting returns a complete scene/layout draft, so inspect both its content and animation settings before saving. Model quality still requires review; the schema validates supported effects and timing, not the instructional appropriateness of motion.
-
-### Place an Assessment on the Stage
-
-An authored assessment appears as a question component on the scene Stage, not as a separate block beneath it. The component reads the existing question data; its prompt, choices, answer key, feedback, and scoring are not copied into ordinary text elements.
-
-1. Use **Create question** or **Edit question** above the scene preview to author the question.
-2. Open **Edit scene > Stage**. The question and learner choices appear on the canvas; correct answers are not revealed there.
-3. Drag or resize the question component, or use the **Question** inspector's position and size fields. The region must remain inside the Stage. Shrinking the Stage keeps the saved question region within its new bounds.
-4. Choose **Save scene**. Placement is saved separately from the question, and remains when the question is edited. Use the question editor to change question content; the Stage component is not an independent copy.
-5. Check **Preview course**. The on-stage controls support all seven question types with their existing attempts, scoring, feedback, and remediation behavior.
-
-Existing assessments without placement data receive a default origin matching the scene's title element, and the redundant Stage title is omitted. Explicitly saved positions remain in use. SCORM and standalone exports use the same authored origin and no longer duplicate the question below the Stage. The question panel grows with its content instead of adding an internal scrollbar; the page can scroll for long content. Learner question text uses a compact 16 px base and 20 px prompt, with native form inputs and reduced spacing. Authoring uses a non-interactive representation; use Preview to answer the question. QTI remains question-data-only and does not include Stage placement.
-
-Submitting an answer opens a feedback modal with the explanation, score, attempts, and a Review lesson action when remediation is configured. Close feedback or Escape returns to the question without closing Preview or changing the attempt count. View feedback reopens the last submitted result without submitting another answer. A changed, unsubmitted answer must be checked again before feedback is available. Correct answers and exhausted attempts remain locked according to the existing scoring rules. The platinum question panel retains its brushed finish, rounded corners, and lower-right shadow; modal feedback uses explicit high-contrast success/error colors in either theme.
 
 ### Export a standalone local course
 
@@ -618,7 +650,7 @@ Choose **SME Master** for one editable landscape, slide-like page per scene, or 
 | 2 | Choose **SME Master** or **Full storyboard**, then decide whether to **Include answer keys (authoring material)**. | The format and answer-key policy are selected. | <a href="user-guide/images/word-export.png"><img src="user-guide/images/word-export.png" alt="word export controls" width="240"></a> |
 | 3 | Click **Download Word document**, then open the DOCX in Word. | Scene text and tables are editable; images remain images and interactions are documented rather than playable. | <a href="user-guide/images/word-export.png"><img src="user-guide/images/word-export.png" alt="word export controls" width="240"></a> |
 
-### Export one assessment as QTI
+### Export one question as QTI
 
 Chimera attempt/retry settings are not equivalent to settings in the receiving assessment system; verify them after import.
 
@@ -631,7 +663,7 @@ Chimera attempt/retry settings are not equivalent to settings in the receiving a
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Save questions in at least two assessment scenes, then open **Export**. | The Assessment test section becomes available. | <a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a><br><a href="user-guide/images/top-actions.png"><img src="user-guide/images/top-actions.png" alt="top actions controls" width="240"></a> |
+| 1 | Save questions in at least two Question scenes, then open **Export**. | The Assessment test section becomes available. | <a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a><br><a href="user-guide/images/top-actions.png"><img src="user-guide/images/top-actions.png" alt="top actions controls" width="240"></a> |
 | 2 | Click **Download QTI test**. | A QTI 2.1 test package containing the authored questions downloads. | <a href="user-guide/images/qti-test.png"><img src="user-guide/images/qti-test.png" alt="qti test controls" width="240"></a> |
 
 ## 12. Back up and restore
@@ -690,7 +722,7 @@ Project health uses a bounded, keyboard-scrollable area at five or more projects
 Do not follow the implementation build plan as if every planned control already exists. The following have no complete workflow in the interface captured here:
 
 - Unauthenticated guest review. Authenticated hosted review links have a separate documented deployment workflow.
-- Video upload, caption/transcript authoring, and course-wide/shared media-library controls. Supported image placement is available through **Edit scene > Canvas**.
+- Video upload, caption/transcript authoring, and course-wide/shared media-library controls. Supported image placement is available through **Edit scene > Stage**.
 - Full reference-resource classification, authority, version-management, and per-scene mapping editors.
 - Word reimport or automatic synchronization of external edits.
 - A general history browser and arbitrary revision restore.
@@ -710,14 +742,17 @@ See the [implementation build plan](storyboard-export-enhancement-build-plan.md)
 | A reference cannot be selected | Inspect its extraction status. Supply readable text when extraction is incomplete. |
 | A proposal or save reports a revision conflict | Reload the latest project and compare changes before trying again. Preserve unsaved text separately first. |
 | A SCORM build is blocked | Run Production release validation and resolve the listed errors. |
-| A QTI test button is missing | Save at least two authored assessment questions. |
+| A QTI test button is disabled | Save at least two authored questions in the course or selected Assessment, and confirm export permission. |
+| Try again seems to submit the same answer | Re-export packages built before the retry fix. In the current player, close feedback, choose Try again, enter a new response, and choose Check answer. Retry retains used attempts; exhausted questions stay locked. |
+| SCORM does not resume or report grades | Confirm Connected to LMS tracking and launch a learner attempt in a graded SCORM activity using the supported profile. Record any initialization/rejected-call diagnostic and inspect the LMS grading and attempt settings. |
+| Text does not fit on the Stage | Use Fit text; unlock or enlarge the affected box, reduce its type size, or shorten its text. Check overlap and contrast in Preview before saving. |
 | JSON restore reports missing references | Make required media/templates available, or use a Chimera storyboard that includes dependencies. |
 | AI generation does not yield a candidate | Check the visible error and ask the administrator to inspect provider/job configuration. The media form has no complete job monitor. |
 
 ## Screenshot and verification record
 
-Screenshots were captured from the actual local frontend and an isolated backend workspace on 2026-09-30, using a compatible headless Chromium browser, a 1500-pixel-wide viewport, and Light appearance. Images are stored in `docs/user-guide/images/` and contain demonstration data only. Proposal, generated-candidate, and enhancement-job examples were seeded locally to expose conditional controls. No paid generation or external submission was performed.
+Changed controls were recaptured on 2026-10-14 from the actual local frontend and a fresh isolated demonstration workspace, using Chromium, a 1500-pixel-wide viewport, and Light appearance. Earlier captures are retained for unchanged controls; see the complete and refresh manifests for provenance. Images are stored in `docs/user-guide/images/` and contain demonstration data only. Proposal, generated-candidate, and enhancement-job examples were seeded locally to expose conditional controls. No paid generation or external submission was performed.
 
-UI navigation, proposal acceptance, commenting/resolution, and sample assessment playback were exercised while capturing screens. This documentation pass does not constitute a complete regression test, Word rendering qualification, AI-provider certification, or LMS test. Screenshots should be refreshed whenever control labels or workflows change.
+UI navigation, proposal acceptance, commenting/resolution, and sample assessment playback were exercised while capturing screens. Separate qualification records document automated regression, the synthetic live-AI quality pass, and operator acceptance of the SCORM 1.2 LMS fixture. This screenshot refresh itself does not establish broader provider quality or LMS compatibility. Screenshots should be refreshed whenever control labels or workflows change.
 
-Capture details and refresh instructions: [manifest](user-guide/capture-manifest.json) and [maintainer instructions](user-guide/support/README.md).
+Capture details and refresh instructions: [original manifest](user-guide/capture-manifest.json), [2026-10-14 refresh](user-guide/refresh-manifest-2026-10-14.json) and [maintainer instructions](user-guide/support/README.md).
