@@ -1,8 +1,12 @@
 # Current work and handoff
 
-Updated 2026-10-13. The active development branch is `extract-onboarding-repository`.
+The [completion plan](completion-plan-2026-10-15.md) and [execution record](completion-update-2026-10-15.md) track this update. Historical qualification evidence remains dated below; PR #5 is merged and PR #6 holds the preceding candidate.
+
+Updated 2026-10-15. Candidate version: 1.1.0; see [release policy](release-policy.md). The active development branch is `extract-onboarding-repository`.
 
 ## Completed
+
+- Completion update 1.1.0: explicit scene/course-wide media placement, precedence/exclusions, immutable shared-library copies, video/captions/transcripts, Word source provenance and optional discussion, local PDF OCR with inspection, AI request/source budgets, provider-reported enhancement usage, API layout warnings, per-profile resume budgets and CI/browser qualification repairs. See the execution record for final checks and remaining acceptance.
 
 - Portable LibreOffice discovery and Word rendering/edit-save-reopen checks.
 - TestFrame revision 8 production validation and local qualification of both SCORM profiles. The user confirmed SCORM 1.2 passes their LMS; that LMS does not accept SCORM 2004.
@@ -22,7 +26,7 @@ Updated 2026-10-13. The active development branch is `extract-onboarding-reposit
 - Scene layout choices now select rendering behavior: Fidelity uses the source slide, Hybrid enables extracted editable layers, Native uses an editable white canvas, and Template applies the selected PPTX first-slide/master treatment. Template, visual-canvas, course-preview, and SCORM paths are covered by backend and browser qualification. Existing scene editing uses one Details/Canvas editor and one save action.
 - My Work now supports owner/admin-authorized project trash, title-independent checkbox confirmation, archive download before removal, 30-day restore, expiry purge, and active-generation-job protection. The project is cleared from active workspace state when trashed. Trash/restore and access boundaries have isolated backend and browser regressions.
 
-## Latest verification
+## Historical verification (before this update)
 
 On 2026-10-13, the backend suite passed 150 tests, the frontend TypeScript/Vite production build passed, the full Chromium onboarding suite passed all 66 tests with one worker, visual qualification passed for unified Details/Canvas editing, master-layer rendering, save/reload and both SCORM profiles, and the hosted-auth HTTPS harness passed with no Axe or JavaScript errors and no mobile overflow. Running the browser suite with three workers once caused a Windows `PermissionError` during atomic storyboard replacement; the complete serial rerun passed. Guide screenshots were recaptured from the isolated `user-guide-restored` workspace and reviewed for the unified editor and Trash confirmation. Project-trash tests cover ownership, expiry, active-job protection, failed-restore recovery, API audit routing, checkbox confirmation and restore. No existing user project was modified in qualification. These local checks do not qualify live Linux/Nginx deployment, external-provider behavior, Firefox/WebKit, or interactive Word editing.
 
@@ -30,10 +34,10 @@ The hosted HTTPS harness also passed login/error handling, secure cookies, recov
 
 ## Next
 
-1. **Push the reviewed candidate commits.** `53ce20f` contains the implementation/tests and `5157cc1` the documentation refresh. The generated `docs/user-guide.pdf` and historical `docs/export-enhancement-recovery.md` change were intentionally left uncommitted. The worktree should remain otherwise clean before pushing.
-2. **Wait for fresh PR #5 checks.** Its prior Playwright check predates these commits. Confirm the new head passes CI and no review/change requests appear. The local Chromium suite passed serially; a three-worker run hit one Windows atomic-replacement `PermissionError`, so hosted CI's one-worker configuration is the relevant confirmation.
-3. **Merge and tag the stable release.** After fresh CI passes, merge PR #5 into `main` and tag the exact merge commit using the repository's release/version policy. Publish release notes with the local qualification evidence and its limits.
-4. **Complete remaining human/deployment gates.** Inspect SME Master and Full Storyboard exports interactively in Writer/LibreOffice, including the user-supplied PPTX master. Live Linux/Nginx inspection still awaits SSH, hostname, and installation-directory details; use the [authentication deployment guide](authentication-deployments.md) and do not assume templates have been installed. Encarta verification awaits its issuer/token, user/tenant mapping, session/logout, and provisioning contract.
+1. **Qualify the completion update.** PR #5 is merged at `994f2afb9cd3618272efc8a5dd654ac429079d96`. PR #6 contains baseline `a181b7336a792f1a2840fbc059d7314bf09f606a`; its October 14 CI run failed WebKit local-file navigation with offline emulation. This update repairs that test while blocking and recording network requests, adds visual qualification to CI, and implements the local completion-plan work. New exact-head CI is required after these changes are submitted.
+2. **Review the new media and reliability contracts.** See [media placement and OCR](media-placement-and-ocr.md), [resume-data policy](resume-data-policy.md), and the [execution record](completion-update-2026-10-15.md) for delivered behavior, checks and limits.
+3. **Complete external acceptance before release claims.** Interactive Writer editing of both templates, target-LMS acceptance of changed packages, novice-author and manual screen-reader reviews remain human tasks. The October 14 replacement SCORM 1.2 package already passed retry, Continue, Start over and Gradebook by operator attestation; preserve that exact artifact evidence.
+4. **Hosted deployment is deferred for this update**, as instructed on 2026-10-15. Encarta remains fail-closed pending its verified integration contract. Do not deploy templates or enable centralized event delivery without the environment and trust/residency inputs.
 
 ## Dated follow-up
 

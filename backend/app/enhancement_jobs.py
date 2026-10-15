@@ -10,6 +10,7 @@ from .models import CourseCompletionSettings, EnhancementField, EnhancementJob, 
 from .models import EnhancementResourceConflict
 from . import storage
 from .ai_context import course_context, scene_context
+from .ai_budget import checked_json, provider_usage
 from .ai_connection import connection_status, open_provider_request, request_budget, resolve_connection
 
 
@@ -55,7 +56,7 @@ class OpenAICompatibleProvider:
         }
         request = urllib.request.Request(
             f"{self.base_url}/chat/completions",
-            data=json.dumps(request_body).encode("utf-8"),
+        data=checked_json(request_body).encode("utf-8"),
             headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
             method="POST",
         )
@@ -71,6 +72,7 @@ class OpenAICompatibleProvider:
             raise RuntimeError("Enhancement provider returned an invalid structured response") from error
         if not isinstance(result, dict) or not isinstance(result.get("proposals"), list):
             raise RuntimeError("Enhancement provider response must contain a proposals array")
+        self.last_usage = provider_usage(response_data)
         return result
 
 
@@ -141,6 +143,7 @@ def _load_job_context(job: EnhancementJob) -> tuple[dict[str, object], dict[tupl
             }],
         },
     }
+    checked_json(payload)
     return payload, locator_text
 
 
@@ -319,6 +322,8 @@ def _run_job(project_id: str, job_id: str) -> None:
             estimatedCostUsd=cost_estimate,
         )
         raw_output = provider.generate(payload)
+        if isinstance(getattr(provider, "last_usage", None), dict):
+            storage.update_enhancement_job(project_id, job_id, actualUsage=provider.last_usage)
         job = storage.read_enhancement_job(project_id, job_id)
         if job.cancelRequested:
             storage.update_enhancement_job(project_id, job_id, status="cancelled", progress=100, message="Cancelled; provider output was discarded")

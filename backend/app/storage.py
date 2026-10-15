@@ -519,6 +519,10 @@ def replace_storyboard(project_id: str, imported: Storyboard, expected_revision:
         "title": current.title,
         "scenes": normalized_scenes,
     })
+    from .media import validate_placements, validate_captions
+    validate_placements(current.model_copy(update={"storyboard": storyboard}))
+    for asset in storyboard.assets:
+        validate_captions(asset.captionsVtt)
     write_storyboard(path, storyboard, expected_revision or current.storyboard.revision)
     metadata = {"id": project_id, "title": current.title, "updatedAt": now_iso()}
     write_project_metadata(path, metadata)
@@ -644,13 +648,15 @@ def update_scene(project_id: str, scene_id: str, data: SceneUpdate, expected_rev
                 "decorativeImages": [asset_id for asset_id in updated_scene.decorativeImages if asset_id in attached_image_ids],
             })
             known_asset_ids = {asset.id for asset in current.storyboard.assets}
-            referenced_asset_ids = set(updated_scene.imageAssets + updated_scene.audioAssets)
+            referenced_asset_ids = set(updated_scene.imageAssets + updated_scene.audioAssets + updated_scene.videoAssets)
             if not referenced_asset_ids.issubset(known_asset_ids):
                 raise ValueError("Scene references an asset that is not in this project")
             if any(asset.kind != "image" for asset in current.storyboard.assets if asset.id in updated_scene.imageAssets):
                 raise ValueError("Image scene references must point to image assets")
             if any(asset.kind != "audio" for asset in current.storyboard.assets if asset.id in updated_scene.audioAssets):
                 raise ValueError("Audio scene references must point to audio assets")
+            if any(asset.kind != "video" for asset in current.storyboard.assets if asset.id in updated_scene.videoAssets):
+                raise ValueError("Video scene references must point to video assets")
             if set(updated_scene.imageAltText) - attached_image_ids or set(updated_scene.decorativeImages) - attached_image_ids:
                 raise ValueError("Image accessibility metadata must refer to attached images")
             if set(updated_scene.imageAltText) & set(updated_scene.decorativeImages):
@@ -661,6 +667,8 @@ def update_scene(project_id: str, scene_id: str, data: SceneUpdate, expected_rev
         raise KeyError(scene_id)
     validate_remediation_targets(scenes)
     storyboard = current.storyboard.model_copy(update={"scenes": scenes})
+    from .media import validate_placements
+    validate_placements(current.model_copy(update={"storyboard": storyboard}))
     write_storyboard(path, storyboard, expected_revision or current.storyboard.revision)
     metadata = {"id": project_id, "title": current.title, "updatedAt": now_iso()}
     write_project_metadata(path, metadata)
@@ -1453,7 +1461,7 @@ def decide_enhancement_proposal(
         raise KeyError(proposal_id)
 
 
-def add_project_asset(project_id: str, filename: str, content: bytes, kind: Literal["image", "audio"], expected_revision: int | None = None) -> ProjectDetail:
+def add_project_asset(project_id: str, filename: str, content: bytes, kind: Literal["image", "audio", "video"], expected_revision: int | None = None, *, source_metadata: dict | None = None) -> ProjectDetail:
     path = project_path(project_id)
     current = read_project(project_id)
     digest = hashlib.sha256(content).hexdigest()
@@ -1461,7 +1469,7 @@ def add_project_asset(project_id: str, filename: str, content: bytes, kind: Lite
     content_type = mimetypes.guess_type(filename)[0] or ("application/octet-stream")
     asset_id = f"{kind}-{digest}"
     safe_filename = f"{asset_id}{extension}"
-    relative_path = Path("assets") / ("images" if kind == "image" else "audio") / safe_filename
+    relative_path = Path("assets") / {"image": "images", "audio": "audio", "video": "video"}[kind] / safe_filename
     destination = path / relative_path
     destination.parent.mkdir(parents=True, exist_ok=True)
     created_destination = False
@@ -1479,7 +1487,14 @@ def add_project_asset(project_id: str, filename: str, content: bytes, kind: Lite
         sha256=digest,
         path=relative_path.as_posix(),
     )
-    assets = [existing for existing in current.storyboard.assets if existing.id != asset.id]
+    existing = next((item for item in current.storyboard.assets if item.id == asset.id), None)
+    if existing:
+        if expected_revision is not None and expected_revision != current.storyboard.revision:
+            raise StoryboardRevisionConflict(expected_revision, current.storyboard.revision)
+        return current
+    if source_metadata:
+        asset = ExtractedAsset.model_validate({**asset.model_dump(), **source_metadata})
+    assets = list(current.storyboard.assets)
     assets.append(asset)
     storyboard = current.storyboard.model_copy(update={"assets": assets})
     try:

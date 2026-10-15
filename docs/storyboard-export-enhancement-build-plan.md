@@ -4,6 +4,10 @@ Status: Release qualification in progress; the integrated authoring, enhancement
 
 Prepared: 2026-09-30
 
+## Current disposition - 2026-10-15
+
+This document preserves the original delivery sequence. The executable status is now the [completion plan](completion-plan-2026-10-15.md) and [execution record](completion-update-2026-10-15.md). Authentication and fixed-revision review links are implemented; remaining hosted/Encarta qualification is deferred for this update. Narration is modeled and exported. New work adds project-pinned shared media, course-wide/scene placement, imported captioned video, local versioned OCR with author inspection, Word provenance/discussion, and resume budgets. Historical remaining-work table entries below must be read with this disposition; future UI/API breadth is not a missing baseline prerequisite.
+
 ## Objective
 
 Make a saved Chimera storyboard the common source for three user actions:

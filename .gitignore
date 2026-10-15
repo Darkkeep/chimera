@@ -1,6 +1,7 @@
 .venv/
 backend/.venv/
 tools/LibreOfficePortable/
+tools/tessdata/
 __pycache__/
 *.py[cod]
 workspace/

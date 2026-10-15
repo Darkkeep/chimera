@@ -9,6 +9,7 @@ from xml.etree import ElementTree as ET
 from .models import ProjectDetail
 from .storage import project_path, read_project, slugify, storyboard_transaction
 from .validation import validate_project
+from .media import resolved_project
 
 
 SCORM_2004_NAMESPACE = "http://www.imsproject.org/xsd/imscp_rootv1p1p2"
@@ -30,12 +31,17 @@ SCORM_12_XSI_NAMESPACE = "http://www.w3.org/2001/XMLSchema-instance"
 ANIMATION_RUNTIME = (Path(__file__).parent / "static" / "stage-animations.js").read_text(encoding="utf-8").replace("export function playStageAnimations", "function playStageAnimations")
 ASSESSMENT_SURFACE_CSS = (Path(__file__).parent / "static" / "assessment-surface.css").read_text(encoding="utf-8")
 
-PLAYER_JS = ANIMATION_RUNTIME + r'''
+CAPTION_RUNTIME = (Path(__file__).parent / "static" / "captions.js").read_text(encoding="utf-8").replace("export function installCaptionTrack", "function installCaptionTrack")
+
+PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
 (() => {
+    const suspendDataLimit = 64000;
     const state = { scenes: [], completionSettings: { passingScore: 80, includeOptionalAssessments: false }, current: 0, visited: new Set(), completedAudio: new Set(), assessments: {}, remediation: null, startedAt: Date.now() };
   let api = null;
         let resumeChoicePending = false;
     let lmsWarningShown = false;
+    let capacityWarning = false;
+    let savedProgressUnreadable = false;
     function runtimeStatus(message) { const status = document.querySelector("#runtime-status"); if (status) status.textContent = message; }
   function findApi() {
         const pending = [window];
@@ -51,12 +57,35 @@ PLAYER_JS = ANIMATION_RUNTIME + r'''
         return null;
   }
         function call(name, value) { if (!api) return ""; try { const result = api[name](...value); if (result === false || result === "false") { lmsWarningShown = true; runtimeStatus(`LMS rejected ${name}; progress or grades may not be saved. Check the LMS launch and grading settings.`); } return result; } catch (_) { if (!lmsWarningShown) { lmsWarningShown = true; runtimeStatus("LMS tracking is unavailable; progress will not be reported."); } return ""; } }
+    function accepted(result) { return result === true || result === "true"; }
+    function suspendSnapshot() {
+        return JSON.stringify({ current: state.current, visited: [...state.visited], completedAudio: [...state.completedAudio], assessments: state.assessments, remediation: state.remediation });
+    }
+    function utf8Size(text) {
+        let bytes = 0;
+        for (const character of text) { const code = character.codePointAt(0); bytes += code <= 0x7f ? 1 : code <= 0x7ff ? 2 : code <= 0xffff ? 3 : 4; }
+        return bytes;
+    }
+    function resumeFits(snapshot) {
+        const bytes = utf8Size(snapshot);
+        if (bytes <= suspendDataLimit) return true;
+        capacityWarning = true;
+        runtimeStatus(`Progress cannot be saved: this course's resume data is ${bytes} bytes, above its ${suspendDataLimit}-byte tracking budget. Your previous saved progress is retained; current answers and grades may not be saved. Contact the course administrator.`);
+        return false;
+    }
   function save() {
-        if (resumeChoicePending) return;
-        call("SetValue", ["cmi.exit", "suspend"]);
-    call("SetValue", ["cmi.location", String(state.current)]);
-        call("SetValue", ["cmi.suspend_data", JSON.stringify({ current: state.current, visited: [...state.visited], completedAudio: [...state.completedAudio], assessments: state.assessments, remediation: state.remediation })]);
-    call("Commit", [""]); 
+        if (resumeChoicePending || savedProgressUnreadable) return false;
+        if (!api) return true;
+        const snapshot = suspendSnapshot();
+        if (!resumeFits(snapshot)) return false;
+        // Save the complete state before advancing the bookmark or reporting grades.
+        // Rejected writes leave the previous bookmark intact and remain visible.
+        if (!accepted(call("SetValue", ["cmi.suspend_data", snapshot]))) return false;
+        if (!accepted(call("SetValue", ["cmi.location", String(state.current)]))) return false;
+        if (!accepted(call("SetValue", ["cmi.exit", "suspend"]))) return false;
+        const committed = accepted(call("Commit", [""]));
+        if (committed && capacityWarning && !lmsWarningShown) { capacityWarning = false; runtimeStatus("Connected to LMS tracking."); }
+        return committed;
   }
     function settings(scene) { return scene.assessmentSettings || { maxAttempts: 2, passingScore: 100, scoreWeight: 1, remediationSceneId: null }; }
     function assessmentCorrect(item, result) {
@@ -101,6 +130,7 @@ PLAYER_JS = ANIMATION_RUNTIME + r'''
         dialog.querySelector("[data-close-feedback]").focus();
     }
     function finish() {
+        if (!save()) return;
         const required = state.scenes.filter(scene => scene.required);
         const complete = state.scenes.length > 0 && required.every(scene => { if (!state.visited.has(scene.id)) return false; if (!scene.assessmentItem) return true; const result = state.assessments[scene.id]; const config = settings(scene); return result && result.attempts > 0 && (result.isCorrect === true || result.attempts >= config.maxAttempts); }) && state.scenes.filter(scene => scene.audioRequired).every(scene => scene.audioAssets.length > 0 && scene.audioAssets.every(id => state.completedAudio.has(`${scene.id}:${id}`)));
         const scored = state.scenes.filter(scene => scene.assessmentItem && (scene.required || (state.completionSettings.includeOptionalAssessments && (state.assessments[scene.id]?.attempts || 0) > 0)));
@@ -113,7 +143,7 @@ PLAYER_JS = ANIMATION_RUNTIME + r'''
     call("SetValue", ["cmi.score.max", "100"]);
         call("SetValue", ["cmi.score.raw", String(score ?? 0)]);
         call("SetValue", ["cmi.score.scaled", String((score ?? 0) / 100)]);
-    save();
+    call("Commit", [""]);
   }
     function text(scene) {
         const paragraphs = (scene.extractedText || []).filter(Boolean).map(value => `<p>${escapeHtml(value)}</p>`).join("");
@@ -244,8 +274,29 @@ PLAYER_JS = ANIMATION_RUNTIME + r'''
     const returnButton = document.querySelector("[data-return-assessment]");
     if (returnButton) returnButton.addEventListener("click", () => { state.current = state.scenes.findIndex(item => item.id === state.remediation.assessmentSceneId); state.remediation = null; save(); render(); });
     const media = document.querySelector("#scene-media"); media.innerHTML = "";
-    (visual ? [] : scene.imageAssets || []).forEach(id => { const asset = window.__CHIMERA_ASSETS[id]; if (!asset) return; const image = document.createElement("img"); image.src = asset.path; image.alt = scene.decorativeImages.includes(id) ? "" : (scene.imageAltText[id] || asset.filename); image.setAttribute("role", image.alt ? "img" : "presentation"); image.addEventListener("error", () => runtimeStatus(`Media could not be loaded: ${asset.filename}`)); media.appendChild(image); });
-    (scene.audioAssets || []).forEach(id => { const asset = window.__CHIMERA_ASSETS[id]; if (!asset) return; const audio = document.createElement("audio"); audio.controls = true; audio.preload = "metadata"; audio.src = asset.path; audio.addEventListener("error", () => runtimeStatus(`Audio could not be loaded: ${asset.filename}`)); if (scene.audioRequired) audio.addEventListener("ended", () => { state.completedAudio.add(`${scene.id}:${id}`); save(); finish(); }); media.appendChild(audio); });
+    const before = document.querySelector("#scene-media-before"); before.innerHTML = "";
+    const embeddedImages = new Set(visual ? scene.visualLayout.elements.filter(e => e.kind === "image").map(e => e.assetId) : []);
+    const placements = scene.mediaPlacements?.length ? scene.mediaPlacements : [...(scene.imageAssets || []), ...(scene.audioAssets || []), ...(scene.videoAssets || [])].map(assetId => ({ assetId, position: "after" }));
+    placements.forEach(placement => {
+        const id = placement.assetId, asset = window.__CHIMERA_ASSETS[id];
+        if (!asset || asset.kind === "image" && embeddedImages.has(id)) return;
+        const container = placement.position === "before" ? before : media;
+        const node = document.createElement(asset.kind === "image" ? "img" : asset.kind === "video" ? "video" : "audio");
+        node.src = asset.path;
+        node.addEventListener("error", () => runtimeStatus(`Media could not be loaded: ${asset.filename}`));
+        if (asset.kind === "image") {
+            node.alt = placement.decorative || (scene.decorativeImages || []).includes(id) ? "" : placement.altText || (scene.imageAltText || {})[id] || asset.filename;
+            node.setAttribute("role", node.alt ? "img" : "presentation");
+        } else {
+            node.controls = true; node.preload = "metadata"; node.loop = Boolean(placement.loop); node.muted = Boolean(placement.muted);
+            node.setAttribute("aria-label", `${asset.kind === "video" ? "Video" : "Audio"}: ${asset.filename}`);
+            if (asset.kind === "video") node.playsInline = true;
+            if (asset.kind === "audio" && scene.audioRequired) node.addEventListener("ended", () => { state.completedAudio.add(`${scene.id}:${id}`); finish(); });
+        }
+        container.appendChild(node);
+        if (asset.captionsVtt && asset.kind !== "image") installCaptionTrack(node, asset.captionsVtt, asset.language || "en");
+        if (asset.transcript && asset.kind !== "image") { const details = document.createElement("details"), summary = document.createElement("summary"), transcript = document.createElement("p"); summary.textContent = `Transcript: ${asset.filename}`; transcript.textContent = asset.transcript; details.appendChild(summary); details.appendChild(transcript); container.appendChild(details); }
+    });
     const status = document.querySelector("#scene-status"); status.textContent = `${state.current + 1} / ${state.scenes.length}`;
     document.querySelector("#previous").disabled = state.current === 0;
     document.querySelector("#next").disabled = state.current === state.scenes.length - 1;
@@ -256,7 +307,7 @@ PLAYER_JS = ANIMATION_RUNTIME + r'''
   }
   async function start() {
                 const localCourse = window.__CHIMERA_STORYBOARD;
-                api = localCourse ? null : findApi(); if (!api) runtimeStatus(localCourse ? "Local course: progress is kept only while this page is open." : "Preview mode: no LMS tracking connection detected."); if (api) { const initialized = call("Initialize", [""]); if (initialized !== true && initialized !== "true") { runtimeStatus("LMS initialization failed; progress and grades will not be saved."); api = null; } else { runtimeStatus("Connected to LMS tracking."); const location = Number(call("GetValue", ["cmi.location"])); if (Number.isInteger(location) && location >= 0) state.current = location; try { const saved = JSON.parse(call("GetValue", ["cmi.suspend_data"]) || "{}"); (saved.visited || []).forEach(id => state.visited.add(id)); (saved.completedAudio || []).forEach(key => state.completedAudio.add(key)); state.assessments = saved.assessments || {}; state.remediation = saved.remediation || null; } catch (_) {} } }
+                api = localCourse ? null : findApi(); if (!api) runtimeStatus(localCourse ? "Local course: progress is kept only while this page is open." : "Preview mode: no LMS tracking connection detected."); if (api) { const initialized = call("Initialize", [""]); if (initialized !== true && initialized !== "true") { runtimeStatus("LMS initialization failed; progress and grades will not be saved."); api = null; } else { runtimeStatus("Connected to LMS tracking."); const location = Number(call("GetValue", ["cmi.location"])); if (Number.isInteger(location) && location >= 0) state.current = location; try { const saved = JSON.parse(call("GetValue", ["cmi.suspend_data"]) || "{}"); (saved.visited || []).forEach(id => state.visited.add(id)); (saved.completedAudio || []).forEach(key => state.completedAudio.add(key)); state.assessments = saved.assessments || {}; state.remediation = saved.remediation || null; } catch (_) { savedProgressUnreadable = true; runtimeStatus("Saved progress could not be read. Close this course and contact the administrator; existing progress will not be overwritten."); } } }
         const storyboard = localCourse || await (await fetch("storyboard.json")).json(); state.scenes = storyboard.scenes || []; state.completionSettings = storyboard.completionSettings || state.completionSettings;
     window.__CHIMERA_ASSETS = Object.fromEntries((storyboard.assets || []).map(asset => [asset.id, { ...asset, path: asset.path }]));
     if (!Number.isInteger(state.current) || state.current < 0 || state.current >= state.scenes.length) state.current = 0;
@@ -313,8 +364,8 @@ PLAYER_HTML = '''<!doctype html>
 <style>#resume-dialog{box-sizing:border-box;width:min(520px,calc(100% - 32px));max-height:90vh;overflow:auto;border:1px solid #52685a;border-radius:6px;padding:24px;background:#fff;color:#26352c;font:16px/1.5 system-ui,sans-serif}#resume-dialog::backdrop{background:rgba(0,0,0,.55)}#resume-dialog h2{margin-top:0}#resume-dialog .controls{flex-wrap:wrap}#resume-dialog button{min-height:44px}</style>
 <style>.assessment-stage-region h3{font-size:24px;margin:0 0 20px}.assessment-stage-region label{display:block;margin:12px 0}.assessment-stage-region button,.assessment-stage-region input,.assessment-stage-region select{font:inherit}.assessment-stage-region button{padding:8px 16px;margin:16px 0}.assessment-stage-region input[type=radio],.assessment-stage-region input[type=checkbox]{width:22px;height:22px}@media(max-width:600px){.assessment-stage-frame{min-height:600px;aspect-ratio:auto!important}}</style>
 <style>.native-slide{box-sizing:border-box;width:100%;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:center;gap:24px;padding:48px 56px;border:1px solid #ccd5cc;background:#fff;overflow-wrap:anywhere}.native-slide h3{margin:0;font-size:32px;line-height:1.25}.native-slide p{margin:0 0 16px;font-size:20px;line-height:1.6}.native-slide p:last-child{margin-bottom:0}@media(max-width:600px){.native-slide{padding:28px 24px;gap:20px}.native-slide h3{font-size:24px}.native-slide p{font-size:18px}}</style>
-<style>body{margin:0;background:#f4f5f1;color:#26352c;font:16px system-ui,sans-serif}main{max-width:960px;margin:0 auto;padding:32px 20px}header{border-bottom:1px solid #ccd5cc;margin-bottom:24px}h1{font-size:28px;margin:0 0 20px}h2{font-size:24px}#scene-body{line-height:1.6}#scene-media{display:grid;gap:16px;margin:24px 0}#scene-media img{max-width:100%;max-height:520px;object-fit:contain;background:#fff}audio{width:100%}.controls{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:28px}.controls button{border:1px solid #52685a;background:#fff;color:#26352c;padding:10px 16px;border-radius:4px;font:inherit}.controls button:disabled{opacity:.45}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}</style></head>
-<body><main><header><h1 id="course-title">Loading course...</h1><p id="scene-status" aria-live="polite"></p><p id="runtime-status" role="status" aria-live="polite"></p><label for="contents">Contents</label> <select id="contents" aria-label="Contents" style="max-width:100%;padding:8px;font:inherit"></select></header><article aria-labelledby="scene-title"><h2 id="scene-title"></h2><div id="scene-body"></div><div id="scene-assessment"></div><div id="scene-media"></div></article><nav class="controls" aria-label="Scene navigation"><button id="previous" type="button">Previous</button><button id="motion" type="button" hidden>Stop motion</button><span class="sr-only">Scene navigation</span><button id="next" type="button">Next</button></nav></main><script src="player.js"></script></body></html>'''
+<style>body{margin:0;background:#f4f5f1;color:#26352c;font:16px system-ui,sans-serif}main{max-width:960px;margin:0 auto;padding:32px 20px}header{border-bottom:1px solid #ccd5cc;margin-bottom:24px}h1{font-size:28px;margin:0 0 20px}h2{font-size:24px}#scene-body{line-height:1.6}#scene-media{display:grid;gap:16px;margin:24px 0}#scene-media img{max-width:100%;max-height:520px;object-fit:contain;background:#fff}audio,video{width:100%;max-height:540px}#scene-media-before img{max-width:100%;max-height:520px}#scene-media-before{display:grid;gap:16px;margin:20px 0}.controls{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:28px}.controls button{border:1px solid #52685a;background:#fff;color:#26352c;padding:10px 16px;border-radius:4px;font:inherit}.controls button:disabled{opacity:.45}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}</style></head>
+<body><main><header><h1 id="course-title">Loading course...</h1><p id="scene-status" aria-live="polite"></p><p id="runtime-status" role="status" aria-live="polite"></p><label for="contents">Contents</label> <select id="contents" aria-label="Contents" style="max-width:100%;padding:8px;font:inherit"></select></header><article aria-labelledby="scene-title"><h2 id="scene-title"></h2><div id="scene-media-before"></div><div id="scene-body"></div><div id="scene-assessment"></div><div id="scene-media"></div></article><nav class="controls" aria-label="Scene navigation"><button id="previous" type="button">Previous</button><button id="motion" type="button" hidden>Stop motion</button><span class="sr-only">Scene navigation</span><button id="next" type="button">Next</button></nav></main><script src="player.js"></script></body></html>'''
 
 
 PLAYER_HTML = PLAYER_HTML.replace("</head>", f"<style>{ASSESSMENT_SURFACE_CSS}</style></head>")
@@ -322,6 +373,7 @@ PLAYER_HTML = PLAYER_HTML.replace("</head>", f"<style>{ASSESSMENT_SURFACE_CSS}</
 
 def _scorm_12_player() -> str:
     player = PLAYER_JS.replace("API_1484_11", "API")
+    player = player.replace("const suspendDataLimit = 64000;", "const suspendDataLimit = 4096;")
     player = player.replace('function call(name, value) { if (!api) return "";', 'function call(name, value) { name = { Initialize: "LMSInitialize", GetValue: "LMSGetValue", SetValue: "LMSSetValue", Commit: "LMSCommit", Terminate: "LMSFinish" }[name] || name; if (!api) return "";')
     player = player.replace("api.Initialize", "api.LMSInitialize")
     player = player.replace("api.GetValue", "api.LMSGetValue")
@@ -386,6 +438,14 @@ def _compatibility_checks(package: bytes, profile: str) -> list[dict[str, object
 def _build_report(project: ProjectDetail, profile: str, package: bytes, files: dict[str, bytes], validation_warnings: list[str]) -> dict[str, object]:
     threshold_bytes = project.storyboard.exportSettings.packageWarningThresholdMB * 1024 * 1024
     warnings = list(validation_warnings)
+    resume = _resume_budget_report(project, profile)
+    if resume["estimatedMaximumBytes"] > resume["budgetBytes"]:
+        warnings.append(
+            f"Resume data may exceed this profile's {resume['budgetBytes']}-byte budget "
+            f"(conservative full-course estimate: {resume['estimatedMaximumBytes']} bytes). "
+            "Reduce tracked questions/media or qualify a profile with more resume capacity. "
+            "The player stops saving progress and grades with a visible warning if the budget is exceeded; it never truncates answers."
+        )
     if len(package) > threshold_bytes:
         warnings.append(
             f"Package is {len(package) / 1024 / 1024:.1f} MB, above the configured {project.storyboard.exportSettings.packageWarningThresholdMB} MB warning threshold."
@@ -411,8 +471,43 @@ def _build_report(project: ProjectDetail, profile: str, package: bytes, files: d
         "requiredSceneCount": sum(scene.required for scene in project.storyboard.scenes),
         "assetCount": len(project.storyboard.assets),
         "warnings": warnings,
+        "resumeData": resume,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def _resume_budget_report(project: ProjectDetail, profile: str) -> dict[str, object]:
+    """Conservative JSON/UTF-8 envelope, not a claim of target-LMS acceptance."""
+    scenes = project.storyboard.scenes
+    assessments = {}
+    for scene in scenes:
+        item = scene.assessmentItem
+        if item is None:
+            continue
+        response, matches, text = [], {}, ""
+        if item.type in {"single-choice", "multiple-response", "ordering"}:
+            response = [choice.identifier for choice in item.choices]
+        elif item.type == "true-false":
+            response = ["false"]
+        elif item.type in {"matching", "drag-drop"}:
+            sources = item.leftItems if item.type == "matching" else item.draggables
+            targets = item.rightItems if item.type == "matching" else item.targets
+            longest = max((target.identifier for target in targets), key=lambda value: len(value.encode("utf-8")), default="")
+            matches = {source.identifier: longest for source in sources}
+        else:
+            # JSON escapes a control character as six ASCII bytes. The player
+            # allows 1,000 UTF-16 code units for each short-answer response.
+            text = "\x00" * 1000
+        assessments[scene.id] = {"response": response, "matches": matches, "textResponse": text,
+                                 "attempts": (scene.assessmentSettings.maxAttempts if scene.assessmentSettings else 2), "isCorrect": False}
+    longest_scene = max((scene.id for scene in scenes), key=lambda value: len(value.encode("utf-8")), default="")
+    snapshot = {"current": max(0, len(scenes) - 1), "visited": [scene.id for scene in scenes],
+                "completedAudio": [f"{scene.id}:{asset}" for scene in scenes if scene.audioRequired for asset in scene.audioAssets],
+                "assessments": assessments,
+                "remediation": {"assessmentSceneId": longest_scene, "remediationSceneId": longest_scene}}
+    size = len(json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    return {"budgetBytes": 4096 if profile == "SCORM 1.2" else 64000,
+            "estimatedMaximumBytes": size, "encoding": "JSON UTF-8", "overflowPolicy": "warn-and-retain-previous-save"}
 
 
 def _manifest(project: ProjectDetail) -> bytes:
@@ -494,6 +589,7 @@ def build_scorm_2004(project: ProjectDetail) -> tuple[bytes, dict[str, object]]:
 
 def _build_scorm_2004_locked(project: ProjectDetail) -> tuple[bytes, dict[str, object]]:
     _ensure_build_revision(project)
+    project = resolved_project(project, published=True)
     validation = validate_project(project, target="production")
     errors = [issue.message for issue in validation.issues if issue.severity == "error"]
     if errors:
@@ -546,6 +642,7 @@ def build_scorm_12(project: ProjectDetail) -> tuple[bytes, dict[str, object]]:
 
 def _build_scorm_12_locked(project: ProjectDetail) -> tuple[bytes, dict[str, object]]:
     _ensure_build_revision(project)
+    project = resolved_project(project, published=True)
     validation = validate_project(project, target="production")
     errors = [issue.message for issue in validation.issues if issue.severity == "error"]
     if errors:

@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 test('all assessment types answer inside the Stage without saved layouts', async ({ page, request }) => {
+  test.setTimeout(60000); // Seven full question/feedback/navigation flows, including WebKit on CI.
   let project = await (await request.post('/api/projects', { data: { title: 'Assessment Stage types' } })).json();
   const choices = [{ identifier: 'first', text: 'Inspect equipment' }, { identifier: 'second', text: 'Start operation' }];
   const items = [

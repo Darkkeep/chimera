@@ -44,6 +44,10 @@ from .password_auth import AccountStore, COOKIE, HostedAuthorizationPolicy, Logi
 
 
 ROUTE_ACTIONS = {
+    "get_media_capabilities": "project.view", "patch_media_metadata": "media.manage", "get_media_captions": "project.view",
+    "get_media_usage": "project.view", "delete_project_media": "media.manage", "put_course_media": "media.manage",
+    "put_scene_media": "media.manage", "get_shared_media": "media.manage", "publish_shared_media": "media.manage",
+    "copy_shared_media": "media.manage", "delete_shared_media": "media.manage", "post_reference_ocr": "reference.create", "post_reference_ocr_accept": "reference.create",
     "health": "identity.view", "auth_config": "identity.view", "login": "identity.view",
     "logout": "identity.view", "reset_password": "identity.view", "get_accounts": "admin.policy.manage",
     "get_identity_context": "identity.view", "get_identity_policy": "identity.view",
@@ -100,6 +104,9 @@ def get_authorization_policy() -> AuthorizationPolicy:
 
 def _hosted_request_action(request: Request) -> str:
     path = request.url.path
+    route_name = getattr(request.scope.get("route"), "name", "")
+    if route_name in {"put_course_media", "put_scene_media", "get_shared_media", "publish_shared_media", "copy_shared_media", "delete_shared_media"}:
+        return "media.manage"
     if "/content-drafts/" in path or path.endswith("/content-draft"):
         return "enhancement.job.create"
     if path.endswith("/trash") and request.method == "POST":
@@ -206,6 +213,8 @@ async def _require_request_access(
         if request.method != "GET" or action == "project.export":
             root = ROOT if action == "project.delete" or getattr(request.scope.get("route"), "name", "") == "restore_project" else project_path(project_id) if project_id else ROOT
             event_class = "security" if action in {"project.export", "project.delete", "project.restore", "project.membership.manage", "admin.policy.manage", "enhancement.proposal.decide", "review.comment.resolve"} else "operational"
+            if action == "media.manage" and ("/shared-media" in request.url.path or request.url.path.endswith("/share")):
+                event_class = "security"
             DurableEventSink(root).record(PlatformEvent(
                 eventName="api.action_completed", installationId=context.installationId,
                 actorId=context.actorId, actorDisplayName=context.actorDisplayName,
@@ -215,7 +224,8 @@ async def _require_request_access(
             ))
 
 
-app = FastAPI(title="Chimera API", version="0.1.0", dependencies=[Depends(_require_request_access)])
+from .version import __version__
+app = FastAPI(title="Chimera API", version=__version__, dependencies=[Depends(_require_request_access)])
 
 
 @app.exception_handler(RequestValidationError)
@@ -1348,11 +1358,11 @@ async def import_project_backup(project_id: str, file: UploadFile = File(...)) -
 
 
 @app.get("/api/projects/{project_id}/storyboard.docx")
-def export_storyboard_docx(project_id: str, include_answer_key: bool = False) -> Response:
+def export_storyboard_docx(project_id: str, include_answer_key: bool = False, include_review_comments: bool = False) -> Response:
     try:
         with storyboard_transaction():
             project = read_project(project_id)
-            content = build_storyboard_docx(project, include_answer_key)
+            content = build_storyboard_docx(project, include_answer_key, include_review_comments)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
     filename = f"{slugify(project.title)}-storyboard.docx"
@@ -1363,7 +1373,7 @@ def export_storyboard_docx(project_id: str, include_answer_key: bool = False) ->
     )
 
 
-def _export_template_storyboard(project_id: str, include_answer_key: bool, full: bool) -> Response:
+def _export_template_storyboard(project_id: str, include_answer_key: bool, full: bool, include_review_comments: bool = False) -> Response:
     template_path = FULL_TEMPLATE_PATH if full else SME_TEMPLATE_PATH
     if not template_path.is_file() or not SME_TEMPLATE_PATH.is_file():
         raise HTTPException(status_code=503, detail="Storyboard export template is unavailable")
@@ -1371,7 +1381,7 @@ def _export_template_storyboard(project_id: str, include_answer_key: bool, full:
         with storyboard_transaction():
             project = read_project(project_id)
             builder = build_full_storyboard_docx if full else build_sme_storyboard_docx
-            content = builder(project, include_answer_key)
+            content = builder(project, include_answer_key, include_review_comments)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
     except TemplateArtworkError as error:
@@ -1382,13 +1392,13 @@ def _export_template_storyboard(project_id: str, include_answer_key: bool, full:
 
 
 @app.get("/api/projects/{project_id}/storyboard-sme.docx")
-def export_sme_storyboard_docx(project_id: str, include_answer_key: bool = False) -> Response:
-    return _export_template_storyboard(project_id, include_answer_key, full=False)
+def export_sme_storyboard_docx(project_id: str, include_answer_key: bool = False, include_review_comments: bool = False) -> Response:
+    return _export_template_storyboard(project_id, include_answer_key, full=False, include_review_comments=include_review_comments)
 
 
 @app.get("/api/projects/{project_id}/storyboard-full.docx")
-def export_full_storyboard_docx(project_id: str, include_answer_key: bool = False) -> Response:
-    return _export_template_storyboard(project_id, include_answer_key, full=True)
+def export_full_storyboard_docx(project_id: str, include_answer_key: bool = False, include_review_comments: bool = False) -> Response:
+    return _export_template_storyboard(project_id, include_answer_key, full=True, include_review_comments=include_review_comments)
 
 
 @app.put("/api/projects/{project_id}/storyboard/import", response_model=ProjectDetail)
@@ -1418,8 +1428,10 @@ async def post_project_asset(project_id: str, file: UploadFile = File(...), if_m
         kind = "image"
     elif extension in AUDIO_UPLOAD_EXTENSIONS:
         kind = "audio"
+    elif extension in {".mp4", ".webm"}:
+        kind = "video"
     else:
-        raise HTTPException(status_code=400, detail="Upload a JPG, PNG, GIF, WebP, MP3, M4A, AAC, WAV, or OGG file")
+        raise HTTPException(status_code=400, detail="Upload a supported image, audio, MP4, or WebM file")
     content = await file.read(MAX_MEDIA_BYTES + 1)
     if not content:
         raise HTTPException(status_code=400, detail="Asset file is empty")
@@ -1431,6 +1443,8 @@ async def post_project_asset(project_id: str, file: UploadFile = File(...), if_m
                 image.verify()
         except (UnidentifiedImageError, OSError) as error:
             raise HTTPException(status_code=422, detail="Could not read image file") from error
+    if kind == "video" and not (extension == ".mp4" and len(content) >= 16 and content[4:8] == b"ftyp" or extension == ".webm" and content.startswith(b"\x1a\x45\xdf\xa3")):
+        raise HTTPException(status_code=422, detail="Video must have a valid MP4 or WebM container header; verify codec playback in Preview")
     try:
         return add_project_asset(project_id, Path(file.filename).name, content, kind, expected_revision)
     except StoryboardRevisionConflict as error:
@@ -1788,3 +1802,7 @@ async def upload_source(project_id: str, file: UploadFile = File(...), if_match:
             persist_slide_previews(project_id, staging_root, scenes)
             staged.replace(destination)
             return read_project(updated.id)
+
+
+from .media_routes import router as media_router
+app.include_router(media_router)

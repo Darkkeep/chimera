@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from .ai_connection import open_provider_request, request_budget, resolve_connection
 from .ai_context import course_context, scene_context
+from .ai_budget import checked_json
 from . import storage
 from .models import CourseContentDraft, ProjectDetail, Scene, SceneContentDraft
 
@@ -39,13 +40,13 @@ def _current_reference_context(project_id: str, resource_ids: list[str] | None =
         if scene_id is not None and resource.sceneIds and scene_id not in resource.sceneIds:
             continue
         version = next((item for item in resource.versions if item.version == resource.currentVersion), None)
-        if version is None or version.extractionStatus == "failed":
+        if version is None or version.extractionStatus != "complete":
             continue
         passages = []
         for passage in version.passages:
-            if remaining <= 0:
-                break
-            text = passage.text[:min(MAX_PASSAGE_CHARS, remaining)]
+            if len(passage.text) > MAX_PASSAGE_CHARS or len(passage.text) > remaining:
+                raise ValueError("Selected reference context exceeds the drafting budget (60,000 characters total; 8,000 per passage). Split the reference or select smaller sources. No source text was silently omitted.")
+            text = passage.text
             if text:
                 passages.append({"locator": passage.locator, "text": text})
                 remaining -= len(text)
@@ -58,8 +59,6 @@ def _current_reference_context(project_id: str, resource_ids: list[str] | None =
                 "version": version.version,
                 "passages": passages,
             })
-        if remaining <= 0:
-            break
     if selected is not None:
         included = {item["id"] for item in context}
         unavailable = selected - included
@@ -83,7 +82,7 @@ def _generate_json(payload: dict[str, object], system_prompt: str) -> object:
     }
     request = urllib.request.Request(
         f"{connection.base_url}/chat/completions",
-        data=json.dumps(request_body).encode("utf-8"),
+        data=checked_json(request_body).encode("utf-8"),
         headers={"Authorization": f"Bearer {connection.api_key}", "Content-Type": "application/json"},
         method="POST",
     )

@@ -20,6 +20,8 @@ Choose **Light**, **Dark**, or **System** under **Appearance** in the sidebar. T
 
 Onboarding's reusable engine and standalone demo live in the private [Darkkeep/onboarding repository](https://github.com/Darkkeep/onboarding). Chimera retains its application walkthroughs and installs the pinned release from `vendor/onboarding`, so no sibling checkout or GitHub credentials are needed. See the [implementation record](docs/onboarding-implementation.md) and [artifact update instructions](vendor/onboarding/README.md).
 
+New media controls support explicit scene/course-wide placement, project copies of shared assets, captioned MP4/WebM video and local PDF OCR with author inspection. Word exports can include accepted source citations and optional review discussion. See [media placement and OCR](docs/media-placement-and-ocr.md), [resume-data limits](docs/resume-data-policy.md), and [release policy](docs/release-policy.md).
+
 ## Start locally
 
 For local, Encarta, and darkrogue.io authentication preparation, see the [deployment authentication guide](docs/authentication-deployments.md). Local single-user operation remains the default; hosted profiles use separate workspaces.

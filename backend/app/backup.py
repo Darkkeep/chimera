@@ -108,6 +108,11 @@ def restore_project_archive(project_id: str, content: bytes) -> object:
             storyboard = Storyboard.model_validate_json(storyboard_path.read_text(encoding="utf-8"))
             if storyboard.projectId != project_id:
                 raise ValueError("Storyboard project ID does not match the archive")
+            from .media import validate_placements, validate_captions
+            from .models import ProjectDetail
+            validate_placements(ProjectDetail(id=project_id, title=storyboard.title, sceneCount=len(storyboard.scenes), updatedAt="restore", hasSourceDeck=False, storyboard=storyboard))
+            for asset in storyboard.assets:
+                validate_captions(asset.captionsVtt)
             for asset in storyboard.assets:
                 asset_path = extracted / asset.path
                 if not asset_path.is_file():

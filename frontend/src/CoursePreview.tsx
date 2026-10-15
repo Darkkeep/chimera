@@ -1,6 +1,6 @@
 import { reportOnboardingOutcome } from "./onboarding-journeys";
 import { BrandMark } from "./BrandMark";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, List, MessageCircle, Play, RotateCcw, Send, Square, X } from "lucide-react";
 import type { AssessmentItem, AssessmentSettings, Project, Scene } from "./App";
 import { evaluateCourseCompletion, type AssessmentOutcome } from "./completion";
@@ -11,6 +11,8 @@ import "./scene-navigation.css";
 import "./assessment-types.css";
 import "./assessments.css";
 import { useSession } from "./AuthGate";
+import { PublishedMedia } from "./PublishedMedia";
+import { resolvedProject } from "./media";
 import { SceneSurface } from "./SceneSurface";
 import { AssessmentFeedbackDialog } from "./AssessmentFeedbackDialog";
 
@@ -133,7 +135,7 @@ function createEmptyAssessmentResult(item: AssessmentItem, settings: AssessmentS
 export function CoursePreview({ project, onClose, canEnhance = true }: CoursePreviewProps) {
   const { session } = useSession();
   const resumeProjectId = session ? `${session.actor.actorId}.${project.id}` : project.id;
-  const scenes = project.storyboard.scenes;
+  const scenes = useMemo(() => resolvedProject(project).storyboard.scenes, [project]);
   const [resumeState] = useState(() => readResumeState(resumeProjectId, scenes));
   const [sceneIndex, setSceneIndex] = useState(resumeState.sceneIndex);
   const [contentsOpen, setContentsOpen] = useState(false);
@@ -237,18 +239,6 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
     return () => controller.abort();
   }, [project.id]);
 
-  const assetById = new Map(project.storyboard.assets.map((asset) => [asset.id, asset]));
-
-  function renderImage(imageId: string, className: string) {
-    const asset = assetById.get(imageId);
-    if (!asset || asset.kind !== "image") return null;
-    const decorative = scene?.decorativeImages.includes(imageId) ?? false;
-    return <figure className={className} key={imageId}>
-      <img src={`/api/projects/${project.id}/assets/${imageId}`} alt={decorative ? "" : scene?.imageAltText[imageId] ?? ""} />
-      {!decorative && scene?.imageAltText[imageId]?.trim() && <figcaption>{scene.imageAltText[imageId]}</figcaption>}
-    </figure>;
-  }
-
   function submitAssessment(item: AssessmentItem) {
     if (!scene) return;
     const settings = assessmentSettings(scene);
@@ -334,9 +324,10 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
       <article className="course-preview-content" aria-labelledby="course-preview-scene-title">
         {remediationRoute?.remediationSceneId === scene.id && <button type="button" className="course-preview-nav-button previous" onClick={returnToAssessment}><ArrowLeft size={16} /><span>Return to question</span></button>}
         <h1 id="course-preview-scene-title" className={scene.assessmentItem || scene.visualLayout?.enabled && scene.visualLayout.elements.some(element => element.kind === "text" && element.text.trim() === scene.title.trim()) ? "course-preview-title-on-stage" : undefined}>{scene.title || "Untitled scene"}</h1>
+        <PublishedMedia position="before" project={project} scene={scene} completedAudioKeys={completedAudioKeys} onAudioEnded={key => setCompletedAudioKeys(current => current.includes(key) ? current : [...current, key])} />
         {!scene.assessmentItem && (scene.visualLayout?.enabled ? <SceneSurface key={motionReplay} project={project} scene={scene} animate={motionEnabled} /> : scene.previewImage ? <div className="course-preview-slide"><img src={`/api/projects/${project.id}/${scene.previewImage}`} alt={`Slide ${scene.sourceSlide ?? sceneIndex + 1}: ${scene.title}`} /></div> : scene.extractedText.length > 0 ? <div className="course-preview-text">{scene.extractedText.map((text, index) => <p key={`${index}-${text}`}>{text}</p>)}</div> : <p className="course-preview-empty">This scene has no learner-facing content yet.</p>)}
         {!scene.visualLayout?.enabled && scene.previewImage && scene.extractedText.length > 0 && <details className="course-preview-transcript"><summary>Read slide text</summary><div>{scene.extractedText.map((text, index) => <p key={`${index}-${text}`}>{text}</p>)}</div></details>}
-        {!scene.visualLayout?.enabled && scene.imageAssets.length > 0 && <div className="course-preview-images" aria-label="Scene images">{scene.imageAssets.map((imageId) => renderImage(imageId, "course-preview-image"))}</div>}
+
         {scene.assessmentItem && <SceneSurface key={motionReplay} project={project} scene={scene} animate={motionEnabled} assessment={(() => {
           const item = scene.assessmentItem;
           const settings = assessmentSettings(scene);
@@ -384,13 +375,7 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
             <div className="course-preview-assessment-actions"><button type="button" className="course-preview-nav-button next" onClick={() => submitAssessment(item)} disabled={!(result.response.length || Object.keys(result.matches).length || result.textResponse.trim()) || assessmentPassed || attemptsExhausted}>{assessmentPassed ? "Passed" : attemptsExhausted ? "Attempts used" : result.isCorrect === false ? "Try again" : "Check answer"}</button>{result.attempts > 0 && result.isCorrect !== null && <button type="button" data-view-feedback className="course-preview-nav-button" onClick={() => setFeedbackSceneId(scene.id)}>View feedback</button>}</div>
           </section>;
         })()} />}
-        {scene.audioAssets.map((audioId) => {
-          const asset = assetById.get(audioId);
-          if (asset?.kind !== "audio") return null;
-          const isRequired = scene.audioRequired;
-          const isComplete = completedAudioKeys.includes(audioCompletionKey(scene.id, audioId));
-          return <section className={`course-preview-audio ${isRequired ? "required-audio" : ""}`} key={audioId}><span>{asset.filename}{isRequired ? ` · ${isComplete ? "Complete" : "Required"}` : ""}</span><audio controls preload="metadata" src={`/api/projects/${project.id}/assets/${audioId}`} aria-label={`Audio: ${asset.filename}${isRequired ? ", required" : ""}`} onEnded={() => { if (isRequired) setCompletedAudioKeys((current) => current.includes(audioCompletionKey(scene.id, audioId)) ? current : [...current, audioCompletionKey(scene.id, audioId)]); }} /></section>;
-        })}
+        <PublishedMedia position="after" project={project} scene={scene} completedAudioKeys={completedAudioKeys} onAudioEnded={key => setCompletedAudioKeys(current => current.includes(key) ? current : [...current, key])} />
         {assessmentSummaries.length > 0 && <section className="course-preview-assessments" aria-labelledby="course-preview-assessments-title">
           <h2 id="course-preview-assessments-title">Assessments</h2>
           <ul>{assessmentSummaries.map(group => <li key={group.id}><strong>{group.title}</strong><span>{group.answeredCount}/{group.total} answered{group.score !== null ? ` · Score ${group.score}%` : ""}</span></li>)}</ul>

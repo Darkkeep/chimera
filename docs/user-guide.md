@@ -756,3 +756,8 @@ Changed controls were recaptured on 2026-10-14 from the actual local frontend an
 UI navigation, proposal acceptance, commenting/resolution, and sample assessment playback were exercised while capturing screens. Separate qualification records document automated regression, the synthetic live-AI quality pass, and operator acceptance of the SCORM 1.2 LMS fixture. This screenshot refresh itself does not establish broader provider quality or LMS compatibility. Screenshots should be refreshed whenever control labels or workflows change.
 
 Capture details and refresh instructions: [original manifest](user-guide/capture-manifest.json), [2026-10-14 refresh](user-guide/refresh-manifest-2026-10-14.json) and [maintainer instructions](user-guide/support/README.md).
+
+
+## Completion update 1.1.0
+
+The expanded Media Library supports explicit course-wide placement and scene overrides/exclusions, shared-library copies, imported MP4/WebM video, transcripts and timed captions. Reference OCR creates a new version for inspection before grounding; Word export can include accepted source provenance and optional review discussion. Follow [media placement and OCR](media-placement-and-ocr.md) for these controls and [resume-data policy](resume-data-policy.md) for large-course limits. Existing screenshots and the downloadable PDF predate this supplemental workflow; see the completion record for current qualification evidence.

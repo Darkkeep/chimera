@@ -107,6 +107,28 @@ class PasswordAuthTests(unittest.TestCase):
             denied = getattr(self.client, method)(path, json={"expectedRevision": "unconfigured"}, headers=self.origin)
             self.assertEqual(denied.status_code, 403)
 
+    def test_shared_library_and_placement_respect_author_reviewer_and_admin_boundaries(self):
+        self.assertEqual(self.login().status_code, 200)
+        project = self.client.post("/api/projects", json={"title": "Shared permissions"}, headers=self.origin).json()
+        base = f"/api/projects/{project['id']}"
+        uploaded = self.client.post(base + "/assets", files={"file": ("clip.mp4", b"\x00\x00\x00\x18ftypisom\x00\x00\x00\x00", "video/mp4")}, headers=self.origin)
+        self.assertEqual(uploaded.status_code, 201)
+        asset_id = uploaded.json()["storyboard"]["assets"][0]["id"]
+        shared = self.client.post(base + f"/assets/{asset_id}/share", headers=self.origin)
+        self.assertEqual(shared.status_code, 201)
+        for role in ("author", "reviewer"):
+            actor = self.store.provision(f"media-{role}@example.com", self.password, role, [role])
+            granted = self.client.post(base + "/members", json={"userId": actor, "role": role}, headers=self.origin)
+            self.assertEqual(granted.status_code, 201)
+            self.client.post("/api/auth/login", json={"email": f"media-{role}@example.com", "password": self.password}, headers=self.origin)
+            self.assertEqual(self.client.get(base + "/shared-media").status_code, 200 if role == "author" else 403)
+            self.assertEqual(self.client.post(base + f"/assets/{asset_id}/share", headers=self.origin).status_code, 403)
+            self.assertEqual(self.client.delete(base + f"/shared-media/{shared.json()['id']}", headers=self.origin).status_code, 403)
+            revision = str(uploaded.json()["storyboard"]["revision"])
+            saved = self.client.put(base + "/course-media", json={"placements": [{"assetId": asset_id}]}, headers={**self.origin, "If-Match": revision})
+            self.assertEqual(saved.status_code, 200 if role == "author" else 403)
+            self.assertEqual(self.login().status_code, 200)
+
     def test_bad_credentials_and_account_lookup_share_error(self):
         a = self.client.post("/api/auth/login", json={"email": "author@example.com", "password": "wrong"}, headers=self.origin)
         b = self.client.post("/api/auth/login", json={"email": "missing@example.com", "password": "wrong"}, headers=self.origin)

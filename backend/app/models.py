@@ -141,6 +141,46 @@ def normalize_assessment_item_type(data: object) -> object:
     return data
 
 
+class MediaPlacement(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    assetId: str = Field(min_length=1, max_length=200)
+    role: Literal["supporting", "narration", "demonstration"] = "supporting"
+    order: int = Field(default=0, ge=0, le=10000)
+    position: Literal["before", "after"] = "after"
+    loop: bool = False
+    muted: bool = False
+    altText: str = Field(default="", max_length=2000)
+    decorative: bool = False
+
+    @model_validator(mode="after")
+    def validate_description(self) -> "MediaPlacement":
+        if self.decorative and self.altText.strip():
+            raise ValueError("A decorative image cannot also have alternative text")
+        return self
+
+
+class MediaPlacementsUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    placements: list[MediaPlacement] = Field(default_factory=list, max_length=200)
+    excludedAssetIds: list[str] = Field(default_factory=list, max_length=200)
+
+    @model_validator(mode="after")
+    def validate_unique(self) -> "MediaPlacementsUpdate":
+        if len({item.assetId for item in self.placements}) != len(self.placements):
+            raise ValueError("Each asset can be placed only once per scope")
+        if len(set(self.excludedAssetIds)) != len(self.excludedAssetIds):
+            raise ValueError("Excluded assets must be unique")
+        return self
+
+
+class AssetMetadataUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    transcript: str = Field(default="", max_length=100000)
+    captionsVtt: str = Field(default="", max_length=200000)
+    language: str = Field(default="en", pattern=r"^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$")
+
+
 class SceneUpdate(BaseModel):
     visualLayout: SceneLayout | None = None
     backgroundAsset: str | None = None
@@ -155,6 +195,9 @@ class SceneUpdate(BaseModel):
     imageAltText: dict[str, str] | None = None
     decorativeImages: list[str] | None = None
     audioAssets: list[str] | None = None
+    videoAssets: list[str] | None = None
+    mediaPlacements: list[MediaPlacement] | None = None
+    excludedCourseMedia: list[str] | None = None
     required: bool | None = None
     audioRequired: bool | None = None
     assessmentItem: "AssessmentItem | None" = None
@@ -535,6 +578,7 @@ class EnhancementResourceConflict(BaseModel):
 
 class EnhancementJob(BaseModel):
     id: str
+    actualUsage: dict[str, int] | None = None
     projectId: str
     sourceRevision: int
     aiConnectionRevision: str | None = None
@@ -698,7 +742,7 @@ SceneUpdate.model_rebuild()
 
 class ExtractedAsset(BaseModel):
     id: str
-    kind: Literal["image", "audio"]
+    kind: Literal["image", "audio", "video"]
     role: Literal["content", "background"] = "content"
     filename: str
     contentType: str
@@ -707,6 +751,10 @@ class ExtractedAsset(BaseModel):
     path: str
     attributionText: str = Field(default="", max_length=2000)
     attributionStatus: Literal["draft", "complete"] = "draft"
+    transcript: str = Field(default="", max_length=100000)
+    captionsVtt: str = Field(default="", max_length=200000)
+    language: str = "en"
+    sharedSourceId: str | None = None
 
 
 class AssetAttributionUpdate(BaseModel):
@@ -734,6 +782,9 @@ class Scene(BaseModel):
     imageAltText: dict[str, str] = Field(default_factory=dict)
     decorativeImages: list[str] = Field(default_factory=list)
     audioAssets: list[str] = Field(default_factory=list)
+    videoAssets: list[str] = Field(default_factory=list)
+    mediaPlacements: list[MediaPlacement] = Field(default_factory=list)
+    excludedCourseMedia: list[str] = Field(default_factory=list)
     previewImage: str | None = None
     renderWarning: str | None = None
     notes: str = ""
@@ -796,6 +847,7 @@ class Storyboard(BaseModel):
     exportSettings: ExportSettings = Field(default_factory=ExportSettings)
     scenes: list[Scene] = Field(default_factory=list)
     assets: list[ExtractedAsset] = Field(default_factory=list)
+    courseMedia: list[MediaPlacement] = Field(default_factory=list)
     assessments: list[AssessmentGroup] = Field(default_factory=list)
 
     @model_validator(mode="after")

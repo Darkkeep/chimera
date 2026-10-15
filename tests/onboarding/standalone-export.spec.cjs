@@ -71,7 +71,10 @@ test('standalone export runs directly from an extracted local folder without net
   const python = require('./python.cjs');
   execFileSync(python, ['-m', 'zipfile', '-e', archivePath, extractedPath]);
   const context = await browser.newContext({
-    offline: !(process.platform === 'win32' && testInfo.project.name === 'webkit'),
+    // WebKit's offline emulation also rejects file: navigations on Linux.
+    // Every browser still rejects and records all HTTP(S) requests below.
+    offline: testInfo.project.name !== 'webkit',
+    serviceWorkers: 'block',
     reducedMotion: 'no-preference',
     viewport: { width: 1440, height: 900 },
   });
