@@ -8,13 +8,13 @@
 </style>
 <header><div class="eyebrow">Chimera · Release candidate 1.1.0</div><h1>Human acceptance checklist</h1><p>Record the checks still needed before acceptance. Start with the exact candidate revision and artifact hashes. Checking a box records your observation; it does not merge, tag, or approve a release automatically.</p></header>
 <aside><p><strong>Hosted deployment is deferred.</strong> October 14 LMS and live-AI attestations retain their original scope and hashes. They do not approve new 1.1.0 packages. Onboarding distribution and the January policy review have separate scopes below.</p></aside>
-<div class="toolbar"><button class="primary" id="export">Download evidence JSON</button><button id="print">Print / save PDF</button></div>
+<main aria-label="Acceptance observations"><div class="toolbar"><button class="primary" id="export">Download evidence JSON</button><button id="print">Print / save PDF</button></div>
 <p id="save-status" role="status">Checking local save availability…</p>
 <div class="fields"><label>Candidate full Git SHA<input type="text" id="revision" placeholder="Full 40-character source revision"></label><label>Acceptance coordinator<input type="text" id="coordinator" placeholder="Name"></label></div>
 <p id="count" aria-live="polite"></p><progress id="progress" value="0" max="1" aria-label="Acceptance checks completed"></progress>
-<main id="gates"></main>
+<div id="gates"></div>
 <article><h2>Deferred and future scope</h2><p>Hosted deployment and Encarta integration remain deferred. MFA, automated email, guest review, tenancy expansion, distributed workers, Word reimport and generated video remain separate work.</p><p><strong>2027-01-04 — owner policy review:</strong> reassess the image-attribution exception. Keep Attribution Pending labels and build warnings until a selected policy change is implemented and tested.</p></article>
-<footer><p>Based on the <a href="human-acceptance-1.1.0.md">human acceptance packet</a> and <a href="../release-policy.md">release policy</a>. Changes are saved in this browser when storage is available. Download the JSON to retain or share evidence; browser storage does not update the repository record.</p></footer>
+</main><footer><p>Based on the <a href="human-acceptance-1.1.0.md">human acceptance packet</a> and <a href="../release-policy.md">release policy</a>. Changes are saved in this browser when storage is available. Download the JSON to retain or share evidence; browser storage does not update the repository record.</p></footer>
 <script>
 const definitions=[
  ['word','Word editing','Course author / operator',[
