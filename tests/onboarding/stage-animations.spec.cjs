@@ -33,9 +33,12 @@ test('animation authoring persists phases and Preview plays the scene timeline a
   await editor.getByRole('button', { name: 'Preview animations', exact: true }).click();
   const moving = editor.locator('[data-scene-element]').filter({ hasText: 'First instruction' });
   await expect.poll(() => moving.evaluate(node => node.getAnimations().length)).toBe(3);
-  const effects = await moving.evaluate(node => {
+  const effects = await moving.evaluate(async node => {
     const animations = node.getAnimations();
-    animations.forEach(animation => { animation.pause(); animation.currentTime = 0; });
+    animations.forEach(animation => animation.pause());
+    // Settle the asynchronous pause before sampling a seeked animation frame.
+    await Promise.all(animations.map(animation => animation.ready));
+    animations.forEach(animation => { animation.currentTime = 0; });
     const before = getComputedStyle(node).opacity;
     animations.forEach(animation => { animation.currentTime = 1000; });
     const during = getComputedStyle(node).rotate;
