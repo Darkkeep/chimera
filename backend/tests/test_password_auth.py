@@ -43,7 +43,7 @@ class PasswordAuthTests(unittest.TestCase):
         for target in (storage, main):
             self.enterContext(patch.object(target, "ROOT", self.root))
         self.enterContext(patch.object(storage, "PROJECTS", self.root / "projects"))
-        self.enterContext(patch.dict("os.environ", {"CHIMERA_DEPLOYMENT_PROFILE": "darkrogue", "CHIMERA_PUBLIC_ORIGIN": "https://darkrogue.io"}))
+        self.enterContext(patch.dict("os.environ", {"CHIMERA_DEPLOYMENT_PROFILE": "networked", "CHIMERA_PUBLIC_ORIGIN": "https://darkrogue.io"}))
         self.store = AccountStore(self.root)
         self.password = "long test passphrase for hosted account"
         self.user_id = self.store.provision("author@example.com", self.password, "Hosted Author", ["administrator", "author"])

@@ -10,7 +10,7 @@ Updated 2026-10-15. Candidate version: 1.1.0; see [release policy](release-polic
 
 - Portable LibreOffice discovery and Word rendering/edit-save-reopen checks.
 - TestFrame revision 8 production validation and local qualification of both SCORM profiles. The user confirmed SCORM 1.2 passes their LMS; that LMS does not accept SCORM 2004.
-- Local, Encarta, and darkrogue.io authentication profiles. Local single-user operation is retained; Encarta remains denied until its real contract is supplied.
+- Local, Encarta, and networked authentication profiles. Local single-user operation is retained; Encarta remains denied until its real contract is supplied.
 - Hosted email/password sign-in/logout, session expiry, secure cookies, rate limits, and administrator-issued one-use password resets.
 - Operator account provisioning, disabling/enabling, password changes, and reset-link tools.
 - Project-scoped access, administrator-controlled membership, filtered project/management views, authenticated review names, and request/background audit attribution.

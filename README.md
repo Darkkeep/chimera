@@ -24,7 +24,7 @@ New media controls support explicit scene/course-wide placement, project copies 
 
 ## Start locally
 
-For local, Encarta, and darkrogue.io authentication preparation, see the [deployment authentication guide](docs/authentication-deployments.md). Local single-user operation remains the default; hosted profiles use separate workspaces.
+For local, Encarta, and networked authentication preparation, see the [deployment authentication guide](docs/authentication-deployments.md). Local single-user operation remains the default; hosted profiles use separate workspaces.
 
 ### Backend
 

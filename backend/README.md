@@ -1,6 +1,6 @@
 # Chimera backend
 
-Authentication profiles, hosted sign-in/recovery, project membership, and authenticated review links are documented in the [deployment guide](../docs/authentication-deployments.md). Set `CHIMERA_DEPLOYMENT_PROFILE=darkrogue` for password authentication, or `encarta` for the intentionally disabled integration profile. Unimplemented providers never fall back to local identity. The hosted frontend and local HTTPS qualification are implemented; real Linux/Nginx server qualification awaits the deferred connection details.
+Authentication profiles, hosted sign-in/recovery, project membership, and authenticated review links are documented in the [deployment guide](../docs/authentication-deployments.md). Set `CHIMERA_DEPLOYMENT_PROFILE=networked` for password authentication, or `encarta` for the intentionally disabled integration profile. Unimplemented providers never fall back to local identity. The hosted frontend and local HTTPS qualification are implemented; real Linux/Nginx server qualification awaits the deferred connection details.
 
 ```powershell
 python -m venv .venv

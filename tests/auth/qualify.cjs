@@ -46,7 +46,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const origin=`https://127.0.0.1:${server.address().port}`;
-  const environment={...process.env,CHIMERA_DEPLOYMENT_PROFILE:'darkrogue',CHIMERA_PUBLIC_ORIGIN:origin,CHIMERA_WORKSPACE:path.join(temporary,'workspace'),CHIMERA_REVIEW_ACCESS:'authenticated',CHIMERA_TEST_PASSWORD:password};
+  const environment={...process.env,CHIMERA_DEPLOYMENT_PROFILE:'networked',CHIMERA_PUBLIC_ORIGIN:origin,CHIMERA_WORKSPACE:path.join(temporary,'workspace'),CHIMERA_REVIEW_ACCESS:'authenticated',CHIMERA_TEST_PASSWORD:password};
   const seed=spawnSync(python,[path.join(__dirname,'seed.py')],{cwd:root,env:environment,windowsHide:true,encoding:'utf8'});
   if(seed.status!==0)throw new Error('Hosted fixture setup failed: '+seed.stderr);
   const fixture=JSON.parse(seed.stdout.trim());
