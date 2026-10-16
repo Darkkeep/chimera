@@ -11,7 +11,7 @@
   gap: 10px;
   min-width: 0;
   padding-bottom: 14px;
-  border-bottom: 1px solid var(--line);
+  border-bottom:1px solid var(--line);
 }
 
 .media-preview {
@@ -19,7 +19,7 @@
   aspect-ratio: 16 / 10;
   place-items: center;
   overflow: hidden;
-  background: #e7ebe5;
+  background:var(--theme-panel);
 }
 
 .media-preview img {
@@ -46,8 +46,8 @@
 }
 
 .media-item-info small {
-  color: var(--muted);
-  font: 10px 'DM Mono', monospace;
+  color:var(--muted);
+  font: 10px var(--chimera-font-mono);
   text-transform: uppercase;
 }
 
@@ -55,14 +55,14 @@
   display: grid;
   gap: 8px;
   padding-top: 8px;
-  border-top: 1px solid var(--line);
+  border-top:1px solid var(--line);
 }
 
 .media-attribution-editor > label,
 .media-attribution-actions > label {
   display: grid;
   gap: 5px;
-  color: var(--muted);
+  color:var(--muted);
   font-size: 10px;
   font-weight: 700;
 }
@@ -72,11 +72,11 @@
   width: 100%;
   min-width: 0;
   padding: 7px 8px;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: #fff;
-  color: var(--ink);
-  font: 11px Manrope, sans-serif;
+  border:1px solid var(--line);
+  border-radius:3px;
+  background:var(--theme-panel);
+  color:var(--ink);
+  font: 11px var(--chimera-font-body);
 }
 
 .media-attribution-editor textarea {
@@ -101,7 +101,7 @@
 }
 
 .media-attribution-error {
-  color: #a14337;
+  color:var(--ui-danger);
   font-size: 10px;
 }
 
@@ -122,7 +122,7 @@
   width: 76px;
   height: 54px;
   object-fit: cover;
-  border: 1px solid var(--line);
+  border:1px solid var(--line);
 }
 
 .scene-audio {
@@ -133,7 +133,7 @@
 
 .scene-audio span {
   overflow: hidden;
-  color: var(--muted);
+  color:var(--muted);
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;

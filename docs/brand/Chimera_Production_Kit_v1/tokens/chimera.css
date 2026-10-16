@@ -1,0 +1,39 @@
+/* CHIMERA Mechanicus Trinity production theme v1 */
+:root {
+  --chimera-void: #090B0F;
+  --chimera-carbon: #151A20;
+  --chimera-gunmetal: #28313A;
+  --chimera-titanium: #B9C2CA;
+  --chimera-white-hot: #F3F6F8;
+  --chimera-ignition: #FF6A21;
+  --chimera-afterburn: #FFB02E;
+  --chimera-pythia-link: #7F5CFF;
+  --chimera-cyan-signal: #26D0FF;
+  --chimera-success: #48C78E;
+  --chimera-danger: #FF4D4D;
+  --chimera-font-display: 'Arial Narrow','Roboto Condensed','Helvetica Neue',Arial,sans-serif;
+  --chimera-font-body: Inter,'Segoe UI',Roboto,Arial,sans-serif;
+  --chimera-font-mono: 'SFMono-Regular',Consolas,'Liberation Mono',monospace;
+  --chimera-radius-sm: 6px;
+  --chimera-radius-md: 10px;
+  --chimera-radius-lg: 16px;
+  --chimera-space-1: 4px;
+  --chimera-space-2: 8px;
+  --chimera-space-3: 12px;
+  --chimera-space-4: 16px;
+  --chimera-space-5: 24px;
+  --chimera-space-6: 32px;
+  --chimera-shadow-panel: 0 12px 32px rgba(0,0,0,.32);
+  --chimera-shadow-glow: 0 0 24px rgba(255,106,33,.22);
+  --chimera-motion-fast: 120ms;
+  --chimera-motion-standard: 180ms;
+  --chimera-motion-deliberate: 260ms;
+  --chimera-ease: cubic-bezier(.2,.8,.2,1);
+}
+
+[data-theme="chimera"], .chimera-theme {
+  color-scheme: dark;
+  background: var(--chimera-void);
+  color: var(--chimera-white-hot);
+  font-family: var(--chimera-font-body);
+}

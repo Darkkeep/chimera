@@ -1,0 +1,169 @@
+/* Approved Mechanicus Trinity tokens mapped to the existing application contract. */
+:root {
+  --font-inter: var(--chimera-font-body);
+  --brand-midnight: var(--chimera-void);
+  --brand-silver: var(--chimera-white-hot);
+  --brand-copper: var(--chimera-ignition);
+  --brand-copper-light: #ffb489;
+  --accent: #b83d08;
+  --accent-hover: #963006;
+  --deep: var(--chimera-carbon);
+  --muted: #53616c;
+  --ui-button-border-radius-4px: var(--chimera-radius-sm);
+  font-family: var(--chimera-font-body);
+}
+:root[data-theme="dark"] {
+  --ink: var(--chimera-white-hot);
+  --muted: var(--chimera-titanium);
+  --line: #3c4752;
+  --surface: var(--chimera-void);
+  --deep: var(--chimera-carbon);
+  --accent: var(--chimera-ignition);
+  --accent-hover: #ff8444;
+  --ui-button-color-253f62: var(--chimera-titanium);
+  --theme-panel: var(--chimera-carbon);
+  --theme-raised: #202830;
+  --theme-input: #0e1217;
+  --theme-selected: #39251d;
+  --theme-success: #8de0b8;
+  --theme-danger: #ffaaa5;
+}
+.sidebar { background: linear-gradient(180deg, var(--chimera-void), var(--chimera-carbon)); color: var(--chimera-white-hot); border-right: 1px solid #39414a; }
+.brand { font-family: var(--chimera-font-display); letter-spacing: .16em; }
+.brand .brand-mark { object-fit: contain; background: transparent; border-radius: 0; }
+.sidebar :is(.sidebar-project,.sidebar-review,.sidebar-footer) { border-color: #3c4752; }
+.sidebar :is(.workspace-label,.project-switcher,.sidebar-footer,.appearance-selector legend) { color: var(--chimera-titanium); }
+.sidebar :is(.nav-item,.review-tools button,.new-project-button) { color: #d1d7dd; }
+.sidebar :is(.nav-item,.review-tools button):hover { background: #252d35; color: var(--chimera-white-hot); }
+.sidebar .nav-item.active { background: linear-gradient(90deg,#ff6a2129,#ff6a2108); box-shadow: inset 2px 0 var(--chimera-ignition); color: var(--chimera-white-hot); }
+.sidebar :is(select,.appearance-options,.workspace-settings) { background: var(--chimera-carbon); border-color: #52606d; color: var(--chimera-white-hot); }
+.appearance-options label { color: var(--chimera-titanium); }
+.appearance-options label:hover { background: #28313a; }
+.appearance-options label.is-active { background: #493020; color: var(--chimera-white-hot); }
+.topbar { min-height: 72px; padding-block: 14px; }
+.topbar h1 { font-family: var(--chimera-font-display); letter-spacing: .025em; }
+.button { transition: background var(--chimera-motion-fast) var(--chimera-ease), border-color var(--chimera-motion-fast) var(--chimera-ease); }
+:root[data-theme="dark"] .button-accent { color: var(--chimera-void); background: var(--chimera-ignition); border: 1px solid #ff8a50; font-weight: 750; }
+:root[data-theme="dark"] .button-accent:hover:not(:disabled):not(.disabled) { background: #ff8444; }
+button:disabled,.button.disabled { opacity: .6; }
+:root :focus-visible, .appearance-options label:focus-within { outline: 2px solid var(--chimera-cyan-signal); outline-offset: 3px; }
+:root[data-theme="dark"] :is(input[type="checkbox"],input[type="radio"]) { accent-color: var(--chimera-cyan-signal); }
+:root[data-theme="dark"] :is(.button-outline,.icon-button):hover:not(:disabled) { color: var(--chimera-white-hot); background: var(--theme-raised); border-color: var(--chimera-titanium); }
+:root[data-theme="dark"] :is(.scene-row-wrap.is-selected,.scene-row-wrap.is-selected:hover) { background: var(--theme-selected); border-color: var(--chimera-ignition); }
+:root[data-theme="dark"] :is(.scene-list-title .icon-button,.scene-order-actions .scene-edit-button,.validation-open,.golden-path-action,.assessment-add-choice) { color: var(--chimera-cyan-signal); }
+:root[data-theme="dark"] :is(.work-area > .scene-list,.canvas-panel,.modal,.management-summary > div) { border-radius: var(--chimera-radius-md); }
+:root[data-theme="dark"] .canvas-panel { background: #11161c; }
+.brand-emblem { border: 0; border-radius: 0; background: transparent; }
+.canvas-empty > .brand-signature { color: #a53a0d; }
+:root[data-theme="dark"] .canvas-empty > .brand-signature { color: #ffb489; }
+.production-workflow { display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; padding:10px 28px; border-bottom:1px solid var(--line); background:var(--theme-panel,#fff); }
+.production-workflow button { display:flex; align-items:center; gap:8px; min-height:32px; padding:6px 10px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--muted); font:700 11px var(--chimera-font-body); letter-spacing:.08em; text-transform:uppercase; cursor:pointer; }
+.production-workflow button span { font:11px var(--chimera-font-mono); opacity:.8; }
+.production-workflow button[aria-current="step"] { color:var(--ink); border-bottom-color:var(--chimera-ignition); }
+.production-workflow button:hover:not(:disabled) { color:var(--ink); background:var(--theme-raised,#edf0f2); }
+.scene-context-actions .button:has(svg.lucide-sparkles) { border-color: #8066c4; }
+@media(max-width:600px) { .production-workflow { padding:8px 12px; gap:3px; } .production-workflow button { font-size:9px; padding:5px; gap:4px; } }
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition-duration:.01ms!important; animation-duration:.01ms!important; animation-iteration-count:1!important; } }
+
+/* Shared semantic surfaces used by every authoring tool and dialog. */
+:root {
+  --theme-panel: #ffffff;
+  --theme-raised: #edf0f2;
+  --theme-input: #ffffff;
+  --theme-selected: #fff0e7;
+  --ui-link: #006480;
+  --ui-success: #216545;
+  --ui-success-surface: #e6f4ed;
+  --ui-success-border: #77ad91;
+  --ui-danger: #a32929;
+  --ui-danger-surface: #fff0ef;
+  --ui-danger-border: #cd8a85;
+  --ui-warning: #79500b;
+  --ui-warning-surface: #fff5df;
+  --ui-warning-border: #bd9a50;
+  --theme-success: var(--ui-success);
+  --theme-danger: var(--ui-danger);
+}
+:root[data-theme="dark"] {
+  --theme-panel: var(--chimera-carbon);
+  --theme-raised: #202830;
+  --theme-input: #0e1217;
+  --theme-selected: #39251d;
+  --ui-link: var(--chimera-cyan-signal);
+  --ui-success: #8de0b8;
+  --ui-success-surface: #183328;
+  --ui-success-border: #48745d;
+  --ui-danger: #ffaaa5;
+  --ui-danger-surface: #382226;
+  --ui-danger-border: #915356;
+  --ui-warning: #ffd18b;
+  --ui-warning-surface: #382d1c;
+  --ui-warning-border: #8b7144;
+  --theme-success: var(--ui-success);
+  --theme-danger: var(--ui-danger);
+}
+/* Shared controls, with colors applied to chrome rather than authored stages. */
+:is(.modal,.assessment-editor-dialog,.validation-dialog,.accessibility-dialog,.golden-path-dialog,.enhancement-review-dialog,.auth-card) {
+  border: 1px solid var(--line);
+  border-radius: var(--chimera-radius-md);
+  box-shadow: var(--chimera-shadow-panel);
+  background: var(--theme-panel);
+  color: var(--ink);
+}
+:is(.modal-head,.assessment-editor-header,.validation-header,.accessibility-header,.golden-path-header,.management-header) h2,
+:is(.modal,.management-view,.auth-card) h1 { font-family:var(--chimera-font-display); letter-spacing:.02em; }
+:is(.modal,.assessment-editor-dialog,.validation-dialog,.accessibility-dialog,.golden-path-dialog,.enhancement-review-dialog,.management-view) :is(input:not([type="checkbox"],[type="radio"],[type="color"],[type="file"]),textarea,select) {
+  background:var(--theme-input); color:var(--ink); border-color:var(--line); border-radius:var(--chimera-radius-sm);
+}
+:is(.modal,.assessment-editor-dialog,.validation-dialog,.accessibility-dialog,.golden-path-dialog,.enhancement-review-dialog,.auth-screen) :focus-visible { outline:2px solid var(--chimera-cyan-signal); outline-offset:3px; }
+:is(.modal,.assessment-editor-dialog,.validation-dialog,.accessibility-dialog,.golden-path-dialog) :is(input,textarea)::placeholder { color:var(--muted); opacity:1; }
+:is(.modal,.assessment-editor-dialog,.validation-dialog,.accessibility-dialog,.golden-path-dialog) :is(input[type="checkbox"],input[type="radio"]) { accent-color:var(--ui-link); }
+:root[data-theme="dark"] :is(.modal,.assessment-editor-dialog,.validation-dialog,.accessibility-dialog,.golden-path-dialog) :is(.button-outline,.icon-button):hover:not(:disabled) { color:var(--ink); background:var(--theme-raised); }
+/* Pythia uses the family accent on boundaries; text remains neutral and legible. */
+.pythia-scene-label,.scene-ai-draft { border-left-color:var(--chimera-pythia-link); background:var(--theme-raised); }
+.pythia-task-state progress { accent-color:var(--chimera-pythia-link); }
+.pythia-capabilities span { color:var(--muted); border-radius:var(--chimera-radius-sm); }
+.pythia-capabilities span.available { background:var(--ui-success-surface); color:var(--ui-success); border-color:var(--ui-success-border); }
+.pythia-result-section li { background:var(--theme-input); color:var(--ink); border-color:var(--line); border-radius:var(--chimera-radius-sm); }
+.pythia-engine-state { color:var(--ink); }
+.pythia-error,.auth-error { background:var(--ui-danger-surface); color:var(--ui-danger); border-color:var(--ui-danger-border); }
+/* Account entry belongs to the same product shell. */
+.auth-screen { background:linear-gradient(160deg,var(--chimera-void),var(--chimera-carbon)); color:var(--chimera-white-hot); }
+.auth-screen::before,.auth-screen::after { border-color:var(--chimera-gunmetal); }
+.auth-brand p { color:var(--chimera-titanium); }
+.auth-brand span { font-family:var(--chimera-font-display); letter-spacing:.16em; }
+.auth-card { background:var(--theme-panel); color:var(--ink); }
+.auth-input { background:var(--theme-input); border-color:var(--line); color:var(--muted); }
+.auth-input input { color:var(--ink); background:transparent; }
+.auth-input input::placeholder { color:var(--muted); }
+.auth-input:focus-within { outline:2px solid var(--chimera-cyan-signal); outline-offset:3px; }
+.auth-submit { background:var(--accent); color:#fff; font-family:var(--chimera-font-body); }
+:root[data-theme="dark"] .auth-submit { color:var(--chimera-void); }
+.auth-submit:hover { background:var(--accent-hover); }
+.auth-link { color:var(--ui-link); }
+.auth-recovery-icon { color:var(--ui-link); }
+/* Canvas manipulation is a technical signal, separate from action orange. */
+.visual-editable.is-selected,.visual-editable:focus-visible { outline-color:var(--chimera-cyan-signal); }
+.visual-resize-handle-se { background:var(--chimera-cyan-signal); box-shadow:0 0 0 1px var(--chimera-cyan-signal); }
+.visual-inspector { padding:16px; background:var(--theme-input); border:1px solid var(--line); border-radius:var(--chimera-radius-md); }
+.visual-editor-tabs button[aria-selected="true"] { box-shadow:inset 0 -2px var(--chimera-ignition); }
+.onboarding-card { background:var(--theme-panel); color:var(--ink); border:1px solid var(--line); border-radius:var(--chimera-radius-md); }
+.onboarding-card :is(h2,h3,p) { color:inherit; }
+.onboarding-card button { font-family:var(--chimera-font-body); }
+:root[data-theme="dark"] :is(.course-preview-nav-button.next) { background:var(--chimera-ignition); color:var(--chimera-void); }
+@media(max-width:800px) { .visual-inspector { padding:14px; } }
+.course-preview-progress-track { background:var(--line); }
+.course-preview-progress-track > span { background:var(--chimera-ignition); }
+.course-preview-dots button { background:var(--line); }
+.course-preview-dots button.visited { background:var(--muted); }
+.course-preview-dots button.active { background:var(--chimera-ignition); }
+.course-preview-header,.course-preview-header strong { color:var(--chimera-white-hot); }
+.course-preview-progress,.course-preview-close { color:var(--chimera-titanium); }
+.readiness-strip { background:var(--theme-panel); }
+.readiness-strip .clear { color:var(--ui-success); }
+.readiness-strip .blocked { color:var(--ui-danger); }
+:is(.assessment-delete,.media-delete,.management-error,.export-error) { color:var(--ui-danger); }
+:is(.success-notice,.auth-message) { color:var(--ui-success); background:var(--ui-success-surface); border-color:var(--ui-success-border); }
+:root[data-theme="dark"] :is(.scene-list-title .icon-button,.scene-edit-button:hover) { background:var(--theme-selected); }
+:root[data-theme="dark"] :is(.validation-summary.is-valid,.golden-path-step.done .golden-path-number,.golden-path-step.next .golden-path-number,.enhancement-proposal.accepted) { color:var(--ui-success); background:var(--ui-success-surface); border-color:var(--ui-success-border); }
+:root[data-theme="dark"] :is(.notice,.validation-issue.warning .validation-issue-icon,.golden-path-step.review .golden-path-number) { color:var(--ui-warning); background:var(--ui-warning-surface); border-color:var(--ui-warning-border); }

@@ -8,6 +8,9 @@ import "./media-library.css";
 import "./workspace.css";
 import "./appearance.css";
 import "./brand.css";
+import "./production-kit/tokens.css";
+import "./production-kit/components.css";
+import "./production-brand.css";
 import { initializeAppearance } from "./AppearanceSelector";
 import { AuthGate } from "./AuthGate";
 

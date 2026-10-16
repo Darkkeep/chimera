@@ -1,0 +1,54 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "brand": "CHIMERA Mechanicus Trinity",
+  "version": "1.0.0",
+  "color": {
+    "void": "#090B0F",
+    "carbon": "#151A20",
+    "gunmetal": "#28313A",
+    "titanium": "#B9C2CA",
+    "whiteHot": "#F3F6F8",
+    "ignition": "#FF6A21",
+    "afterburn": "#FFB02E",
+    "pythiaLink": "#7F5CFF",
+    "cyanSignal": "#26D0FF",
+    "success": "#48C78E",
+    "warning": "#FFB02E",
+    "danger": "#FF4D4D"
+  },
+  "space": {
+    "1": "4px",
+    "2": "8px",
+    "3": "12px",
+    "4": "16px",
+    "5": "24px",
+    "6": "32px",
+    "7": "48px",
+    "8": "64px"
+  },
+  "radius": {
+    "sm": "6px",
+    "md": "10px",
+    "lg": "16px",
+    "pill": "999px"
+  },
+  "border": {
+    "subtle": "1px solid rgba(185,194,202,.18)",
+    "active": "1px solid rgba(255,106,33,.72)"
+  },
+  "shadow": {
+    "panel": "0 12px 32px rgba(0,0,0,.32)",
+    "glow": "0 0 24px rgba(255,106,33,.22)"
+  },
+  "type": {
+    "display": "'Arial Narrow','Roboto Condensed','Helvetica Neue',Arial,sans-serif",
+    "body": "Inter,'Segoe UI',Roboto,Arial,sans-serif",
+    "mono": "'SFMono-Regular',Consolas,'Liberation Mono',monospace"
+  },
+  "motion": {
+    "fast": "120ms",
+    "standard": "180ms",
+    "deliberate": "260ms",
+    "ease": "cubic-bezier(.2,.8,.2,1)"
+  }
+}
