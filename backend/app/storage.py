@@ -13,7 +13,7 @@ from threading import RLock, local
 from typing import Iterator, Literal
 from .models import AssessmentGroup, AssessmentGroupWrite, ProductionStageUpdate
 from .ai_connection import connection_status
-from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalChange, EnhancementProposalChangeCreate, EnhancementProposalCreate, EnhancementProposalDecisionRecord, ExportSettings, ExtractedAsset, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, ReferencePassage, ReferenceResource, ReferenceResourceVersion, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewCommentReply, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate, TrashedProject
+from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalChange, EnhancementProposalChangeCreate, EnhancementProposalCreate, EnhancementProposalDecisionRecord, ExportSettings, ExtractedAsset, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, PythiaAnalysisProposal, PythiaAnalysisProposalCreate, PythiaAnalysisProposalDecisionRecord, PythiaCourseFindingDecision, PythiaCourseFindingDecisionRecord, PythiaCourseFindingReview, PythiaCourseReview, PythiaCourseReviewCreate, PythiaTransformProposal, PythiaTransformProposalCreate, PythiaTransformProposalDecisionRecord, ReferencePassage, ReferenceResource, ReferenceResourceVersion, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewCommentReply, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate, TrashedProject
 ROOT = Path(os.environ.get("CHIMERA_WORKSPACE", Path(__file__).resolve().parents[2] / "workspace"))
 from .platform import DurableEventSink, LOCAL_ACTOR, ActorContext, PlatformEvent, get_actor_context, get_correlation_id
 PROJECTS = ROOT / "projects"
@@ -758,6 +758,248 @@ def _enhancement_proposals_path(project_id: str) -> Path:
     return project_path(project_id) / "proposals" / "enhancements.json"
 
 
+def _pythia_analysis_proposals_path(project_id: str) -> Path:
+    return project_path(project_id) / "proposals" / "pythia-analyses.json"
+
+
+def list_pythia_analysis_proposals(project_id: str) -> list[PythiaAnalysisProposal]:
+    read_project(project_id)
+    path = _pythia_analysis_proposals_path(project_id)
+    if not path.is_file():
+        return []
+    return [PythiaAnalysisProposal.model_validate(item) for item in json.loads(path.read_text(encoding="utf-8"))]
+
+
+def create_pythia_analysis_proposal(
+    project_id: str,
+    data: PythiaAnalysisProposalCreate,
+    artifact: dict[str, object],
+) -> PythiaAnalysisProposal:
+    with storyboard_transaction():
+        project = read_project(project_id)
+        if data.sourceRevision > project.storyboard.revision:
+            raise ValueError("The proposal source revision is newer than the storyboard")
+        if not any(scene.id == data.sceneId for scene in project.storyboard.scenes):
+            raise KeyError(data.sceneId)
+        proposals = list_pythia_analysis_proposals(project_id)
+        existing = next((proposal for proposal in proposals if proposal.taskId == data.taskId), None)
+        if existing:
+            if existing.artifactId != data.artifactId or existing.sceneId != data.sceneId:
+                raise ValueError("The task already has a different Pythia analysis proposal")
+            return existing
+        proposal = PythiaAnalysisProposal(
+            id=f"pythia-proposal-{uuid.uuid4().hex[:12]}",
+            taskId=data.taskId,
+            artifactId=data.artifactId,
+            sceneId=data.sceneId,
+            sourceRevision=data.sourceRevision,
+            artifact=artifact,
+            createdAt=now_iso(),
+        )
+        proposals.append(proposal)
+        path = _pythia_analysis_proposals_path(project_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+        temp_path.write_text(json.dumps([item.model_dump(mode="json") for item in proposals], indent=2), encoding="utf-8")
+        temp_path.replace(path)
+        return proposal
+
+
+def decide_pythia_analysis_proposal(
+    project_id: str,
+    proposal_id: str,
+    decision: Literal["accept", "reject"],
+) -> PythiaAnalysisProposal:
+    with storyboard_transaction():
+        project = read_project(project_id)
+        proposals = list_pythia_analysis_proposals(project_id)
+        for index, proposal in enumerate(proposals):
+            if proposal.id != proposal_id:
+                continue
+            if proposal.status != "pending":
+                raise ValueError("Only pending Pythia analysis proposals can be decided")
+            now = now_iso()
+            actor = get_actor_context()
+            record = PythiaAnalysisProposalDecisionRecord(
+                decision=decision,
+                decidedAt=now,
+                storyboardRevision=project.storyboard.revision,
+                actorId=actor.actorId,
+                actorDisplayName=actor.actorDisplayName,
+                installationId=actor.installationId,
+                correlationId=get_correlation_id(),
+            )
+            decided = proposal.model_copy(update={
+                "status": "accepted" if decision == "accept" else "rejected",
+                "decidedAt": now,
+                "decisionHistory": [*proposal.decisionHistory, record],
+            })
+            proposals[index] = decided
+            path = _pythia_analysis_proposals_path(project_id)
+            temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+            temp_path.write_text(json.dumps([item.model_dump(mode="json") for item in proposals], indent=2), encoding="utf-8")
+            temp_path.replace(path)
+            return decided
+        raise KeyError(proposal_id)
+
+
+def _pythia_transform_proposals_path(project_id: str) -> Path:
+    return project_path(project_id) / "proposals" / "pythia-transforms.json"
+
+
+def _write_pythia_transform_proposals(project_id: str, proposals: list[PythiaTransformProposal]) -> None:
+    path = _pythia_transform_proposals_path(project_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    temp_path.write_text(json.dumps([proposal.model_dump(mode="json") for proposal in proposals], indent=2), encoding="utf-8")
+    temp_path.replace(path)
+
+
+def list_pythia_transform_proposals(project_id: str) -> list[PythiaTransformProposal]:
+    read_project(project_id)
+    path = _pythia_transform_proposals_path(project_id)
+    if not path.is_file():
+        return []
+    return [PythiaTransformProposal.model_validate(item) for item in json.loads(path.read_text(encoding="utf-8"))]
+
+
+def create_pythia_transform_proposal(
+    project_id: str,
+    data: PythiaTransformProposalCreate,
+    artifact: dict[str, object],
+) -> PythiaTransformProposal:
+    with storyboard_transaction():
+        project = read_project(project_id)
+        if data.sourceRevision > project.storyboard.revision:
+            raise ValueError("The proposal source revision is newer than the storyboard")
+        current_scene_ids = {scene.id for scene in project.storyboard.scenes}
+        if not set(data.sourceSceneIds).issubset(current_scene_ids):
+            raise KeyError("A selected scene no longer exists")
+        proposals = list_pythia_transform_proposals(project_id)
+        existing = next((proposal for proposal in proposals if proposal.taskId == data.taskId), None)
+        if existing:
+            if existing.artifactId != data.artifactId or existing.sourceSceneIds != data.sourceSceneIds:
+                raise ValueError("The task already has a different Pythia transformation proposal")
+            return existing
+        proposal = PythiaTransformProposal(
+            id=f"pythia-transform-{uuid.uuid4().hex[:12]}",
+            taskId=data.taskId,
+            artifactId=data.artifactId,
+            sourceSceneIds=data.sourceSceneIds,
+            sourceRevision=data.sourceRevision,
+            artifact=artifact,
+            createdAt=now_iso(),
+        )
+        _write_pythia_transform_proposals(project_id, [*proposals, proposal])
+        return proposal
+
+
+def decide_pythia_transform_proposal(
+    project_id: str,
+    proposal_id: str,
+    decision: Literal["accept", "reject"],
+    expected_revision: int,
+    proposed_scenes: list[dict[str, object]] | None = None,
+) -> tuple[PythiaTransformProposal, ProjectDetail | None]:
+    with storyboard_transaction():
+        project = read_project(project_id)
+        proposals = list_pythia_transform_proposals(project_id)
+        for index, proposal in enumerate(proposals):
+            if proposal.id != proposal_id:
+                continue
+            if proposal.status != "pending":
+                raise ValueError("Only pending Pythia transformation proposals can be decided")
+            if expected_revision != project.storyboard.revision:
+                raise StoryboardRevisionConflict(expected_revision, project.storyboard.revision)
+            if decision == "accept" and proposal.sourceRevision != project.storyboard.revision:
+                now = now_iso()
+                proposals[index] = proposal.model_copy(update={"status": "stale", "decidedAt": now})
+                _write_pythia_transform_proposals(project_id, proposals)
+                raise EnhancementProposalConflict("This transformation is stale because the storyboard changed")
+
+            now = now_iso()
+            updated_project: ProjectDetail | None = None
+            accepted_scenes: list[dict[str, object]] = []
+            project_root = project_path(project_id)
+            storyboard_file = project_root / "storyboard.json"
+            metadata_file = project_root / "project.json"
+            proposals_file = _pythia_transform_proposals_path(project_id)
+            storyboard_snapshot = storyboard_file.read_bytes() if decision == "accept" else None
+            metadata_snapshot = metadata_file.read_bytes() if decision == "accept" else None
+            proposals_snapshot = proposals_file.read_bytes() if decision == "accept" and proposals_file.exists() else None
+
+            if decision == "accept":
+                scenes_to_apply = proposed_scenes or proposal.artifact["payload"]["proposed_scenes"]
+                current_scenes = list(project.storyboard.scenes)
+                selected_ids = set(proposal.sourceSceneIds)
+                selected_indices = [scene_index for scene_index, scene in enumerate(current_scenes) if scene.id in selected_ids]
+                if len(selected_indices) != len(selected_ids):
+                    raise EnhancementProposalConflict("A selected source scene no longer exists")
+                insert_index = min(selected_indices)
+                added_scenes = [Scene(
+                    id=f"scene-{uuid.uuid4().hex[:8]}",
+                    title=scene_data["title"],
+                    sceneType="content",
+                    extractedText=scene_data["learner_content"],
+                    actionDescription=f"Purpose: {scene_data['purpose']}\nInteraction: {scene_data['interaction_recommendation']}",
+                    notes=scene_data["production_notes"],
+                    layoutMode="native",
+                ) for scene_data in scenes_to_apply]
+                replacement_scenes = [
+                    *current_scenes[:insert_index],
+                    *added_scenes,
+                    *(scene for scene in current_scenes[insert_index:] if scene.id not in selected_ids),
+                ]
+                try:
+                    updated_project = replace_storyboard(
+                        project_id,
+                        project.storyboard.model_copy(update={"scenes": replacement_scenes}),
+                        expected_revision,
+                    )
+                    accepted_scenes = [scene_data for scene_data in scenes_to_apply]
+                    record = PythiaTransformProposalDecisionRecord(
+                        decision=decision,
+                        decidedAt=now,
+                        expectedRevision=expected_revision,
+                        actorId=get_actor_context().actorId,
+                        actorDisplayName=get_actor_context().actorDisplayName,
+                        installationId=get_actor_context().installationId,
+                        correlationId=get_correlation_id(),
+                        acceptedScenes=accepted_scenes,
+                    )
+                    decided = proposal.model_copy(update={
+                        "status": "accepted",
+                        "decidedAt": now,
+                        "decisionHistory": [*proposal.decisionHistory, record],
+                    })
+                    proposals[index] = decided
+                    _write_pythia_transform_proposals(project_id, proposals)
+                except Exception:
+                    _restore_file_snapshot(storyboard_file, storyboard_snapshot)
+                    _restore_file_snapshot(metadata_file, metadata_snapshot)
+                    _restore_file_snapshot(proposals_file, proposals_snapshot)
+                    raise
+            else:
+                record = PythiaTransformProposalDecisionRecord(
+                    decision=decision,
+                    decidedAt=now,
+                    expectedRevision=expected_revision,
+                    actorId=get_actor_context().actorId,
+                    actorDisplayName=get_actor_context().actorDisplayName,
+                    installationId=get_actor_context().installationId,
+                    correlationId=get_correlation_id(),
+                )
+                decided = proposal.model_copy(update={
+                    "status": "rejected",
+                    "decidedAt": now,
+                    "decisionHistory": [*proposal.decisionHistory, record],
+                })
+                proposals[index] = decided
+                _write_pythia_transform_proposals(project_id, proposals)
+            return decided, updated_project
+        raise KeyError(proposal_id)
+
+
 def _reference_resources_path(project_id: str) -> Path:
     return project_path(project_id) / "references" / "resources.json"
 
@@ -776,6 +1018,97 @@ def _generated_candidates_path(project_id: str) -> Path:
 
 def _review_comments_path(project_id: str) -> Path:
     return project_path(project_id) / "review" / "comments.json"
+
+
+def _pythia_course_reviews_path(project_id: str) -> Path:
+    return project_path(project_id) / "review" / "pythia-course-reviews.json"
+
+
+def _write_pythia_course_reviews(project_id: str, reviews: list[PythiaCourseReview]) -> None:
+    path = _pythia_course_reviews_path(project_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    temporary.write_text(json.dumps([review.model_dump(mode="json") for review in reviews], indent=2), encoding="utf-8")
+    temporary.replace(path)
+
+
+def list_pythia_course_reviews(project_id: str) -> list[PythiaCourseReview]:
+    read_project(project_id)
+    path = _pythia_course_reviews_path(project_id)
+    if not path.is_file():
+        return []
+    return [PythiaCourseReview.model_validate(item) for item in json.loads(path.read_text(encoding="utf-8"))]
+
+
+def create_pythia_course_review(
+    project_id: str,
+    data: PythiaCourseReviewCreate,
+    artifact: dict[str, object],
+) -> PythiaCourseReview:
+    with storyboard_transaction():
+        project = read_project(project_id)
+        if data.sourceRevision > project.storyboard.revision:
+            raise ValueError("Course review source revision is newer than the project")
+        reviews = list_pythia_course_reviews(project_id)
+        existing = next((review for review in reviews if review.taskId == data.taskId), None)
+        if existing:
+            if existing.artifactId != data.artifactId:
+                raise ValueError("The Pythia task already has a different course review")
+            return existing
+        now = now_iso()
+        payload = artifact["payload"]
+        review = PythiaCourseReview(
+            id=f"course-review-{uuid.uuid4().hex[:12]}",
+            taskId=data.taskId,
+            artifactId=data.artifactId,
+            sourceRevision=data.sourceRevision,
+            artifact=artifact,
+            findings=[PythiaCourseFindingReview(findingId=finding["finding_id"]) for finding in payload["findings"]],
+            createdAt=now,
+            updatedAt=now,
+        )
+        _write_pythia_course_reviews(project_id, [*reviews, review])
+        return review
+
+
+def decide_pythia_course_finding(
+    project_id: str,
+    review_id: str,
+    finding_id: str,
+    data: PythiaCourseFindingDecision,
+) -> PythiaCourseReview:
+    with storyboard_transaction():
+        reviews = list_pythia_course_reviews(project_id)
+        for review_index, review in enumerate(reviews):
+            if review.id != review_id:
+                continue
+            finding_index = next((index for index, finding in enumerate(review.findings) if finding.findingId == finding_id), None)
+            if finding_index is None:
+                raise KeyError(finding_id)
+            finding = review.findings[finding_index]
+            now = now_iso()
+            actor = get_actor_context()
+            decision = PythiaCourseFindingDecisionRecord(
+                previousStatus=finding.status,
+                status=data.status,
+                resolutionNote=data.resolutionNote,
+                decidedAt=now,
+                actorId=actor.actorId,
+                actorDisplayName=actor.actorDisplayName,
+                installationId=actor.installationId,
+                correlationId=get_correlation_id(),
+            )
+            findings = list(review.findings)
+            findings[finding_index] = finding.model_copy(update={
+                "status": data.status,
+                "resolutionNote": data.resolutionNote,
+                "decisionHistory": [*finding.decisionHistory, decision],
+            })
+            updated = review.model_copy(update={"findings": findings, "updatedAt": now})
+            reviews[review_index] = updated
+            _write_pythia_course_reviews(project_id, reviews)
+            return updated
+        raise KeyError(review_id)
 
 
 def list_reference_resources(project_id: str) -> list[ReferenceResource]:
@@ -977,7 +1310,6 @@ def create_enhancement_job(
             id=f"enhancement-{uuid.uuid4().hex[:12]}",
             projectId=project_id,
             sourceRevision=project.storyboard.revision,
-            aiConnectionRevision=connection_status(ROOT)["revision"],
             scope=data.scope,
             sceneIds=scene_ids,
             goal=data.goal,
@@ -1223,6 +1555,8 @@ def create_enhancement_proposal(project_id: str, data: EnhancementProposalCreate
             if existing:
                 return existing
         project = read_project(project_id)
+        if data.sourceRevision is not None and data.sourceRevision != project.storyboard.revision:
+            raise EnhancementProposalConflict("The storyboard changed while the Pythia assessment was being generated")
         requested_changes = data.changes or [EnhancementProposalChangeCreate(
             targetSceneId=data.targetSceneId,
             field=data.field,
@@ -1251,6 +1585,10 @@ def create_enhancement_proposal(project_id: str, data: EnhancementProposalCreate
             origin=data.origin,
             provider=data.provider,
             model=data.model,
+            sourceTaskId=data.sourceTaskId,
+            sourceArtifactId=data.sourceArtifactId,
+            sourceCapability=data.sourceCapability,
+            sourceArtifact=data.sourceArtifact,
             createdAt=now_iso(),
         )
         proposals = list_enhancement_proposals(project_id)

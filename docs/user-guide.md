@@ -1,20 +1,20 @@
 # Chimera user guide
 
-Process-based instructions for Chimera, updated 2026-10-14 against commit `6641162`. Screenshots for changed authoring, assessment, playback, and export controls were refreshed for this update; the capture records identify earlier images retained for unchanged controls. Captures use the isolated user-guide demonstration workspace and made no live AI requests or use of credentials. Historical source/recovery context is documented in the [recovery record](export-enhancement-recovery.md).
+Process-based instructions for Chimera. Workflow text updated 2026-10-15, including Pythia analysis, transformation, assessment design, and course review. Screenshots last refreshed 2026-10-08 from commit `4ade811` plus then-uncommitted working-tree updates; they predate the current Pythia controls and Settings labels. Captures use the isolated user-guide demonstration workspace and made no live AI requests or use of credentials. Historical source/recovery context is documented in the [recovery record](export-enhancement-recovery.md).
 
 ## How to use this guide
 
-Each task has its own **Step / Action / Result / Control image** table. Click a control image to open the full-size screenshot. Screenshots show the real Chimera interface in Light appearance, using an isolated demonstration project. Course names and sample content will differ in your workspace. Browser file pickers, download prompts, and confirmation dialogs vary by browser and operating system; screenshots show the Chimera controls that open them.
+Tasks use numbered instructions or **Step / Action / Result / Control image** tables. Click a control image to open the full-size screenshot. Screenshots show the real Chimera interface in Light appearance, using an isolated demonstration project. Course names and sample content will differ in your workspace. Browser file pickers, download prompts, and confirmation dialogs vary by browser and operating system; screenshots show the Chimera controls that open them. Follow the current text labels where an older image differs.
 
 The source has changed since the original capability review: Word export, reference upload, enhancement submission, generated-media candidate review, comments, and Chimera storyboard archives now have interface controls. Their presence does not certify a configured AI provider or compatibility with every LMS. Example proposals, candidates, and job statuses in these images are documentation fixtures; no live AI request was made for this guide.
 
-**Prerequisite:** Start the backend and frontend using the [README setup instructions](../README.md#start-locally), then open `http://localhost:5173`. Keep both services running while authoring. LibreOffice is needed for rendered PowerPoint slide previews. AI tasks require a configured connection through **Settings > AI connection** or server environment settings. Shared-installation changes require an administrator; see [AI connection](ai-connection.md).
+**Prerequisite:** Start the backend and frontend using the [README setup instructions](../README.md#start-locally), then open `http://localhost:5173`. Keep both services running while authoring. LibreOffice is needed for rendered PowerPoint slide previews. Pythia workflows additionally need the Engine API; check **Settings > Intelligence Engine**. Image and narration generation use the separate **Settings > Media provider** connection or server environment settings. Shared-installation connection changes require an administrator; see [AI connection](ai-connection.md).
 
 My Work opens after normal launch/sign-in and refresh. It is first in the workspace menu. Select a project row to open its authoring workspace, choose New Project to create one, or Resume authoring to return to the remembered project. Direct authenticated review links retain their review destination.
 
 **Working convention:** Select the intended project and scene before editing. Use the task's Save/Create/Accept control and wait for completion. Merely typing into a form does not save it. If a revision-conflict message appears, reload the project, inspect the latest values, and reapply the intended change. Do not assume unsaved form text will survive a reload.
 
-Optional interactive help is available under **Review tools > Guided review > All functionality walkthroughs**. Search the catalog and start the task you want to practice. The sidebar resumes your last selected walkthrough. Action steps wait for confirmed saves/downloads; review steps use Next. Escape pauses without clearing an open draft. Progress is browser-local and separate for each task/project; completing a walkthrough does not certify readiness. Restore/deletion confirmations and provider submissions remain your decisions.
+Optional interactive help is available under **Review tools > Guided review > All functionality walkthroughs**. Search the 68-task catalog, including nine Pythia workflows, and start the task you want to practice. The sidebar resumes your last selected walkthrough. Action steps wait for confirmed saves/downloads; Pythia draft steps wait until the draft is saved in Chimera, and review steps use Next. Escape pauses without clearing an open draft. Progress is browser-local and separate for each task/project; completing a walkthrough does not certify readiness. Restore/deletion confirmations and provider submissions remain your decisions. See the [walkthrough catalog and behavior](onboarding-implementation.md#walkthrough-catalog).
 
 ## Processes
 
@@ -31,6 +31,9 @@ Optional interactive help is available under **Review tools > Guided review > Al
 11. [Export course deliverables](#11-export-course-deliverables)
 12. [Back up and restore](#12-back-up-and-restore)
 13. [Review project health](#13-review-project-health)
+14. [Work with Pythia](#14-work-with-pythia)
+
+For the PowerPoint-to-SCORM path, start with [Work with Pythia](#14-work-with-pythia). It links the existing import, media, assessment, validation, and export tasks into one human-reviewed workflow.
 
 ![Chimera authoring workspace](user-guide/images/workspace.png)
 
@@ -67,13 +70,15 @@ Project owners can move a project to Trash from its row in **My Work**. Projects
 | 1 | Open **Settings** at the bottom of the sidebar. | Appearance options become available. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a> |
 | 2 | Choose **Light**, **Dark**, or **System**. | The preference is applied and remembered in this browser. | <a href="user-guide/images/appearance.png"><img src="user-guide/images/appearance.png" alt="appearance controls" width="240"></a> |
 
-### Configure AI
+### Configure the media provider
+
+This connection serves image and narration generation, not storyboard enhancement or Pythia's learning-intelligence providers. Check **Settings > Intelligence Engine** for analysis, transformation, assessment, course review, and enhancement status; see [Pythia prerequisites](#before-you-start-with-pythia). Older screenshots call the media connection **AI connection**.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Open **Settings > AI connection**. | Connection status appears; shared-installation non-admins see a read-only view. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="AI connection settings" width="240"></a> |
-| 2 | Choose approved models, enter the API key, and set request limits. Click **Save connection**. | The key is stored in the server's OS credential store and cleared from the form. Saving fails closed when secure storage is unavailable. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Models, write-only API key and request limits" width="240"></a> |
-| 3 | Click **Test connection** after saving. | A models-list request checks the credential without sending course content or generating media. Model access and costs still depend on the provider account. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Save, test and disconnect controls" width="240"></a> |
+| 1 | Open **Settings > Media provider**. | Media generation connection status appears; shared-installation non-admins see a read-only view. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Older AI connection settings screenshot" width="240"></a> |
+| 2 | Choose approved image/audio models, enter the API key, and set request limits. Click **Save media settings**. | The key is stored in the server's OS credential store and cleared from the form. Saving fails closed when secure storage is unavailable. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Older models, write-only API key and request limits screenshot" width="240"></a> |
+| 3 | Click **Test provider** after saving. | A models-list request checks the credential without sending course content or generating media. Model access and costs still depend on the provider account. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Older save, test and disconnect controls screenshot" width="240"></a> |
 | 4 | To disable AI, click **Disconnect** and confirm. | The saved key is deleted and environment fallback is disabled. Running requests may finish; queued jobs against changed settings require resubmission. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Disconnect AI connection" width="240"></a> |
 
 Request limits are not spending limits. Set a provider-account budget and confirm organisational data-use approval before enabling generation. See [AI connection](ai-connection.md) for credential-store provisioning and operational requirements.
@@ -90,16 +95,6 @@ For an interactive first-scene walkthrough, choose **Start / resume walkthrough*
 ## 2. Import and author scenes
 
 Scene creation and edits are saved locally. History snapshots are maintained by the application; there is no general history browser or restore-history button documented in this interface.
-
-### Draft a course with AI
-
-Configure **Settings > AI connection** first. The course prompt generates text and structured questions; it does not create attached images or audio. Review generated facts and questions against your source documents.
-
-| Step | Action | Result | Control image |
-| --- | --- | --- | --- |
-| 1 | Choose **Create project**, enter the Course name, and use **Attach course design documents** to select the references that should ground the draft. Enter a **Course prompt** describing objectives, audience, sequence, and desired questions, then create the project. | The project is created and the Draft course scenes review opens. | <a href="user-guide/images/create-project.png"><img src="user-guide/images/create-project.png" alt="Course prompt and reference attachment controls" width="240"></a> |
-| 2 | Review the references and brief, then choose **Generate course draft**. | A proposed scene list appears. Generation does not add it to the storyboard. | <a href="user-guide/images/course-draft-prompt.png"><img src="user-guide/images/course-draft-prompt.png" alt="Course brief and Generate course draft control" width="240"></a> |
-| 3 | Inspect titles, learner text, narration, production notes, and any question answers/feedback/scoring. Edit or deselect scenes as needed, then choose **Add selected scenes**. | Selected scenes are saved after the storyboard revision check. Use the question editor for further question changes. | <a href="user-guide/images/course-draft-review.png"><img src="user-guide/images/course-draft-review.png" alt="Generated scenes review and Add selected scenes control" width="240"></a> |
 
 ### Import a PowerPoint storyboard
 
@@ -125,74 +120,26 @@ The **Edit scene** dialog combines scene details and canvas authoring. On-screen
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Select a scene, then click **Edit scene** or its pencil icon. | The unified scene editor opens; choose Details to edit scene metadata. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a><br><a href="user-guide/images/scene-sequence.png"><img src="user-guide/images/scene-sequence.png" alt="scene sequence controls" width="240"></a> |
-| 2 | In **Details**, update the title, type, layout, on-screen text, action description, speaker notes, or required status. Choose **Stage** to edit the visual layout in the same dialog. | Both sections share one draft and one save action. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
+| 1 | Select a scene, then click **Edit scene** or its pencil icon. | The unified scene editor opens on Details. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a><br><a href="user-guide/images/scene-sequence.png"><img src="user-guide/images/scene-sequence.png" alt="scene sequence controls" width="240"></a> |
+| 2 | In **Details**, update the title, type, layout, on-screen text, action description, speaker notes, or required status. Choose **Canvas** to edit the visual layout in the same dialog. | Both sections share one draft and one save action. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
 | 3 | Click **Save scene**; use **Cancel** to discard edits from either section. | Saved changes update the storyboard and its revision. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor Details controls" width="240"></a> |
 
-### Edit text and images on the Stage
+### Edit text and images on the canvas
 
-Open **Edit scene**, then choose **Stage**. The canvas editor saves an editable layout; it does not paint over the flattened PowerPoint preview. Canvas edits to an imported slide use Hybrid rendering so the edited layers, rather than an unchanged flattened image, are shown.
+Open **Edit scene**, then choose **Canvas**. The canvas editor saves an editable layout; it does not paint over the flattened PowerPoint preview. Canvas edits to an imported slide use Hybrid rendering so the edited layers, rather than an unchanged flattened image, are shown.
 
-![Unified scene editor Stage tab](user-guide/images/scene-canvas-editor.png)
+![Unified scene editor Canvas tab](user-guide/images/scene-canvas-editor.png)
 
 1. For an older imported scene, choose **Extract source layout** to recover positions and inherited artwork from the retained PPTX. This preserves scene IDs, notes, questions, review threads, existing assets, and authored text. The extracted layout remains inactive until **Save scene**. Cancelling keeps the extracted data but does not change playback.
 2. Double-click a text box, or focus it and press Enter, to edit its text directly. The **Text** field also edits the selected box. Drag boxes to move them, use resize handles, or enter exact position and size in the properties panel. Text resize handles preserve the box's current aspect ratio; image resize handles allow freeform sizing. Arrow keys move the focused element; Shift changes the step from one to ten slide-space units.
-3. Drag a thumbnail from **Content** onto the Stage. Clicking the thumbnail adds it without dragging. The media-library selector can add other project images. Selecting an image exposes replacement and crop-reset controls.
+3. Drag an **Attached images** thumbnail onto the canvas. Clicking the thumbnail adds it without dragging. The media-library selector can add other project images. Selecting an image exposes replacement and crop-reset controls.
 4. Use **Layers** to select overlapping or inherited content. Master and layout artwork starts locked; unlock it before editing. Toolbar controls add text, undo/redo, duplicate/delete elements, and change stacking order. Text properties include size, color, typeface, alignment, bold, and italic.
 5. Choose a background color or project image in the properties panel. Imported picture backgrounds and supported inherited master/layout images are available as project assets. **Source slide**, when available, temporarily shows the original flattened rendering for comparison.
 6. Choose **Save scene**, then check **Preview course**. The saved canvas replaces the source preview in authoring, preview, and both SCORM profiles. **Cancel** discards unsaved canvas changes.
 
 New imports capture editable text, images, common PowerPoint shapes, line connectors, custom freeform geometry, rotation, cropping, slide dimensions, inherited graphics, and solid/picture backgrounds. Byte-identical images are shared as one Media library asset while every source placement stays separate on the canvas. Most extracted shapes can be moved, resized, rotated, layered, locked, or deleted like other canvas elements; text inside a shape remains separately editable. The original preview remains available for comparison. Less-common preset geometry, gradients, group rotation, mixed text formatting, bullets, and some inherited styles may be approximated and are listed under **Import limitations**; charts and SmartArt remain unsupported objects. This is not full PowerPoint-equivalent editing.
 
-For a scene with an enabled visual layout, edits to **On-screen text** in the original metadata dialog also update the corresponding visual text boxes. Title and On-screen text changes are synchronized with matching visual text boxes when you save. Inspect the Stage before saving; manually composed text and custom placements still need review.
-
-### Fit Stage Text
-
-AI scene drafts are measured in the browser before review. If text overflows, Chimera first grows an unlocked, unrotated text box downward into available space without moving its origin or other elements. If necessary it reduces the font size, stopping at 18 px (or the original size if already smaller). Text and animation settings are preserved. Locked text is reported rather than changed.
-
-For an existing scene, select **Edit scene > Stage > Fit text**. The change is undoable and remains unsaved until **Save scene**. The command includes current On-screen text edits. If text still does not fit, the editor identifies it and blocks saving an enabled visual layout until the box or content is corrected. Fidelity-only scenes are not subject to this visual-layout save check.
-
-This is browser-measured overflow checking, not certification of visual quality. Inspect the Stage for existing overlaps, contrast, motion bounds, and reading order. Installed fonts can differ between the authoring and playback machines; recheck representative exported courses on their intended devices. Direct API updates do not run browser measurements.
-
-![Stage editor with Fit text](user-guide/images/text-fit.png)
-
-### Animate Stage Content
-
-Text, images, and shapes on an enabled visual Stage support three animation phases. These settings are editable scene data, not production notes, and run in the editor's motion preview, course Preview, SCORM 2004, SCORM 1.2, and standalone packages.
-
-1. Open **Edit scene > Stage** and select a text, image, or shape element.
-2. In the **Animation** inspector choose an **Entrance**, **Presentation**, or **Exit** effect and set its duration and delay. Use **None** to disable a phase.
-3. For text that dances into place, use the toolbar's **Stagger text entrances** command. It applies a 600 ms bounce entrance to each unlocked text block, adding 150 ms delay per block in element order. It includes the current On-screen text and leaves final positions unchanged.
-4. Select **Preview animations** to play the current unsaved timeline. Select it again to replay, or **Stop animation preview** to return to static editing. Changing an element also returns to editing. Generating or previewing does not save the scene.
-5. Choose **Save scene** and inspect **Preview course** before exporting. Previously downloaded packages must be exported again.
-
-Supported effects:
-
-| Phase | Effects | Timing |
-| --- | --- | --- |
-| Entrance | Fade, slide up, slide from left, zoom, bounce into place | Delay from scene entry; final position remains unchanged. |
-| Presentation | Pulse, sway, highlight | Delay after the entrance ends, or from scene entry if no entrance. Repeats 1-5 times. |
-| Exit | Fade out, slide down, slide to left, shrink out | Absolute scene time, after entrance and presentation finish. Not a transition triggered by Next or Previous. |
-
-Durations are 100-5,000 ms; delays are 0-60,000 ms. Exited elements stay visually hidden until scene re-entry or **Stop motion**. Keep important instructions visible unless the course intentionally requires their removal. Navigation is not delayed by animation. Effects restart when the learner re-enters a scene, not when an assessment result changes. Existing elements without animation settings remain static. Animations do not alter geometry, assessment answers, attempts, or completion rules.
-
-Learners can select **Stop motion** to immediately restore static content, and **Play motion** to restart. In Chimera Preview, **Replay motion** restarts the current scene's effects in one click without navigating, changing assessment answers, or saving the scene. Entrance and finite presentation effects settle into the final static layout, so use Replay when reviewing effects that finished before you could inspect them. Preview hides its separate page heading when the Stage already contains the same title; the accessible scene name remains available. The system's reduced-motion preference suppresses effects and reveals content immediately, including when the preference changes during playback. The assessment question component itself stays interactive and static; animation controls apply to text, image, and shape elements. Arbitrary motion paths, custom scripts/keyframes, click-triggered reveal sequences, audio synchronization, and PowerPoint animation playback are not implemented by these presets.
-
-Scene AI drafting receives the supported animation schema. For example, enter:
-
-> Animate the title and each On-screen text block into its final Stage position when the scene begins. Use staggered bounce entrances, 600 ms each, with 150 ms additional delay per block. Add one gentle sway after each entrance. Keep all final positions unchanged and do not add exits. Configure the visualLayout element animations, not just production notes.
-
-AI drafting returns a complete scene/layout draft, so inspect both its content and animation settings before saving. Model quality still requires review; the schema validates supported effects and timing, not the instructional appropriateness of motion.
-
-![Animation settings for a selected text element](user-guide/images/animation-inspector.png)
-
-### Revise a scene with AI
-
-Open **Edit scene > Details**, enter a **Scene prompt**, and choose **Generate scene + layout draft**. The request includes the current editor values, including unsaved text and title, the course sequence and completion rules, and relevant reference excerpts. The returned layout replaces the editor draft; inspect the Stage, optional status, notes, narration, question data, and animation settings before choosing **Save scene**. **Cancel** discards the editor draft.
-
-Scene drafting composes text on a 1280 × 720 Stage. It does not preserve every visual object or create images, audio, arbitrary scripts, or custom interactions. Attached assets are sent as metadata references rather than media binaries. A production action described in notes is not automatically implemented. Browser text fitting runs before review; unresolved overflow must be corrected before saving an enabled visual layout. Preservation and factual quality still need author review.
-
-Example prompt: “Clarify the three procedure steps without adding facts. Preserve the current title, required status, narration, and question scoring. Animate each text block with a staggered bounce entrance and leave it visible afterward.”
+For a scene with an enabled visual layout, edits to **On-screen text** in the original metadata dialog also update the corresponding visual text boxes. The scene title remains the navigation label; use the canvas editor to change a title drawn on the slide.
 
 ### Jump directly to another scene
 
@@ -270,7 +217,7 @@ The current upload interface accepts images and audio, up to 100 MB per file. Im
 
 ### Create a media candidate
 
-Configure AI through **Settings > AI connection** before generating candidates. In shared deployments, an installation administrator manages the connection. See [AI connection](ai-connection.md) for credential storage, connection testing, limits, and data handling.
+Configure image and narration generation through **Settings > Media provider** before generating candidates. In shared deployments, an installation administrator manages the connection. See [AI connection](ai-connection.md) for credential storage, connection testing, limits, and data handling. This connection is separate from Pythia.
 
 Create a media candidate starts collapsed. Select its heading to expand it. When the server-side AI connection is not configured, its heading is greyed and generation controls are disabled. If connection status cannot be loaded or your role does not permit generation, controls also remain disabled. Configuration availability does not guarantee that a provider is reachable or supports a particular model. Existing candidates can still be approved or rejected without a configured AI connection; regeneration requires the connection.
 
@@ -315,27 +262,27 @@ A green **Ready for production** check means the media loaded, its attribution i
 
 ## 5. Author assessments
 
-A **Question** scene contains one authored question. An **Assessment** is a named, ordered collection of Question scenes. Start each question-authoring task with a scene whose **Scene type** is **Question**; older courses using the Assessment scene type load automatically as Question scenes. Set that type in Edit scene and save. Select **Create question** for a new question or **Edit question** for an existing one. The question editor supports seven types. Changing types replaces the type-specific question structure in the form; save only after checking the new content.
+Start each assessment task with a scene whose **Scene type** is **Assessment**. Set that type in Edit scene and save. Select **Create question** for a new question or **Edit question** for an existing one. The question editor supports seven types. Changing types replaces the type-specific question structure in the form; save only after checking the new content.
 
 ### Open or create an assessment question
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Edit the scene, choose **Question** under **Scene type**, and save. | The scene displays the question-authoring section. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
-| 2 | Click **Create question** or **Edit question** above the Stage. | The question editor opens. | <a href="user-guide/images/assessment-create.png"><img src="user-guide/images/assessment-create.png" alt="Create question control" width="240"></a><br><a href="user-guide/images/assessment-launch.png"><img src="user-guide/images/assessment-launch.png" alt="assessment launch controls" width="240"></a> |
+| 1 | Edit the scene, choose **Assessment** under **Scene type**, and save. | The scene displays the question-authoring section. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
+| 2 | Click **Create question** or **Edit question** below the canvas. | The question editor opens. | <a href="user-guide/images/assessment-create.png"><img src="user-guide/images/assessment-create.png" alt="Create question control" width="240"></a><br><a href="user-guide/images/assessment-launch.png"><img src="user-guide/images/assessment-launch.png" alt="assessment launch controls" width="240"></a> |
 
 ### Author a single-choice question
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Choose **Multiple choice · one answer**, enter the **Question prompt** and answer text, and mark exactly one answer as correct. Use **Add answer choice** or the minus buttons as needed. | The question content and correct response are defined. | <a href="user-guide/images/question-single-choice.png"><img src="user-guide/images/question-single-choice.png" alt="question single choice controls" width="240"></a> |
+| 1 | Choose **Multiple choice ? one answer**, enter the **Question prompt** and answer text, and mark exactly one answer as correct. Use **Add answer choice** or the minus buttons as needed. | The question content and correct response are defined. | <a href="user-guide/images/question-single-choice.png"><img src="user-guide/images/question-single-choice.png" alt="question single choice controls" width="240"></a> |
 | 2 | Enter **Correct feedback** and **Incorrect feedback**, then click **Save question**. | The question is saved to the scene. | <a href="user-guide/images/question-single-choice.png"><img src="user-guide/images/question-single-choice.png" alt="question single choice controls" width="240"></a><br><a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
 ### Author a multiple-correct question
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Choose **Multiple choice · multiple answers**, enter the prompt and answer choices, and select the checkbox for every correct answer. | The question content and correct response are defined. | <a href="user-guide/images/question-multiple-response.png"><img src="user-guide/images/question-multiple-response.png" alt="question multiple response controls" width="240"></a> |
+| 1 | Choose **Multiple choice ? multiple answers**, enter the prompt and answer choices, and select the checkbox for every correct answer. | The question content and correct response are defined. | <a href="user-guide/images/question-multiple-response.png"><img src="user-guide/images/question-multiple-response.png" alt="question multiple response controls" width="240"></a> |
 | 2 | Enter **Correct feedback** and **Incorrect feedback**, then click **Save question**. | The question is saved to the scene. | <a href="user-guide/images/question-multiple-response.png"><img src="user-guide/images/question-multiple-response.png" alt="question multiple response controls" width="240"></a><br><a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
 ### Author a true/false question
@@ -383,36 +330,6 @@ Current question scoring is binary: 0% or 100%. Course score weights affect the 
 | 2 | Set **Maximum attempts**, **Passing score**, **Course score weight**, and an optional **Remediation scene**. | Attempts, scoring contribution, and review destination are specified. | <a href="user-guide/images/assessment-rules.png"><img src="user-guide/images/assessment-rules.png" alt="assessment rules controls" width="240"></a> |
 | 3 | Click **Save question**. | The question and its rules are saved. | <a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
-### Place a question on the Stage
-
-An authored assessment appears as a question component on the scene Stage, not as a separate block beneath it. The component reads the existing question data; its prompt, choices, answer key, feedback, and scoring are not copied into ordinary text elements.
-
-1. Use **Create question** or **Edit question** above the scene preview to author the question.
-2. Open **Edit scene > Stage**. The question and learner choices appear on the canvas; correct answers are not revealed there.
-3. Drag or resize the question component, or use the **Question** inspector's position and size fields. The region must remain inside the Stage. Shrinking the Stage keeps the saved question region within its new bounds.
-4. Choose **Save scene**. Placement is saved separately from the question, and remains when the question is edited. Use the question editor to change question content; the Stage component is not an independent copy.
-5. Check **Preview course**. The on-stage controls support all seven question types with their existing attempts, scoring, feedback, and remediation behavior.
-
-Existing assessments without placement data receive a default origin matching the scene's title element, and the redundant Stage title is omitted. Explicitly saved positions remain in use. SCORM and standalone exports use the same authored origin and no longer duplicate the question below the Stage. The question panel grows with its content instead of adding an internal scrollbar; the page can scroll for long content. Learner question text uses a compact 16 px base and 20 px prompt, with native form inputs and reduced spacing. Authoring uses a non-interactive representation; use Preview to answer the question. QTI remains question-data-only and does not include Stage placement.
-
-Submitting an answer opens a feedback modal with the explanation, score, attempts, and a Review lesson action when remediation is configured. Close feedback or Escape returns to the question without closing Preview or changing the attempt count. View feedback reopens the last submitted result without submitting another answer. A changed, unsubmitted answer must be checked again before feedback is available. Correct answers and exhausted attempts remain locked according to the existing scoring rules. The platinum question panel retains its brushed finish, rounded corners, and lower-right shadow; modal feedback uses explicit high-contrast success/error colors in either theme.
-
-![Question placement in the Stage editor](user-guide/images/question-placement.png)
-
-### Create and edit Assessments
-
-Choose **Question** as the scene type when creating a question scene. Older courses that use the `assessment` scene type load as Question scenes automatically. Use **Create question** or **Edit question** above the selected scene Stage to author its prompt, answers, feedback, and scoring.
-
-An Assessment is a named, ordered collection of Question scenes. Open **Review tools → Assessments**, choose **Create assessment**, enter a title, select questions, and use the arrow controls to set their order. Choose **Save assessment** to persist the collection. Empty collections can be saved as drafts. Use the saved collection's **Edit** control to change its title, membership, or order.
-
-**Download QTI test** exports the collection's authored questions in the selected order; at least two authored questions are required. Preview shows each collection's answered count and weighted score. Grouping does not change course completion settings or count a question twice in the course score.
-
-Deleting an Assessment retains its Question scenes. Deleting a Question scene removes its membership from all Assessments. Remove a Question from its collections before changing its scene type. If another author saves first, reload the latest storyboard and review your retained draft before saving again. Collections are included in storyboard JSON and project backups.
-
-![Select and order questions in an Assessment](user-guide/images/assessments-editor.png)
-
-![Saved Assessment with edit, delete, and QTI download controls](user-guide/images/assessments-list.png)
-
 ### Remove an assessment question
 
 | Step | Action | Result | Control image |
@@ -430,7 +347,9 @@ Deleting an Assessment retains its Question scenes. Deleting a Question scene re
 
 ## 6. Import references and request enhancement
 
-AI submission requires an administrator to configure the server-side provider. Without it, Preview submission remains useful, but Submit run is disabled. This guide does not claim that an AI service was contacted or its output verified.
+This section describes **New enhancement run**, which uses Pythia's `storyboard.enhance` capability. It is separate from the analysis, transformation, assessment, and course-review dialogs described in [Work with Pythia](#14-work-with-pythia). Only the references selected in this form accompany this enhancement request; they are not automatically included in the other Pythia workflows.
+
+Enhancement submission requires an available Intelligence Engine supporting `storyboard.enhance`, managed by an administrator in shared installations. Check **Settings > Intelligence Engine**, not **Media provider**. Without it, Preview submission remains useful, but Submit run is disabled. This documentation update made no live AI requests and does not certify provider output.
 
 ### Import a Study Guide or supporting reference
 
@@ -448,13 +367,13 @@ Failed or incomplete extraction disables selection. The current form does not pr
 | --- | --- | --- | --- |
 | 1 | Choose **Whole course** or **Selected scenes** under **Scope**; for selected scenes, check the required scene boxes. | The enhancement target is defined. | <a href="user-guide/images/enhancement-form.png"><img src="user-guide/images/enhancement-form.png" alt="enhancement form controls" width="240"></a> |
 | 2 | Enter an **Enhancement goal** and check the **Permitted references** to include. | The run is limited to the chosen content and references. | <a href="user-guide/images/enhancement-form.png"><img src="user-guide/images/enhancement-form.png" alt="enhancement form controls" width="240"></a> |
-| 3 | Click **Preview submission**, then expand **Inspect submitted content**. | You can inspect the payload, source revision, counts, estimated input tokens, and any available cost estimate. | <a href="user-guide/images/submission-actions.png"><img src="user-guide/images/submission-actions.png" alt="Preview submission and Submit run controls" width="240"></a><br><a href="user-guide/images/submission-preview.png"><img src="user-guide/images/submission-preview.png" alt="submission preview controls" width="240"></a> |
+| 3 | Click **Preview submission**, then expand **Inspect submitted content**. | You can inspect the payload, source revision, counts, estimated input units, and any available cost estimate. | <a href="user-guide/images/submission-actions.png"><img src="user-guide/images/submission-actions.png" alt="Preview submission and Submit run controls" width="240"></a><br><a href="user-guide/images/submission-preview.png"><img src="user-guide/images/submission-preview.png" alt="submission preview controls" width="240"></a> |
 
 ### Submit an enhancement run
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Complete and inspect the submission preview. Resolve the provider-not-configured message if present. | You know what will be sent and whether submission is available. | <a href="user-guide/images/submission-preview.png"><img src="user-guide/images/submission-preview.png" alt="submission preview controls" width="240"></a> |
+| 1 | Complete and inspect the submission preview. Resolve any Intelligence Engine unavailable or unsupported-capability message. | You know what will be sent and whether submission is available. | <a href="user-guide/images/submission-preview.png"><img src="user-guide/images/submission-preview.png" alt="submission preview controls" width="240"></a> |
 | 2 | Click **Submit run** when enabled. | An enhancement job is created; it produces proposals rather than directly applying changes. | <a href="user-guide/images/submission-actions.png"><img src="user-guide/images/submission-actions.png" alt="submission preview controls" width="240"></a> |
 | 3 | Review the job status and any reported resource conflicts, then review returned suggestions individually. | You can distinguish completion, failure, and suggestions needing a decision. | <a href="user-guide/images/enhancement-jobs.png"><img src="user-guide/images/enhancement-jobs.png" alt="enhancement jobs controls" width="240"></a><br><a href="user-guide/images/proposal.png"><img src="user-guide/images/proposal.png" alt="proposal controls" width="240"></a> |
 
@@ -466,6 +385,8 @@ Failed or incomplete extraction disables selection. The current form does not pr
 | 2 | Click **Cancel** for a queued/running job, or **Retry** for a failed/cancelled job after addressing the cause. | Cancellation is requested or a retry job is started. Neither action approves proposals. | <a href="user-guide/images/enhancement-jobs.png"><img src="user-guide/images/enhancement-jobs.png" alt="enhancement jobs controls" width="240"></a> |
 
 ## 7. Review enhancement proposals
+
+**Review suggestions** contains several proposal types. The **Accept change**, **Edit values**, and **Undo acceptance** instructions below apply to regular enhancement proposals, including native assessment items drafted by Pythia. Pythia analysis uses **Accept review** without changing content; storyboard transformation uses **Edit proposal** and **Accept transformation**, with no undo button. Follow the [Pythia-specific decision steps](#14-work-with-pythia) for those records.
 
 ### Accept or reject a suggestion
 
@@ -494,7 +415,7 @@ A proposal can contain multiple related changes. Accept change applies that disp
 
 ## 8. Generate and approve media
 
-Select the target project and scene before opening Media library. Create a media candidate starts collapsed; expand its heading to access the form. Without AI configuration or generation permission, the section is greyed and generation/regeneration is disabled. Existing candidates remain reviewable. Approval attaches a candidate to its target scene; choose **Edit scene > Stage** afterward to place supported image assets. A generation-cost preview and full media-job monitor are not provided.
+Select the target project and scene before opening Media library. Create a media candidate starts collapsed; expand its heading to access the form. Without AI configuration or generation permission, the section is greyed and generation/regeneration is disabled. Existing candidates remain reviewable. Approval attaches a candidate to its target scene; choose **Edit scene > Canvas** afterward to place supported image assets. A generation-cost preview and full media-job monitor are not provided.
 
 ### Request an image candidate
 
@@ -534,17 +455,11 @@ Preview progress is stored in this browser, separately from a learner's LMS sess
 | 2 | Use **Next**, **Previous**, or a scene navigation dot. Play attached audio with its player controls. | You review scene order, content, and media; required progress updates. | <a href="user-guide/images/preview-navigation.png"><img src="user-guide/images/preview-navigation.png" alt="preview navigation controls" width="240"></a><br><a href="user-guide/images/preview-audio.png"><img src="user-guide/images/preview-audio.png" alt="preview audio controls" width="240"></a> |
 | 3 | Use **Read slide text** when shown for a rendered imported slide. Click **Exit preview** to return to authoring. | You can inspect extracted text and resume editing. | <a href="user-guide/images/slide-transcript.png"><img src="user-guide/images/slide-transcript.png" alt="slide transcript controls" width="240"></a><br><a href="user-guide/images/preview-header.png"><img src="user-guide/images/preview-header.png" alt="preview header controls" width="240"></a> |
 
-After an incorrect answer, close feedback and choose **Try again** to clear the response without using another attempt. Enter a new answer and choose **Check answer** to grade it. You can also change the answer directly; the action then becomes Check answer. Completed or exhausted questions retain their attempt limits.
-
-![Incorrect-answer feedback with the attempt count](user-guide/images/learner-feedback.png)
-
-![Try again action before clearing the previous response](user-guide/images/learner-retry.png)
-
 ### Test an assessment in preview
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Navigate to the Question scene. Select an answer, enter text, order items, or match/drag items as appropriate. | A response is prepared. | <a href="user-guide/images/learner-question.png"><img src="user-guide/images/learner-question.png" alt="learner question controls" width="240"></a> |
+| 1 | Navigate to the assessment scene. Select an answer, enter text, order items, or match/drag items as appropriate. | A response is prepared. | <a href="user-guide/images/learner-question.png"><img src="user-guide/images/learner-question.png" alt="learner question controls" width="240"></a> |
 | 2 | Click **Check answer**; use **Try again** when offered after an incorrect attempt. | Feedback, score, and attempt count appear. Correct answers or exhausted attempts disable further attempts. | <a href="user-guide/images/remediation.png"><img src="user-guide/images/remediation.png" alt="Try again control" width="240"></a><br><a href="user-guide/images/learner-result.png"><img src="user-guide/images/learner-result.png" alt="learner result controls" width="240"></a> |
 | 3 | If **Review lesson** is offered, follow it and use **Return to question** to resume. | The remediation path is exercised. | <a href="user-guide/images/return-question.png"><img src="user-guide/images/return-question.png" alt="Return to question control" width="240"></a><br><a href="user-guide/images/remediation.png"><img src="user-guide/images/remediation.png" alt="remediation controls" width="240"></a> |
 
@@ -602,11 +517,9 @@ Passing validation is not certification for every LMS. Pending suggestions and u
 
 ## 11. Export course deliverables
 
-Open Export for the intended saved project. Export uses saved content, not unsaved dialog edits or pending proposals. Use the SCORM profile supported by your destination LMS. The current SCORM 1.2 test package passed retry, Continue, Start over, and Gradebook score/completion checks in the operator’s LMS on 2026-10-14; consult the [compatibility checklist](scorm-compatibility-checklist.md) for the tested package and evidence limits. This does not qualify every course or LMS configuration.
+Open Export for the intended saved project. Export uses saved content, not unsaved dialog edits or pending proposals. SCORM 2004 has recorded Blackboard verification for a specific artifact; consult the [compatibility checklist](scorm-compatibility-checklist.md) for the scope of testing.
 
 ### Build a SCORM package
-
-When the LMS returns saved progress, the exported player asks whether to **Continue** at the saved scene or **Start over**. Continue retains answers, attempts, and progress. Start over resets course-owned state and returns to the first scene; it does not create a new LMS attempt or guarantee clearing a previously recorded grade. LMS grading and attempt rules still apply. Closing the course before choosing leaves the saved bookmark unchanged. New launches without saved progress do not show this prompt. Standalone packages have no persistent resume state and are unaffected.
 
 LMS upload controls are outside Chimera and vary by platform. Verify launch, media, completion, score, and resume in the destination LMS.
 
@@ -625,21 +538,6 @@ A report may be absent before the first build. Verify its revision/date before t
 | 1 | In Export, change **Warn when a package exceeds** and leave the field to save a valid value. | The warning threshold is saved in MB. | <a href="user-guide/images/scorm-export.png"><img src="user-guide/images/scorm-export.png" alt="scorm export controls" width="240"></a> |
 | 2 | After building the corresponding profile, click **Report 2004** or **Report 1.2**. | The latest available profile build report downloads. | <a href="user-guide/images/scorm-export.png"><img src="user-guide/images/scorm-export.png" alt="scorm export controls" width="240"></a> |
 
-### Export a standalone local course
-
-1. Open **Export** and find **Standalone course**.
-2. Select **Download standalone ZIP**. The saved course must pass the same production validation as SCORM exports.
-3. Extract the entire ZIP into a folder. Do not run the course from inside the ZIP viewer.
-4. Open the extracted `index.html` in a modern browser. Keep its scripts, `assets`, and any `renders` folders together.
-
-The package contains its own player, course data, and media. It does not require Chimera, an LMS, an internet connection, or a local web server. The same directory can also be hosted on a static web server. Do not remove or rearrange packaged files.
-
-Navigation, visual layouts, attached images/audio, required-audio playback, and assessments use the existing course player. Assessment answers and progress last only while the page is open; reloading or reopening starts a new session. No results are sent to an LMS or saved as learner records. Use SCORM when persistent LMS tracking is required. Answer keys are present in the package, so this format is not appropriate for secure testing. Narration text does not create audio unless an audio file is attached.
-
-The ZIP includes `README.txt` launch instructions. Its `course-data.js` preloads course data without a browser fetch, allowing direct `file://` launches. `storyboard.json` is the published learner data, not a full authoring backup; speaker notes and production action descriptions are excluded.
-
-Standalone and SCORM exports share the same presentation. Saved visual layouts and source-slide previews are retained. Native scenes with neither an enabled visual layout nor a slide preview use a slide-style title-and-text fallback instead of unframed text. This fallback does not invent a designed layout or change the saved scene. Desktop content uses a 16:9 frame; longer content and narrow screens expand to keep text readable. Previously downloaded packages must be exported again to receive player updates.
-
 ### Export an editable Word storyboard
 
 Choose **SME Master** for one editable landscape, slide-like page per scene, or **Full storyboard** for the Multimedia Instructional document with SME pages and detailed scene records. In both formats, attached image thumbnails appear in the corresponding media row with identifying, accessibility, and credit details. Edits made in Word do not synchronize back into Chimera. Word reimport is not exposed by this interface.
@@ -650,7 +548,7 @@ Choose **SME Master** for one editable landscape, slide-like page per scene, or 
 | 2 | Choose **SME Master** or **Full storyboard**, then decide whether to **Include answer keys (authoring material)**. | The format and answer-key policy are selected. | <a href="user-guide/images/word-export.png"><img src="user-guide/images/word-export.png" alt="word export controls" width="240"></a> |
 | 3 | Click **Download Word document**, then open the DOCX in Word. | Scene text and tables are editable; images remain images and interactions are documented rather than playable. | <a href="user-guide/images/word-export.png"><img src="user-guide/images/word-export.png" alt="word export controls" width="240"></a> |
 
-### Export one question as QTI
+### Export one assessment as QTI
 
 Chimera attempt/retry settings are not equivalent to settings in the receiving assessment system; verify them after import.
 
@@ -663,7 +561,7 @@ Chimera attempt/retry settings are not equivalent to settings in the receiving a
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Save questions in at least two Question scenes, then open **Export**. | The Assessment test section becomes available. | <a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a><br><a href="user-guide/images/top-actions.png"><img src="user-guide/images/top-actions.png" alt="top actions controls" width="240"></a> |
+| 1 | Save questions in at least two assessment scenes, then open **Export**. | The Assessment test section becomes available. | <a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a><br><a href="user-guide/images/top-actions.png"><img src="user-guide/images/top-actions.png" alt="top actions controls" width="240"></a> |
 | 2 | Click **Download QTI test**. | A QTI 2.1 test package containing the authored questions downloads. | <a href="user-guide/images/qti-test.png"><img src="user-guide/images/qti-test.png" alt="qti test controls" width="240"></a> |
 
 ## 12. Back up and restore
@@ -717,12 +615,104 @@ Project health uses a bounded, keyboard-scrollable area at five or more projects
 | 2 | Review counts, production stages and categorized blockers. Expand blocker findings or **Recent activity** as needed. | You can identify projects that need attention without treating readiness as approval. | <a href="user-guide/images/my-work-current.png"><img src="user-guide/images/my-work-current.png" alt="Project stages and categorized blockers" width="240"></a> |
 | 3 | Select a project name/row to open that project's Storyboard, or choose **Resume authoring**. | Authoring opens for editable projects; review-only users retain review access. | <a href="user-guide/images/my-work-current.png"><img src="user-guide/images/my-work-current.png" alt="Open a project or resume authoring" width="240"></a> |
 
+## 14. Work with Pythia
+
+Pythia returns drafts for human review. Chimera remains the authoring workspace: submitting a task does not approve the course, replace scenes, or add questions. Analysis and course-review decisions record your judgment without editing content; accepted transformations and assessment proposals do change saved content.
+
+### Before you start with Pythia
+
+1. Open the intended project with authoring access, save any open edits, and select a scene in **Storyboard**. Analysis, transformation, and assessment design start from the buttons above that scene. Course review starts from **Review tools > Review course with Pythia**.
+2. Open **Settings > Intelligence Engine**. Check **Engine**, **Version**, **Capabilities**, and **Provider registry**. The required capabilities are `storyboard.analyze`, `storyboard.transform`, `assessment.design` (or the supported `assessment.blueprint` alias), and `course.review`; the reference-based enhancement form additionally requires `storyboard.enhance`. An online engine alone does not guarantee that every capability is available to your installation or account.
+3. Ask the installation administrator to resolve missing capabilities, access restrictions, or an unavailable engine. This panel is diagnostic, not a provider editor. Pythia manages learning-intelligence provider/model selection; changing **Media provider** does not select a Pythia model. Usage telemetry requires administrator access and resets when the Engine restarts. Reported budget units are not a currency spending cap.
+4. Confirm organisational permission to submit the selected course content. Pythia requests use saved scene text and notes, or the course inventory for course review. Do not assume that references checked in **New enhancement run** accompany these tasks. Check the reported provider: deterministic local drafts are not evidence of an external model call or instructional quality.
+
+For a local installation, Pythia is a third service alongside the Chimera backend and frontend. From the Pythia repository root, start it in a separate terminal:
+
+```powershell
+.\.venv\Scripts\uvicorn.exe service.app:create_app --factory --host 127.0.0.1 --port 8001
+```
+
+Before starting the Chimera backend, set its Engine address in that backend terminal:
+
+```powershell
+$env:CHIMERA_PYTHIA_BASE_URL = 'http://127.0.0.1:8001'
+```
+
+Then start Chimera using the [local setup instructions](../README.md#start-locally). If the backend is already running, restart it with the variable set, or configure the equivalent environment for its VS Code task/service. Pythia and Chimera's backend cannot both bind port 8000 on the same host. Hosted users should ask their administrator to configure the Engine address rather than starting a local copy.
+
+### Follow the PowerPoint-to-SCORM workflow
+
+Use **Review tools > Guided review** for the Golden Path checklist and its task shortcuts. Checklist availability is not evidence that a task has been completed or approved.
+
+1. [Create a project and import the PowerPoint](#2-import-and-author-scenes). Inspect extracted text, notes, scene order, and rendering warnings before asking Pythia to reason about them.
+2. [Analyze a source scene](#analyze-a-source-scene) and inspect its evidence, uncertainty, and recommendations. Record the analysis decision in **Review suggestions**.
+3. [Propose and accept a transformation](#transform-selected-scenes). Review the entire replacement sequence before acceptance, then inspect the saved scenes.
+4. [Add supporting media and image descriptions](#4-manage-imported-media-and-accessibility). Transformation media requirements are suggestions, not generated or attached assets.
+5. [Design an assessment](#design-and-accept-an-assessment). Review each native question proposal, accept only suitable items, and test them in learner preview.
+6. [Review the complete course](#review-the-complete-course-with-pythia). Address findings in the relevant editors and record your resolution decisions. Re-run review after content changes.
+7. [Preview the course](#9-play-and-comment-on-the-storyboard), then run [Production release validation](#10-validate-course-readiness) and resolve blocking errors.
+8. In [My Work](#13-review-project-health), record the human release decision by setting the production stage to **Approved**, if you have project-settings permission. This is a declared stage, not an automatic Pythia verdict or a substitute for validation.
+9. [Build the SCORM package and inspect its report](#11-export-course-deliverables). Verify playback, scoring, completion, and resume in the destination LMS before release.
+
+### Analyze a source scene
+
+1. In **Storyboard**, select the source scene and click **Analyze with Pythia**. Verify the scene title and wait for the engine check.
+2. Click **Analyze selected scene**. Keep the dialog open while Chimera polls the task and saves the returned draft. **Draft ready for review** is not approval.
+3. Read **Findings**, **Recommendations**, **Uncertainties**, **Review questions**, and **Source references**. Check observations against the saved source; evidence links do not guarantee correctness.
+4. Wait for **Saved to Review suggestions**, close the dialog, and open **Review tools > Review suggestions**. Locate the record labeled **Pythia · storyboard.analyze** and check its source revision.
+5. Choose **Accept review** to mark the analysis reviewed, or **Reject** to reject the record. Neither action applies recommendations or changes the storyboard. There is no analysis **Edit values** or **Undo acceptance** control. Make any desired content changes in the scene editor or through a separately reviewed transformation.
+
+### Transform selected scenes
+
+**Before accepting:** [Download a Chimera storyboard](#12-back-up-and-restore) if you need an accessible recovery copy. Transformation replaces selected scenes with a proposed sequence; it is not an overlay on the original slide design. Revision history is retained, but the interface has no general history-restore browser or transformation undo button.
+
+1. Select a scene and click **Transform with Pythia**. In **Scenes to transform**, check every source scene to include. At least one is required; selected scenes are submitted in storyboard order.
+2. Click **Propose transformation**. Wait for **Draft saved for review**. Compare **Current** with **Proposed sequence**, including purpose, learner content, interaction recommendations, production notes, media requirements, and assessment opportunities.
+3. Close the dialog and open **Review tools > Review suggestions**. Find **Storyboard transformation**, labeled **Pythia · storyboard.transform**. Verify the selected source scenes and source revision, not just the proposal title.
+4. To revise the sequence before accepting, click **Edit proposal**. This exposes **Proposed scene sequence · JSON**, not a visual scene editor. Preserve the structured fields and valid JSON; use **Cancel edit** to discard form edits. Editing alone does not apply the sequence.
+5. Click **Accept transformation** to replace the selected scenes and save a new storyboard revision, or **Reject** to keep the storyboard unchanged. Acceptance applies the whole proposed sequence, not one displayed scene at a time.
+6. Return to **Storyboard** and inspect the actual saved order, learner text, layouts, media, and any assessment or navigation dependencies. Implement and verify suggested interactions and media separately; a production note is not a finished interaction.
+
+If the proposal becomes **stale** or acceptance reports that the storyboard changed, reload the current project and run a new transformation. Do not repeatedly accept the old proposal to overwrite newer work. Decide a transformation before submitting downstream assessment/review work that depends on the resulting scenes.
+
+### Design and accept an assessment
+
+1. Select a scene and click **Design assessment**. Under **Scenes**, select the saved source scenes the assessment should cover.
+2. Enter an **Objective ID** and **Statement** for every objective; use **Add objective** for additional objectives. For example, use `evacuation-route` with "Choose the safest evacuation route for a blocked exit." Remove unused objective rows rather than leaving incomplete entries.
+3. Complete **Audience**, **Desired difficulty** (**Recall**, **Understanding**, **Application**, or **Analysis**), and **Completion rules**. These describe the design request; they do not save Chimera's course completion policy. Configure the actual policy separately under **Review tools > Completion rules**.
+4. Click **Design assessment** and wait for the draft items to be saved. Read **Objective alignment**, **Draft items**, **Assumptions**, **Limitations**, and **Review questions**, including each item's target scene.
+5. Open **Review tools > Review suggestions** and find the proposals with a **Pythia assessment...** task/artifact label. Inspect **Objective alignment**, **Blueprint assumptions and review notes**, and every **Current / Suggested** change. Verify the prompt, correct answer, feedback, scoring, fairness, and whether an existing target question would be replaced.
+6. Choose **Edit values** if needed, preserving valid JSON for structured question values. Click **Accept change** to apply that proposal, or **Reject** to leave content unchanged. Draft generation alone adds no question. **Undo acceptance** is available for these native proposals only when later changes permit a safe restore.
+7. Inspect the saved question through [the question editor](#5-author-assessments), set scoring/remediation rules, and [test it in preview](#test-an-assessment-in-preview). Check correct and incorrect responses and completion behavior; blueprint validity is not assessment-quality approval.
+
+Resolve stale/conflicting item proposals against the latest saved storyboard rather than forcing them through. Refresh **Review suggestions** after decisions and re-run design when the source or objectives have changed.
+
+### Review the complete course with Pythia
+
+1. After saving scene, assessment, media, and accessibility changes, open **Review tools > Review course with Pythia**. Click **Review course with Pythia** in the dialog to submit the current course inventory.
+2. Wait for the report to be saved. Use **Review run** to select a saved report by date and source revision. A report marked **source has changed** describes an earlier revision; close and reopen the dialog to start a fresh review of current content.
+3. Inspect **Domain status**, each finding's category and severity, evidence references, recommendations, limitations, and the report's **Review questions**. "No findings returned" is not a certification, especially where report limitations identify missing evidence.
+4. Use **Open scene**, **Open assessment**, or the other available **Open ...** controls to inspect the referenced object. Make and save the necessary correction in its editor, then return to course review and select the relevant run.
+5. Enter a **Resolution note** explaining what you verified or changed, then click **Resolve**. A note is required for resolution. Use **Dismiss** for a finding you judge inapplicable; record your rationale in the note before dismissing. Use **Reopen** if a closed finding needs further attention.
+6. Re-run review after content changes and inspect the new report before the release decision. Finding statuses belong to their saved review run; do not treat an older resolved report as evidence about a newer storyboard.
+
+Resolving or dismissing a finding records a human decision only. It does not fix scene text, add alternative text, change an answer key, run production validation, set **Approved**, or publish a package. Pythia course review complements, rather than replaces, validation and learner/LMS testing.
+
+### Handle task failures and interruptions
+
+- **Engine unavailable or capability missing:** Check **Settings > Intelligence Engine** and the address configured for the Chimera backend. Use **Refresh engine status** there, or **Retry connection** where offered in analysis. Authoring, preview, validation, and export do not require a running Pythia engine.
+- **Task in progress:** Keep its dialog open until the draft is saved. **Cancel task** requests cancellation while submitted, queued, or running; inspect the returned state. Closing a dialog is not a cancellation action, and there is no general Pythia task-resume dashboard documented here.
+- **Polling error:** Use **Retry polling** when offered. This resumes checking the existing task; it is not a new submission. Do not submit duplicate tasks just because a status request failed.
+- **Failed or cancelled:** Address the reported cause, then use **Analyze again**, **Run transformation again**, **Run assessment design again**, or **Run course review again**, as appropriate. These create new work; they do not accept an earlier draft.
+- **Access, capacity, or provider error:** Ask the administrator to check authoring permission, capability authorization, task limits, and Pythia provider health. Do not put credentials into course text or a proposal.
+- **Draft saved but not visible:** Reopen **Review suggestions** for analysis, transformation, or assessment proposals. Reopen **Review course with Pythia** and select **Review run** for course reports. Confirm the active project and source revision before deciding.
+
 ## Features without a documented user-facing workflow
 
 Do not follow the implementation build plan as if every planned control already exists. The following have no complete workflow in the interface captured here:
 
 - Unauthenticated guest review. Authenticated hosted review links have a separate documented deployment workflow.
-- Video upload, caption/transcript authoring, and course-wide/shared media-library controls. Supported image placement is available through **Edit scene > Stage**.
+- Video upload, caption/transcript authoring, and course-wide/shared media-library controls. Supported image placement is available through **Edit scene > Canvas**.
 - Full reference-resource classification, authority, version-management, and per-scene mapping editors.
 - Word reimport or automatic synchronization of external edits.
 - A general history browser and arbitrary revision restore.
@@ -736,28 +726,22 @@ See the [implementation build plan](storyboard-export-enhancement-build-plan.md)
 | Symptom | What to do |
 | --- | --- |
 | Projects or libraries do not load | Confirm both local services are running and inspect the displayed error. |
-| A control is disabled | Select a project/scene, complete required fields, or wait for the current operation. AI Submit run also needs server configuration. |
+| A control is disabled | Select a project/scene, complete required fields, or wait for the current operation. Submit run and other Pythia tasks need authoring access and their Intelligence Engine capability; media generation needs its separate provider connection. See [Pythia prerequisites](#before-you-start-with-pythia). |
 | PowerPoint imports without a slide image | Check the render warning and LibreOffice availability. Inspect extracted text and media. |
 | Media upload is rejected | Check the supported image/audio extension, file validity, and 100 MB limit. |
 | A reference cannot be selected | Inspect its extraction status. Supply readable text when extraction is incomplete. |
 | A proposal or save reports a revision conflict | Reload the latest project and compare changes before trying again. Preserve unsaved text separately first. |
 | A SCORM build is blocked | Run Production release validation and resolve the listed errors. |
-| A QTI test button is disabled | Save at least two authored questions in the course or selected Assessment, and confirm export permission. |
-| Try again seems to submit the same answer | Re-export packages built before the retry fix. In the current player, close feedback, choose Try again, enter a new response, and choose Check answer. Retry retains used attempts; exhausted questions stay locked. |
-| SCORM does not resume or report grades | Confirm Connected to LMS tracking and launch a learner attempt in a graded SCORM activity using the supported profile. Record any initialization/rejected-call diagnostic and inspect the LMS grading and attempt settings. |
-| Text does not fit on the Stage | Use Fit text; unlock or enlarge the affected box, reduce its type size, or shorten its text. Check overlap and contrast in Preview before saving. |
+| A QTI test button is missing | Save at least two authored assessment questions. |
 | JSON restore reports missing references | Make required media/templates available, or use a Chimera storyboard that includes dependencies. |
 | AI generation does not yield a candidate | Check the visible error and ask the administrator to inspect provider/job configuration. The media form has no complete job monitor. |
 
 ## Screenshot and verification record
 
-Changed controls were recaptured on 2026-10-14 from the actual local frontend and a fresh isolated demonstration workspace, using Chromium, a 1500-pixel-wide viewport, and Light appearance. Earlier captures are retained for unchanged controls; see the complete and refresh manifests for provenance. Images are stored in `docs/user-guide/images/` and contain demonstration data only. Proposal, generated-candidate, and enhancement-job examples were seeded locally to expose conditional controls. No paid generation or external submission was performed.
+Screenshots were captured from the actual local frontend and an isolated backend workspace on 2026-09-30, using a compatible headless Chromium browser, a 1500-pixel-wide viewport, and Light appearance. Images are stored in `docs/user-guide/images/` and contain demonstration data only. Proposal, generated-candidate, and enhancement-job examples were seeded locally to expose conditional controls. No paid generation or external submission was performed.
 
-UI navigation, proposal acceptance, commenting/resolution, and sample assessment playback were exercised while capturing screens. Separate qualification records document automated regression, the synthetic live-AI quality pass, and operator acceptance of the SCORM 1.2 LMS fixture. This screenshot refresh itself does not establish broader provider quality or LMS compatibility. Screenshots should be refreshed whenever control labels or workflows change.
+UI navigation, proposal acceptance, commenting/resolution, and sample assessment playback were exercised while capturing screens. This documentation pass does not constitute a complete regression test, Word rendering qualification, AI-provider certification, or LMS test. Screenshots should be refreshed whenever control labels or workflows change.
 
-Capture details and refresh instructions: [original manifest](user-guide/capture-manifest.json), [2026-10-14 refresh](user-guide/refresh-manifest-2026-10-14.json) and [maintainer instructions](user-guide/support/README.md).
+The 2026-10-15 Pythia workflow text was checked against the current frontend controls and integration handoffs; no new screenshots or live provider requests were made for this update. The separate [Sprint 10 qualification record](pythia-sprint-10-golden-path-handoff.md) covers an API-level PowerPoint-to-SCORM regression using deterministic local Pythia providers. It is not a screenshot walkthrough, external-model qualification, human SME approval, or live LMS test.
 
-
-## Completion update 1.1.0
-
-The expanded Media Library supports explicit course-wide placement and scene overrides/exclusions, shared-library copies, imported MP4/WebM video, transcripts and timed captions. Reference OCR creates a new version for inspection before grounding; Word export can include accepted source provenance and optional review discussion. Follow [media placement and OCR](media-placement-and-ocr.md) for these controls and [resume-data policy](resume-data-policy.md) for large-course limits. Existing screenshots and the downloadable PDF predate this supplemental workflow; see the completion record for current qualification evidence.
+Capture details and refresh instructions: [manifest](user-guide/capture-manifest.json) and [maintainer instructions](user-guide/support/README.md).

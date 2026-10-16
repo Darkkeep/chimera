@@ -4,6 +4,7 @@ import mimetypes
 import tempfile
 from pathlib import Path
 from typing import Annotated, Literal
+from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -21,33 +22,36 @@ from .backup import build_project_archive, restore_project_archive
 from .enhancement_jobs import cancel_enhancement_job, preview_enhancement_submission, recover_enhancement_jobs, retry_enhancement_job, start_enhancement_job
 from .identity import IdentitySnapshot, LocalIdentityDirectory, OrganizationPolicy, ProjectMembership, ProjectMembershipCreate, RoleBasedAuthorizationPolicy
 from .media_generation import cancel_media_generation_job, recover_media_generation_jobs, regenerate_candidate, retry_media_generation_job, start_media_generation_job
-from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalCreate, EnhancementProposalDecision, EnhancementProposalResult, ExportSettings, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, ReferenceResource, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewReplyCreate, Scene, SceneCreate, SceneElement, SceneLayout, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate, ValidationReport
+from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalChangeCreate, EnhancementProposalCreate, EnhancementProposalDecision, EnhancementProposalResult, EnhancementReferenceCitation, ExportSettings, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, PythiaAnalysisProposal, PythiaAnalysisProposalCreate, PythiaAnalysisProposalDecision, PythiaAssessmentDesignRequest, PythiaAssessmentObjective, PythiaAssessmentProposalCreate, PythiaCourseFindingDecision, PythiaCourseReview, PythiaCourseReviewCreate, PythiaTransformProposal, PythiaTransformProposalCreate, PythiaTransformProposalDecision, PythiaTransformProposalResult, PythiaTransformRequest, ReferenceResource, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewReplyCreate, Scene, SceneCreate, SceneElement, SceneLayout, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate, ValidationReport
 from .platform import ActorContext, AuditEventPage, AuthorizationPolicy, DurableEventSink, PlatformEvent, LOCAL_ACTOR, REQUEST_ACTOR, action_context, get_actor_context, get_correlation_id, read_audit_events
 from .references import SUPPORTED_REFERENCE_EXTENSIONS, extract_reference_passages
 from .render import render_slides
 from .qti import assessment_item_xml, assessment_test_package
 from .scorm import persist_scorm_12_build, persist_scorm_build, read_scorm_report
 from .standalone import build_standalone_course
-from .storage import ROOT, EnhancementProposalConflict, StoryboardRevisionConflict, add_project_asset, add_review_reply, approve_generated_candidate, create_enhancement_job, create_enhancement_proposal, create_media_generation_job, create_project, create_review_comment, create_scene, create_scenes, create_template, decide_enhancement_proposal, decide_review_comment, delete_scene, list_enhancement_jobs, list_enhancement_proposals, list_generated_candidates, list_media_generation_jobs, list_projects, list_reference_resources, list_review_comments, list_templates, project_path, read_enhancement_job, read_generated_candidate, read_media_generation_job, read_project, read_template, persist_imported_assets, persist_slide_previews, reorder_scenes, replace_storyboard, replace_template_source, save_reference_resource, slugify, storyboard_transaction, update_from_import, update_project_asset_attribution, update_project_completion_settings, update_project_export_settings, update_generated_candidate, update_media_generation_job, update_scene, update_template, validate_visual_assets, write_project_metadata, write_storyboard, template_path
+from .storage import ROOT, EnhancementProposalConflict, StoryboardRevisionConflict, add_project_asset, add_review_reply, approve_generated_candidate, create_enhancement_job, create_enhancement_proposal, create_media_generation_job, create_project, create_pythia_analysis_proposal, create_pythia_course_review, create_pythia_transform_proposal, create_review_comment, create_scene, create_template, decide_enhancement_proposal, decide_pythia_analysis_proposal, decide_pythia_course_finding, decide_pythia_transform_proposal, decide_review_comment, delete_scene, list_enhancement_jobs, list_enhancement_proposals, list_generated_candidates, list_media_generation_jobs, list_projects, list_pythia_analysis_proposals, list_pythia_course_reviews, list_pythia_transform_proposals, list_reference_resources, list_review_comments, list_templates, project_path, read_enhancement_job, read_generated_candidate, read_media_generation_job, read_project, read_template, persist_imported_assets, persist_slide_previews, reorder_scenes, replace_storyboard, replace_template_source, save_reference_resource, slugify, storyboard_transaction, update_from_import, update_project_asset_attribution, update_project_completion_settings, update_project_export_settings, update_generated_candidate, update_media_generation_job, update_scene, update_template, validate_visual_assets, write_project_metadata, write_storyboard, template_path
 from .validation import validate_project
-from .models import CourseDraftRequest, CourseContentDraft, SceneDraftRequest, SceneContentDraft, ProductionStageUpdate
+from .models import ProductionStageUpdate
 from .models import TrashedProject
-from .models import AssessmentGroup, AssessmentGroupWrite
-from .storage import save_assessment_group
 from .storage import update_project_production_stage
 from .storage import now_iso
 from .media_generation import media_provider_configured
+from .media_routes import router as media_router
+from .learning_intelligence import PythiaProvider, PythiaUnavailableError, validate_assessment_blueprint, validate_course_review, validate_storyboard_analysis, validate_storyboard_transformation
 from .ai_connection import ConnectionRevision, ConnectionUpdate, connection_status, disconnect_connection, save_connection, test_connection
 from .word_export import DOCX_MEDIA_TYPE, FULL_TEMPLATE_PATH, SME_TEMPLATE_PATH, TemplateArtworkError, build_full_storyboard_docx, build_sme_storyboard_docx, build_storyboard_docx
 from .deployment import cors_origins, installation_policy, public_origin
 from .password_auth import AccountStore, COOKIE, HostedAuthorizationPolicy, LoginRequest, ResetPasswordRequest, ReviewInvitationRequest, SESSION_SECONDS, require_origin
+from .models import AssessmentGroup, AssessmentGroupWrite, CourseDraftRequest, CourseContentDraft, SceneDraftRequest, SceneContentDraft
+from .storage import create_scenes, save_assessment_group
 
 
 ROUTE_ACTIONS = {
     "get_media_capabilities": "project.view", "patch_media_metadata": "media.manage", "get_media_captions": "project.view",
     "get_media_usage": "project.view", "delete_project_media": "media.manage", "put_course_media": "media.manage",
     "put_scene_media": "media.manage", "get_shared_media": "media.manage", "publish_shared_media": "media.manage",
-    "copy_shared_media": "media.manage", "delete_shared_media": "media.manage", "post_reference_ocr": "reference.create", "post_reference_ocr_accept": "reference.create",
+    "copy_shared_media": "media.manage", "delete_shared_media": "media.manage", "post_reference_ocr": "reference.create",
+    "post_reference_ocr_accept": "reference.create",
     "health": "identity.view", "auth_config": "identity.view", "login": "identity.view",
     "logout": "identity.view", "reset_password": "identity.view", "get_accounts": "admin.policy.manage",
     "get_identity_context": "identity.view", "get_identity_policy": "identity.view",
@@ -68,6 +72,7 @@ ROUTE_ACTIONS = {
     "post_enhancement_proposal": "enhancement.proposal.create", "post_enhancement_proposal_decision": "enhancement.proposal.decide",
     "get_reference_resources": "project.view", "post_reference_resource": "reference.create",
     "get_enhancement_jobs": "project.view", "get_ai_connection": "identity.view",
+    "get_intelligence_engine": "identity.view",
     "put_ai_connection": "admin.policy.manage", "post_ai_disconnect": "admin.policy.manage", "post_ai_test": "admin.policy.manage",
     "get_media_generation_capability": "project.view", "get_media_generation_jobs": "project.view",
     "post_media_generation_job": "media.job.create", "get_media_generation_job": "project.view",
@@ -76,15 +81,29 @@ ROUTE_ACTIONS = {
     "post_generated_candidate_rejection": "media.candidate.manage", "post_generated_candidate_regeneration": "media.job.create",
     "get_generated_candidate_asset": "project.view", "post_enhancement_job_preview": "enhancement.job.create",
     "post_enhancement_job": "enhancement.job.create", "get_enhancement_job": "project.view",
-    "generate_course_content_draft": "enhancement.job.create", "generate_scene_content_draft": "enhancement.job.create",
-    "apply_course_content_draft": "enhancement.job.create",
     "post_enhancement_job_cancel": "enhancement.job.manage", "post_enhancement_job_retry": "enhancement.job.manage",
-    "export_qti_assessment_item": "project.export", "export_qti_assessment_test": "project.export",
+    "get_pythia_status": "project.view", "submit_pythia_analysis": "enhancement.job.create",
+    "submit_pythia_transform": "enhancement.job.create",
+    "submit_pythia_assessment_design": "enhancement.job.create",
+    "post_pythia_assessment_proposal": "enhancement.proposal.create",
+    "submit_pythia_course_review": "enhancement.job.create",
+    "get_pythia_course_reviews": "project.view",
+    "post_pythia_course_review": "enhancement.proposal.create",
+    "patch_pythia_course_finding": "review.comment.resolve",
+    "get_pythia_task": "project.view", "cancel_pythia_task": "enhancement.job.manage",
+    "get_pythia_artifact": "project.view", "get_pythia_analysis_proposals": "project.view",
+    "post_pythia_analysis_proposal": "enhancement.proposal.create",
+    "post_pythia_analysis_proposal_decision": "enhancement.proposal.decide",
+    "get_pythia_transform_proposals": "project.view",
+    "post_pythia_transform_proposal": "enhancement.proposal.create",
+    "post_pythia_transform_proposal_decision": "enhancement.proposal.decide",
     "get_assessments": "project.view", "post_assessment": "project.settings.update",
     "patch_assessment": "project.settings.update", "delete_assessment": "project.settings.update",
-    "export_qti_assessment_group": "project.export",
+    "generate_course_content_draft": "enhancement.job.create", "apply_course_content_draft": "enhancement.job.create",
+    "generate_scene_content_draft": "enhancement.job.create",
+    "export_qti_assessment_item": "project.export", "export_qti_assessment_test": "project.export",
+    "export_assessment_group_qti": "project.export", "export_standalone": "project.export",
     "export_scorm_2004": "project.export", "export_scorm_12": "project.export", "get_scorm_report": "project.export",
-    "export_standalone": "project.export",
     "export_storyboard": "project.export", "export_project_backup": "project.export", "import_project_backup": "project.restore",
     "export_storyboard_docx": "project.export", "export_sme_storyboard_docx": "project.export", "export_full_storyboard_docx": "project.export",
     "import_storyboard": "project.import", "post_project_asset": "media.manage",
@@ -104,11 +123,6 @@ def get_authorization_policy() -> AuthorizationPolicy:
 
 def _hosted_request_action(request: Request) -> str:
     path = request.url.path
-    route_name = getattr(request.scope.get("route"), "name", "")
-    if route_name in {"put_course_media", "put_scene_media", "get_shared_media", "publish_shared_media", "copy_shared_media", "delete_shared_media"}:
-        return "media.manage"
-    if "/content-drafts/" in path or path.endswith("/content-draft"):
-        return "enhancement.job.create"
     if path.endswith("/trash") and request.method == "POST":
         return "project.delete"
     if path.endswith("/restore") and request.method == "POST":
@@ -117,6 +131,38 @@ def _hosted_request_action(request: Request) -> str:
         return "workspace.view"
     if path.startswith("/api/ai-connection"):
         return "identity.self" if request.method == "GET" else "admin.policy.manage"
+    if "/shared-media" in path:
+        return "media.manage"
+    if path.endswith("/pythia-analysis") and request.method == "POST":
+        return "enhancement.job.create"
+    if path.endswith("/pythia-transform") and request.method == "POST":
+        return "enhancement.job.create"
+    if path.endswith("/pythia-assessment-design") and request.method == "POST":
+        return "enhancement.job.create"
+    if path.endswith("/pythia-course-review") and request.method == "POST":
+        return "enhancement.job.create"
+    if "/content-drafts/" in path or path.endswith("/content-draft"):
+        return "enhancement.job.create"
+    if "/assessments" in path:
+        if request.method == "GET":
+            return "project.export" if path.endswith(".zip") else "project.view"
+        return "project.settings.update"
+    if "/pythia-tasks/" in path and path.endswith("/cancel") and request.method == "POST":
+        return "enhancement.job.manage"
+    if "/pythia-analysis-proposals/" in path and path.endswith("/decision") and request.method == "POST":
+        return "enhancement.proposal.decide"
+    if path.endswith("/pythia-analysis-proposals") and request.method == "POST":
+        return "enhancement.proposal.create"
+    if "/pythia-transform-proposals/" in path and path.endswith("/decision") and request.method == "POST":
+        return "enhancement.proposal.decide"
+    if path.endswith("/pythia-transform-proposals") and request.method == "POST":
+        return "enhancement.proposal.create"
+    if path.endswith("/pythia-assessment-proposals") and request.method == "POST":
+        return "enhancement.proposal.create"
+    if path.endswith("/pythia-course-reviews") and request.method == "POST":
+        return "enhancement.proposal.create"
+    if "/pythia-course-reviews/" in path and "/findings/" in path and request.method == "PATCH":
+        return "review.comment.resolve"
     if path.startswith("/api/identity/") and request.method == "GET" or path == "/api/installation/config":
         return "identity.self"
     if path.startswith("/api/accounts"):
@@ -178,7 +224,7 @@ def _hosted_request_action(request: Request) -> str:
         return "project.import"
     if "/assets" in path:
         return "media.manage"
-    if "/completion-settings" in path or "/export-settings" in path or path.endswith("/production-stage") or "/assessments" in path:
+    if "/completion-settings" in path or "/export-settings" in path or path.endswith("/production-stage"):
         return "project.settings.update"
     if "/scenes" in path:
         return "scene.manage"
@@ -213,8 +259,6 @@ async def _require_request_access(
         if request.method != "GET" or action == "project.export":
             root = ROOT if action == "project.delete" or getattr(request.scope.get("route"), "name", "") == "restore_project" else project_path(project_id) if project_id else ROOT
             event_class = "security" if action in {"project.export", "project.delete", "project.restore", "project.membership.manage", "admin.policy.manage", "enhancement.proposal.decide", "review.comment.resolve"} else "operational"
-            if action == "media.manage" and ("/shared-media" in request.url.path or request.url.path.endswith("/share")):
-                event_class = "security"
             DurableEventSink(root).record(PlatformEvent(
                 eventName="api.action_completed", installationId=context.installationId,
                 actorId=context.actorId, actorDisplayName=context.actorDisplayName,
@@ -224,8 +268,8 @@ async def _require_request_access(
             ))
 
 
-from .version import __version__
-app = FastAPI(title="Chimera API", version=__version__, dependencies=[Depends(_require_request_access)])
+app = FastAPI(title="Chimera API", version="0.1.0", dependencies=[Depends(_require_request_access)])
+app.include_router(media_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -685,6 +729,574 @@ def get_project(project_id: str) -> ProjectDetail:
         raise HTTPException(status_code=404, detail="Project not found") from error
 
 
+def _pythia_error(error: PythiaUnavailableError) -> HTTPException:
+    expected_statuses = {400, 401, 403, 404, 409, 413, 422, 429, 503}
+    status_code = error.status_code if error.status_code in expected_statuses else 503 if error.status_code is None else 502
+    headers = {"X-Pythia-Request-Id": error.request_id} if error.request_id else None
+    return HTTPException(status_code=status_code, detail=str(error), headers=headers)
+
+
+def _pythia_provider() -> PythiaProvider:
+    try:
+        return PythiaProvider()
+    except ValueError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+def _pythia_supports_capability(capabilities: dict[str, object], capability: str) -> bool:
+    entries = capabilities.get("capabilities", capabilities)
+    if isinstance(entries, dict):
+        if capability in entries:
+            return True
+        entries = list(entries.values())
+    if not isinstance(entries, list):
+        return False
+    return any(
+        item == capability
+        or isinstance(item, dict) and any(item.get(key) == capability for key in ("id", "capability", "capability_id"))
+        for item in entries
+    )
+
+
+def _pythia_supports_analysis(capabilities: dict[str, object]) -> bool:
+    return _pythia_supports_capability(capabilities, "storyboard.analyze")
+
+
+def _pythia_assessment_capability(capabilities: dict[str, object]) -> str | None:
+    for capability in ("assessment.design", "assessment.blueprint"):
+        if _pythia_supports_capability(capabilities, capability):
+            return capability
+    return None
+
+
+def _pythia_course_inventory(project: ProjectDetail) -> dict[str, object]:
+    course_ref = f"chimera://{project.id}/course"
+    scenes = project.storyboard.scenes
+    image_assets = [asset for asset in project.storyboard.assets if asset.kind == "image"]
+    return {
+        "course_ref": course_ref,
+        "objectives": [],
+        "scenes": [{
+            "scene_id": scene.id,
+            "source_ref": f"chimera://{project.id}/scenes/{scene.id}",
+            "title": scene.title,
+            "body_text": "\n".join(filter(None, [*scene.extractedText, scene.actionDescription, scene.narration, scene.notes])),
+            "objective_ids": [],
+        } for scene in scenes],
+        "assessment_items": [{
+            "assessment_id": f"{scene.id}:{scene.assessmentItem.identifier}",
+            "objective_ids": [],
+            "source_ref": f"chimera://{project.id}/scenes/{scene.id}/assessments/{scene.assessmentItem.identifier}",
+        } for scene in scenes if scene.assessmentItem],
+        "assets": [{
+            "asset_id": asset.id,
+            "source_ref": f"chimera://{project.id}/assets/{asset.id}",
+            "alt_text": next((scene.imageAltText[asset.id] for scene in scenes if asset.id in scene.imageAltText and scene.imageAltText[asset.id].strip()), None),
+            "decorative": any(asset.id in scene.imageAssets for scene in scenes) and all(
+                asset.id in scene.decorativeImages for scene in scenes if asset.id in scene.imageAssets
+            ),
+        } for asset in image_assets],
+        "source_records": [{
+            "source_id": resource.id,
+            "source_ref": f"chimera://{project.id}/sources/{resource.id}",
+            "checked_date": None,
+        } for resource in list_reference_resources(project.id)],
+        "standards_status": "unavailable",
+        "tracking_status": "unavailable",
+        "packaging_status": "ready" if validate_project(project, target="production").passed else "review_required",
+    }
+
+
+def _pythia_scene(project_id: str, scene_id: str) -> tuple[ProjectDetail, Scene]:
+    try:
+        project = read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    scene = next((item for item in project.storyboard.scenes if item.id == scene_id), None)
+    if scene is None:
+        raise HTTPException(status_code=404, detail="Scene not found")
+    return project, scene
+
+
+@app.get("/api/projects/{project_id}/pythia-status", name="get_pythia_status")
+def get_pythia_status(project_id: str) -> dict[str, object]:
+    try:
+        read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    provider = _pythia_provider()
+    try:
+        health = provider.health()
+        capabilities = provider.capabilities()
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+    return {
+        "health": health,
+        "capabilities": capabilities,
+        "supportsStoryboardAnalyze": _pythia_supports_analysis(capabilities),
+        "supportsStoryboardTransform": _pythia_supports_capability(capabilities, "storyboard.transform"),
+        "supportsAssessmentDesign": _pythia_assessment_capability(capabilities) is not None,
+        "assessmentCapability": _pythia_assessment_capability(capabilities),
+        "supportsCourseReview": _pythia_supports_capability(capabilities, "course.review"),
+    }
+
+
+@app.post("/api/projects/{project_id}/scenes/{scene_id}/pythia-analysis", status_code=202, name="submit_pythia_analysis")
+def submit_pythia_analysis(project_id: str, scene_id: str) -> dict[str, object]:
+    project, scene = _pythia_scene(project_id, scene_id)
+    provider = _pythia_provider()
+    try:
+        health = provider.health()
+        if health.get("status") != "ok":
+            raise HTTPException(status_code=503, detail="Pythia Engine API is unavailable")
+        if not _pythia_supports_analysis(provider.capabilities()):
+            raise HTTPException(status_code=422, detail="Pythia does not advertise storyboard.analyze")
+        task_id = f"chimera-{uuid4().hex}"
+        task = provider.submit_task({
+            "schema_version": "1.0",
+            "task_id": task_id,
+            "capability": "storyboard.analyze",
+            "consumer": "chimera",
+            "project_id": project.id,
+            "inputs": [{
+                "scene_id": scene_id,
+                "source_ref": f"chimera://{project.id}/scenes/{scene_id}",
+                "scene_content": {
+                    "title": scene.title,
+                    "body_text": "\n".join(filter(None, [*scene.extractedText, scene.actionDescription])),
+                    "speaker_notes": scene.notes,
+                    "objective_ids": [],
+                },
+            }],
+            "constraints": {},
+            "context": {},
+        })
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+    if task.get("task_id") != task_id or task.get("status") != "submitted":
+        raise HTTPException(status_code=502, detail="Pythia did not accept the analysis task")
+    return {**task, "source_revision": project.storyboard.revision}
+
+
+@app.post("/api/projects/{project_id}/pythia-transform", status_code=202, name="submit_pythia_transform")
+def submit_pythia_transform(project_id: str, data: PythiaTransformRequest) -> dict[str, object]:
+    try:
+        project = read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    scenes_by_id = {scene.id: scene for scene in project.storyboard.scenes}
+    if any(scene_id not in scenes_by_id for scene_id in data.sceneIds):
+        raise HTTPException(status_code=404, detail="A selected scene was not found")
+    selected_scene_ids = set(data.sceneIds)
+    ordered_scene_ids = [scene.id for scene in project.storyboard.scenes if scene.id in selected_scene_ids]
+    provider = _pythia_provider()
+    try:
+        health = provider.health()
+        if health.get("status") != "ok":
+            raise HTTPException(status_code=503, detail="Pythia Engine API is unavailable")
+        capabilities = provider.capabilities()
+        if not _pythia_supports_capability(capabilities, "storyboard.transform"):
+            raise HTTPException(status_code=422, detail="Pythia does not advertise storyboard.transform")
+        task_id = f"chimera-{uuid4().hex}"
+        task = provider.submit_task({
+            "schema_version": "1.0",
+            "task_id": task_id,
+            "capability": "storyboard.transform",
+            "consumer": "chimera",
+            "project_id": project.id,
+            "inputs": [{
+                "scene_id": scene.id,
+                "source_ref": f"chimera://{project.id}/scenes/{scene.id}",
+                "scene_content": {
+                    "title": scene.title,
+                    "body_text": "\n".join(filter(None, [*scene.extractedText, scene.actionDescription])),
+                    "speaker_notes": scene.notes,
+                    "objective_ids": [],
+                },
+            } for scene in (scenes_by_id[scene_id] for scene_id in ordered_scene_ids)],
+            "constraints": data.constraints,
+            "context": {},
+        })
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+    if task.get("task_id") != task_id or task.get("status") != "submitted":
+        raise HTTPException(status_code=502, detail="Pythia did not accept the transformation task")
+    return {**task, "source_revision": project.storyboard.revision, "source_scene_ids": ordered_scene_ids}
+
+
+@app.post("/api/projects/{project_id}/pythia-assessment-design", status_code=202, name="submit_pythia_assessment_design")
+def submit_pythia_assessment_design(project_id: str, data: PythiaAssessmentDesignRequest) -> dict[str, object]:
+    try:
+        project = read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    scenes_by_id = {scene.id: scene for scene in project.storyboard.scenes}
+    if any(scene_id not in scenes_by_id for scene_id in data.sceneIds):
+        raise HTTPException(status_code=404, detail="A selected scene was not found")
+    selected_ids = set(data.sceneIds)
+    ordered_scene_ids = [scene.id for scene in project.storyboard.scenes if scene.id in selected_ids]
+    provider = _pythia_provider()
+    try:
+        health = provider.health()
+        if health.get("status") != "ok":
+            raise HTTPException(status_code=503, detail="Pythia Engine API is unavailable")
+        capabilities = provider.capabilities()
+        capability = _pythia_assessment_capability(capabilities)
+        if capability is None:
+            raise HTTPException(status_code=422, detail="Pythia does not advertise assessment design")
+        task_id = f"chimera-{uuid4().hex}"
+        task = provider.submit_task({
+            "schema_version": "1.0",
+            "task_id": task_id,
+            "capability": capability,
+            "consumer": "chimera",
+            "project_id": project.id,
+            "inputs": [{
+                "scene_id": scene.id,
+                "source_ref": f"chimera://{project.id}/scenes/{scene.id}",
+                "scene_content": {
+                    "title": scene.title,
+                    "body_text": "\n".join(filter(None, [*scene.extractedText, scene.actionDescription])),
+                    "speaker_notes": scene.notes,
+                    "objective_ids": [objective.id for objective in data.objectives if scene.id in objective.sceneIds],
+                },
+            } for scene in (scenes_by_id[scene_id] for scene_id in ordered_scene_ids)],
+            "constraints": data.constraints,
+            "context": {
+                "objectives": [{"id": objective.id, "statement": objective.statement} for objective in data.objectives],
+                "audience": data.audience,
+                "desired_difficulty": data.desiredDifficulty,
+                "completion_rules": data.completionRules,
+                "existing_items": [{
+                    "scene_id": scene_id,
+                    "item": scenes_by_id[scene_id].assessmentItem.model_dump(mode="json") if scenes_by_id[scene_id].assessmentItem else None,
+                } for scene_id in ordered_scene_ids],
+            },
+        })
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+    if task.get("task_id") != task_id or task.get("status") != "submitted":
+        raise HTTPException(status_code=502, detail="Pythia did not accept the assessment design task")
+    return {
+        **task,
+        "source_revision": project.storyboard.revision,
+        "source_scene_ids": ordered_scene_ids,
+        "objective_ids": [objective.id for objective in data.objectives],
+        "capability": capability,
+    }
+
+
+@app.post("/api/projects/{project_id}/pythia-course-review", status_code=202, name="submit_pythia_course_review")
+def submit_pythia_course_review(project_id: str) -> dict[str, object]:
+    try:
+        project = read_project(project_id)
+        inventory = _pythia_course_inventory(project)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    if not inventory["scenes"]:
+        raise HTTPException(status_code=422, detail="Add at least one scene before reviewing the course")
+    provider = _pythia_provider()
+    try:
+        health = provider.health()
+        if health.get("status") != "ok":
+            raise HTTPException(status_code=503, detail="Pythia Engine API is unavailable")
+        if not _pythia_supports_capability(provider.capabilities(), "course.review"):
+            raise HTTPException(status_code=422, detail="Pythia does not advertise course.review")
+        task_id = f"chimera-{uuid4().hex}"
+        task = provider.submit_task({
+            "schema_version": "1.0",
+            "task_id": task_id,
+            "capability": "course.review",
+            "consumer": "chimera",
+            "project_id": project.id,
+            "inputs": [inventory],
+            "constraints": {},
+            "context": {},
+        })
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+    if task.get("task_id") != task_id or task.get("status") != "submitted":
+        raise HTTPException(status_code=502, detail="Pythia did not accept the course review task")
+    return {**task, "source_revision": project.storyboard.revision, "course_ref": inventory["course_ref"]}
+
+
+@app.get("/api/projects/{project_id}/pythia-tasks/{task_id}", name="get_pythia_task")
+def get_pythia_task(project_id: str, task_id: str) -> dict[str, object]:
+    try:
+        project = read_project(project_id)
+        task = _pythia_provider().task_status(task_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+    if task.get("project_id") != project.id or task.get("consumer") != "chimera":
+        raise HTTPException(status_code=404, detail="Pythia task not found for this project")
+    return task
+
+
+@app.post("/api/projects/{project_id}/pythia-tasks/{task_id}/cancel", name="cancel_pythia_task")
+def cancel_pythia_task(project_id: str, task_id: str) -> dict[str, object]:
+    try:
+        project = read_project(project_id)
+        provider = _pythia_provider()
+        task = provider.task_status(task_id)
+        if task.get("project_id") != project.id or task.get("consumer") != "chimera":
+            raise HTTPException(status_code=404, detail="Pythia task not found for this project")
+        return provider.cancel_task(task_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+
+
+@app.get("/api/projects/{project_id}/scenes/{scene_id}/pythia-artifacts/{artifact_id}", name="get_pythia_artifact")
+def get_pythia_artifact(project_id: str, scene_id: str, artifact_id: str) -> dict[str, object]:
+    _pythia_scene(project_id, scene_id)
+    try:
+        envelope = _pythia_provider().artifact(artifact_id)
+        return validate_storyboard_analysis(envelope, project_id, scene_id)
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+    except ValueError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+
+@app.get("/api/projects/{project_id}/pythia-analysis-proposals", response_model=list[PythiaAnalysisProposal], name="get_pythia_analysis_proposals")
+def get_pythia_analysis_proposals(project_id: str) -> list[PythiaAnalysisProposal]:
+    try:
+        return list_pythia_analysis_proposals(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+
+
+@app.post("/api/projects/{project_id}/pythia-analysis-proposals", response_model=PythiaAnalysisProposal, status_code=201, name="post_pythia_analysis_proposal")
+def post_pythia_analysis_proposal(project_id: str, data: PythiaAnalysisProposalCreate) -> PythiaAnalysisProposal:
+    project, _ = _pythia_scene(project_id, data.sceneId)
+    provider = _pythia_provider()
+    try:
+        task = provider.task_status(data.taskId)
+        if task.get("project_id") != project.id or task.get("consumer") != "chimera":
+            raise HTTPException(status_code=404, detail="Pythia task not found for this project")
+        if task.get("status") != "awaiting_review" or task.get("artifact_id") != data.artifactId:
+            raise HTTPException(status_code=409, detail="Pythia task is not awaiting review with this artifact")
+        envelope = provider.artifact(data.artifactId)
+        artifact = validate_storyboard_analysis(envelope, project.id, data.sceneId)
+        return create_pythia_analysis_proposal(project_id, data, artifact)
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Scene not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/projects/{project_id}/pythia-analysis-proposals/{proposal_id}/decision", response_model=PythiaAnalysisProposal, name="post_pythia_analysis_proposal_decision")
+def post_pythia_analysis_proposal_decision(
+    project_id: str,
+    proposal_id: str,
+    data: PythiaAnalysisProposalDecision,
+) -> PythiaAnalysisProposal:
+    try:
+        return decide_pythia_analysis_proposal(project_id, proposal_id, data.decision)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Pythia analysis proposal not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get("/api/projects/{project_id}/pythia-transform-proposals", response_model=list[PythiaTransformProposal], name="get_pythia_transform_proposals")
+def get_pythia_transform_proposals(project_id: str) -> list[PythiaTransformProposal]:
+    try:
+        return list_pythia_transform_proposals(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+
+
+@app.post("/api/projects/{project_id}/pythia-transform-proposals", response_model=PythiaTransformProposal, status_code=201, name="post_pythia_transform_proposal")
+def post_pythia_transform_proposal(project_id: str, data: PythiaTransformProposalCreate) -> PythiaTransformProposal:
+    try:
+        project = read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    provider = _pythia_provider()
+    try:
+        task = provider.task_status(data.taskId)
+        if task.get("project_id") != project.id or task.get("consumer") != "chimera":
+            raise HTTPException(status_code=404, detail="Pythia task not found for this project")
+        if task.get("status") != "awaiting_review" or task.get("artifact_id") != data.artifactId:
+            raise HTTPException(status_code=409, detail="Pythia task is not awaiting review with this artifact")
+        envelope = provider.artifact(data.artifactId)
+        artifact = validate_storyboard_transformation(envelope, project.id, data.sourceSceneIds)
+        return create_pythia_transform_proposal(project_id, data, artifact)
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="A selected scene was not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/projects/{project_id}/pythia-transform-proposals/{proposal_id}/decision", response_model=PythiaTransformProposalResult, name="post_pythia_transform_proposal_decision")
+def post_pythia_transform_proposal_decision(
+    project_id: str,
+    proposal_id: str,
+    data: PythiaTransformProposalDecision,
+    if_match: Annotated[str | None, Header()] = None,
+) -> PythiaTransformProposalResult:
+    if if_match is None:
+        raise HTTPException(status_code=428, detail="An If-Match storyboard revision is required")
+    try:
+        expected_revision = _expected_revision(if_match)
+        proposal = next((item for item in list_pythia_transform_proposals(project_id) if item.id == proposal_id), None)
+        if proposal is None:
+            raise HTTPException(status_code=404, detail="Pythia transformation proposal not found")
+        proposed_scenes = data.proposedScenes
+        if proposed_scenes is not None:
+            candidate_artifact = {
+                **proposal.artifact,
+                "payload": {**proposal.artifact["payload"], "proposed_scenes": proposed_scenes},
+            }
+            validate_storyboard_transformation(candidate_artifact, project_id, proposal.sourceSceneIds)
+        decided, updated_project = decide_pythia_transform_proposal(
+            project_id,
+            proposal_id,
+            data.decision,
+            expected_revision,
+            proposed_scenes,
+        )
+        return PythiaTransformProposalResult(proposal=decided, project=updated_project)
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except EnhancementProposalConflict as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Pythia transformation proposal not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/api/projects/{project_id}/pythia-assessment-proposals", response_model=list[EnhancementProposal], status_code=201, name="post_pythia_assessment_proposal")
+def post_pythia_assessment_proposal(
+    project_id: str,
+    data: PythiaAssessmentProposalCreate,
+) -> list[EnhancementProposal]:
+    try:
+        project = read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    provider = _pythia_provider()
+    try:
+        task = provider.task_status(data.taskId)
+        if task.get("project_id") != project.id or task.get("consumer") != "chimera":
+            raise HTTPException(status_code=404, detail="Pythia task not found for this project")
+        if task.get("status") != "awaiting_review" or task.get("artifact_id") != data.artifactId:
+            raise HTTPException(status_code=409, detail="Pythia task is not awaiting review with this artifact")
+        envelope = provider.artifact(data.artifactId)
+        artifact = validate_assessment_blueprint(
+            envelope,
+            project.id,
+            data.sourceSceneIds,
+            data.objectiveIds,
+        )
+        with storyboard_transaction():
+            current_project = read_project(project_id)
+            if data.sourceRevision != current_project.storyboard.revision:
+                raise EnhancementProposalConflict("The storyboard changed while the Pythia assessment was being generated")
+            proposals: list[EnhancementProposal] = []
+            for item_proposal in artifact["payload"]["proposed_items"]:
+                rationale = item_proposal["rationale"]
+                proposals.append(create_enhancement_proposal(project_id, EnhancementProposalCreate(
+                    targetSceneId=item_proposal["target_scene_id"],
+                    field="assessmentItem",
+                    proposedValue=item_proposal["item"],
+                    changes=[EnhancementProposalChangeCreate(
+                        targetSceneId=item_proposal["target_scene_id"],
+                        field="assessmentItem",
+                        proposedValue=item_proposal["item"],
+                    )],
+                    rationale=rationale,
+                    origin="ai",
+                    provider="Pythia",
+                    affectedIds=[item_proposal["target_scene_id"], *item_proposal["objective_ids"]],
+                    referenceCitations=[EnhancementReferenceCitation(resourceId=reference) for reference in item_proposal["evidence_refs"]],
+                    jobId=f"pythia-assessment:{data.taskId}:{item_proposal['proposal_item_id']}",
+                    sourceRevision=data.sourceRevision,
+                    sourceTaskId=data.taskId,
+                    sourceArtifactId=data.artifactId,
+                    sourceCapability=task.get("capability") if isinstance(task.get("capability"), str) else None,
+                    sourceArtifact=artifact,
+                )))
+            return proposals
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Assessment target scene was not found") from error
+    except EnhancementProposalConflict as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.get("/api/projects/{project_id}/pythia-course-reviews", response_model=list[PythiaCourseReview], name="get_pythia_course_reviews")
+def get_pythia_course_reviews(project_id: str) -> list[PythiaCourseReview]:
+    try:
+        return list_pythia_course_reviews(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+
+
+@app.post("/api/projects/{project_id}/pythia-course-reviews", response_model=PythiaCourseReview, status_code=201, name="post_pythia_course_review")
+def post_pythia_course_review(project_id: str, data: PythiaCourseReviewCreate) -> PythiaCourseReview:
+    try:
+        project = read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    if data.sourceRevision != project.storyboard.revision:
+        raise HTTPException(status_code=409, detail="The storyboard changed while the Pythia course review was running")
+    provider = _pythia_provider()
+    try:
+        task = provider.task_status(data.taskId)
+        if task.get("project_id") != project.id or task.get("consumer") != "chimera":
+            raise HTTPException(status_code=404, detail="Pythia task not found for this project")
+        if task.get("capability") != "course.review":
+            raise HTTPException(status_code=409, detail="Pythia task is not a course review")
+        if task.get("status") != "awaiting_review" or task.get("artifact_id") != data.artifactId:
+            raise HTTPException(status_code=409, detail="Pythia task is not awaiting review with this artifact")
+        inventory = _pythia_course_inventory(project)
+        envelope = provider.artifact(data.artifactId)
+        artifact = validate_course_review(envelope, project.id, inventory)
+        return create_pythia_course_review(project_id, data, artifact)
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+    except EnhancementProposalConflict as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.patch("/api/projects/{project_id}/pythia-course-reviews/{review_id}/findings/{finding_id}", response_model=PythiaCourseReview, name="patch_pythia_course_finding")
+def patch_pythia_course_finding(
+    project_id: str,
+    review_id: str,
+    finding_id: str,
+    data: PythiaCourseFindingDecision,
+) -> PythiaCourseReview:
+    try:
+        return decide_pythia_course_finding(project_id, review_id, finding_id, data)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Course review or finding not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
 @app.get("/api/projects/{project_id}/validation", response_model=ValidationReport)
 def get_project_validation(project_id: str, target: Literal["authoring", "production"] = "authoring") -> ValidationReport:
     try:
@@ -709,11 +1321,15 @@ def get_project_readiness(project_id: str) -> dict[str, object]:
         production = validate_project(project, target="production")
         comments = list_review_comments(project_id)
         proposals = list_enhancement_proposals(project_id)
+        pythia_proposals = list_pythia_analysis_proposals(project_id)
+        transform_proposals = list_pythia_transform_proposals(project_id)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
     return {
         "revision": project.storyboard.revision,
-        "pendingProposals": sum(proposal.status == "pending" for proposal in proposals),
+        "pendingProposals": sum(proposal.status == "pending" for proposal in proposals)
+        + sum(proposal.status == "pending" for proposal in pythia_proposals)
+        + sum(proposal.status == "pending" for proposal in transform_proposals),
         "unresolvedComments": sum(not comment.resolved for comment in comments),
         "outdatedComments": sum(comment.outdated or comment.sceneDeleted for comment in comments),
         "missingMedia": sum(issue.code in {"missing-asset-file", "invalid-asset-reference"} for issue in authoring.issues),
@@ -793,6 +1409,26 @@ def patch_assessment(project_id: str, assessment_id: str, data: AssessmentGroupW
 @app.delete("/api/projects/{project_id}/assessments/{assessment_id}", response_model=ProjectDetail)
 def delete_assessment(project_id: str, assessment_id: str, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
     return _save_assessment(project_id, None, assessment_id, if_match)
+
+
+@app.get("/api/projects/{project_id}/assessments/{assessment_id}/assessment.qti.zip")
+def export_assessment_group_qti(project_id: str, assessment_id: str) -> Response:
+    try:
+        project = read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    group = next((item for item in project.storyboard.assessments if item.id == assessment_id), None)
+    if group is None:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    scenes = {scene.id: scene for scene in project.storyboard.scenes}
+    questions = [scenes[scene_id] for scene_id in group.questionSceneIds if scenes[scene_id].assessmentItem is not None]
+    if len(questions) < 2:
+        raise HTTPException(status_code=422, detail="Assessment QTI export requires at least two authored question scenes in this group")
+    try:
+        package = assessment_test_package(questions, group.title)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return Response(content=package, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{slugify(group.title)}-assessment.qti.zip"'})
 
 
 @app.get("/api/projects/{project_id}/enhancement-proposals", response_model=list[EnhancementProposal])
@@ -983,6 +1619,28 @@ def _record_ai_event(name: str) -> None:
 @app.get("/api/ai-connection")
 def get_ai_connection() -> dict:
     return {**connection_status(ROOT), "canManage": get_authorization_policy().allows(get_actor_context(), "admin.policy.manage")}
+
+
+@app.get("/api/intelligence-engine", name="get_intelligence_engine")
+def get_intelligence_engine() -> dict[str, object]:
+    provider = _pythia_provider()
+    can_view_usage = get_authorization_policy().allows(get_actor_context(), "admin.policy.manage")
+    try:
+        health = provider.health()
+        capabilities = provider.capabilities()
+        registry = provider.providers()
+        telemetry = provider.telemetry() if can_view_usage else {"schema_version": "1.0", "events": []}
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+    entries = capabilities.get("capabilities", {})
+    return {
+        "available": health.get("status") == "ok",
+        "health": health,
+        "capabilities": entries,
+        "providerRegistry": registry,
+        "telemetry": telemetry,
+        "canViewUsage": can_view_usage,
+    }
 
 
 @app.put("/api/ai-connection")
@@ -1216,26 +1874,6 @@ def export_qti_assessment_item(project_id: str, scene_id: str) -> Response:
     )
 
 
-@app.get("/api/projects/{project_id}/assessments/{assessment_id}/assessment.qti.zip")
-def export_qti_assessment_group(project_id: str, assessment_id: str) -> Response:
-    try:
-        project = read_project(project_id)
-    except FileNotFoundError as error:
-        raise HTTPException(status_code=404, detail="Project not found") from error
-    group = next((group for group in project.storyboard.assessments if group.id == assessment_id), None)
-    if group is None:
-        raise HTTPException(status_code=404, detail="Assessment not found")
-    scenes = {scene.id: scene for scene in project.storyboard.scenes}
-    questions = [scenes[scene_id] for scene_id in group.questionSceneIds if scenes[scene_id].assessmentItem is not None]
-    if len(questions) < 2:
-        raise HTTPException(status_code=422, detail="Assessment QTI export requires at least two authored question scenes in this group")
-    try:
-        package = assessment_test_package(questions, group.title)
-    except ValueError as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
-    return Response(content=package, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{slugify(group.title)}-assessment.qti.zip"'})
-
-
 @app.get("/api/projects/{project_id}/assessment.qti.zip")
 def export_qti_assessment_test(project_id: str) -> Response:
     try:
@@ -1263,11 +1901,7 @@ def export_standalone(project_id: str) -> Response:
         raise HTTPException(status_code=404, detail="Project not found") from error
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
-    return Response(
-        content=content,
-        media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    return Response(content=content, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @app.get("/api/projects/{project_id}/scorm-2004.zip")
@@ -1358,11 +1992,11 @@ async def import_project_backup(project_id: str, file: UploadFile = File(...)) -
 
 
 @app.get("/api/projects/{project_id}/storyboard.docx")
-def export_storyboard_docx(project_id: str, include_answer_key: bool = False, include_review_comments: bool = False) -> Response:
+def export_storyboard_docx(project_id: str, include_answer_key: bool = False) -> Response:
     try:
         with storyboard_transaction():
             project = read_project(project_id)
-            content = build_storyboard_docx(project, include_answer_key, include_review_comments)
+            content = build_storyboard_docx(project, include_answer_key)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
     filename = f"{slugify(project.title)}-storyboard.docx"
@@ -1373,7 +2007,7 @@ def export_storyboard_docx(project_id: str, include_answer_key: bool = False, in
     )
 
 
-def _export_template_storyboard(project_id: str, include_answer_key: bool, full: bool, include_review_comments: bool = False) -> Response:
+def _export_template_storyboard(project_id: str, include_answer_key: bool, full: bool) -> Response:
     template_path = FULL_TEMPLATE_PATH if full else SME_TEMPLATE_PATH
     if not template_path.is_file() or not SME_TEMPLATE_PATH.is_file():
         raise HTTPException(status_code=503, detail="Storyboard export template is unavailable")
@@ -1381,7 +2015,7 @@ def _export_template_storyboard(project_id: str, include_answer_key: bool, full:
         with storyboard_transaction():
             project = read_project(project_id)
             builder = build_full_storyboard_docx if full else build_sme_storyboard_docx
-            content = builder(project, include_answer_key, include_review_comments)
+            content = builder(project, include_answer_key)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
     except TemplateArtworkError as error:
@@ -1392,13 +2026,13 @@ def _export_template_storyboard(project_id: str, include_answer_key: bool, full:
 
 
 @app.get("/api/projects/{project_id}/storyboard-sme.docx")
-def export_sme_storyboard_docx(project_id: str, include_answer_key: bool = False, include_review_comments: bool = False) -> Response:
-    return _export_template_storyboard(project_id, include_answer_key, full=False, include_review_comments=include_review_comments)
+def export_sme_storyboard_docx(project_id: str, include_answer_key: bool = False) -> Response:
+    return _export_template_storyboard(project_id, include_answer_key, full=False)
 
 
 @app.get("/api/projects/{project_id}/storyboard-full.docx")
-def export_full_storyboard_docx(project_id: str, include_answer_key: bool = False, include_review_comments: bool = False) -> Response:
-    return _export_template_storyboard(project_id, include_answer_key, full=True, include_review_comments=include_review_comments)
+def export_full_storyboard_docx(project_id: str, include_answer_key: bool = False) -> Response:
+    return _export_template_storyboard(project_id, include_answer_key, full=True)
 
 
 @app.put("/api/projects/{project_id}/storyboard/import", response_model=ProjectDetail)
@@ -1431,7 +2065,7 @@ async def post_project_asset(project_id: str, file: UploadFile = File(...), if_m
     elif extension in {".mp4", ".webm"}:
         kind = "video"
     else:
-        raise HTTPException(status_code=400, detail="Upload a supported image, audio, MP4, or WebM file")
+        raise HTTPException(status_code=400, detail="Upload a JPG, PNG, GIF, WebP, MP3, M4A, AAC, WAV, or OGG file")
     content = await file.read(MAX_MEDIA_BYTES + 1)
     if not content:
         raise HTTPException(status_code=400, detail="Asset file is empty")
@@ -1443,7 +2077,10 @@ async def post_project_asset(project_id: str, file: UploadFile = File(...), if_m
                 image.verify()
         except (UnidentifiedImageError, OSError) as error:
             raise HTTPException(status_code=422, detail="Could not read image file") from error
-    if kind == "video" and not (extension == ".mp4" and len(content) >= 16 and content[4:8] == b"ftyp" or extension == ".webm" and content.startswith(b"\x1a\x45\xdf\xa3")):
+    if kind == "video" and not (
+        extension == ".mp4" and len(content) >= 16 and content[4:8] == b"ftyp"
+        or extension == ".webm" and content.startswith(b"\x1a\x45\xdf\xa3")
+    ):
         raise HTTPException(status_code=422, detail="Video must have a valid MP4 or WebM container header; verify codec playback in Preview")
     try:
         return add_project_asset(project_id, Path(file.filename).name, content, kind, expected_revision)
@@ -1640,7 +2277,7 @@ def patch_scene(project_id: str, scene_id: str, data: SceneUpdate, if_match: Ann
         template_changed = requested_template != scene.templateId
         if requested_mode == "template" and (mode_changed or template_changed or scene.visualLayout is None):
             return _apply_template_scene_layout(project_id, scene_id, data, expected)
-        if (mode_changed and requested_mode == "native") or (requested_mode == "native" and scene.visualLayout is None and data.visualLayout is None):
+        if (mode_changed and requested_mode == "native") or (requested_mode == "native" and scene.visualLayout is None):
             native_scene = scene.model_copy(update={
                 "title": data.title if "title" in data.model_fields_set else scene.title,
                 "extractedText": data.extractedText if "extractedText" in data.model_fields_set else scene.extractedText,
@@ -1802,7 +2439,3 @@ async def upload_source(project_id: str, file: UploadFile = File(...), if_match:
             persist_slide_previews(project_id, staging_root, scenes)
             staged.replace(destination)
             return read_project(updated.id)
-
-
-from .media_routes import router as media_router
-app.include_router(media_router)

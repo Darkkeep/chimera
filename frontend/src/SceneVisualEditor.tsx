@@ -202,7 +202,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
   return <EditorDialog className="visual-editor" labelledBy="visual-editor-title" busy={busy} onClose={onClose}>
     <header className="visual-editor-header"><div><p className="eyebrow">SCENE EDITOR</p><h2 id="visual-editor-title">{title || scene.title}</h2></div><button type="button" className="icon-button" aria-label="Close scene editor" disabled={busy} onClick={onClose}><X size={18} /></button></header>
     <div className="visual-editor-tabs" role="tablist" aria-label="Scene editor sections">
-      <button type="button" role="tab" aria-selected={panel === "canvas"} onClick={() => setPanel("canvas")}>Stage</button>
+      <button type="button" role="tab" aria-label="Canvas" aria-selected={panel === "canvas"} onClick={() => setPanel("canvas")}>Stage</button>
       <button type="button" role="tab" aria-selected={panel === "details"} onClick={() => setPanel("details")}>Details</button>
     </div>
     {panel === "canvas" && <div className="visual-editor-toolbar" role="toolbar" aria-label="Stage content tools">

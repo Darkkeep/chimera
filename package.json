@@ -8,6 +8,7 @@
   },
   "scripts": {
     "test:visual": "node tests/visual/qualify.cjs",
+    "test:golden-path": "python tests/golden_path/qualify.py",
     "test:onboarding": "playwright test --config playwright.onboarding.config.cjs",
     "test:management": "playwright test --config playwright.onboarding.config.cjs management.spec.cjs --project chromium",
     "test:auth": "node tests/auth/qualify.cjs",

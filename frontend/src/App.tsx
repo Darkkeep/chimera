@@ -12,6 +12,7 @@ import { MediaLibraryItem } from "./MediaLibraryItem";
 import { GeneratedMediaPanel } from "./GeneratedMediaPanel";
 import { ManagementView } from "./ManagementView";
 import { AIConnectionPanel } from "./AIConnectionPanel";
+import { IntelligenceEnginePanel } from "./IntelligenceEnginePanel";
 import "./readiness.css";
 import { CompletionSettingsEditor } from "./CompletionSettingsEditor";
 import { EnhancementReviewView } from "./EnhancementReviewView";
@@ -34,6 +35,10 @@ import { AssessmentDraftPreview } from "./AssessmentDraftPreview";
 import { AssessmentsEditor } from "./AssessmentsEditor";
 import { SceneSurface } from "./SceneSurface";
 import type { SceneLayout } from "./SceneSurface";
+import { PythiaAnalysisView } from "./PythiaAnalysisView";
+import { PythiaTransformView } from "./PythiaTransformView";
+import { PythiaAssessmentDesignView } from "./PythiaAssessmentDesignView";
+import { PythiaCourseReviewView } from "./PythiaCourseReviewView";
 
 type LayoutMode = "fidelity" | "hybrid" | "native" | "template";
 type SceneType = "content" | "title" | "question" | "media" | "interaction" | "summary";
@@ -98,9 +103,14 @@ export function App() {
   const [showCompletionSettings, setShowCompletionSettings] = useState(false);
   const [showAssessments, setShowAssessments] = useState(false);
   const [showEnhancementReview, setShowEnhancementReview] = useState(false);
+  const [showPythiaAnalysis, setShowPythiaAnalysis] = useState(false);
+  const [showPythiaTransform, setShowPythiaTransform] = useState(false);
+  const [showPythiaAssessmentDesign, setShowPythiaAssessmentDesign] = useState(false);
+  const [showPythiaCourseReview, setShowPythiaCourseReview] = useState(false);
   const [showReviewTools, setShowReviewTools] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showAIConnection, setShowAIConnection] = useState(false);
+  const [showIntelligenceEngine, setShowIntelligenceEngine] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showManagement, setShowManagement] = useState(true);
   const managementButtonRef = useRef<HTMLButtonElement>(null);
@@ -154,9 +164,11 @@ export function App() {
   const currentSurface = visualSceneId || sceneDraft ? "scene.edit" : isCreating ? "project.name" : templateDraft ? "templates.edit" :
     showExport ? "export.panel" : showPreview ? "preview.content" : showAssessmentEditor ? "assessment.editor" :
     showAssessments ? "review.assessments" : showCompletionSettings ? "review.completion" : showEnhancementReview ? "review.enhancement" :
+    showPythiaCourseReview ? "review.course" : showPythiaAnalysis ? "pythia.analysis" : showPythiaTransform ? "pythia.transform" :
+    showPythiaAssessmentDesign ? "pythia.assessment" : showIntelligenceEngine ? "settings.engine" :
     showAccessibility ? "review.accessibility" : showValidation ? "review.validation" :
     showGoldenPath ? "catalog" : showManagement ? "workspace.management" : activeView;
-  const hasOpenForm = Boolean(visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showAccessibility || showValidation);
+  const hasOpenForm = Boolean(visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showAccessibility || showValidation);
   guideNavigate.current = (step) => {
     const target = step.target;
     if (!target) return;
@@ -177,6 +189,12 @@ export function App() {
     else if (target?.startsWith("preview.")) setShowPreview(true);
     else if (target === "review.completion") setShowCompletionSettings(true);
     else if (target === "review.enhancement") setShowEnhancementReview(true);
+    else if (target === "pythia.analysis") { setActiveView("storyboard"); setShowPythiaAnalysis(true); }
+    else if (target === "pythia.transform") { setActiveView("storyboard"); setShowPythiaTransform(true); }
+    else if (target === "pythia.assessment") { setActiveView("storyboard"); setShowPythiaAssessmentDesign(true); }
+    else if (target === "review.course") setShowPythiaCourseReview(true);
+    else if (target === "settings.engine") setShowIntelligenceEngine(true);
+    else if (target === "settings.media") setShowAIConnection(true);
     else if (target === "review.accessibility") setShowAccessibility(true);
     else if (target === "review.validation") setShowValidation(true);
     else if (target === "export.panel") setShowExport(true);
@@ -1050,6 +1068,31 @@ export function App() {
   const scene = scenes[selectedScene];
   const canCreateProject = !session || session.memberships.some(item => ["author", "instructional-designer", "administrator"].includes(item.role));
 
+  function openCourseReviewObject(objectType: "course" | "scene" | "objective" | "assessment" | "asset", objectId: string) {
+    setShowPythiaCourseReview(false);
+    setShowManagement(false);
+    if (objectType === "course") { setActiveView("storyboard"); return; }
+    if (objectType === "scene") {
+      const sceneIndex = scenes.findIndex(item => item.id === objectId);
+      setActiveView("storyboard");
+      if (sceneIndex >= 0) setSelectedScene(sceneIndex);
+      return;
+    }
+    if (objectType === "assessment") {
+      const separator = objectId.indexOf(":");
+      const targetSceneId = separator >= 0 ? objectId.slice(0, separator) : scenes.find(item => item.assessmentItem?.identifier === objectId)?.id;
+      const sceneIndex = scenes.findIndex(item => item.id === targetSceneId);
+      setActiveView("storyboard");
+      if (sceneIndex >= 0) { setSelectedScene(sceneIndex); if (scenes[sceneIndex].assessmentItem) setShowAssessmentEditor(true); }
+      return;
+    }
+    if (objectType === "asset") {
+      const sceneIndex = scenes.findIndex(item => item.imageAssets.includes(objectId) || item.audioAssets.includes(objectId) || item.videoAssets?.includes(objectId));
+      if (sceneIndex >= 0) setSelectedScene(sceneIndex);
+      setActiveView("media");
+    }
+  }
+
   if (reviewToken && session) return <ReviewLinkView token={reviewToken} onClose={() => { history.replaceState(null, "", location.pathname+location.search); setReviewToken(""); }} />;
 
   return <div className="app-shell">
@@ -1077,16 +1120,18 @@ export function App() {
           <button onClick={() => setShowCompletionSettings(true)} disabled={!project.id || busy}><Settings2 size={16} /> Completion rules</button>
           <button onClick={() => setShowAssessments(true)} disabled={!project.id || busy || !permissions.canEdit}><ClipboardList size={16} /> Assessments</button>
           <button onClick={() => setShowEnhancementReview(true)} disabled={!project.id || busy}><Sparkles size={16} /> Review suggestions</button>
+          <button onClick={() => setShowPythiaCourseReview(true)} disabled={!project.id || busy}><Sparkles size={16} /> Review course with Pythia</button>
         </div>}
       </div>
       <div className="sidebar-bottom">
         <button className="nav-item settings-toggle" aria-expanded={showSettings} aria-controls="workspace-settings" onClick={() => setShowSettings((open) => !open)}><Settings2 size={18} /><span>Settings</span><ChevronDown size={15} className={showSettings ? "expanded" : ""} /></button>
-        {showSettings && <div id="workspace-settings" className="workspace-settings"><AppearanceSelector /><button type="button" className="nav-item" disabled={busy} onClick={event => { event.currentTarget.focus(); setShowAIConnection(true); }}><Sparkles size={16} />AI connection</button>{session && permissions.canManageMembers && <button className="nav-item" disabled={!project.id} onClick={() => setShowProjectAccess(true)}>Project access</button>}</div>}
+        {showSettings && <div id="workspace-settings" className="workspace-settings"><AppearanceSelector /><button type="button" className="nav-item" disabled={busy} onClick={() => setShowIntelligenceEngine(true)}><Sparkles size={16} />Intelligence Engine</button><button type="button" className="nav-item" disabled={busy} onClick={event => { event.currentTarget.focus(); setShowAIConnection(true); }}><Sparkles size={16} />AI connection</button>{session && permissions.canManageMembers && <button className="nav-item" disabled={!project.id} onClick={() => setShowProjectAccess(true)}>Project access</button>}</div>}
         {session && <div className="hosted-session"><span>{session.actor.actorDisplayName}</span><button onClick={() => { if (window.confirm("Sign out? Unsaved changes will be discarded.")) void logout().catch(issue => setError(issue instanceof Error ? issue.message : "Sign-out failed.")); }}>Sign out</button></div>}
         <div className="sidebar-footer"><span className="status-dot" />{session ? "Hosted workspace" : "Local workspace"}</div>
       </div>
     </aside>
-    {showAIConnection && <AIConnectionPanel onClose={() => setShowAIConnection(false)} />}
+    {showAIConnection && <AIConnectionPanel onboardingScope={project.id || "workspace"} onClose={() => setShowAIConnection(false)} />}
+    {showIntelligenceEngine && <IntelligenceEnginePanel onClose={() => setShowIntelligenceEngine(false)} />}
     <main className="main-content" id="workspace-content" tabIndex={-1}>
       {showManagement ? <ManagementView busy={busy || restoringProject} canCreateProject={canCreateProject} onCreateProject={() => setIsCreating(true)} canResume={Boolean(project.id)} onOpenProject={(projectId) => switchProject(projectId, true)} onProjectTrashed={handleProjectTrashed} onProjectsRestored={handleProjectsRestored} onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} /> : showProjectAccess ? <ProjectAccessPanel project={project} onClose={() => setShowProjectAccess(false)} /> : !permissions.canEdit && session && project.id ? <section className="project-access-panel"><h1>{project.title}</h1><p>You have review access to this project.</p><button className="button button-dark" onClick={() => setShowPreview(true)}>Open course review</button></section> : <>
       <header className="topbar">
@@ -1115,7 +1160,7 @@ export function App() {
         </section>
         <section data-onboarding="scene.saved" className={`canvas-panel ${scene?.visualLayout?.enabled ? "visual-active" : ""}`} aria-label="Selected scene">{scene ? <>
           <div className="scene-context-header">
-            <button className="button button-accent" onClick={() => beginSceneEdit()} disabled={busy || !permissions.canEdit}><Pencil size={16} /> Edit scene</button>
+            <div className="scene-context-actions"><button className="button button-accent" onClick={() => beginSceneEdit()} disabled={busy || !permissions.canEdit}><Pencil size={16} /> Edit scene</button><button className="button button-outline" onClick={() => setShowPythiaAnalysis(true)} disabled={busy || !permissions.canEnhance}><Sparkles size={16} /> Analyze with Pythia</button><button className="button button-outline" onClick={() => setShowPythiaTransform(true)} disabled={busy || !permissions.canEnhance}><Sparkles size={16} /> Transform with Pythia</button><button className="button button-outline" onClick={() => setShowPythiaAssessmentDesign(true)} disabled={busy || !permissions.canEnhance}><Sparkles size={16} /> Design assessment</button></div>
             <div className="scene-context-title"><h2>{scene.title}</h2><span>Scene {selectedScene + 1} of {scenes.length} · {scene.required ? "Required" : "Optional"}</span></div>
           </div>
           {scene.sceneType === "question" && <section className="assessment-authoring-launch" aria-label="Scene question">
@@ -1151,11 +1196,15 @@ export function App() {
       {error && <p className="export-error" role="alert">{error}</p>}{feedback && <p className="export-feedback" role="status">{feedback}</p>}{busy && <p role="status">Working…</p>}
     </EditorDialog>}
     {showCompletionSettings && <CompletionSettingsEditor project={project} onClose={() => setShowCompletionSettings(false)} onProjectUpdated={applyProject} />}
+    {showPythiaAnalysis && scene && <PythiaAnalysisView key={`${project.id}-${scene.id}`} projectId={project.id} scene={scene} onClose={() => setShowPythiaAnalysis(false)} />}
+    {showPythiaTransform && scene && <PythiaTransformView key={`${project.id}-${scene.id}`} projectId={project.id} scene={scene} scenes={scenes} onClose={() => setShowPythiaTransform(false)} />}
+    {showPythiaAssessmentDesign && scene && <PythiaAssessmentDesignView key={`${project.id}-${scene.id}`} projectId={project.id} scene={scene} scenes={scenes} onClose={() => setShowPythiaAssessmentDesign(false)} />}
+    {showPythiaCourseReview && <PythiaCourseReviewView project={project} onClose={() => setShowPythiaCourseReview(false)} onNavigateToObject={reference => openCourseReviewObject(reference.object_type, reference.object_id)} />}
     {showAssessments && permissions.canEdit && <AssessmentsEditor key={project.id} project={project} canExport={permissions.canExport} onClose={() => setShowAssessments(false)} onProjectUpdated={applyProject} />}
     {showEnhancementReview && <EnhancementReviewView project={project} onClose={() => setShowEnhancementReview(false)} onProjectUpdated={applyProject} />}
     {showValidation && <ValidationView projectId={project.id} onClose={() => setShowValidation(false)} onOpenScene={(sceneId, issueCode) => { const index = scenes.findIndex((item) => item.id === sceneId); setShowValidation(false); if (index >= 0) setSelectedScene(index); if (issueCode === "missing-image-alt-text") setShowAccessibility(true); else if (issueCode === "missing-assessment-item") setShowAssessmentEditor(true); else setActiveView("storyboard"); }} />}
     {showAccessibility && <AccessibilityView projectId={project.id} revision={project.storyboard.revision} scenes={scenes} assets={project.storyboard.assets} onClose={() => setShowAccessibility(false)} onProjectUpdated={applyProject} />}
-    {showGoldenPath && <GoldenPathView walkthroughStatuses={Object.fromEntries(Object.entries(guides).map(([id, guide]) => [id, guide.controller.snapshot().status]))} onStartWalkthrough={() => startOnboarding()} onSelectWalkthrough={id => startOnboarding(id)} project={project} onClose={() => setShowGoldenPath(false)} onCreateProject={() => { setShowGoldenPath(false); setIsCreating(true); }} onOpenStoryboard={() => { setShowGoldenPath(false); setActiveView("storyboard"); }} onOpenMedia={() => { setShowGoldenPath(false); setActiveView("media"); }} onOpenAccessibility={() => { setShowGoldenPath(false); setShowAccessibility(true); }} onOpenPreview={() => { setShowGoldenPath(false); if (project.id) setShowPreview(true); }} onRunValidation={() => { setShowGoldenPath(false); setShowValidation(true); }} />}
+    {showGoldenPath && <GoldenPathView walkthroughStatuses={Object.fromEntries(Object.entries(guides).map(([id, guide]) => [id, guide.controller.snapshot().status]))} onStartWalkthrough={() => startOnboarding()} onSelectWalkthrough={id => startOnboarding(id)} project={project} onClose={() => setShowGoldenPath(false)} onCreateProject={() => { setShowGoldenPath(false); setIsCreating(true); }} onOpenStoryboard={() => { setShowGoldenPath(false); setActiveView("storyboard"); }} onOpenMedia={() => { setShowGoldenPath(false); setActiveView("media"); }} onOpenAccessibility={() => { setShowGoldenPath(false); setShowAccessibility(true); }} onOpenPreview={() => { setShowGoldenPath(false); if (project.id) setShowPreview(true); }} onRunValidation={() => { setShowGoldenPath(false); setShowValidation(true); }} onOpenPythiaAnalysis={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaAnalysis(true); }} onOpenPythiaTransform={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaTransform(true); }} onOpenPythiaAssessment={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaAssessmentDesign(true); }} onOpenSuggestions={() => { setShowGoldenPath(false); setShowManagement(false); setShowEnhancementReview(true); }} onOpenCourseReview={() => { setShowGoldenPath(false); setShowManagement(false); setShowPythiaCourseReview(true); }} onOpenManagement={() => { setShowGoldenPath(false); setShowManagement(true); }} onOpenExport={() => { setShowGoldenPath(false); setShowManagement(false); setShowExport(true); }} />}
     {showPreview && project.id && <CoursePreview project={project} onClose={() => setShowPreview(false)} canEnhance={permissions.canEnhance} />}
     {visualSceneId && scenes.find(item => item.id === visualSceneId) && <SceneVisualEditor key={`${project.id}:${visualSceneId}`} initialPanel={sceneEditorPanel} project={project} scene={scenes.find(item => item.id === visualSceneId)!} templates={templates} onClose={() => setVisualSceneId(null)} onSave={saveVisualScene} onExtract={extractVisualScene} onGenerate={generateSceneContentDraft} canGenerate={permissions.canEnhance} />}
     {showAssessmentEditor && project.id && scene?.sceneType === "question" && <AssessmentEditor projectId={project.id} projectTitle={project.title} revision={project.storyboard.revision} scene={scene} scenes={scenes}

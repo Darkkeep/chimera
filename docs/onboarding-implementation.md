@@ -19,34 +19,42 @@ The independent demo now lives in [Darkkeep/onboarding](https://github.com/Darkk
 
 ## Walkthrough catalog
 
-Open **Review tools ? Guided review ? All functionality walkthroughs**. Search by task name (for example, audio, questions, storyboard), then choose a walkthrough. The sidebar **Start / resume walkthrough** resumes the last selected task. Each of the 48 walkthroughs has independent browser-local progress for the selected project; **Practiced**, **Paused**, and **Ended with skips** describe practice history rather than project readiness.
+Open **Review tools > Guided review > All functionality walkthroughs**. Search by task name (for example, Pythia, canvas, audio, questions, storyboard), then choose a walkthrough. The sidebar **Start / resume walkthrough** resumes the last selected task. The catalog now contains **68 walkthroughs**, including **9 Pythia workflows**, with independent browser-local progress for the selected project; **Practiced**, **Paused**, and **Ended with skips** describe practice history rather than project readiness.
 
 | Functionality | Walkthroughs and outcomes |
 | --- | --- |
-| Projects and workspace | First project/scene, project selection, Light/Dark/System appearance |
-| Scene authoring | PowerPoint import, text/notes/action/type/layout/required settings in the unified Details/Canvas editor, saved ordering, explicitly confirmed deletion |
+| Projects and workspace | First project/scene with optional course-design references, project selection, Light/Dark/System appearance, Trash/recovery review, permission-gated hosted members and review links |
+| Scene authoring | PowerPoint import, text/notes/action/type/layout/required settings, dedicated saved canvas authoring, ordering, explicitly confirmed deletion |
 | Templates | PPTX upload, name/description save, source replacement, saved scene assignment |
 | Media | Image/audio upload, attach/detach, attribution save, required playback, alt text/decorative save |
 | Assessments | Separate save journeys for single-choice, multiple-answer, true/false, ordering, drag/drop, matching and short-answer; attempts/score/weight/remediation; confirmed removal; QTI item export |
-| Learner preview | Scene/media/question/retry/remediation/progress review, saved comments, replies and resolve/reopen |
+| Learner preview | Contents navigation, scene/media/question/retry/remediation/progress review, saved comments, replies, resolve/reopen, explicit enhancement from a comment |
 | Course review | Saved completion rules, successfully loaded validation followed by acknowledgment of authoring/production findings |
 | Enhancement | Reference upload, preview/explicit submission, cancel/retry jobs, edit/accept/reject/reverse suggestion decisions |
+| Pythia | Persisted scene analysis and separate review decision, persisted transformation and separate sequence decision, persisted assessment blueprint and separate native-item decision, saved course review, finding resolution, confirmed task cancellation and recovery |
+| Connections | Intelligence Engine diagnostics and separate media-provider configuration review, successful settings save, explicit provider test and confirmed disconnect |
 | Generated media | Image/narration candidate review and approve/reject, explicit regeneration |
 | Exports | SCORM 2004 and 1.2, build reports, Word/answer-key choice, QTI test, JSON, Chimera storyboard archive, saved size warning |
 | Restore | JSON and Chimera storyboard ZIP restoration after the existing user confirmation and successful API response |
-| Management | My Work project health, approvals, identity/policy and audit activity review |
+| Management | My Work project health, saved production/release stage, identity/policy and audit activity review |
 
 Action steps wait for their handler's successful outcome, including the project scope and scene identity where applicable. Question-type journeys also require the matching saved type. Prerequisites block with Retry/Skip/Pause when required content is absent. Preparation opens existing views/forms; it never performs a save, accepts a destructive confirmation or starts a provider run. Review steps use Next for explicit acknowledgment. Escape pauses the guide; open dialogs offer Resume walkthrough without clearing drafts. Changing projects or tasks preserves separate progress.
+
+Pythia draft steps advance only after the returned artifact has been persisted in Chimera, not after task submission or polling completion alone. Failed draft saves leave the task step active; **Retry polling** checks the existing task without submitting another one. Scene-based draft outcomes also match the selected scene. Decisions have separate outcome identifiers, so an unrelated enhancement decision cannot finish a Pythia review step. **Accept review** records analysis review without content changes; **Accept transformation** replaces selected scenes with no undo button; assessment **Accept change** uses the native proposal mechanism. Finding resolution requires a note and records a decision rather than fixing course content. Escape pauses the guide while keeping the form open; closing the form also pauses the guide but may discard unsaved form values.
+
+The Golden Path now includes Engine diagnostics and a recovery archive before transformation. It ends with preview, production validation, a human-declared release stage and SCORM export. Trash/recovery, hosted access and connection inspection are review walkthroughs: they do not require destructive or permission-changing actions just to practice. Hosted access is unavailable without a signed-in account with membership-management permission. Provider actions and approvals always require an explicit user decision. See the [user guide's complete Pythia process](user-guide.md#14-work-with-pythia) for setup and operational limits.
 
 The new catalog reuses the existing Guided review rows and controls. The reusable package and independent vanilla demo retain their framework-independent contract.
 
 ## Run verification
 
-Chimera now opens on My Work after launch and refresh. Authoring reload checks explicitly choose Resume authoring before resuming a guide; this does not reset task/project progress. The media file picker is Add media, while the existing upload outcome identifier remains unchanged. Candidate review remains available when creation is collapsed or AI is unavailable. Settings > AI connection is a separate permission-aware dialog, not a provider call triggered by a walkthrough.
+Chimera now opens on My Work after launch and refresh. Authoring reload checks explicitly choose Resume authoring before resuming a guide; this does not reset task/project progress. The media file picker is Add media, while the existing upload outcome identifier remains unchanged. Candidate review remains available when creation is collapsed or AI is unavailable. **Settings > Intelligence Engine** provides diagnostics; **Settings > Media provider** opens the separate permission-aware media connection dialog. Neither starts a provider task when opened by a walkthrough.
 
 The 2026-10-07 Chromium run passed 56 tests across the existing catalog/recovery workflows and My Work, Media Library, and AI connection regression specs. AI setting tests use inert mocked keys/responses and isolated server workspaces. `npm run test:management` runs the 18 My Work checks; `npm run test:onboarding -- --project chromium` runs the full Chromium suite. These results do not assert current Firefox/WebKit or live-provider qualification.
 
-Install backend requirements into your active Python environment. The browser fixture uses the root `.venv` Python when present, otherwise `python` on Windows or `python3` elsewhere. Override with `CHIMERA_TEST_PYTHON` if needed.
+On 2026-10-15, the expanded catalog and recovery suites passed **38 Chromium tests** with `npm run test:onboarding -- catalog.spec.cjs journeys.spec.cjs --project chromium`; the frontend TypeScript/production build also passed, with a bundle-size warning. The catalog check opened all 68 task entries, verifying visible targets for available tasks and the prerequisite block for hosted-only access. New checks cover Pythia draft persistence failures and polling recovery, explicit submission, unrelated decisions, wrong-project/scene outcomes, cancellation, required resolution notes, canvas saves, release-stage saves and media-provider actions. Desktop Light (1440px) and mobile Dark (390px) Pythia guide captures, scoped axe checks and draft-preserving pause/resume passed. Pythia/provider responses were inert browser fixtures; no external AI calls, hosted membership changes or live LMS tests were performed. This run did not requalify the separate management/media/connection suites or Firefox/WebKit.
+
+Install backend requirements into your active Python environment. The browser fixture uses the root `.venv` Python when present, otherwise `python` on Windows or `python3` elsewhere. For the README's backend virtual environment, set `$env:CHIMERA_TEST_PYTHON = (Resolve-Path backend/.venv/Scripts/python.exe).Path` before running tests in PowerShell.
 
 ```powershell
 npx playwright install chromium firefox webkit

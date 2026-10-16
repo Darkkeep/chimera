@@ -412,6 +412,11 @@ class EnhancementProposalCreate(EnhancementSceneTypeValues):
     dependencyGroupId: str | None = None
     referenceCitations: list[EnhancementReferenceCitation] = Field(default_factory=list, max_length=100)
     jobId: str | None = None
+    sourceRevision: int | None = Field(default=None, ge=1)
+    sourceTaskId: str | None = Field(default=None, max_length=200)
+    sourceArtifactId: str | None = Field(default=None, max_length=200)
+    sourceCapability: str | None = Field(default=None, max_length=120)
+    sourceArtifact: dict[str, Any] | None = None
 
     @model_validator(mode="after")
     def validate_changes(self) -> "EnhancementProposalCreate":
@@ -432,6 +437,10 @@ class EnhancementProposal(EnhancementSceneTypeValues):
     dependencyGroupId: str | None = None
     referenceCitations: list[EnhancementReferenceCitation] = Field(default_factory=list)
     jobId: str | None = None
+    sourceTaskId: str | None = None
+    sourceArtifactId: str | None = None
+    sourceCapability: str | None = None
+    sourceArtifact: dict[str, Any] | None = None
     rationale: str
     origin: Literal["ai", "author"]
     provider: str | None = None
@@ -457,6 +466,184 @@ class EnhancementProposalDecisionRecord(BaseModel):
 class EnhancementProposalDecision(BaseModel):
     decision: Literal["accept", "reject", "reverse"]
     changes: list[EnhancementProposalChangeCreate] | None = None
+
+
+class PythiaAnalysisProposalCreate(BaseModel):
+    taskId: str = Field(min_length=1, max_length=200)
+    artifactId: str = Field(min_length=1, max_length=200)
+    sceneId: str = Field(min_length=1, max_length=120)
+    sourceRevision: int = Field(ge=1)
+
+
+class PythiaTransformRequest(BaseModel):
+    sceneIds: list[str] = Field(min_length=1, max_length=100)
+    constraints: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_unique_scenes(self) -> "PythiaTransformRequest":
+        if len(set(self.sceneIds)) != len(self.sceneIds):
+            raise ValueError("Transform scene IDs must be unique")
+        return self
+
+
+class PythiaTransformProposalCreate(BaseModel):
+    taskId: str = Field(min_length=1, max_length=200)
+    artifactId: str = Field(min_length=1, max_length=200)
+    sourceSceneIds: list[str] = Field(min_length=1, max_length=100)
+    sourceRevision: int = Field(ge=1)
+
+
+class PythiaTransformProposalDecision(BaseModel):
+    decision: Literal["accept", "reject"]
+    proposedScenes: list[dict[str, Any]] | None = None
+
+
+class PythiaTransformProposalDecisionRecord(BaseModel):
+    decision: Literal["accept", "reject"]
+    decidedAt: str
+    expectedRevision: int
+    actorId: str | None = None
+    actorDisplayName: str | None = None
+    installationId: str | None = None
+    correlationId: str | None = None
+    acceptedScenes: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class PythiaTransformProposal(BaseModel):
+    id: str
+    taskId: str
+    artifactId: str
+    sourceSceneIds: list[str] = Field(min_length=1, max_length=100)
+    sourceRevision: int = Field(ge=1)
+    artifact: dict[str, Any]
+    status: Literal["pending", "accepted", "rejected", "stale"] = "pending"
+    createdAt: str
+    decidedAt: str | None = None
+    decisionHistory: list[PythiaTransformProposalDecisionRecord] = Field(default_factory=list)
+
+
+class PythiaTransformProposalResult(BaseModel):
+    proposal: PythiaTransformProposal
+    project: "ProjectDetail | None" = None
+
+
+class PythiaAssessmentObjective(BaseModel):
+    id: str = Field(min_length=1, max_length=120)
+    statement: str = Field(min_length=1, max_length=2000)
+    sceneIds: list[str] = Field(min_length=1, max_length=100)
+
+
+class PythiaAssessmentDesignRequest(BaseModel):
+    sceneIds: list[str] = Field(min_length=1, max_length=100)
+    objectives: list[PythiaAssessmentObjective] = Field(min_length=1, max_length=100)
+    audience: str = Field(min_length=1, max_length=500)
+    desiredDifficulty: str = Field(min_length=1, max_length=80)
+    completionRules: str = Field(min_length=1, max_length=2000)
+    constraints: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_unique_assessment_inputs(self) -> "PythiaAssessmentDesignRequest":
+        if len(set(self.sceneIds)) != len(self.sceneIds):
+            raise ValueError("Assessment design scene IDs must be unique")
+        objective_ids = [objective.id for objective in self.objectives]
+        if len(set(objective_ids)) != len(objective_ids):
+            raise ValueError("Assessment objective IDs must be unique")
+        selected_scene_ids = set(self.sceneIds)
+        for objective in self.objectives:
+            if len(set(objective.sceneIds)) != len(objective.sceneIds):
+                raise ValueError("Assessment objective scene mappings must be unique")
+            if not set(objective.sceneIds).issubset(selected_scene_ids):
+                raise ValueError("Assessment objectives can only map to selected scenes")
+        return self
+
+
+class PythiaAssessmentProposalCreate(BaseModel):
+    taskId: str = Field(min_length=1, max_length=200)
+    artifactId: str = Field(min_length=1, max_length=200)
+    sourceSceneIds: list[str] = Field(min_length=1, max_length=100)
+    objectiveIds: list[str] = Field(min_length=1, max_length=100)
+    sourceRevision: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def validate_unique_assessment_scope(self) -> "PythiaAssessmentProposalCreate":
+        if len(set(self.sourceSceneIds)) != len(self.sourceSceneIds):
+            raise ValueError("Assessment proposal source scene IDs must be unique")
+        if len(set(self.objectiveIds)) != len(self.objectiveIds):
+            raise ValueError("Assessment objective IDs must be unique")
+        return self
+
+
+class PythiaAnalysisProposalDecision(BaseModel):
+    decision: Literal["accept", "reject"]
+
+
+class PythiaAnalysisProposalDecisionRecord(BaseModel):
+    decision: Literal["accept", "reject"]
+    decidedAt: str
+    storyboardRevision: int
+    actorId: str | None = None
+    actorDisplayName: str | None = None
+    installationId: str | None = None
+    correlationId: str | None = None
+
+
+class PythiaAnalysisProposal(BaseModel):
+    id: str
+    taskId: str
+    artifactId: str
+    sceneId: str
+    sourceRevision: int
+    artifact: dict[str, Any]
+    status: Literal["pending", "accepted", "rejected"] = "pending"
+    createdAt: str
+    decidedAt: str | None = None
+    decisionHistory: list[PythiaAnalysisProposalDecisionRecord] = Field(default_factory=list)
+
+
+class PythiaCourseReviewCreate(BaseModel):
+    taskId: str = Field(min_length=1, max_length=200)
+    artifactId: str = Field(min_length=1, max_length=200)
+    sourceRevision: int = Field(ge=1)
+
+
+class PythiaCourseFindingDecision(BaseModel):
+    status: Literal["open", "resolved", "dismissed"]
+    resolutionNote: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_resolution(self) -> "PythiaCourseFindingDecision":
+        if self.status == "resolved" and not (self.resolutionNote or "").strip():
+            raise ValueError("A resolution note is required to resolve a course finding")
+        return self
+
+
+class PythiaCourseFindingDecisionRecord(BaseModel):
+    previousStatus: Literal["open", "resolved", "dismissed"]
+    status: Literal["open", "resolved", "dismissed"]
+    resolutionNote: str | None = None
+    decidedAt: str
+    actorId: str | None = None
+    actorDisplayName: str | None = None
+    installationId: str | None = None
+    correlationId: str | None = None
+
+
+class PythiaCourseFindingReview(BaseModel):
+    findingId: str
+    status: Literal["open", "resolved", "dismissed"] = "open"
+    resolutionNote: str | None = None
+    decisionHistory: list[PythiaCourseFindingDecisionRecord] = Field(default_factory=list)
+
+
+class PythiaCourseReview(BaseModel):
+    id: str
+    taskId: str
+    artifactId: str
+    sourceRevision: int = Field(ge=1)
+    artifact: dict[str, Any]
+    findings: list[PythiaCourseFindingReview] = Field(default_factory=list)
+    createdAt: str
+    updatedAt: str
 
 
 class ReferencePassage(BaseModel):

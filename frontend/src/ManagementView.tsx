@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Activity, ArrowRight, ChevronRight, LoaderCircle, Plus, RotateCcw, ShieldCheck, Trash2, Users } from "lucide-react";
 import { EditorDialog } from "./EditorDialog";
+import { reportOnboardingOutcome } from "./onboarding-journeys";
 import "./management.css";
 
 type ProductionStage = "not-set" | "draft" | "in-production" | "in-review" | "approved" | "published";
@@ -87,6 +88,7 @@ export function ManagementView({ onClose, onOpenProject, onCreateProject, onProj
       const updated = await response.json() as { productionStage: ProductionStage; updatedAt: string };
       setHealth((current) => current.map((entry) => entry.projectId === item.projectId ? { ...entry, productionStage: updated.productionStage, updatedAt: updated.updatedAt } : entry));
       setStatus(`${item.title}: ${stages[updated.productionStage]} saved.`);
+      reportOnboardingOutcome("project.stage-saved", item.projectId);
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : "Production stage could not be saved.");
     } finally { stageSavePending.current = false; setSavingStage(null); }

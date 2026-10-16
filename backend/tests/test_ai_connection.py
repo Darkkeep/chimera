@@ -5,11 +5,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from jsonschema import Draft202012Validator
 from pydantic import SecretStr, ValidationError
 from fastapi.testclient import TestClient
 
-from backend.app import ai_connection, content_generation, enhancement_jobs, main, media_generation, storage
-from backend.app.models import CourseContentDraft, CourseDraftRequest, GeneratedSceneDraft, ProjectCreate, SceneCreate, SceneDraftRequest, EnhancementJobCreate, MediaGenerationJobCreate
+from backend.app import ai_connection, enhancement_jobs, main, media_generation, storage
+from backend.app.models import ProjectCreate, SceneCreate, EnhancementJobCreate, MediaGenerationJobCreate
 
 
 class AIConnectionTests(unittest.TestCase):
@@ -104,148 +105,82 @@ class AIConnectionTests(unittest.TestCase):
             self.assertNotIn("test-secret-only", audit)
             self.assertEqual(client.put("/api/ai-connection", json=payload, headers={"Origin": "http://127.0.0.1:5173"}).status_code, 409)
 
-    def test_jobs_bind_connection_revision_and_providers_share_settings(self):
+    def test_only_media_jobs_bind_to_media_provider_settings(self):
         saved = self.save()
         project = storage.create_project(ProjectCreate(title="Bound connection"))
         project = storage.create_scene(project.id, SceneCreate(title="Scene"))
         scene_id = project.storyboard.scenes[0].id
         enhancement = storage.create_enhancement_job(project.id, EnhancementJobCreate(scope="whole-course", goal="Check content"))
         media = storage.create_media_generation_job(project.id, MediaGenerationJobCreate(kind="image", sceneId=scene_id, purpose="Illustration", prompt="Fixture"))
-        self.assertEqual(enhancement.aiConnectionRevision, saved["revision"])
+        self.assertIsNone(enhancement.aiConnectionRevision)
         self.assertEqual(media.aiConnectionRevision, saved["revision"])
-        self.assertEqual(enhancement_jobs._provider(saved["revision"]).model, "gpt-4.1-mini")
+        self.assertEqual(enhancement_jobs._provider().name, "Pythia Engine")
         self.assertEqual(media_generation._provider(saved["revision"]).image_model, "gpt-image-1")
-        self.assertTrue(enhancement_jobs.preview_enhancement_submission(project.id, EnhancementJobCreate(scope="whole-course", goal="Check"))["providerConfigured"])
+        with patch.object(enhancement_jobs.PythiaProvider, "health", return_value={"status": "ok"}), patch.object(
+            enhancement_jobs.PythiaProvider, "capabilities", return_value={"capabilities": {"storyboard.enhance": {}}},
+        ):
+            self.assertTrue(enhancement_jobs.preview_enhancement_submission(
+                project.id, EnhancementJobCreate(scope="whole-course", goal="Check"),
+            )["engineConfigured"])
         self.save(textModel="gpt-4.1")
-        for factory in (enhancement_jobs._provider, media_generation._provider):
+        for factory in (media_generation._provider,):
             with self.assertRaisesRegex(RuntimeError, "changed"):
                 factory(saved["revision"])
         for path in (self.root / "projects").rglob("*.json"):
             self.assertNotIn("test-secret-only", path.read_text())
 
-    def test_course_and_scene_content_drafts_are_prompted_scoped_and_not_persisted(self):
-        self.save()
-        project = storage.create_project(ProjectCreate(title="Drafted course"))
-        project = storage.create_scene(project.id, SceneCreate(title="Target lesson", extractedText=["Existing learner content"]))
-        target_scene, = project.storyboard.scenes
-        resource = storage.save_reference_resource(
-            project.id,
-            "course-guide.txt",
-            "Course guide",
-            "study-guide",
-            False,
-            [],
-            b"Course guide source",
-            "text/plain",
-            [{"locator": "line:1", "text": "Use the local safety checklist before operation."}],
-            "complete",
-            None,
-        )
-        output = {
-            "scenes": [{"title": "Introduction", "sceneType": "content", "extractedText": ["Explain the learning goals."], "required": True}],
+    def test_enhancement_provider_submits_and_retrieves_a_pythia_artifact(self):
+        engine = Mock()
+        engine.health.return_value = {"status": "ok"}
+        engine.capabilities.return_value = {"capabilities": {"storyboard.enhance": {}}}
+        engine.submit_task.side_effect = lambda request: {"task_id": request["task_id"], "status": "submitted"}
+        engine.task_status.return_value = {"status": "awaiting_review", "artifact_id": "enhancement-artifact"}
+        engine.artifact.return_value = {
+            "schema_version": "1.0",
+            "artifact": {"type": "storyboard-enhancement", "id": "enhancement-artifact", "version": 1},
+            "producer": {"skill": "storyboard-producer", "version": "0.1.0"},
+            "sources": ["chimera://course-123/scenes/scene-1"],
+            "status": "draft",
+            "validation": {"state": "passed", "validators": ["storyboard-enhancement-1.0"]},
+            "payload": {
+                "project_id": "course-123",
+                "source_revision": 4,
+                "source_scene_ids": ["scene-1"],
+                "rationale": "No supported change was needed for this fixture.",
+                "proposals": [],
+                "resource_conflicts": [],
+            },
         }
-        client = TestClient(main.app)
-        requests = []
-
-        def provider_response(connection, request, timeout):
-            requests.append(json.loads(request.data.decode("utf-8")))
-            response = Mock(status=200)
-            response.read.return_value = json.dumps({"choices": [{"message": {"content": json.dumps(output)}}]}).encode("utf-8")
-            response.__enter__ = Mock(return_value=response)
-            response.__exit__ = Mock(return_value=False)
-            return response
-
-        with patch.object(content_generation, "open_provider_request", side_effect=provider_response):
-            course = client.post(
-                f"/api/projects/{project.id}/content-drafts/course",
-                json={"prompt": "Create a concise course for new operators.", "resourceIds": [resource.id]},
-            )
-            self.assertEqual(course.status_code, 200, course.text)
-            self.assertEqual(len(course.json()["scenes"]), 1)
-            course_payload = json.loads(requests[-1]["messages"][1]["content"])
-            self.assertEqual(course_payload["course"]["title"], "Drafted course")
-            self.assertEqual(course_payload["course"]["sceneSequence"][0]["id"], target_scene.id)
-            self.assertIn("completionSettings", course_payload["course"])
-            self.assertIn("scenes", course_payload["outputJsonSchema"]["properties"])
-            self.assertEqual(course_payload["instruction"], "Create a concise course for new operators.")
-            self.assertEqual(course_payload["references"][0]["passages"][0]["text"], "Use the local safety checklist before operation.")
-
-            output = {
-                "title": "Revised target lesson",
-                "sceneType": "content",
-                "extractedText": ["Use the checklist before starting."],
-                "required": True,
-                "visualLayout": {
-                    "enabled": True,
-                    "backgroundColor": "#17324d",
-                    "elements": [
-                        {"id": "headline", "kind": "text", "x": 64, "y": 72, "width": 1120, "height": 160, "text": "Revised target lesson", "fontSize": 48, "color": "#ffffff", "bold": True},
-                        {"id": "body", "kind": "text", "x": 64, "y": 300, "width": 1120, "height": 160, "text": "Use the checklist before starting.", "fontSize": 28, "color": "#ffffff"},
-                    ],
-                },
-            }
-            scene = client.post(
-                f"/api/projects/{project.id}/scenes/{target_scene.id}/content-draft",
-                json={"prompt": "Make this clearer for first-time learners.", "currentScene": {"title": "Unsaved target lesson", "required": False, "notes": "Use current editor wording"}},
-            )
-            self.assertEqual(scene.status_code, 200, scene.text)
-            scene_payload = json.loads(requests[-1]["messages"][1]["content"])
-            self.assertEqual(scene_payload["targetScene"]["id"], target_scene.id)
-            self.assertEqual(scene_payload["targetScene"]["title"], "Unsaved target lesson")
-            self.assertFalse(scene_payload["targetScene"]["required"])
-            self.assertEqual(scene_payload["targetScene"]["notes"], "Use current editor wording")
-            self.assertIn("assessmentSettings", scene_payload["targetScene"])
-            self.assertIn("visualLayout", scene_payload["outputJsonSchema"]["properties"])
-            self.assertEqual(scene_payload["instruction"], "Make this clearer for first-time learners.")
-            self.assertEqual(scene_payload["outputSchema"]["visualLayout"]["width"], 1280)
-            self.assertIn("animations", scene_payload["outputJsonSchema"]["$defs"]["SceneElement"]["properties"])
-            self.assertIn("staggered bounce entrances", requests[-1]["messages"][0]["content"])
-            self.assertTrue(scene.json()["visualLayout"]["enabled"])
-            self.assertEqual(scene.json()["visualLayout"]["elements"][0]["text"], "Revised target lesson")
-
-        unchanged = storage.read_project(project.id)
-        self.assertEqual(unchanged.storyboard.revision, project.storyboard.revision)
-        self.assertEqual(unchanged.storyboard.scenes[0].title, "Target lesson")
-        self.assertEqual(unchanged.storyboard.scenes[0].extractedText, ["Existing learner content"])
-
-    def test_content_draft_requires_a_configured_provider(self):
-        project = storage.create_project(ProjectCreate(title="No provider"))
-        response = TestClient(main.app).post(
-            f"/api/projects/{project.id}/content-drafts/course",
-            json={"prompt": "Draft a course"},
-        )
-        self.assertEqual(response.status_code, 503)
-        self.assertIn("Configure an AI connection", response.json()["detail"])
-
-    def test_course_content_draft_application_is_atomic_and_revision_checked(self):
-        project = storage.create_project(ProjectCreate(title="Apply reviewed draft"))
-        client = TestClient(main.app)
-        path = f"/api/projects/{project.id}/content-drafts/course/apply"
-        scenes = {
-            "scenes": [
-                {"title": "Scene one", "extractedText": ["First scene content."], "narration": "First narration."},
-                {"title": "Scene two", "extractedText": ["Second scene content."], "notes": "Review notes."},
-                {"title": "Knowledge check", "sceneType": "assessment", "assessmentItem": {"type": "true-false", "identifier": "safety-check", "prompt": "Inspect equipment before operation.", "correctResponse": "true"}, "assessmentSettings": {"maxAttempts": 3}},
-            ],
+        payload = {
+            "projectId": "course-123",
+            "sourceRevision": 4,
+            "goal": "Improve clarity",
+            "scenes": [{"id": "scene-1", "title": "Scene", "learnerText": ["Submitted text"], "actionDescription": "", "narration": ""}],
+            "references": [],
         }
-        self.assertEqual(client.post(path, json=scenes).status_code, 428)
-        self.assertEqual(client.post(path, json=scenes, headers={"If-Match": '"99"'}).status_code, 412)
 
-        invalid_scenes = {"scenes": [*scenes["scenes"], {"title": ""}]}
-        invalid = client.post(path, json=invalid_scenes, headers={"If-Match": f'"{project.storyboard.revision}"'})
-        self.assertEqual(invalid.status_code, 422, invalid.text)
-        unchanged = storage.read_project(project.id)
-        self.assertEqual(unchanged.storyboard.revision, project.storyboard.revision)
-        self.assertEqual(unchanged.storyboard.scenes, [])
+        with patch.object(enhancement_jobs, "PythiaProvider", return_value=engine):
+            output = enhancement_jobs.PythiaEnhancementProvider().generate(payload)
 
-        accepted = client.post(path, json=scenes, headers={"If-Match": f'"{project.storyboard.revision}"'})
-        self.assertEqual(accepted.status_code, 200, accepted.text)
-        result = accepted.json()
-        self.assertEqual(result["storyboard"]["revision"], project.storyboard.revision + 1)
-        self.assertEqual([scene["title"] for scene in result["storyboard"]["scenes"]], ["Scene one", "Scene two", "Knowledge check"])
-        self.assertEqual(result["storyboard"]["scenes"][0]["narration"], "First narration.")
-        self.assertEqual(result["storyboard"]["scenes"][2]["assessmentItem"]["correctResponse"], "true")
-        self.assertEqual(result["storyboard"]["scenes"][2]["assessmentSettings"]["maxAttempts"], 3)
+        self.assertEqual({"proposals": [], "resourceConflicts": []}, output)
+        task_request = engine.submit_task.call_args.args[0]
+        self.assertEqual("storyboard.enhance", task_request["capability"])
+        self.assertEqual("Submitted text", task_request["inputs"][0]["scene_content"]["body_text"])
+        self.assertEqual(4, task_request["context"]["source_revision"])
+        schemas = Path(__file__).resolve().parents[3] / "pythia-contracts" / "schemas"
+        if not schemas.is_dir():
+            self.skipTest("The sibling pythia-contracts package is not checked out")
+        documents = [
+            ("task-request.schema.json", task_request),
+            ("storyboard-enhancement-input.schema.json", task_request["inputs"][0]),
+            ("storyboard-enhancement-context.schema.json", task_request["context"]),
+            ("artifact-envelope.schema.json", engine.artifact.return_value),
+            ("storyboard-enhancement.schema.json", engine.artifact.return_value["payload"]),
+        ]
+        for schema_name, document in documents:
+            with self.subTest(schema=schema_name):
+                schema = json.loads((schemas / schema_name).read_text(encoding="utf-8"))
+                self.assertEqual([], list(Draft202012Validator(schema).iter_errors(document)))
 
     def test_environment_key_is_not_reused_for_a_different_provider(self):
         with patch.dict(os.environ, {"CHIMERA_AI_BASE_URL": "https://other-provider.test/v1", "CHIMERA_AI_API_KEY": "other-secret", "CHIMERA_AI_MODEL": "other-model"}):
