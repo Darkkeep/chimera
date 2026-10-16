@@ -167,9 +167,8 @@ class AIConnectionTests(unittest.TestCase):
         self.assertEqual("storyboard.enhance", task_request["capability"])
         self.assertEqual("Submitted text", task_request["inputs"][0]["scene_content"]["body_text"])
         self.assertEqual(4, task_request["context"]["source_revision"])
-        schemas = Path(__file__).resolve().parents[3] / "pythia-contracts" / "schemas"
-        if not schemas.is_dir():
-            self.skipTest("The sibling pythia-contracts package is not checked out")
+        schemas = Path(__file__).resolve().parents[2] / "vendor" / "pythia-contracts" / "schemas"
+        self.assertTrue(schemas.is_dir(), f"Shared contract schemas are required at {schemas}")
         documents = [
             ("task-request.schema.json", task_request),
             ("storyboard-enhancement-input.schema.json", task_request["inputs"][0]),
@@ -181,6 +180,27 @@ class AIConnectionTests(unittest.TestCase):
             with self.subTest(schema=schema_name):
                 schema = json.loads((schemas / schema_name).read_text(encoding="utf-8"))
                 self.assertEqual([], list(Draft202012Validator(schema).iter_errors(document)))
+
+    @unittest.skipUnless(os.environ.get("CHIMERA_PYTHIA_ENHANCEMENT_INTEGRATION") == "1", "set CHIMERA_PYTHIA_ENHANCEMENT_INTEGRATION=1 to call local Pythia")
+    def test_live_pythia_enhancement_round_trip_uses_pinned_contracts(self):
+        payload = {
+            "projectId": "course-123",
+            "sourceRevision": 4,
+            "goal": "Improve clarity",
+            "scenes": [{
+                "id": "scene-1",
+                "title": "Evacuation",
+                "learnerText": ["Use the nearest marked exit."],
+                "actionDescription": "",
+                "narration": "",
+            }],
+            "references": [],
+        }
+        with patch.dict(os.environ, {"CHIMERA_PYTHIA_BASE_URL": os.environ.get("CHIMERA_PYTHIA_BASE_URL", "http://127.0.0.1:8002")}):
+            result = enhancement_jobs.PythiaEnhancementProvider().generate(payload)
+
+        self.assertIsInstance(result["proposals"], list)
+        self.assertIsInstance(result["resourceConflicts"], list)
 
     def test_environment_key_is_not_reused_for_a_different_provider(self):
         with patch.dict(os.environ, {"CHIMERA_AI_BASE_URL": "https://other-provider.test/v1", "CHIMERA_AI_API_KEY": "other-secret", "CHIMERA_AI_MODEL": "other-model"}):

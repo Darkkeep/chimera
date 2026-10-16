@@ -1,4 +1,5 @@
 import os
+import json
 import tempfile
 import time
 import unittest
@@ -8,6 +9,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import httpx
+from jsonschema import Draft202012Validator
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pptx import Presentation
@@ -140,6 +142,17 @@ def course_review_envelope(project_id: str, inventory: dict[str, object]) -> dic
             "review_questions": ["Which delivery standard is required?"],
         },
     }
+
+
+def assert_contract_schema(test_case: unittest.TestCase, schema_name: str, document: dict[str, object]) -> None:
+    schema_path = Path(__file__).resolve().parents[2] / "vendor" / "pythia-contracts" / "schemas" / schema_name
+    test_case.assertTrue(schema_path.is_file(), f"Shared contract schema is required: {schema_path}")
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    errors = sorted(
+        Draft202012Validator(schema).iter_errors(document),
+        key=lambda error: list(error.absolute_path),
+    )
+    test_case.assertEqual([], [error.message for error in errors], schema_name)
 
 
 class LearningIntelligenceTests(unittest.TestCase):
@@ -324,6 +337,8 @@ class LearningIntelligenceTests(unittest.TestCase):
             },
         }
 
+        assert_contract_schema(self, "artifact-envelope.schema.json", envelope)
+        assert_contract_schema(self, "storyboard-transformation.schema.json", envelope["payload"])
         self.assertIs(validate_storyboard_transformation(envelope, "course-123", ["scene_a81f73"]), envelope)
         with self.assertRaisesRegex(ValueError, "selected scenes"):
             validate_storyboard_transformation(envelope, "course-123", ["other-scene"])
@@ -334,6 +349,8 @@ class LearningIntelligenceTests(unittest.TestCase):
     def test_assessment_blueprint_validates_native_item_and_scope_references(self):
         envelope = assessment_blueprint_envelope("course-123", ["scene_a81f73"], ["objective-evacuation"])
 
+        assert_contract_schema(self, "artifact-envelope.schema.json", envelope)
+        assert_contract_schema(self, "assessment-blueprint.schema.json", envelope["payload"])
         self.assertIs(validate_assessment_blueprint(envelope, "course-123", ["scene_a81f73"], ["objective-evacuation"]), envelope)
         invalid_item = {**envelope, "payload": {**envelope["payload"], "proposed_items": [{
             **envelope["payload"]["proposed_items"][0],
@@ -359,6 +376,8 @@ class LearningIntelligenceTests(unittest.TestCase):
         }
         envelope = course_review_envelope("course-123", inventory)
 
+        assert_contract_schema(self, "artifact-envelope.schema.json", envelope)
+        assert_contract_schema(self, "course-review.schema.json", envelope["payload"])
         self.assertIs(validate_course_review(envelope, "course-123", inventory), envelope)
         invalid = {**envelope, "payload": {**envelope["payload"], "findings": [{
             **envelope["payload"]["findings"][0],
@@ -438,6 +457,8 @@ class PythiaRouteTests(unittest.TestCase):
         }])
         self.assertEqual(request["constraints"], {})
         self.assertEqual(request["context"], {})
+        assert_contract_schema(self, "task-request.schema.json", request)
+        assert_contract_schema(self, "storyboard-analysis-input.schema.json", request["inputs"][0])
 
     def test_transform_submit_preserves_selected_scene_order_and_content(self):
         self.project = storage.create_scene(self.project.id, SceneCreate(
@@ -466,6 +487,9 @@ class PythiaRouteTests(unittest.TestCase):
         self.assertEqual(request["inputs"][1]["scene_content"]["body_text"], "Keep the route clear.")
         self.assertEqual(request["inputs"][1]["scene_content"]["speaker_notes"], "Connect this instruction to the alarm.")
         self.assertEqual(request["constraints"], {"audience": "new staff"})
+        assert_contract_schema(self, "task-request.schema.json", request)
+        for scene_input in request["inputs"]:
+            assert_contract_schema(self, "storyboard-transform-input.schema.json", scene_input)
 
     def test_transform_submit_refuses_unadvertised_capability(self):
         provider = Mock()
@@ -478,10 +502,10 @@ class PythiaRouteTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 422)
         provider.submit_task.assert_not_called()
 
-    def test_assessment_design_submits_advertised_blueprint_capability_and_context(self):
+    def test_assessment_design_submits_canonical_capability_and_context(self):
         provider = Mock()
         provider.health.return_value = {"status": "ok", "version": "1.0"}
-        provider.capabilities.return_value = {"capabilities": [{"id": "assessment.blueprint"}]}
+        provider.capabilities.return_value = {"capabilities": [{"id": "assessment.design"}]}
         provider.submit_task.side_effect = lambda request: {"task_id": request["task_id"], "status": "submitted"}
         request_data = main.PythiaAssessmentDesignRequest(
             sceneIds=[self.scene.id],
@@ -496,13 +520,16 @@ class PythiaRouteTests(unittest.TestCase):
 
         submitted = provider.submit_task.call_args.args[0]
         self.assertTrue(status["supportsAssessmentDesign"])
-        self.assertEqual(status["assessmentCapability"], "assessment.blueprint")
-        self.assertEqual(task["capability"], "assessment.blueprint")
-        self.assertEqual(submitted["capability"], "assessment.blueprint")
+        self.assertEqual(status["assessmentCapability"], "assessment.design")
+        self.assertEqual(task["capability"], "assessment.design")
+        self.assertEqual(submitted["capability"], "assessment.design")
         self.assertEqual(submitted["inputs"][0]["scene_id"], self.scene.id)
         self.assertEqual(submitted["context"]["objectives"], [{"id": "objective-evacuation", "statement": "Choose a safe exit."}])
         self.assertEqual(submitted["context"]["audience"], "New staff")
         self.assertEqual(submitted["context"]["existing_items"], [{"scene_id": self.scene.id, "item": None}])
+        assert_contract_schema(self, "task-request.schema.json", submitted)
+        assert_contract_schema(self, "storyboard-transform-input.schema.json", submitted["inputs"][0])
+        assert_contract_schema(self, "assessment-design-context.schema.json", submitted["context"])
 
     def test_assessment_design_refuses_unadvertised_capability(self):
         provider = Mock()
@@ -541,6 +568,8 @@ class PythiaRouteTests(unittest.TestCase):
         self.assertEqual(inventory["scenes"][0]["objective_ids"], [])
         self.assertEqual(inventory["standards_status"], "unavailable")
         self.assertEqual(inventory["tracking_status"], "unavailable")
+        assert_contract_schema(self, "task-request.schema.json", request)
+        assert_contract_schema(self, "course-review-input.schema.json", inventory)
 
     def test_course_review_persists_findings_and_resolution_without_storyboard_mutation(self):
         inventory = main._pythia_course_inventory(self.project)
@@ -588,7 +617,7 @@ class PythiaRouteTests(unittest.TestCase):
             "task_id": "task-assessment-1",
             "project_id": self.project.id,
             "consumer": "chimera",
-            "capability": "assessment.blueprint",
+            "capability": "assessment.design",
             "status": "awaiting_review",
             "artifact_id": "artifact-assessment-1",
         }
@@ -617,7 +646,7 @@ class PythiaRouteTests(unittest.TestCase):
         self.assertEqual(proposal["field"], "assessmentItem")
         self.assertEqual(proposal["sourceTaskId"], "task-assessment-1")
         self.assertEqual(proposal["sourceArtifactId"], "artifact-assessment-1")
-        self.assertEqual(proposal["sourceCapability"], "assessment.blueprint")
+        self.assertEqual(proposal["sourceCapability"], "assessment.design")
         self.assertEqual(proposal["proposedValue"]["identifier"], "evacuation-response")
         self.assertIsNone(before_accept.storyboard.scenes[0].assessmentItem)
         self.assertEqual(accepted.status_code, 200, accepted.text)
@@ -796,10 +825,12 @@ class PythiaRouteTests(unittest.TestCase):
             "artifact_id": "artifact-analysis-1",
         }
         provider.artifact.return_value = {
-            "artifact": {"type": "storyboard-analysis"},
+            "schema_version": "1.0",
+            "artifact": {"type": "storyboard-analysis", "id": "artifact-analysis-1", "version": 1},
             "status": "draft",
-            "validation": {"state": "passed"},
-            "producer": {"skill": "storyboard-producer"},
+            "validation": {"state": "passed", "validators": ["storyboard-analysis-1.0"]},
+            "producer": {"skill": "storyboard-producer", "version": "1.0"},
+            "sources": [source_ref],
             "payload": {
                 "project_id": self.project.id,
                 "scene_id": self.scene.id,
@@ -820,6 +851,8 @@ class PythiaRouteTests(unittest.TestCase):
                 "review_questions": [],
             },
         }
+        assert_contract_schema(self, "artifact-envelope.schema.json", provider.artifact.return_value)
+        assert_contract_schema(self, "storyboard-analysis.schema.json", provider.artifact.return_value["payload"])
         source_revision = self.project.storyboard.revision
         with patch.object(main, "PythiaProvider", return_value=provider), TestClient(main.app) as client:
             created = client.post(
