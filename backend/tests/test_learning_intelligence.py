@@ -12,8 +12,8 @@ from fastapi.testclient import TestClient
 from starlette.requests import Request
 
 from backend.app import main, storage
-from backend.app.learning_intelligence import PythiaProvider, PythiaUnavailableError, validate_storyboard_analysis, validate_storyboard_transformation
-from backend.app.models import ProjectCreate, PythiaAnalysisProposalCreate, SceneCreate
+from backend.app.learning_intelligence import PythiaProvider, PythiaUnavailableError, validate_assessment_blueprint, validate_course_review, validate_storyboard_analysis, validate_storyboard_transformation
+from backend.app.models import ProjectCreate, PythiaAnalysisProposalCreate, PythiaAssessmentProposalCreate, SceneCreate
 
 
 def transformation_envelope(project_id: str, scene_ids: list[str]) -> dict[str, object]:
@@ -53,6 +53,88 @@ def transformation_envelope(project_id: str, scene_ids: list[str]) -> dict[str, 
                 "assessment_opportunities": ["Identify the correct follow-up action."],
                 "rationale": "Separate follow-up guidance from evacuation steps.",
             }],
+        },
+    }
+
+
+def assessment_blueprint_envelope(project_id: str, scene_ids: list[str], objective_ids: list[str]) -> dict[str, object]:
+    return {
+        "schema_version": "1.0",
+        "artifact": {"type": "assessment-blueprint", "id": "artifact-assessment-1", "version": 1},
+        "producer": {"skill": "assessment-designer", "version": "1.0"},
+        "sources": [f"chimera://{project_id}/scenes/{scene_id}" for scene_id in scene_ids],
+        "status": "draft",
+        "validation": {"state": "passed", "validators": ["assessment-blueprint-1.0"]},
+        "payload": {
+            "project_id": project_id,
+            "candidate_interpretations": [],
+            "unresolved_findings": [],
+            "assumptions": ["Review the distractors with an SME."],
+            "alignment": [{
+                "objective_id": objective_ids[0],
+                "evidence": "The learner selects a safe response.",
+                "method": "Single choice",
+                "scoring": "One correct answer",
+                "fairness": "Use plain language.",
+            }],
+            "ai_use_boundaries": "AI drafts items; SMEs approve scoring.",
+            "limitations": ["No audience research was supplied."],
+            "review_questions": ["Confirm the local procedure."],
+            "proposed_items": [{
+                "proposal_item_id": "proposal-item-1",
+                "target_scene_id": scene_ids[0],
+                "objective_ids": [objective_ids[0]],
+                "item": {
+                    "type": "single-choice",
+                    "identifier": "evacuation-response",
+                    "prompt": "What should you do when the alarm sounds?",
+                    "choices": [
+                        {"identifier": "CHOICE_A", "text": "Use the nearest marked exit."},
+                        {"identifier": "CHOICE_B", "text": "Collect personal items first."},
+                    ],
+                    "correctResponse": "CHOICE_A",
+                    "correctFeedback": "Correct.",
+                    "incorrectFeedback": "Leave personal items behind.",
+                },
+                "rationale": "Checks the stated evacuation objective.",
+                "evidence_refs": [f"chimera://{project_id}/scenes/{scene_ids[0]}"],
+            }],
+        },
+    }
+
+
+def course_review_envelope(project_id: str, inventory: dict[str, object]) -> dict[str, object]:
+    course_ref = inventory["course_ref"]
+    source_refs = [course_ref, *(scene["source_ref"] for scene in inventory["scenes"])]
+    domains = ["objectives", "instructional_alignment", "assessment", "accessibility", "source_currency", "standards", "tracking", "packaging", "evaluation"]
+    return {
+        "schema_version": "1.0",
+        "artifact": {"type": "course-review", "id": "artifact-course-review-1", "version": 1},
+        "producer": {"skill": "kernel-orchestrator", "version": "1.0"},
+        "sources": source_refs,
+        "status": "draft",
+        "validation": {"state": "passed", "validators": ["course-review-1.0"]},
+        "payload": {
+            "project_id": project_id,
+            "course_ref": course_ref,
+            "domain_status": [{
+                "domain": domain,
+                "status": "review_required" if domain == "standards" else "insufficient_evidence" if domain == "evaluation" else "ready",
+                "finding_count": 1 if domain == "standards" else 0,
+            } for domain in domains],
+            "findings": [{
+                "finding_id": "standards-1",
+                "category": "standards",
+                "severity": "review",
+                "statement": "Standards selection is unavailable.",
+                "object_refs": [{"object_type": "course", "object_id": course_ref}],
+                "evidence_refs": [course_ref],
+                "recommendation": "Select or document the delivery standard.",
+                "limitations": ["No delivery target was submitted."],
+            }],
+            "specialist_routes": [{"domain": "standards", "capability": "standards.validate", "provider": "standards-architect"}],
+            "limitations": ["Only the submitted project inventory was reviewed."],
+            "review_questions": ["Which delivery standard is required?"],
         },
     }
 
@@ -173,6 +255,48 @@ class LearningIntelligenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "source_refs"):
             validate_storyboard_transformation(invalid_sources, "course-123", ["scene_a81f73"])
 
+    def test_assessment_blueprint_validates_native_item_and_scope_references(self):
+        envelope = assessment_blueprint_envelope("course-123", ["scene_a81f73"], ["objective-evacuation"])
+
+        self.assertIs(validate_assessment_blueprint(envelope, "course-123", ["scene_a81f73"], ["objective-evacuation"]), envelope)
+        invalid_item = {**envelope, "payload": {**envelope["payload"], "proposed_items": [{
+            **envelope["payload"]["proposed_items"][0],
+            "target_scene_id": "other-scene",
+        }]}}
+        with self.assertRaisesRegex(ValueError, "outside the selected scope"):
+            validate_assessment_blueprint(invalid_item, "course-123", ["scene_a81f73"], ["objective-evacuation"])
+        invalid_objective = {**envelope, "payload": {**envelope["payload"], "proposed_items": [{
+            **envelope["payload"]["proposed_items"][0],
+            "objective_ids": ["unsubmitted-objective"],
+        }]}}
+        with self.assertRaisesRegex(ValueError, "supplied objectives"):
+            validate_assessment_blueprint(invalid_objective, "course-123", ["scene_a81f73"], ["objective-evacuation"])
+
+    def test_course_review_validator_rejects_object_references_outside_inventory(self):
+        inventory = {
+            "course_ref": "chimera://course-123/course",
+            "objectives": [],
+            "scenes": [{"scene_id": "scene-1", "source_ref": "chimera://course-123/scenes/scene-1"}],
+            "assessment_items": [],
+            "assets": [],
+            "source_records": [],
+        }
+        envelope = course_review_envelope("course-123", inventory)
+
+        self.assertIs(validate_course_review(envelope, "course-123", inventory), envelope)
+        invalid = {**envelope, "payload": {**envelope["payload"], "findings": [{
+            **envelope["payload"]["findings"][0],
+            "object_refs": [{"object_type": "scene", "object_id": "unknown-scene"}],
+        }]}}
+        with self.assertRaisesRegex(ValueError, "outside the submitted scope"):
+            validate_course_review(invalid, "course-123", inventory)
+        invalid_evidence = {**envelope, "payload": {**envelope["payload"], "findings": [{
+            **envelope["payload"]["findings"][0],
+            "evidence_refs": [{"untrusted": "object"}],
+        }]}}
+        with self.assertRaisesRegex(ValueError, "evidence_refs"):
+            validate_course_review(invalid_evidence, "course-123", inventory)
+
 
 class PythiaRouteTests(unittest.TestCase):
     def setUp(self):
@@ -277,6 +401,153 @@ class PythiaRouteTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.status_code, 422)
         provider.submit_task.assert_not_called()
+
+    def test_assessment_design_submits_advertised_blueprint_capability_and_context(self):
+        provider = Mock()
+        provider.health.return_value = {"status": "ok", "version": "1.0"}
+        provider.capabilities.return_value = {"capabilities": [{"id": "assessment.blueprint"}]}
+        provider.submit_task.side_effect = lambda request: {"task_id": request["task_id"], "status": "submitted"}
+        request_data = main.PythiaAssessmentDesignRequest(
+            sceneIds=[self.scene.id],
+            objectives=[main.PythiaAssessmentObjective(id="objective-evacuation", statement="Choose a safe exit.", sceneIds=[self.scene.id])],
+            audience="New staff",
+            desiredDifficulty="application",
+            completionRules="One correct response is required.",
+        )
+        with patch.object(main, "PythiaProvider", return_value=provider):
+            status = main.get_pythia_status(self.project.id)
+            task = main.submit_pythia_assessment_design(self.project.id, request_data)
+
+        submitted = provider.submit_task.call_args.args[0]
+        self.assertTrue(status["supportsAssessmentDesign"])
+        self.assertEqual(status["assessmentCapability"], "assessment.blueprint")
+        self.assertEqual(task["capability"], "assessment.blueprint")
+        self.assertEqual(submitted["capability"], "assessment.blueprint")
+        self.assertEqual(submitted["inputs"][0]["scene_id"], self.scene.id)
+        self.assertEqual(submitted["context"]["objectives"], [{"id": "objective-evacuation", "statement": "Choose a safe exit."}])
+        self.assertEqual(submitted["context"]["audience"], "New staff")
+        self.assertEqual(submitted["context"]["existing_items"], [{"scene_id": self.scene.id, "item": None}])
+
+    def test_assessment_design_refuses_unadvertised_capability(self):
+        provider = Mock()
+        provider.health.return_value = {"status": "ok"}
+        provider.capabilities.return_value = {"capabilities": [{"id": "storyboard.transform"}]}
+        with patch.object(main, "PythiaProvider", return_value=provider):
+            with self.assertRaises(HTTPException) as raised:
+                main.submit_pythia_assessment_design(self.project.id, main.PythiaAssessmentDesignRequest(
+                    sceneIds=[self.scene.id],
+                    objectives=[main.PythiaAssessmentObjective(id="objective-1", statement="Complete the action.", sceneIds=[self.scene.id])],
+                    audience="New staff",
+                    desiredDifficulty="application",
+                    completionRules="One correct response is required.",
+                ))
+
+        self.assertEqual(raised.exception.status_code, 422)
+        provider.submit_task.assert_not_called()
+
+    def test_course_review_submits_only_inventory_fields_chimera_owns(self):
+        provider = Mock()
+        provider.health.return_value = {"status": "ok", "version": "1.0"}
+        provider.capabilities.return_value = {"capabilities": [{"id": "course.review"}]}
+        provider.submit_task.side_effect = lambda request: {"task_id": request["task_id"], "status": "submitted"}
+        with patch.object(main, "PythiaProvider", return_value=provider):
+            status = main.get_pythia_status(self.project.id)
+            task = main.submit_pythia_course_review(self.project.id)
+
+        request = provider.submit_task.call_args.args[0]
+        inventory = request["inputs"][0]
+        self.assertTrue(status["supportsCourseReview"])
+        self.assertEqual(request["capability"], "course.review")
+        self.assertEqual(task["source_revision"], self.project.storyboard.revision)
+        self.assertEqual(inventory["course_ref"], f"chimera://{self.project.id}/course")
+        self.assertEqual(inventory["objectives"], [])
+        self.assertEqual(inventory["scenes"][0]["scene_id"], self.scene.id)
+        self.assertEqual(inventory["scenes"][0]["objective_ids"], [])
+        self.assertEqual(inventory["standards_status"], "unavailable")
+        self.assertEqual(inventory["tracking_status"], "unavailable")
+
+    def test_course_review_persists_findings_and_resolution_without_storyboard_mutation(self):
+        inventory = main._pythia_course_inventory(self.project)
+        provider = Mock()
+        provider.task_status.return_value = {
+            "task_id": "task-course-review-1",
+            "project_id": self.project.id,
+            "consumer": "chimera",
+            "capability": "course.review",
+            "status": "awaiting_review",
+            "artifact_id": "artifact-course-review-1",
+        }
+        provider.artifact.return_value = course_review_envelope(self.project.id, inventory)
+        revision = self.project.storyboard.revision
+        with patch.object(main, "PythiaProvider", return_value=provider), TestClient(main.app) as client:
+            created = client.post(
+                f"/api/projects/{self.project.id}/pythia-course-reviews",
+                json={
+                    "taskId": "task-course-review-1",
+                    "artifactId": "artifact-course-review-1",
+                    "sourceRevision": revision,
+                },
+            )
+            listed = client.get(f"/api/projects/{self.project.id}/pythia-course-reviews")
+            review_id = created.json()["id"]
+            resolved = client.patch(
+                f"/api/projects/{self.project.id}/pythia-course-reviews/{review_id}/findings/standards-1",
+                json={"status": "resolved", "resolutionNote": "Standard selected in the LMS plan."},
+            )
+
+        self.assertEqual(created.status_code, 201, created.text)
+        self.assertEqual(listed.status_code, 200, listed.text)
+        self.assertEqual(listed.json()[0]["artifact"]["artifact"]["type"], "course-review")
+        self.assertEqual(listed.json()[0]["findings"][0]["status"], "open")
+        self.assertEqual(resolved.status_code, 200, resolved.text)
+        self.assertEqual(resolved.json()["findings"][0]["status"], "resolved")
+        self.assertEqual(resolved.json()["findings"][0]["decisionHistory"][0]["resolutionNote"], "Standard selected in the LMS plan.")
+        self.assertEqual(storage.read_project(self.project.id).storyboard.revision, revision)
+
+    def test_assessment_artifact_becomes_editable_proposal_and_mutates_only_on_accept(self):
+        objective_ids = ["objective-evacuation"]
+        source_revision = self.project.storyboard.revision
+        provider = Mock()
+        provider.task_status.return_value = {
+            "task_id": "task-assessment-1",
+            "project_id": self.project.id,
+            "consumer": "chimera",
+            "capability": "assessment.blueprint",
+            "status": "awaiting_review",
+            "artifact_id": "artifact-assessment-1",
+        }
+        provider.artifact.return_value = assessment_blueprint_envelope(self.project.id, [self.scene.id], objective_ids)
+        with patch.object(main, "PythiaProvider", return_value=provider), TestClient(main.app) as client:
+            saved = client.post(
+                f"/api/projects/{self.project.id}/pythia-assessment-proposals",
+                json={
+                    "taskId": "task-assessment-1",
+                    "artifactId": "artifact-assessment-1",
+                    "sourceSceneIds": [self.scene.id],
+                    "objectiveIds": objective_ids,
+                    "sourceRevision": source_revision,
+                },
+            )
+            proposal = saved.json()[0]
+            before_accept = storage.read_project(self.project.id)
+            accepted = client.post(
+                f"/api/projects/{self.project.id}/enhancement-proposals/{proposal['id']}/decision",
+                headers={"If-Match": f'"{source_revision}"'},
+                json={"decision": "accept"},
+            )
+
+        self.assertEqual(saved.status_code, 201, saved.text)
+        self.assertEqual(len(saved.json()), 1)
+        self.assertEqual(proposal["field"], "assessmentItem")
+        self.assertEqual(proposal["sourceTaskId"], "task-assessment-1")
+        self.assertEqual(proposal["sourceArtifactId"], "artifact-assessment-1")
+        self.assertEqual(proposal["sourceCapability"], "assessment.blueprint")
+        self.assertEqual(proposal["proposedValue"]["identifier"], "evacuation-response")
+        self.assertIsNone(before_accept.storyboard.scenes[0].assessmentItem)
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+        accepted_project = storage.read_project(self.project.id)
+        self.assertEqual(accepted_project.storyboard.revision, source_revision + 1)
+        self.assertEqual(accepted_project.storyboard.scenes[0].assessmentItem.identifier, "evacuation-response")
 
     def test_transform_proposal_accept_replaces_only_selected_scenes_and_writes_history(self):
         self.project = storage.create_scene(self.project.id, SceneCreate(title="Unselected scene"))
@@ -718,6 +989,97 @@ class PythiaRouteTests(unittest.TestCase):
         self.assertEqual(len(result.project.storyboard.scenes), 3)
         self.assertEqual(result.project.storyboard.scenes[0].title, self.scene.title)
         self.assertEqual(len(result.project.storyboard.scenes[1:]), len(proposal.artifact["payload"]["proposed_scenes"]))
+
+    @unittest.skipUnless(os.environ.get("CHIMERA_PYTHIA_ASSESSMENT_INTEGRATION") == "1", "set CHIMERA_PYTHIA_ASSESSMENT_INTEGRATION=1 to call local Pythia")
+    def test_live_pythia_assessment_design_becomes_reviewable_native_proposal(self):
+        self.project = storage.update_scene(
+            self.project.id,
+            self.scene.id,
+            main.SceneUpdate(
+                extractedText=["Leave by the nearest marked exit and report to the assembly area."],
+                notes="Emphasize the local assembly point.",
+            ),
+        )
+        source_revision = self.project.storyboard.revision
+        base_url = os.environ.get("CHIMERA_PYTHIA_BASE_URL", "http://127.0.0.1:8003")
+        with patch.dict("os.environ", {"CHIMERA_PYTHIA_BASE_URL": base_url}):
+            submitted = main.submit_pythia_assessment_design(
+                self.project.id,
+                main.PythiaAssessmentDesignRequest(
+                    sceneIds=[self.scene.id],
+                    objectives=[main.PythiaAssessmentObjective(
+                        id="objective-evacuation",
+                        statement="Choose the safe evacuation response.",
+                        sceneIds=[self.scene.id],
+                    )],
+                    audience="New staff",
+                    desiredDifficulty="application",
+                    completionRules="One correct response is required.",
+                ),
+            )
+            task = submitted
+            deadline = time.monotonic() + 20
+            while task.get("status") in {"submitted", "queued", "running"} and time.monotonic() < deadline:
+                time.sleep(0.1)
+                task = main.get_pythia_task(self.project.id, submitted["task_id"])
+            self.assertEqual(task.get("status"), "awaiting_review", task)
+            proposals = main.post_pythia_assessment_proposal(self.project.id, PythiaAssessmentProposalCreate(
+                taskId=task["task_id"],
+                artifactId=task["artifact_id"],
+                sourceSceneIds=submitted["source_scene_ids"],
+                objectiveIds=submitted["objective_ids"],
+                sourceRevision=submitted["source_revision"],
+            ))
+
+        self.assertTrue(proposals)
+        proposal = proposals[0]
+        self.assertEqual(proposal.sourceTaskId, task["task_id"])
+        self.assertEqual(proposal.sourceArtifactId, task["artifact_id"])
+        self.assertIsNone(storage.read_project(self.project.id).storyboard.scenes[0].assessmentItem)
+        decided, updated_project = storage.decide_enhancement_proposal(
+            self.project.id,
+            proposal.id,
+            "accept",
+            source_revision,
+        )
+        self.assertEqual(decided.status, "accepted")
+        self.assertEqual(updated_project.storyboard.revision, source_revision + 1)
+        self.assertEqual(updated_project.storyboard.scenes[0].assessmentItem.identifier, proposal.proposedValue["identifier"])
+
+    @unittest.skipUnless(os.environ.get("CHIMERA_PYTHIA_COURSE_REVIEW_INTEGRATION") == "1", "set CHIMERA_PYTHIA_COURSE_REVIEW_INTEGRATION=1 to call local Pythia")
+    def test_live_pythia_course_review_persists_and_resolves_finding_without_mutation(self):
+        self.project = storage.create_scene(self.project.id, SceneCreate(
+            title="Respond to a fire alarm",
+            extractedText=["Leave by the nearest marked exit."],
+            notes="Emphasize the local assembly point.",
+        ))
+        source_revision = self.project.storyboard.revision
+        base_url = os.environ.get("CHIMERA_PYTHIA_BASE_URL", "http://127.0.0.1:8003")
+        with patch.dict("os.environ", {"CHIMERA_PYTHIA_BASE_URL": base_url}):
+            submitted = main.submit_pythia_course_review(self.project.id)
+            task = submitted
+            deadline = time.monotonic() + 20
+            while task.get("status") in {"submitted", "queued", "running"} and time.monotonic() < deadline:
+                time.sleep(0.1)
+                task = main.get_pythia_task(self.project.id, submitted["task_id"])
+            self.assertEqual(task.get("status"), "awaiting_review", task)
+            review = main.post_pythia_course_review(self.project.id, main.PythiaCourseReviewCreate(
+                taskId=task["task_id"],
+                artifactId=task["artifact_id"],
+                sourceRevision=submitted["source_revision"],
+            ))
+            self.assertTrue(review.findings)
+            finding = review.findings[0]
+            decided = main.patch_pythia_course_finding(
+                self.project.id,
+                review.id,
+                finding.findingId,
+                main.PythiaCourseFindingDecision(status="resolved", resolutionNote="Reviewed against the current course plan."),
+            )
+
+        self.assertEqual(decided.findings[0].status, "resolved")
+        self.assertEqual(decided.artifact["artifact"]["type"], "course-review")
+        self.assertEqual(storage.read_project(self.project.id).storyboard.revision, source_revision)
 
 
 if __name__ == "__main__":

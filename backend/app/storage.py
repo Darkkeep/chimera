@@ -12,7 +12,7 @@ from threading import RLock, local
 from typing import Iterator, Literal
 from .models import ProductionStageUpdate
 from .ai_connection import connection_status
-from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalChange, EnhancementProposalChangeCreate, EnhancementProposalCreate, EnhancementProposalDecisionRecord, ExportSettings, ExtractedAsset, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, PythiaAnalysisProposal, PythiaAnalysisProposalCreate, PythiaAnalysisProposalDecisionRecord, PythiaTransformProposal, PythiaTransformProposalCreate, PythiaTransformProposalDecisionRecord, ReferencePassage, ReferenceResource, ReferenceResourceVersion, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewCommentReply, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate, TrashedProject
+from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalChange, EnhancementProposalChangeCreate, EnhancementProposalCreate, EnhancementProposalDecisionRecord, ExportSettings, ExtractedAsset, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, PythiaAnalysisProposal, PythiaAnalysisProposalCreate, PythiaAnalysisProposalDecisionRecord, PythiaCourseFindingDecision, PythiaCourseFindingDecisionRecord, PythiaCourseFindingReview, PythiaCourseReview, PythiaCourseReviewCreate, PythiaTransformProposal, PythiaTransformProposalCreate, PythiaTransformProposalDecisionRecord, ReferencePassage, ReferenceResource, ReferenceResourceVersion, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewCommentReply, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate, TrashedProject
 ROOT = Path(os.environ.get("CHIMERA_WORKSPACE", Path(__file__).resolve().parents[2] / "workspace"))
 from .platform import DurableEventSink, LOCAL_ACTOR, ActorContext, PlatformEvent, get_actor_context, get_correlation_id
 PROJECTS = ROOT / "projects"
@@ -940,6 +940,97 @@ def _review_comments_path(project_id: str) -> Path:
     return project_path(project_id) / "review" / "comments.json"
 
 
+def _pythia_course_reviews_path(project_id: str) -> Path:
+    return project_path(project_id) / "review" / "pythia-course-reviews.json"
+
+
+def _write_pythia_course_reviews(project_id: str, reviews: list[PythiaCourseReview]) -> None:
+    path = _pythia_course_reviews_path(project_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    temporary.write_text(json.dumps([review.model_dump(mode="json") for review in reviews], indent=2), encoding="utf-8")
+    temporary.replace(path)
+
+
+def list_pythia_course_reviews(project_id: str) -> list[PythiaCourseReview]:
+    read_project(project_id)
+    path = _pythia_course_reviews_path(project_id)
+    if not path.is_file():
+        return []
+    return [PythiaCourseReview.model_validate(item) for item in json.loads(path.read_text(encoding="utf-8"))]
+
+
+def create_pythia_course_review(
+    project_id: str,
+    data: PythiaCourseReviewCreate,
+    artifact: dict[str, object],
+) -> PythiaCourseReview:
+    with storyboard_transaction():
+        project = read_project(project_id)
+        if data.sourceRevision > project.storyboard.revision:
+            raise ValueError("Course review source revision is newer than the project")
+        reviews = list_pythia_course_reviews(project_id)
+        existing = next((review for review in reviews if review.taskId == data.taskId), None)
+        if existing:
+            if existing.artifactId != data.artifactId:
+                raise ValueError("The Pythia task already has a different course review")
+            return existing
+        now = now_iso()
+        payload = artifact["payload"]
+        review = PythiaCourseReview(
+            id=f"course-review-{uuid.uuid4().hex[:12]}",
+            taskId=data.taskId,
+            artifactId=data.artifactId,
+            sourceRevision=data.sourceRevision,
+            artifact=artifact,
+            findings=[PythiaCourseFindingReview(findingId=finding["finding_id"]) for finding in payload["findings"]],
+            createdAt=now,
+            updatedAt=now,
+        )
+        _write_pythia_course_reviews(project_id, [*reviews, review])
+        return review
+
+
+def decide_pythia_course_finding(
+    project_id: str,
+    review_id: str,
+    finding_id: str,
+    data: PythiaCourseFindingDecision,
+) -> PythiaCourseReview:
+    with storyboard_transaction():
+        reviews = list_pythia_course_reviews(project_id)
+        for review_index, review in enumerate(reviews):
+            if review.id != review_id:
+                continue
+            finding_index = next((index for index, finding in enumerate(review.findings) if finding.findingId == finding_id), None)
+            if finding_index is None:
+                raise KeyError(finding_id)
+            finding = review.findings[finding_index]
+            now = now_iso()
+            actor = get_actor_context()
+            decision = PythiaCourseFindingDecisionRecord(
+                previousStatus=finding.status,
+                status=data.status,
+                resolutionNote=data.resolutionNote,
+                decidedAt=now,
+                actorId=actor.actorId,
+                actorDisplayName=actor.actorDisplayName,
+                installationId=actor.installationId,
+                correlationId=get_correlation_id(),
+            )
+            findings = list(review.findings)
+            findings[finding_index] = finding.model_copy(update={
+                "status": data.status,
+                "resolutionNote": data.resolutionNote,
+                "decisionHistory": [*finding.decisionHistory, decision],
+            })
+            updated = review.model_copy(update={"findings": findings, "updatedAt": now})
+            reviews[review_index] = updated
+            _write_pythia_course_reviews(project_id, reviews)
+            return updated
+        raise KeyError(review_id)
+
+
 def list_reference_resources(project_id: str) -> list[ReferenceResource]:
     read_project(project_id)
     path = _reference_resources_path(project_id)
@@ -1385,6 +1476,8 @@ def create_enhancement_proposal(project_id: str, data: EnhancementProposalCreate
             if existing:
                 return existing
         project = read_project(project_id)
+        if data.sourceRevision is not None and data.sourceRevision != project.storyboard.revision:
+            raise EnhancementProposalConflict("The storyboard changed while the Pythia assessment was being generated")
         requested_changes = data.changes or [EnhancementProposalChangeCreate(
             targetSceneId=data.targetSceneId,
             field=data.field,
@@ -1413,6 +1506,10 @@ def create_enhancement_proposal(project_id: str, data: EnhancementProposalCreate
             origin=data.origin,
             provider=data.provider,
             model=data.model,
+            sourceTaskId=data.sourceTaskId,
+            sourceArtifactId=data.sourceArtifactId,
+            sourceCapability=data.sourceCapability,
+            sourceArtifact=data.sourceArtifact,
             createdAt=now_iso(),
         )
         proposals = list_enhancement_proposals(project_id)

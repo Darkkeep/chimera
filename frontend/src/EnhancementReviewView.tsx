@@ -29,6 +29,16 @@ type EnhancementProposal = {
   origin: "ai" | "author";
   provider: string | null;
   model: string | null;
+  sourceTaskId?: string | null;
+  sourceArtifactId?: string | null;
+  sourceCapability?: string | null;
+  sourceArtifact?: { payload?: {
+    alignment?: { objective_id: string; evidence: string; method: string; scoring: string; fairness: string }[];
+    assumptions?: string[];
+    limitations?: string[];
+    review_questions?: string[];
+    ai_use_boundaries?: string;
+  } } | null;
   status: "pending" | "accepted" | "rejected" | "stale" | "superseded" | "reversed";
   createdAt: string;
   decidedAt: string | null;
@@ -496,6 +506,8 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
         })}</div>}
         {proposals.length > 0 && <div className="enhancement-proposal-list">{proposals.map((proposal) => {
           const targetScene = project.storyboard.scenes.find((scene) => scene.id === proposal.targetSceneId);
+            const assessmentBlueprint = proposal.sourceCapability?.startsWith("assessment.") ? proposal.sourceArtifact?.payload : undefined;
+            const relevantAlignment = assessmentBlueprint?.alignment?.filter((item) => proposal.affectedIds.includes(item.objective_id)) ?? [];
           const proposalChanges = proposal.changes.length > 0 ? proposal.changes : [{
             targetSceneId: proposal.targetSceneId,
             field: proposal.field,
@@ -505,6 +517,9 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
           return <article className={`enhancement-proposal ${proposal.status}`} key={proposal.id}>
             <div className="enhancement-proposal-heading"><div><span className="enhancement-proposal-status">{proposal.status}</span><h3>{targetScene?.title ?? (proposal.targetSceneId ? "Scene no longer exists" : "Storyboard change")}</h3><span className="enhancement-proposal-field">{proposalChanges.length} change{proposalChanges.length === 1 ? "" : "s"} · source revision {proposal.sourceRevision}{proposal.dependencyGroupId ? ` · group ${proposal.dependencyGroupId}` : ""}</span></div><span className="enhancement-proposal-origin">{proposal.origin === "ai" ? `AI suggestion · ${proposal.referenceCitations.length ? "source-backed" : "ungrounded"}` : "Author suggestion"}{proposal.provider ? ` · ${proposal.provider}` : ""}{proposal.model ? ` / ${proposal.model}` : ""}</span></div>
             <p className="enhancement-proposal-rationale">{proposal.rationale}</p>
+            {proposal.sourceTaskId && <p className="enhancement-proposal-field">Pythia {proposal.sourceCapability} · task {proposal.sourceTaskId} · artifact {proposal.sourceArtifactId}</p>}
+            {relevantAlignment.length > 0 && <section className="enhancement-proposal-change"><div className="enhancement-proposal-field">Objective alignment</div><ul>{relevantAlignment.map((alignment) => <li key={`${alignment.objective_id}-${alignment.method}`}><strong>{alignment.objective_id}</strong><p>{alignment.evidence} · {alignment.method}</p><p>Scoring: {alignment.scoring}</p><p>Fairness: {alignment.fairness}</p></li>)}</ul></section>}
+            {assessmentBlueprint && <details className="enhancement-proposal-citations"><summary>Blueprint assumptions and review notes</summary><p>{assessmentBlueprint.ai_use_boundaries}</p>{assessmentBlueprint.assumptions?.map((item, index) => <p key={`assessment-assumption-${index}`}>{item}</p>)}{assessmentBlueprint.limitations?.map((item, index) => <p key={`assessment-limitation-${index}`}>{item}</p>)}{assessmentBlueprint.review_questions?.map((item, index) => <p key={`assessment-question-${index}`}>{item}</p>)}</details>}
             {proposalChanges.map((change, index) => <section className="enhancement-proposal-change" key={`${change.targetSceneId ?? "storyboard"}-${change.field}-${index}`}>
               <div className="enhancement-proposal-field">{change.field.replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`)}{change.targetSceneId ? ` · ${project.storyboard.scenes.find((scene) => scene.id === change.targetSceneId)?.title ?? "Missing scene"}` : " · storyboard"}</div>
               {editingProposalId === proposal.id ? <label className="enhancement-proposal-editor"><span>Suggested value{typeof change.proposedValue !== "string" ? " · JSON" : ""}</span><textarea value={changeDrafts[proposal.id]?.[index] ?? ""} onChange={(event) => setChangeDrafts((current) => ({ ...current, [proposal.id]: (current[proposal.id] ?? []).map((value, draftIndex) => draftIndex === index ? event.target.value : value) }))} rows={Math.min(8, Math.max(3, (changeDrafts[proposal.id]?.[index]?.split("\n").length ?? 3)))} /></label>
