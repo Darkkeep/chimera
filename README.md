@@ -16,7 +16,7 @@ The Media Library **Project** selector defaults to the active course and switche
 
 Configure an approved OpenAI connection through **Settings > AI connection**. Saved keys use the server account's OS credential store, never browser storage or project backups. Shared-deployment changes require an installation administrator. Existing server environment configuration remains supported; headless services without a supported credential store cannot save connections through the panel. See [AI connection](docs/ai-connection.md) for connection testing, request limits, and data-handling requirements.
 
-Choose **Light**, **Dark**, or **System** under **Appearance** in the sidebar. The preference is remembered in this browser and shared across its tabs. System is the default and follows changes to your device's color scheme. Slide images and uploaded media retain their original colors.
+Choose **Light**, **Dark**, or **System** under **Appearance** in the sidebar. The preference is remembered in this browser and shared across its tabs. Dark is the default; System follows changes to your device's color scheme. Slide images and uploaded media retain their original colors.
 
 Onboarding's reusable engine and standalone demo live in the private [Darkkeep/onboarding repository](https://github.com/Darkkeep/onboarding). Chimera retains its application walkthroughs and installs the pinned release from `vendor/onboarding`, so no sibling checkout or GitHub credentials are needed. See the [implementation record](docs/onboarding-implementation.md) and [artifact update instructions](vendor/onboarding/README.md).
 
