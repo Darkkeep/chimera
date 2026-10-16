@@ -346,6 +346,92 @@ class EnhancementProposalDecision(BaseModel):
     changes: list[EnhancementProposalChangeCreate] | None = None
 
 
+class PythiaAnalysisProposalCreate(BaseModel):
+    taskId: str = Field(min_length=1, max_length=200)
+    artifactId: str = Field(min_length=1, max_length=200)
+    sceneId: str = Field(min_length=1, max_length=120)
+    sourceRevision: int = Field(ge=1)
+
+
+class PythiaTransformRequest(BaseModel):
+    sceneIds: list[str] = Field(min_length=1, max_length=100)
+    constraints: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_unique_scenes(self) -> "PythiaTransformRequest":
+        if len(set(self.sceneIds)) != len(self.sceneIds):
+            raise ValueError("Transform scene IDs must be unique")
+        return self
+
+
+class PythiaTransformProposalCreate(BaseModel):
+    taskId: str = Field(min_length=1, max_length=200)
+    artifactId: str = Field(min_length=1, max_length=200)
+    sourceSceneIds: list[str] = Field(min_length=1, max_length=100)
+    sourceRevision: int = Field(ge=1)
+
+
+class PythiaTransformProposalDecision(BaseModel):
+    decision: Literal["accept", "reject"]
+    proposedScenes: list[dict[str, Any]] | None = None
+
+
+class PythiaTransformProposalDecisionRecord(BaseModel):
+    decision: Literal["accept", "reject"]
+    decidedAt: str
+    expectedRevision: int
+    actorId: str | None = None
+    actorDisplayName: str | None = None
+    installationId: str | None = None
+    correlationId: str | None = None
+    acceptedScenes: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class PythiaTransformProposal(BaseModel):
+    id: str
+    taskId: str
+    artifactId: str
+    sourceSceneIds: list[str] = Field(min_length=1, max_length=100)
+    sourceRevision: int = Field(ge=1)
+    artifact: dict[str, Any]
+    status: Literal["pending", "accepted", "rejected", "stale"] = "pending"
+    createdAt: str
+    decidedAt: str | None = None
+    decisionHistory: list[PythiaTransformProposalDecisionRecord] = Field(default_factory=list)
+
+
+class PythiaTransformProposalResult(BaseModel):
+    proposal: PythiaTransformProposal
+    project: "ProjectDetail | None" = None
+
+
+class PythiaAnalysisProposalDecision(BaseModel):
+    decision: Literal["accept", "reject"]
+
+
+class PythiaAnalysisProposalDecisionRecord(BaseModel):
+    decision: Literal["accept", "reject"]
+    decidedAt: str
+    storyboardRevision: int
+    actorId: str | None = None
+    actorDisplayName: str | None = None
+    installationId: str | None = None
+    correlationId: str | None = None
+
+
+class PythiaAnalysisProposal(BaseModel):
+    id: str
+    taskId: str
+    artifactId: str
+    sceneId: str
+    sourceRevision: int
+    artifact: dict[str, Any]
+    status: Literal["pending", "accepted", "rejected"] = "pending"
+    createdAt: str
+    decidedAt: str | None = None
+    decisionHistory: list[PythiaAnalysisProposalDecisionRecord] = Field(default_factory=list)
+
+
 class ReferencePassage(BaseModel):
     locator: str
     text: str = Field(min_length=1, max_length=50000)
@@ -674,6 +760,7 @@ class TrashedProject(ProjectSummary):
 
 
 EnhancementProposalResult.model_rebuild()
+PythiaTransformProposalResult.model_rebuild()
 
 
 class ValidationIssue(BaseModel):

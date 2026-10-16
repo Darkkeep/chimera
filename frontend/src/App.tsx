@@ -30,6 +30,8 @@ import { SceneVisualEditor } from "./SceneVisualEditor";
 import type { SceneEditSettings } from "./SceneVisualEditor";
 import { SceneSurface } from "./SceneSurface";
 import type { SceneLayout } from "./SceneSurface";
+import { PythiaAnalysisView } from "./PythiaAnalysisView";
+import { PythiaTransformView } from "./PythiaTransformView";
 
 type LayoutMode = "fidelity" | "hybrid" | "native" | "template";
 type SceneType = "content" | "title" | "assessment" | "media" | "interaction" | "summary";
@@ -85,6 +87,8 @@ export function App() {
   const [showAssessmentEditor, setShowAssessmentEditor] = useState(false);
   const [showCompletionSettings, setShowCompletionSettings] = useState(false);
   const [showEnhancementReview, setShowEnhancementReview] = useState(false);
+  const [showPythiaAnalysis, setShowPythiaAnalysis] = useState(false);
+  const [showPythiaTransform, setShowPythiaTransform] = useState(false);
   const [showReviewTools, setShowReviewTools] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showAIConnection, setShowAIConnection] = useState(false);
@@ -142,7 +146,7 @@ export function App() {
     showCompletionSettings ? "review.completion" : showEnhancementReview ? "review.enhancement" :
     showAccessibility ? "review.accessibility" : showValidation ? "review.validation" :
     showGoldenPath ? "catalog" : showManagement ? "workspace.management" : activeView;
-  const hasOpenForm = Boolean(visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showCompletionSettings || showEnhancementReview || showAccessibility || showValidation);
+  const hasOpenForm = Boolean(visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showCompletionSettings || showEnhancementReview || showPythiaTransform || showAccessibility || showValidation);
   guideNavigate.current = (step) => {
     const target = step.target;
     if (!target) return;
@@ -998,7 +1002,7 @@ export function App() {
         </section>
         <section data-onboarding="scene.saved" className={`canvas-panel ${scene?.visualLayout?.enabled ? "visual-active" : ""}`} aria-label="Selected scene">{scene ? <>
           <div className="scene-context-header">
-            <button className="button button-accent" onClick={() => beginSceneEdit()} disabled={busy || !permissions.canEdit}><Pencil size={16} /> Edit scene</button>
+            <div className="scene-context-actions"><button className="button button-accent" onClick={() => beginSceneEdit()} disabled={busy || !permissions.canEdit}><Pencil size={16} /> Edit scene</button><button className="button button-outline" onClick={() => setShowPythiaAnalysis(true)} disabled={busy || !permissions.canEnhance} title={!permissions.canEnhance ? "Analysis requires project authoring access" : undefined}><Sparkles size={16} /> Analyze with Pythia</button><button className="button button-outline" onClick={() => setShowPythiaTransform(true)} disabled={busy || !permissions.canEnhance} title={!permissions.canEnhance ? "Transformation requires project authoring access" : undefined}><Sparkles size={16} /> Transform with Pythia</button></div>
             <div className="scene-context-title"><h2>{scene.title}</h2><span>Scene {selectedScene + 1} of {scenes.length} · {scene.required ? "Required" : "Optional"}</span></div>
           </div>
           {scene.visualLayout?.enabled && <div className="visual-authoring-surface"><SceneSurface project={project} scene={scene} /></div>}
@@ -1032,6 +1036,8 @@ export function App() {
       {error && <p className="export-error" role="alert">{error}</p>}{feedback && <p className="export-feedback" role="status">{feedback}</p>}{busy && <p role="status">Working…</p>}
     </EditorDialog>}
     {showCompletionSettings && <CompletionSettingsEditor project={project} onClose={() => setShowCompletionSettings(false)} onProjectUpdated={applyProject} />}
+    {showPythiaAnalysis && scene && <PythiaAnalysisView key={`${project.id}-${scene.id}`} projectId={project.id} scene={scene} onClose={() => setShowPythiaAnalysis(false)} />}
+    {showPythiaTransform && scene && <PythiaTransformView key={`${project.id}-${scene.id}`} projectId={project.id} scene={scene} scenes={scenes} onClose={() => setShowPythiaTransform(false)} />}
     {showEnhancementReview && <EnhancementReviewView project={project} onClose={() => setShowEnhancementReview(false)} onProjectUpdated={applyProject} />}
     {showValidation && <ValidationView projectId={project.id} onClose={() => setShowValidation(false)} onOpenScene={(sceneId, issueCode) => { const index = scenes.findIndex((item) => item.id === sceneId); setShowValidation(false); if (index >= 0) setSelectedScene(index); if (issueCode === "missing-image-alt-text") setShowAccessibility(true); else if (issueCode === "missing-assessment-item") setShowAssessmentEditor(true); else setActiveView("storyboard"); }} />}
     {showAccessibility && <AccessibilityView projectId={project.id} revision={project.storyboard.revision} scenes={scenes} assets={project.storyboard.assets} onClose={() => setShowAccessibility(false)} onProjectUpdated={applyProject} />}
