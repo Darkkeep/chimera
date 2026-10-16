@@ -1,20 +1,20 @@
 # Chimera user guide
 
-Process-based instructions for Chimera. Screenshots refreshed 2026-10-08 from commit `4ade811` plus uncommitted working-tree updates. Captures use the isolated user-guide demonstration workspace and made no live AI requests or use of credentials. Historical source/recovery context is documented in the [recovery record](export-enhancement-recovery.md).
+Process-based instructions for Chimera. Workflow text updated 2026-10-15, including Pythia analysis, transformation, assessment design, and course review. Screenshots last refreshed 2026-10-08 from commit `4ade811` plus then-uncommitted working-tree updates; they predate the current Pythia controls and Settings labels. Captures use the isolated user-guide demonstration workspace and made no live AI requests or use of credentials. Historical source/recovery context is documented in the [recovery record](export-enhancement-recovery.md).
 
 ## How to use this guide
 
-Each task has its own **Step / Action / Result / Control image** table. Click a control image to open the full-size screenshot. Screenshots show the real Chimera interface in Light appearance, using an isolated demonstration project. Course names and sample content will differ in your workspace. Browser file pickers, download prompts, and confirmation dialogs vary by browser and operating system; screenshots show the Chimera controls that open them.
+Tasks use numbered instructions or **Step / Action / Result / Control image** tables. Click a control image to open the full-size screenshot. Screenshots show the real Chimera interface in Light appearance, using an isolated demonstration project. Course names and sample content will differ in your workspace. Browser file pickers, download prompts, and confirmation dialogs vary by browser and operating system; screenshots show the Chimera controls that open them. Follow the current text labels where an older image differs.
 
 The source has changed since the original capability review: Word export, reference upload, enhancement submission, generated-media candidate review, comments, and Chimera storyboard archives now have interface controls. Their presence does not certify a configured AI provider or compatibility with every LMS. Example proposals, candidates, and job statuses in these images are documentation fixtures; no live AI request was made for this guide.
 
-**Prerequisite:** Start the backend and frontend using the [README setup instructions](../README.md#start-locally), then open `http://localhost:5173`. Keep both services running while authoring. LibreOffice is needed for rendered PowerPoint slide previews. AI tasks require a configured connection through **Settings > AI connection** or server environment settings. Shared-installation changes require an administrator; see [AI connection](ai-connection.md).
+**Prerequisite:** Start the backend and frontend using the [README setup instructions](../README.md#start-locally), then open `http://localhost:5173`. Keep both services running while authoring. LibreOffice is needed for rendered PowerPoint slide previews. Pythia workflows additionally need the Engine API; check **Settings > Intelligence Engine**. Image and narration generation use the separate **Settings > Media provider** connection or server environment settings. Shared-installation connection changes require an administrator; see [AI connection](ai-connection.md).
 
 My Work opens after normal launch/sign-in and refresh. It is first in the workspace menu. Select a project row to open its authoring workspace, choose New Project to create one, or Resume authoring to return to the remembered project. Direct authenticated review links retain their review destination.
 
 **Working convention:** Select the intended project and scene before editing. Use the task's Save/Create/Accept control and wait for completion. Merely typing into a form does not save it. If a revision-conflict message appears, reload the project, inspect the latest values, and reapply the intended change. Do not assume unsaved form text will survive a reload.
 
-Optional interactive help is available under **Review tools ? Guided review ? All functionality walkthroughs**. Search the catalog and start the task you want to practice. The sidebar resumes your last selected walkthrough. Action steps wait for confirmed saves/downloads; review steps use Next. Escape pauses without clearing an open draft. Progress is browser-local and separate for each task/project; completing a walkthrough does not certify readiness. Restore/deletion confirmations and provider submissions remain your decisions.
+Optional interactive help is available under **Review tools > Guided review > All functionality walkthroughs**. Search the 68-task catalog, including nine Pythia workflows, and start the task you want to practice. The sidebar resumes your last selected walkthrough. Action steps wait for confirmed saves/downloads; Pythia draft steps wait until the draft is saved in Chimera, and review steps use Next. Escape pauses without clearing an open draft. Progress is browser-local and separate for each task/project; completing a walkthrough does not certify readiness. Restore/deletion confirmations and provider submissions remain your decisions. See the [walkthrough catalog and behavior](onboarding-implementation.md#walkthrough-catalog).
 
 ## Processes
 
@@ -31,6 +31,9 @@ Optional interactive help is available under **Review tools ? Guided review ? Al
 11. [Export course deliverables](#11-export-course-deliverables)
 12. [Back up and restore](#12-back-up-and-restore)
 13. [Review project health](#13-review-project-health)
+14. [Work with Pythia](#14-work-with-pythia)
+
+For the PowerPoint-to-SCORM path, start with [Work with Pythia](#14-work-with-pythia). It links the existing import, media, assessment, validation, and export tasks into one human-reviewed workflow.
 
 ![Chimera authoring workspace](user-guide/images/workspace.png)
 
@@ -67,13 +70,15 @@ Project owners can move a project to Trash from its row in **My Work**. Projects
 | 1 | Open **Settings** at the bottom of the sidebar. | Appearance options become available. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a> |
 | 2 | Choose **Light**, **Dark**, or **System**. | The preference is applied and remembered in this browser. | <a href="user-guide/images/appearance.png"><img src="user-guide/images/appearance.png" alt="appearance controls" width="240"></a> |
 
-### Configure AI
+### Configure the media provider
+
+This connection serves image and narration generation, not storyboard enhancement or Pythia's learning-intelligence providers. Check **Settings > Intelligence Engine** for analysis, transformation, assessment, course review, and enhancement status; see [Pythia prerequisites](#before-you-start-with-pythia). Older screenshots call the media connection **AI connection**.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Open **Settings > AI connection**. | Connection status appears; shared-installation non-admins see a read-only view. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="AI connection settings" width="240"></a> |
-| 2 | Choose approved models, enter the API key, and set request limits. Click **Save connection**. | The key is stored in the server's OS credential store and cleared from the form. Saving fails closed when secure storage is unavailable. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Models, write-only API key and request limits" width="240"></a> |
-| 3 | Click **Test connection** after saving. | A models-list request checks the credential without sending course content or generating media. Model access and costs still depend on the provider account. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Save, test and disconnect controls" width="240"></a> |
+| 1 | Open **Settings > Media provider**. | Media generation connection status appears; shared-installation non-admins see a read-only view. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Older AI connection settings screenshot" width="240"></a> |
+| 2 | Choose approved image/audio models, enter the API key, and set request limits. Click **Save media settings**. | The key is stored in the server's OS credential store and cleared from the form. Saving fails closed when secure storage is unavailable. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Older models, write-only API key and request limits screenshot" width="240"></a> |
+| 3 | Click **Test provider** after saving. | A models-list request checks the credential without sending course content or generating media. Model access and costs still depend on the provider account. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Older save, test and disconnect controls screenshot" width="240"></a> |
 | 4 | To disable AI, click **Disconnect** and confirm. | The saved key is deleted and environment fallback is disabled. Running requests may finish; queued jobs against changed settings require resubmission. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Disconnect AI connection" width="240"></a> |
 
 Request limits are not spending limits. Set a provider-account budget and confirm organisational data-use approval before enabling generation. See [AI connection](ai-connection.md) for credential-store provisioning and operational requirements.
@@ -212,7 +217,7 @@ The current upload interface accepts images and audio, up to 100 MB per file. Im
 
 ### Create a media candidate
 
-Configure AI through **Settings > AI connection** before generating candidates. In shared deployments, an installation administrator manages the connection. See [AI connection](ai-connection.md) for credential storage, connection testing, limits, and data handling.
+Configure image and narration generation through **Settings > Media provider** before generating candidates. In shared deployments, an installation administrator manages the connection. See [AI connection](ai-connection.md) for credential storage, connection testing, limits, and data handling. This connection is separate from Pythia.
 
 Create a media candidate starts collapsed. Select its heading to expand it. When the server-side AI connection is not configured, its heading is greyed and generation controls are disabled. If connection status cannot be loaded or your role does not permit generation, controls also remain disabled. Configuration availability does not guarantee that a provider is reachable or supports a particular model. Existing candidates can still be approved or rejected without a configured AI connection; regeneration requires the connection.
 
@@ -342,7 +347,9 @@ Current question scoring is binary: 0% or 100%. Course score weights affect the 
 
 ## 6. Import references and request enhancement
 
-AI submission requires an administrator to configure the server-side provider. Without it, Preview submission remains useful, but Submit run is disabled. This guide does not claim that an AI service was contacted or its output verified.
+This section describes **New enhancement run**, which uses Pythia's `storyboard.enhance` capability. It is separate from the analysis, transformation, assessment, and course-review dialogs described in [Work with Pythia](#14-work-with-pythia). Only the references selected in this form accompany this enhancement request; they are not automatically included in the other Pythia workflows.
+
+Enhancement submission requires an available Intelligence Engine supporting `storyboard.enhance`, managed by an administrator in shared installations. Check **Settings > Intelligence Engine**, not **Media provider**. Without it, Preview submission remains useful, but Submit run is disabled. This documentation update made no live AI requests and does not certify provider output.
 
 ### Import a Study Guide or supporting reference
 
@@ -360,13 +367,13 @@ Failed or incomplete extraction disables selection. The current form does not pr
 | --- | --- | --- | --- |
 | 1 | Choose **Whole course** or **Selected scenes** under **Scope**; for selected scenes, check the required scene boxes. | The enhancement target is defined. | <a href="user-guide/images/enhancement-form.png"><img src="user-guide/images/enhancement-form.png" alt="enhancement form controls" width="240"></a> |
 | 2 | Enter an **Enhancement goal** and check the **Permitted references** to include. | The run is limited to the chosen content and references. | <a href="user-guide/images/enhancement-form.png"><img src="user-guide/images/enhancement-form.png" alt="enhancement form controls" width="240"></a> |
-| 3 | Click **Preview submission**, then expand **Inspect submitted content**. | You can inspect the payload, source revision, counts, estimated input tokens, and any available cost estimate. | <a href="user-guide/images/submission-actions.png"><img src="user-guide/images/submission-actions.png" alt="Preview submission and Submit run controls" width="240"></a><br><a href="user-guide/images/submission-preview.png"><img src="user-guide/images/submission-preview.png" alt="submission preview controls" width="240"></a> |
+| 3 | Click **Preview submission**, then expand **Inspect submitted content**. | You can inspect the payload, source revision, counts, estimated input units, and any available cost estimate. | <a href="user-guide/images/submission-actions.png"><img src="user-guide/images/submission-actions.png" alt="Preview submission and Submit run controls" width="240"></a><br><a href="user-guide/images/submission-preview.png"><img src="user-guide/images/submission-preview.png" alt="submission preview controls" width="240"></a> |
 
 ### Submit an enhancement run
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Complete and inspect the submission preview. Resolve the provider-not-configured message if present. | You know what will be sent and whether submission is available. | <a href="user-guide/images/submission-preview.png"><img src="user-guide/images/submission-preview.png" alt="submission preview controls" width="240"></a> |
+| 1 | Complete and inspect the submission preview. Resolve any Intelligence Engine unavailable or unsupported-capability message. | You know what will be sent and whether submission is available. | <a href="user-guide/images/submission-preview.png"><img src="user-guide/images/submission-preview.png" alt="submission preview controls" width="240"></a> |
 | 2 | Click **Submit run** when enabled. | An enhancement job is created; it produces proposals rather than directly applying changes. | <a href="user-guide/images/submission-actions.png"><img src="user-guide/images/submission-actions.png" alt="submission preview controls" width="240"></a> |
 | 3 | Review the job status and any reported resource conflicts, then review returned suggestions individually. | You can distinguish completion, failure, and suggestions needing a decision. | <a href="user-guide/images/enhancement-jobs.png"><img src="user-guide/images/enhancement-jobs.png" alt="enhancement jobs controls" width="240"></a><br><a href="user-guide/images/proposal.png"><img src="user-guide/images/proposal.png" alt="proposal controls" width="240"></a> |
 
@@ -378,6 +385,8 @@ Failed or incomplete extraction disables selection. The current form does not pr
 | 2 | Click **Cancel** for a queued/running job, or **Retry** for a failed/cancelled job after addressing the cause. | Cancellation is requested or a retry job is started. Neither action approves proposals. | <a href="user-guide/images/enhancement-jobs.png"><img src="user-guide/images/enhancement-jobs.png" alt="enhancement jobs controls" width="240"></a> |
 
 ## 7. Review enhancement proposals
+
+**Review suggestions** contains several proposal types. The **Accept change**, **Edit values**, and **Undo acceptance** instructions below apply to regular enhancement proposals, including native assessment items drafted by Pythia. Pythia analysis uses **Accept review** without changing content; storyboard transformation uses **Edit proposal** and **Accept transformation**, with no undo button. Follow the [Pythia-specific decision steps](#14-work-with-pythia) for those records.
 
 ### Accept or reject a suggestion
 
@@ -606,6 +615,98 @@ Project health uses a bounded, keyboard-scrollable area at five or more projects
 | 2 | Review counts, production stages and categorized blockers. Expand blocker findings or **Recent activity** as needed. | You can identify projects that need attention without treating readiness as approval. | <a href="user-guide/images/my-work-current.png"><img src="user-guide/images/my-work-current.png" alt="Project stages and categorized blockers" width="240"></a> |
 | 3 | Select a project name/row to open that project's Storyboard, or choose **Resume authoring**. | Authoring opens for editable projects; review-only users retain review access. | <a href="user-guide/images/my-work-current.png"><img src="user-guide/images/my-work-current.png" alt="Open a project or resume authoring" width="240"></a> |
 
+## 14. Work with Pythia
+
+Pythia returns drafts for human review. Chimera remains the authoring workspace: submitting a task does not approve the course, replace scenes, or add questions. Analysis and course-review decisions record your judgment without editing content; accepted transformations and assessment proposals do change saved content.
+
+### Before you start with Pythia
+
+1. Open the intended project with authoring access, save any open edits, and select a scene in **Storyboard**. Analysis, transformation, and assessment design start from the buttons above that scene. Course review starts from **Review tools > Review course with Pythia**.
+2. Open **Settings > Intelligence Engine**. Check **Engine**, **Version**, **Capabilities**, and **Provider registry**. The required capabilities are `storyboard.analyze`, `storyboard.transform`, `assessment.design` (or the supported `assessment.blueprint` alias), and `course.review`; the reference-based enhancement form additionally requires `storyboard.enhance`. An online engine alone does not guarantee that every capability is available to your installation or account.
+3. Ask the installation administrator to resolve missing capabilities, access restrictions, or an unavailable engine. This panel is diagnostic, not a provider editor. Pythia manages learning-intelligence provider/model selection; changing **Media provider** does not select a Pythia model. Usage telemetry requires administrator access and resets when the Engine restarts. Reported budget units are not a currency spending cap.
+4. Confirm organisational permission to submit the selected course content. Pythia requests use saved scene text and notes, or the course inventory for course review. Do not assume that references checked in **New enhancement run** accompany these tasks. Check the reported provider: deterministic local drafts are not evidence of an external model call or instructional quality.
+
+For a local installation, Pythia is a third service alongside the Chimera backend and frontend. From the Pythia repository root, start it in a separate terminal:
+
+```powershell
+.\.venv\Scripts\uvicorn.exe service.app:create_app --factory --host 127.0.0.1 --port 8001
+```
+
+Before starting the Chimera backend, set its Engine address in that backend terminal:
+
+```powershell
+$env:CHIMERA_PYTHIA_BASE_URL = 'http://127.0.0.1:8001'
+```
+
+Then start Chimera using the [local setup instructions](../README.md#start-locally). If the backend is already running, restart it with the variable set, or configure the equivalent environment for its VS Code task/service. Pythia and Chimera's backend cannot both bind port 8000 on the same host. Hosted users should ask their administrator to configure the Engine address rather than starting a local copy.
+
+### Follow the PowerPoint-to-SCORM workflow
+
+Use **Review tools > Guided review** for the Golden Path checklist and its task shortcuts. Checklist availability is not evidence that a task has been completed or approved.
+
+1. [Create a project and import the PowerPoint](#2-import-and-author-scenes). Inspect extracted text, notes, scene order, and rendering warnings before asking Pythia to reason about them.
+2. [Analyze a source scene](#analyze-a-source-scene) and inspect its evidence, uncertainty, and recommendations. Record the analysis decision in **Review suggestions**.
+3. [Propose and accept a transformation](#transform-selected-scenes). Review the entire replacement sequence before acceptance, then inspect the saved scenes.
+4. [Add supporting media and image descriptions](#4-manage-imported-media-and-accessibility). Transformation media requirements are suggestions, not generated or attached assets.
+5. [Design an assessment](#design-and-accept-an-assessment). Review each native question proposal, accept only suitable items, and test them in learner preview.
+6. [Review the complete course](#review-the-complete-course-with-pythia). Address findings in the relevant editors and record your resolution decisions. Re-run review after content changes.
+7. [Preview the course](#9-play-and-comment-on-the-storyboard), then run [Production release validation](#10-validate-course-readiness) and resolve blocking errors.
+8. In [My Work](#13-review-project-health), record the human release decision by setting the production stage to **Approved**, if you have project-settings permission. This is a declared stage, not an automatic Pythia verdict or a substitute for validation.
+9. [Build the SCORM package and inspect its report](#11-export-course-deliverables). Verify playback, scoring, completion, and resume in the destination LMS before release.
+
+### Analyze a source scene
+
+1. In **Storyboard**, select the source scene and click **Analyze with Pythia**. Verify the scene title and wait for the engine check.
+2. Click **Analyze selected scene**. Keep the dialog open while Chimera polls the task and saves the returned draft. **Draft ready for review** is not approval.
+3. Read **Findings**, **Recommendations**, **Uncertainties**, **Review questions**, and **Source references**. Check observations against the saved source; evidence links do not guarantee correctness.
+4. Wait for **Saved to Review suggestions**, close the dialog, and open **Review tools > Review suggestions**. Locate the record labeled **Pythia · storyboard.analyze** and check its source revision.
+5. Choose **Accept review** to mark the analysis reviewed, or **Reject** to reject the record. Neither action applies recommendations or changes the storyboard. There is no analysis **Edit values** or **Undo acceptance** control. Make any desired content changes in the scene editor or through a separately reviewed transformation.
+
+### Transform selected scenes
+
+**Before accepting:** [Download a Chimera storyboard](#12-back-up-and-restore) if you need an accessible recovery copy. Transformation replaces selected scenes with a proposed sequence; it is not an overlay on the original slide design. Revision history is retained, but the interface has no general history-restore browser or transformation undo button.
+
+1. Select a scene and click **Transform with Pythia**. In **Scenes to transform**, check every source scene to include. At least one is required; selected scenes are submitted in storyboard order.
+2. Click **Propose transformation**. Wait for **Draft saved for review**. Compare **Current** with **Proposed sequence**, including purpose, learner content, interaction recommendations, production notes, media requirements, and assessment opportunities.
+3. Close the dialog and open **Review tools > Review suggestions**. Find **Storyboard transformation**, labeled **Pythia · storyboard.transform**. Verify the selected source scenes and source revision, not just the proposal title.
+4. To revise the sequence before accepting, click **Edit proposal**. This exposes **Proposed scene sequence · JSON**, not a visual scene editor. Preserve the structured fields and valid JSON; use **Cancel edit** to discard form edits. Editing alone does not apply the sequence.
+5. Click **Accept transformation** to replace the selected scenes and save a new storyboard revision, or **Reject** to keep the storyboard unchanged. Acceptance applies the whole proposed sequence, not one displayed scene at a time.
+6. Return to **Storyboard** and inspect the actual saved order, learner text, layouts, media, and any assessment or navigation dependencies. Implement and verify suggested interactions and media separately; a production note is not a finished interaction.
+
+If the proposal becomes **stale** or acceptance reports that the storyboard changed, reload the current project and run a new transformation. Do not repeatedly accept the old proposal to overwrite newer work. Decide a transformation before submitting downstream assessment/review work that depends on the resulting scenes.
+
+### Design and accept an assessment
+
+1. Select a scene and click **Design assessment**. Under **Scenes**, select the saved source scenes the assessment should cover.
+2. Enter an **Objective ID** and **Statement** for every objective; use **Add objective** for additional objectives. For example, use `evacuation-route` with "Choose the safest evacuation route for a blocked exit." Remove unused objective rows rather than leaving incomplete entries.
+3. Complete **Audience**, **Desired difficulty** (**Recall**, **Understanding**, **Application**, or **Analysis**), and **Completion rules**. These describe the design request; they do not save Chimera's course completion policy. Configure the actual policy separately under **Review tools > Completion rules**.
+4. Click **Design assessment** and wait for the draft items to be saved. Read **Objective alignment**, **Draft items**, **Assumptions**, **Limitations**, and **Review questions**, including each item's target scene.
+5. Open **Review tools > Review suggestions** and find the proposals with a **Pythia assessment...** task/artifact label. Inspect **Objective alignment**, **Blueprint assumptions and review notes**, and every **Current / Suggested** change. Verify the prompt, correct answer, feedback, scoring, fairness, and whether an existing target question would be replaced.
+6. Choose **Edit values** if needed, preserving valid JSON for structured question values. Click **Accept change** to apply that proposal, or **Reject** to leave content unchanged. Draft generation alone adds no question. **Undo acceptance** is available for these native proposals only when later changes permit a safe restore.
+7. Inspect the saved question through [the question editor](#5-author-assessments), set scoring/remediation rules, and [test it in preview](#test-an-assessment-in-preview). Check correct and incorrect responses and completion behavior; blueprint validity is not assessment-quality approval.
+
+Resolve stale/conflicting item proposals against the latest saved storyboard rather than forcing them through. Refresh **Review suggestions** after decisions and re-run design when the source or objectives have changed.
+
+### Review the complete course with Pythia
+
+1. After saving scene, assessment, media, and accessibility changes, open **Review tools > Review course with Pythia**. Click **Review course with Pythia** in the dialog to submit the current course inventory.
+2. Wait for the report to be saved. Use **Review run** to select a saved report by date and source revision. A report marked **source has changed** describes an earlier revision; close and reopen the dialog to start a fresh review of current content.
+3. Inspect **Domain status**, each finding's category and severity, evidence references, recommendations, limitations, and the report's **Review questions**. "No findings returned" is not a certification, especially where report limitations identify missing evidence.
+4. Use **Open scene**, **Open assessment**, or the other available **Open ...** controls to inspect the referenced object. Make and save the necessary correction in its editor, then return to course review and select the relevant run.
+5. Enter a **Resolution note** explaining what you verified or changed, then click **Resolve**. A note is required for resolution. Use **Dismiss** for a finding you judge inapplicable; record your rationale in the note before dismissing. Use **Reopen** if a closed finding needs further attention.
+6. Re-run review after content changes and inspect the new report before the release decision. Finding statuses belong to their saved review run; do not treat an older resolved report as evidence about a newer storyboard.
+
+Resolving or dismissing a finding records a human decision only. It does not fix scene text, add alternative text, change an answer key, run production validation, set **Approved**, or publish a package. Pythia course review complements, rather than replaces, validation and learner/LMS testing.
+
+### Handle task failures and interruptions
+
+- **Engine unavailable or capability missing:** Check **Settings > Intelligence Engine** and the address configured for the Chimera backend. Use **Refresh engine status** there, or **Retry connection** where offered in analysis. Authoring, preview, validation, and export do not require a running Pythia engine.
+- **Task in progress:** Keep its dialog open until the draft is saved. **Cancel task** requests cancellation while submitted, queued, or running; inspect the returned state. Closing a dialog is not a cancellation action, and there is no general Pythia task-resume dashboard documented here.
+- **Polling error:** Use **Retry polling** when offered. This resumes checking the existing task; it is not a new submission. Do not submit duplicate tasks just because a status request failed.
+- **Failed or cancelled:** Address the reported cause, then use **Analyze again**, **Run transformation again**, **Run assessment design again**, or **Run course review again**, as appropriate. These create new work; they do not accept an earlier draft.
+- **Access, capacity, or provider error:** Ask the administrator to check authoring permission, capability authorization, task limits, and Pythia provider health. Do not put credentials into course text or a proposal.
+- **Draft saved but not visible:** Reopen **Review suggestions** for analysis, transformation, or assessment proposals. Reopen **Review course with Pythia** and select **Review run** for course reports. Confirm the active project and source revision before deciding.
+
 ## Features without a documented user-facing workflow
 
 Do not follow the implementation build plan as if every planned control already exists. The following have no complete workflow in the interface captured here:
@@ -625,7 +726,7 @@ See the [implementation build plan](storyboard-export-enhancement-build-plan.md)
 | Symptom | What to do |
 | --- | --- |
 | Projects or libraries do not load | Confirm both local services are running and inspect the displayed error. |
-| A control is disabled | Select a project/scene, complete required fields, or wait for the current operation. AI Submit run also needs server configuration. |
+| A control is disabled | Select a project/scene, complete required fields, or wait for the current operation. Submit run and other Pythia tasks need authoring access and their Intelligence Engine capability; media generation needs its separate provider connection. See [Pythia prerequisites](#before-you-start-with-pythia). |
 | PowerPoint imports without a slide image | Check the render warning and LibreOffice availability. Inspect extracted text and media. |
 | Media upload is rejected | Check the supported image/audio extension, file validity, and 100 MB limit. |
 | A reference cannot be selected | Inspect its extraction status. Supply readable text when extraction is incomplete. |
@@ -640,5 +741,7 @@ See the [implementation build plan](storyboard-export-enhancement-build-plan.md)
 Screenshots were captured from the actual local frontend and an isolated backend workspace on 2026-09-30, using a compatible headless Chromium browser, a 1500-pixel-wide viewport, and Light appearance. Images are stored in `docs/user-guide/images/` and contain demonstration data only. Proposal, generated-candidate, and enhancement-job examples were seeded locally to expose conditional controls. No paid generation or external submission was performed.
 
 UI navigation, proposal acceptance, commenting/resolution, and sample assessment playback were exercised while capturing screens. This documentation pass does not constitute a complete regression test, Word rendering qualification, AI-provider certification, or LMS test. Screenshots should be refreshed whenever control labels or workflows change.
+
+The 2026-10-15 Pythia workflow text was checked against the current frontend controls and integration handoffs; no new screenshots or live provider requests were made for this update. The separate [Sprint 10 qualification record](pythia-sprint-10-golden-path-handoff.md) covers an API-level PowerPoint-to-SCORM regression using deterministic local Pythia providers. It is not a screenshot walkthrough, external-model qualification, human SME approval, or live LMS test.
 
 Capture details and refresh instructions: [manifest](user-guide/capture-manifest.json) and [maintainer instructions](user-guide/support/README.md).

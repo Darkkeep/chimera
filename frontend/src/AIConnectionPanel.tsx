@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, Save, Unplug, X } from "lucide-react";
 import { EditorDialog } from "./EditorDialog";
+import { reportOnboardingOutcome } from "./onboarding-journeys";
 import "./ai-connection.css";
 
 type ConnectionStatus = {
@@ -10,7 +11,7 @@ type ConnectionStatus = {
   maxRequestsPerDay: number; maxConcurrentRequests: number;
 };
 
-export function AIConnectionPanel({ onClose }: { onClose: () => void }) {
+export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { onClose: () => void; onboardingScope?: string }) {
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [textModel, setTextModel] = useState("gpt-4.1-mini");
   const [imageModel, setImageModel] = useState("gpt-image-1");
@@ -59,11 +60,12 @@ export function AIConnectionPanel({ onClose }: { onClose: () => void }) {
       if (!response.ok) throw new Error(result.detail || "The media provider action could not be completed.");
       if (action === "test") setMessage(result.message || "Connection verified.");
       else { applyStatus(result); setMessage(action === "save" ? "Media provider settings saved." : "Media provider disconnected."); window.dispatchEvent(new Event("chimera:ai-connection-updated")); }
+      reportOnboardingOutcome(`media.provider.${action === "test" ? "tested" : action === "disconnect" ? "disconnected" : "saved"}`, onboardingScope);
     } catch (issue) { setError(issue instanceof Error ? issue.message : "Media provider action failed."); }
     finally { setApiKey(""); setWorking(false); }
   }
 
-  return <EditorDialog labelledBy="ai-connection-title" onClose={() => { setApiKey(""); onClose(); }} busy={working} className="ai-connection-dialog">
+  return <EditorDialog onboardingTarget="settings.media" labelledBy="ai-connection-title" onClose={() => { setApiKey(""); onClose(); }} busy={working} className="ai-connection-dialog">
     <header className="ai-connection-header"><h2 id="ai-connection-title">Media generation connection</h2><button type="button" className="icon-button" aria-label="Close media provider settings" title="Close media provider settings" disabled={working} onClick={onClose}><X size={18} /></button></header>
     {loading ? <p role="status">Loading connection...</p> : status && <>
       <dl className="ai-connection-status"><div><dt>Media provider</dt><dd>{status.configured ? "Configured" : "Not configured"}</dd></div><div><dt>Source</dt><dd>{status.source === "environment" ? "Server environment" : status.source === "saved" ? "Saved connection" : "None"}</dd></div><div><dt>Credential</dt><dd>{status.keyConfigured ? "Configured" : "Not configured"}</dd></div></dl>

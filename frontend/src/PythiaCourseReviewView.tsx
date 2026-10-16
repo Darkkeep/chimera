@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, Check, LoaderCircle, RotateCw, Sparkles, X } from "lucide-react";
 import { EditorDialog } from "./EditorDialog";
+import { reportOnboardingOutcome } from "./onboarding-journeys";
 import type { Project } from "./App";
 
 type Capability = { id?: string; capability?: string; capability_id?: string } | string;
@@ -115,6 +116,7 @@ export function PythiaCourseReviewView({
             setTask(next);
             setReviews((current) => [...current.filter((review) => review.id !== saved.id), saved]);
             setSelectedReviewId(saved.id);
+            reportOnboardingOutcome("pythia.course.saved", project.id);
           }
         } else if (!controller.signal.aborted) {
           setTask(next);
@@ -169,6 +171,7 @@ export function PythiaCourseReviewView({
         { status, resolutionNote: resolutionNote || null },
       );
       setReviews((current) => current.map((review) => review.id === saved.id ? saved : review));
+      reportOnboardingOutcome("pythia.finding.decided", project.id);
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : "Finding status could not be saved.");
     } finally {
@@ -184,7 +187,7 @@ export function PythiaCourseReviewView({
   const reviewIsStale = Boolean(selectedReview && selectedReview.sourceRevision !== project.storyboard.revision);
   const findingState = new Map((selectedReview?.findings ?? []).map((finding) => [finding.findingId, finding]));
 
-  return <EditorDialog labelledBy="pythia-course-review-title" className="pythia-analysis-dialog" onClose={onClose} busy={busy}>
+  return <EditorDialog onboardingTarget="review.course" labelledBy="pythia-course-review-title" className="pythia-analysis-dialog" onClose={onClose} busy={busy}>
     <div className="modal-head"><div><p className="eyebrow">PYTHIA ENGINE</p><h2 id="pythia-course-review-title">Course review</h2></div><button className="icon-button" onClick={onClose} disabled={busy} aria-label="Close course review"><X size={19} /></button></div>
     <div className="pythia-scene-label"><span>COURSE</span><strong>{project.title}</strong></div>
     <section className="pythia-engine-state" role="status">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, Check, LoaderCircle, Sparkles, X } from "lucide-react";
 import { EditorDialog } from "./EditorDialog";
+import { reportOnboardingOutcome } from "./onboarding-journeys";
 import type { Scene } from "./App";
 import "./pythia-analysis.css";
 
@@ -125,7 +126,10 @@ export function PythiaAnalysisView({ projectId, scene, onClose }: { projectId: s
               sourceRevision: analyzedRevision,
             },
           );
-          if (!controller.signal.aborted) { setTask(next); setArtifact(result); setProposal(reviewProposal); }
+          if (!controller.signal.aborted) {
+            setTask(next); setArtifact(result); setProposal(reviewProposal);
+            reportOnboardingOutcome("pythia.analysis.saved", projectId, scene.id);
+          }
         } else if (!controller.signal.aborted) {
           setTask(next);
           if (next.status === "failed") setError(typeof next.error === "string" ? next.error : next.error ? JSON.stringify(next.error) : "Pythia analysis failed.");
@@ -161,6 +165,7 @@ export function PythiaAnalysisView({ projectId, scene, onClose }: { projectId: s
     try {
       const cancelled = await requestJson<Task>(`/api/projects/${projectId}/pythia-tasks/${encodeURIComponent(task.task_id)}/cancel`, undefined, "POST");
       setTask(cancelled);
+      if (cancelled.status === "cancelled") reportOnboardingOutcome("pythia.task.cancelled", projectId, scene.id);
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : "Pythia task could not be cancelled.");
     }
@@ -171,7 +176,7 @@ export function PythiaAnalysisView({ projectId, scene, onClose }: { projectId: s
   const canSubmit = Boolean(engine?.health?.status === "ok" && engine.supportsStoryboardAnalyze);
   const payload = artifact?.payload;
 
-  return <EditorDialog labelledBy="pythia-analysis-title" className="pythia-analysis-dialog" onClose={onClose} busy={submitting}>
+  return <EditorDialog onboardingTarget="pythia.analysis" labelledBy="pythia-analysis-title" className="pythia-analysis-dialog" onClose={onClose} busy={submitting}>
     <div className="modal-head"><div><p className="eyebrow">PYTHIA ENGINE</p><h2 id="pythia-analysis-title">Analyze with Pythia</h2></div><button className="icon-button" onClick={onClose} disabled={submitting} aria-label="Close Pythia analysis"><X size={19} /></button></div>
     <div className="pythia-scene-label"><span>SCENE {scene.id}</span><strong>{scene.title}</strong></div>
     <section className="pythia-engine-state" role="status">

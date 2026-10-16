@@ -337,6 +337,7 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
       if (result.project) onProjectUpdated(result.project);
       setEditingProposalId("");
       reportOnboardingOutcome("suggestion.decided", project.id);
+      if (result.proposal.sourceCapability?.startsWith("assessment.")) reportOnboardingOutcome("pythia.assessment.decided", project.id);
     } catch (decisionError) {
       setError(decisionError instanceof Error ? decisionError.message : "Suggestion could not be reviewed.");
       if (decisionError instanceof Error && decisionError.message.includes("stale")) {
@@ -360,6 +361,7 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
       const result = await response.json().catch(() => null) as PythiaAnalysisProposal & { detail?: string } | null;
       if (!response.ok || !result) throw new Error(result?.detail || "Pythia analysis could not be reviewed.");
       setPythiaProposals((current) => current.map((proposal) => proposal.id === result.id ? result : proposal));
+      reportOnboardingOutcome("pythia.analysis.decided", project.id);
     } catch (decisionError) {
       setError(decisionError instanceof Error ? decisionError.message : "Pythia analysis could not be reviewed.");
     } finally {
@@ -388,6 +390,7 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
       setTransformProposals((current) => current.map((proposal) => proposal.id === result.proposal.id ? result.proposal : proposal));
       if (result.project) onProjectUpdated(result.project);
       setEditingTransformId("");
+      reportOnboardingOutcome("pythia.transform.decided", project.id);
     } catch (decisionError) {
       const message = decisionError instanceof Error ? decisionError.message : "Pythia transformation could not be reviewed.";
       setError(message);

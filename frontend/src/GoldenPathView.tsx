@@ -54,6 +54,14 @@ export function GoldenPathView({ onStartWalkthrough, onSelectWalkthrough, walkth
       action: onCreateProject,
     },
     {
+      title: "Check the Intelligence Engine",
+      instructions: "Inspect Pythia availability, capabilities and providers. Media generation uses a separate connection; opening diagnostics does not submit a task.",
+      status: "review",
+      statusLabel: "Connection check",
+      actionLabel: "Inspect Intelligence Engine",
+      action: () => onSelectWalkthrough("engine-status"),
+    },
+    {
       title: "Bring in course content",
       instructions: "Import a PowerPoint to seed scenes, or start with a blank scene in the storyboard.",
       status: hasContent ? "done" : project.id ? "next" : "waiting",
@@ -79,11 +87,19 @@ export function GoldenPathView({ onStartWalkthrough, onSelectWalkthrough, walkth
     },
     {
       title: "Review the analysis proposal",
-      instructions: "Inspect evidence and uncertainty in Review suggestions. Accept, edit, or reject the proposal explicitly.",
+      instructions: "Inspect evidence and uncertainty in Review suggestions. Accept review or Reject records your decision without applying recommendations; make content edits separately.",
       status: scenes.length > 0 ? "review" : "waiting",
       statusLabel: scenes.length > 0 ? "Human review" : "After analysis",
       actionLabel: "Open Review suggestions",
       action: project.id ? onOpenSuggestions : undefined,
+    },
+    {
+      title: "Preserve the source before replacement",
+      instructions: "Download a Chimera storyboard if you need an accessible recovery copy. Transformation replaces selected scenes and has no undo button.",
+      status: project.id ? "review" : "waiting",
+      statusLabel: project.id ? "Recovery copy" : "After project setup",
+      actionLabel: "Download Chimera storyboard",
+      action: project.id ? () => onSelectWalkthrough("export-backup") : undefined,
     },
     {
       title: "Propose a storyboard transformation",

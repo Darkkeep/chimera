@@ -142,6 +142,7 @@ export function App() {
   const [resumeHost, setResumeHost] = useState<Element | null>(null);
   guideContext.current = { ...guideContext.current, projectId: project.id, sceneCount: project.storyboard.scenes.length,
     assetCount: project.storyboard.assets.length, templateCount: templates.length,
+    canEnhance: permissions.canEnhance, canManageAccess: Boolean(session && permissions.canManageMembers),
     selectedSceneId: project.storyboard.scenes[selectedScene]?.id,
     assessmentSceneId: project.storyboard.scenes[selectedScene]?.sceneType === "assessment" ? project.storyboard.scenes[selectedScene].id : project.storyboard.scenes.find(s => s.sceneType === "assessment")?.id,
     questionCount: project.storyboard.scenes.filter(s => s.assessmentItem).length,
@@ -150,9 +151,11 @@ export function App() {
   const currentSurface = visualSceneId || sceneDraft ? "scene.edit" : isCreating ? "project.name" : templateDraft ? "templates.edit" :
     showExport ? "export.panel" : showPreview ? "preview.content" : showAssessmentEditor ? "assessment.editor" :
     showCompletionSettings ? "review.completion" : showEnhancementReview ? "review.enhancement" : showPythiaCourseReview ? "review.course" :
+    showPythiaAnalysis ? "pythia.analysis" : showPythiaTransform ? "pythia.transform" : showPythiaAssessmentDesign ? "pythia.assessment" :
+    showIntelligenceEngine ? "settings.engine" : showAIConnection ? "settings.media" :
     showAccessibility ? "review.accessibility" : showValidation ? "review.validation" :
-    showGoldenPath ? "catalog" : showManagement ? "workspace.management" : activeView;
-  const hasOpenForm = Boolean(visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showCompletionSettings || showEnhancementReview || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showAccessibility || showValidation);
+    showGoldenPath ? "catalog" : showManagement ? "workspace.management" : showProjectAccess ? "workspace.access" : activeView;
+  const hasOpenForm = Boolean(visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showAccessibility || showValidation);
   guideNavigate.current = (step) => {
     const target = step.target;
     if (!target) return;
@@ -163,6 +166,7 @@ export function App() {
     if (target === currentSurface || (target === "preview.comments" && showPreview)) return;
     if (hasOpenForm) throw new Error("Close the current task before continuing. Your draft is preserved. Then Retry.");
     setShowManagement(false);
+    setShowProjectAccess(false);
     if (target === "scene.edit") { setActiveView("storyboard"); beginSceneEdit(); }
     else if (target === "scene.audio") setActiveView("storyboard");
     else if (target?.startsWith("storyboard.") || target === "scene.saved") setActiveView("storyboard");
@@ -173,11 +177,18 @@ export function App() {
     else if (target?.startsWith("preview.")) setShowPreview(true);
     else if (target === "review.completion") setShowCompletionSettings(true);
     else if (target === "review.enhancement") setShowEnhancementReview(true);
+    else if (target === "pythia.analysis") { setActiveView("storyboard"); setShowPythiaAnalysis(true); }
+    else if (target === "pythia.transform") { setActiveView("storyboard"); setShowPythiaTransform(true); }
+    else if (target === "pythia.assessment") { setActiveView("storyboard"); setShowPythiaAssessmentDesign(true); }
+    else if (target === "review.course") setShowPythiaCourseReview(true);
+    else if (target === "settings.engine") setShowIntelligenceEngine(true);
+    else if (target === "settings.media") setShowAIConnection(true);
     else if (target === "review.accessibility") setShowAccessibility(true);
     else if (target === "review.validation") setShowValidation(true);
     else if (target === "export.panel") setShowExport(true);
     else if (target === "workspace.appearance") setShowSettings(true);
     else if (target === "workspace.management") setShowManagement(true);
+    else if (target === "workspace.access") setShowProjectAccess(true);
   };
   useEffect(() => onboarding.controller.subscribe(state => setGuidePaused(state.status === "paused")), [onboarding]);
   useEffect(() => {
@@ -1014,7 +1025,7 @@ export function App() {
         <div className="sidebar-footer"><span className="status-dot" />{session ? "Hosted workspace" : "Local workspace"}</div>
       </div>
     </aside>
-    {showAIConnection && <AIConnectionPanel onClose={() => setShowAIConnection(false)} />}
+    {showAIConnection && <AIConnectionPanel onboardingScope={project.id || "workspace"} onClose={() => setShowAIConnection(false)} />}
     {showIntelligenceEngine && <IntelligenceEnginePanel onClose={() => setShowIntelligenceEngine(false)} />}
     <main className="main-content" id="workspace-content" tabIndex={-1}>
       {showManagement ? <ManagementView busy={busy || restoringProject} canCreateProject={canCreateProject} onCreateProject={() => setIsCreating(true)} canResume={Boolean(project.id)} onOpenProject={(projectId) => switchProject(projectId, true)} onProjectTrashed={handleProjectTrashed} onProjectsRestored={handleProjectsRestored} onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} /> : showProjectAccess ? <ProjectAccessPanel project={project} onClose={() => setShowProjectAccess(false)} /> : !permissions.canEdit && session && project.id ? <section className="project-access-panel"><h1>{project.title}</h1><p>You have review access to this project.</p><button className="button button-dark" onClick={() => setShowPreview(true)}>Open course review</button></section> : <>

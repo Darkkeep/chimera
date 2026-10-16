@@ -38,6 +38,239 @@ async function write(page, id, endpoint, data, method = 'post') {
   return response.json();
 }
 
+async function mockPythia(page, id) {
+  const project = await readProject(page, id);
+  const sceneId = project.storyboard.scenes[0].id;
+  const sourceRevision = project.storyboard.revision;
+  const state = { submissions: 0, decisions: 0, failSave: false, failDecision: false, running: false, failCancel: false };
+  const analysis = { id: 'analysis-fixture', sceneId, sourceRevision, status: 'pending', artifact: { payload: { scene_id: sceneId, findings: [], recommendations: [], uncertainties: [], review_questions: [], source_refs: [] } } };
+  const transformation = { id: 'transform-fixture', sourceSceneIds: [sceneId], sourceRevision, status: 'pending', artifact: { payload: { rationale: 'Inert transformation fixture', proposed_scenes: [{ proposal_scene_id: 'proposed-one', title: 'Proposed scene', purpose: 'Practice', learner_content: ['Practice safely'], interaction_recommendation: 'Review', production_notes: 'Verify manually', media_requirements: [], assessment_opportunities: [] }] } } };
+  const item = { identifier: 'fixture_question', type: 'true-false', prompt: 'Practice safely?', correctResponse: 'true', correctFeedback: 'Yes', incorrectFeedback: 'Try again' };
+  const assessment = { id: 'assessment-fixture', targetSceneId: sceneId, sourceRevision, status: 'pending', origin: 'ai', provider: 'Pythia', field: 'assessmentItem', beforeValue: null, proposedValue: item, changes: [], rationale: 'Inert assessment fixture', affectedIds: ['objective-one'], referenceCitations: [], sourceTaskId: 'task-fixture', sourceArtifactId: 'artifact-fixture', sourceCapability: 'assessment.design', sourceArtifact: { payload: { alignment: [], assumptions: [], limitations: [], review_questions: [], ai_use_boundaries: 'Human review required', proposed_items: [] } } };
+  const review = { id: 'review-fixture', taskId: 'task-fixture', artifactId: 'artifact-fixture', sourceRevision, createdAt: new Date().toISOString(), findings: [{ findingId: 'finding-one', status: 'open', resolutionNote: null }], artifact: { payload: { domain_status: [], findings: [{ finding_id: 'finding-one', category: 'accessibility', severity: 'review', statement: 'Inspect this scene', object_refs: [], evidence_refs: [], recommendation: 'Verify the saved content', limitations: [] }], specialist_routes: [], limitations: [], review_questions: [] } } };
+  const task = { task_id: 'task-fixture', status: 'submitted', source_revision: sourceRevision, source_scene_ids: [sceneId], objective_ids: ['objective-one'] };
+  await page.route(/\/api\/projects\/[^/]+\/(?:scenes\/[^/]+\/)?pythia-/, async route => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    if (pathname.endsWith('/pythia-status')) return route.fulfill({ json: { health: { status: 'ok' }, capabilities: { capabilities: ['storyboard.analyze', 'storyboard.transform', 'assessment.design', 'course.review'] }, supportsStoryboardAnalyze: true, supportsStoryboardTransform: true, supportsAssessmentDesign: true, supportsCourseReview: true } });
+    if (pathname.includes('/pythia-tasks/')) {
+      if (pathname.endsWith('/cancel')) {
+        if (state.failCancel) return route.fulfill({ status: 503, json: { detail: 'Cancellation unavailable' } });
+        return route.fulfill({ json: { ...task, status: 'cancelled' } });
+      }
+      return route.fulfill({ json: { ...task, status: state.running ? 'running' : 'awaiting_review', artifact_id: 'artifact-fixture' } });
+    }
+    if (pathname.includes('/pythia-artifacts/')) return route.fulfill({ json: analysis.artifact });
+    if (pathname.endsWith('/decision')) {
+      state.decisions++;
+      if (state.failDecision) return route.fulfill({ status: 409, json: { detail: 'Decision conflict' } });
+      const proposal = pathname.includes('analysis') ? analysis : transformation;
+      proposal.status = request.postDataJSON().decision === 'accept' ? 'accepted' : 'rejected';
+      return route.fulfill({ json: pathname.includes('analysis') ? proposal : { proposal, project: null } });
+    }
+    if (pathname.includes('/findings/')) {
+      state.decisions++;
+      if (state.failDecision) return route.fulfill({ status: 503, json: { detail: 'Finding save unavailable' } });
+      review.findings[0] = { ...review.findings[0], ...request.postDataJSON() };
+      return route.fulfill({ json: review });
+    }
+    const saved = pathname.endsWith('/pythia-analysis-proposals') ? analysis : pathname.endsWith('/pythia-transform-proposals') ? transformation : pathname.endsWith('/pythia-assessment-proposals') ? assessment : pathname.endsWith('/pythia-course-reviews') ? review : null;
+    if (saved) {
+      if (request.method() === 'GET') return route.fulfill({ json: [saved] });
+      if (state.failSave) return route.fulfill({ status: 503, json: { detail: 'Draft save unavailable' } });
+      return route.fulfill({ status: 201, json: saved === assessment ? [saved] : saved });
+    }
+    state.submissions++;
+    return route.fulfill({ status: 202, json: task });
+  });
+  await page.route('**/api/projects/*/enhancement-proposals**', async route => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: [assessment] });
+    state.decisions++;
+    if (state.failDecision) return route.fulfill({ status: 409, json: { detail: 'Decision conflict' } });
+    assessment.status = route.request().postDataJSON().decision === 'accept' ? 'accepted' : 'rejected';
+    return route.fulfill({ json: { proposal: assessment, project: null } });
+  });
+  return state;
+}
+
+for (const [name, submit] of [
+  ['Analyze a scene with Pythia', 'Analyze selected scene'],
+  ['Propose a Pythia storyboard transformation', 'Propose transformation'],
+  ['Design an assessment with Pythia', 'Design assessment'],
+  ['Review the course with Pythia', 'Review course with Pythia'],
+]) {
+  test(`${name} waits for an explicit submission and a persisted draft`, async ({ page }) => {
+    const id = await seed(page);
+    const before = await readProject(page, id);
+    const state = await mockPythia(page, id);
+    state.failSave = true;
+    await choose(page, name);
+    await expectStep(page, name);
+    expect(state.submissions).toBe(0);
+    if (submit === 'Analyze selected scene') {
+      await page.evaluate(scope => {
+        for (const detail of [
+          { type: 'pythia.analysis.saved', scope, entityId: 'wrong-scene' },
+          { type: 'pythia.analysis.saved', scope: 'wrong-project' },
+        ]) window.dispatchEvent(new CustomEvent('chimera:onboarding-outcome', { detail }));
+      }, id);
+      await expectStep(page, name);
+    }
+    if (submit === 'Design assessment') {
+      await page.getByLabel('Objective ID', { exact: true }).fill('objective-one');
+      await page.getByLabel('Statement', { exact: true }).fill('Practice safely');
+      await page.getByLabel('Audience', { exact: true }).fill('New authors');
+      await page.getByLabel('Completion rules', { exact: true }).fill('Answer correctly');
+      await page.keyboard.press('Escape');
+      await expect(guide(page)).toHaveCount(0);
+      await expect(page.getByLabel('Audience', { exact: true })).toHaveValue('New authors');
+      await page.getByRole('button', { name: 'Resume walkthrough', exact: true }).click();
+      await expectStep(page, name);
+    }
+    await page.getByRole('dialog').getByRole('button', { name: submit, exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Draft save unavailable');
+    await expectStep(page, name);
+    expect(state.submissions).toBe(1);
+    state.failSave = false;
+    await page.getByRole('button', { name: 'Retry polling', exact: true }).click();
+    await finish(page);
+    expect(state.submissions).toBe(1);
+    expect((await readProject(page, id)).storyboard).toEqual(before.storyboard);
+  });
+}
+
+for (const [name, proposalLabel, button] of [
+  ['Review a Pythia analysis', 'Pythia analysis proposals', 'Accept review'],
+  ['Review a Pythia transformation', 'Pythia storyboard transformations', 'Reject'],
+  ['Review Pythia assessment items', null, 'Reject'],
+]) {
+  test(`${name} advances only after its own successful decision`, async ({ page }) => {
+    const id = await seed(page);
+    const state = await mockPythia(page, id);
+    await choose(page, name);
+    const unrelated = proposalLabel
+      ? page.getByRole('article').filter({ hasText: 'Inert assessment fixture' })
+      : page.getByLabel('Pythia analysis proposals').getByRole('article').first();
+    await unrelated.getByRole('button', { name: proposalLabel ? 'Reject' : 'Accept review', exact: true }).click();
+    await expectStep(page, name);
+    state.failDecision = true;
+    const proposal = proposalLabel ? page.getByLabel(proposalLabel).getByRole('article').first() : page.getByRole('article').filter({ hasText: 'Inert assessment fixture' });
+    await proposal.getByRole('button', { name: button, exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
+    await expectStep(page, name);
+    state.failDecision = false;
+    await proposal.getByRole('button', { name: button, exact: true }).click();
+    await finish(page);
+    expect(state.submissions).toBe(0);
+    expect(state.decisions).toBe(3);
+  });
+}
+
+test('Pythia cancellation waits for confirmation and findings require a saved resolution', async ({ page }) => {
+  const id = await seed(page);
+  const state = await mockPythia(page, id);
+  state.running = true;
+  state.failCancel = true;
+  await choose(page, 'Cancel or recover a Pythia task');
+  await page.getByRole('button', { name: 'Analyze selected scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Cancel task', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Cancellation unavailable');
+  await expectStep(page, 'Cancel or recover a Pythia task');
+  state.failCancel = false;
+  await page.getByRole('button', { name: 'Cancel task', exact: true }).click();
+  await finish(page);
+  await page.getByRole('button', { name: 'Close Pythia analysis', exact: true }).click();
+  await choose(page, 'Resolve Pythia course findings');
+  await expect(page.getByRole('button', { name: 'Resolve', exact: true })).toBeDisabled();
+  await page.getByLabel('Resolution note', { exact: true }).fill('Verified in the saved scene');
+  state.failDecision = true;
+  await page.getByRole('button', { name: 'Resolve', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Finding save unavailable');
+  await expectStep(page, 'Resolve Pythia course findings');
+  state.failDecision = false;
+  await page.getByRole('button', { name: 'Resolve', exact: true }).click();
+  await finish(page);
+  await expect(page.getByRole('button', { name: 'Reopen', exact: true })).toBeVisible();
+});
+
+test('canvas authoring and production stage walkthroughs wait for real saves', async ({ page }) => {
+  const id = await seed(page);
+  await choose(page, 'Author the scene canvas');
+  await page.getByRole('tab', { name: 'Canvas', exact: true }).click();
+  await page.getByRole('button', { name: 'Save scene', exact: true }).click();
+  await finish(page);
+  await choose(page, 'Record the production and release stage');
+  const title = (await readProject(page, id)).title;
+  await page.getByLabel(`Production stage for ${title}`, { exact: true }).selectOption('in-review');
+  await finish(page);
+  expect((await readProject(page, id)).productionStage).toBe('in-review');
+});
+
+test('media provider walkthroughs require successful explicit actions and retain disconnect confirmation', async ({ page }) => {
+  await seed(page);
+  let writes = 0;
+  let fail = true;
+  const status = { configured: true, keyConfigured: true, storageAvailable: true, canManage: true, revision: 'fixture', source: 'saved', provider: 'openai', textModel: 'text-fixture', textModels: ['text-fixture'], imageModel: 'image-fixture', imageModels: ['image-fixture'], audioModel: 'audio-fixture', audioModels: ['audio-fixture'], maxRequestsPerDay: 20, maxConcurrentRequests: 1 };
+  await page.route('**/api/ai-connection**', route => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: status });
+    writes++;
+    if (fail) return route.fulfill({ status: 503, json: { detail: 'Provider action unavailable' } });
+    return route.fulfill({ json: route.request().url().endsWith('/test') ? { message: 'Connection verified.' } : status });
+  });
+  await choose(page, 'Save media provider settings');
+  expect(writes).toBe(0);
+  await page.getByLabel('Daily request limit', { exact: true }).fill('10');
+  await page.getByRole('button', { name: 'Save media settings', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Provider action unavailable');
+  await expectStep(page, 'Save media provider settings');
+  fail = false;
+  await page.getByRole('button', { name: 'Save media settings', exact: true }).click();
+  await finish(page);
+  await page.getByRole('button', { name: 'Close media provider settings', exact: true }).click();
+  await choose(page, 'Test the media provider connection');
+  await page.getByRole('button', { name: 'Test provider', exact: true }).click();
+  await finish(page);
+  await page.getByRole('button', { name: 'Close media provider settings', exact: true }).click();
+  await choose(page, 'Disconnect the media provider');
+  page.once('dialog', dialog => dialog.dismiss());
+  await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await expectStep(page, 'Disconnect the media provider');
+  expect(writes).toBe(3);
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await finish(page);
+  expect(writes).toBe(4);
+});
+
+test('Pythia guides fit desktop and mobile, preserve drafts and do not submit on navigation', async ({ page }) => {
+  const id = await seed(page);
+  const state = await mockPythia(page, id);
+  for (const [width, theme] of [[1440, 'Light'], [390, 'Dark']]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const reviewTools = page.getByRole('button', { name: 'Review tools', exact: true });
+    if (await reviewTools.getAttribute('aria-expanded') === 'true') await reviewTools.click();
+    const settings = page.getByRole('button', { name: 'Settings', exact: true });
+    if (await settings.getAttribute('aria-expanded') !== 'true') await settings.click();
+    await page.getByRole('radio', { name: theme, exact: true }).check();
+    await choose(page, 'Design an assessment with Pythia');
+    await page.getByLabel('Audience', { exact: true }).fill('Draft audience');
+    await expect(guide(page)).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const bounds = await guide(page).boundingBox();
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(1000);
+    expect((await new AxeBuilder({ page }).include('.onboarding-card').analyze()).violations).toEqual([]);
+    await page.screenshot({ path: test.info().outputPath(`pythia-guide-${width}.png`) });
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Resume walkthrough', exact: true }).click();
+    await expect(page.getByLabel('Audience', { exact: true })).toHaveValue('Draft audience');
+    await guide(page).getByRole('button', { name: 'Pause guide' }).click();
+    await page.getByRole('button', { name: 'Close assessment design', exact: true }).click();
+  }
+  expect(state.submissions).toBe(0);
+});
+
 test('every catalog journey opens a visible target in a prepared project', async ({ page }) => {
   test.setTimeout(180000);
   const id = await seed(page);
@@ -62,10 +295,15 @@ test('every catalog journey opens a visible target in a prepared project', async
   await page.getByRole('button', { name: 'Guided review', exact: true }).click();
   await page.getByText(/^All functionality walkthroughs/).click();
   const names = await page.locator('details').getByRole('button').allTextContents();
-  expect(names.length).toBeGreaterThan(40);
+  expect(names.length).toBeGreaterThan(60);
   await page.getByRole('button', { name: 'Close Golden Path' }).click();
   for (const label of names) {
     await choose(page, label.replace(/^Start /, '').trim());
+    if (label.includes('Manage project members and review links')) {
+      await expect(guide(page).getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+      await guide(page).getByRole('button', { name: 'Pause guide' }).click();
+      continue;
+    }
     await expect(guide(page).getByRole('button', { name: 'Retry', exact: true }), label).toHaveCount(0);
     await expect(page.locator('[data-onboarding-highlight]'), label).toHaveCount(1);
     await expect(page.locator('[data-onboarding-highlight]'), label).toBeVisible();
@@ -275,7 +513,7 @@ test('references and author suggestions save without invoking an AI provider', a
 test('enhancement submission requires an explicit click; provider requests use inert responses', async ({ page }) => {
   const id = await seed(page); let submissions = 0;
   const job = { id: 'fixture-job', sourceRevision: 2, scope: 'whole-course', sceneIds: [], goal: 'Practice', resourceIds: [], resourceVersions: {}, status: 'queued', progress: 0, message: 'Inert fixture', provider: 'fixture', model: 'fixture', estimatedInputTokens: 1, estimatedCostUsd: null, proposalIds: [], resourceConflicts: [], error: null, retryOf: null };
-  await page.route('**/enhancement-jobs/preview', r => r.fulfill({ json: { sourceRevision: 2, sceneCount: 1, resourceCount: 0, estimatedInputTokens: 1, estimatedCostUsd: null, providerConfigured: true, payload: { scenes: [], references: [] } } }));
+  await page.route('**/enhancement-jobs/preview', r => r.fulfill({ json: { sourceRevision: 2, sceneCount: 1, resourceCount: 0, estimatedInputTokens: 1, estimatedCostUsd: null, engineConfigured: true, payload: { scenes: [], references: [] } } }));
   await page.route('**/enhancement-jobs', r => { if (r.request().method() === 'POST') { submissions++; return r.fulfill({ status: 202, json: job }); } return r.fulfill({ json: [] }); });
   await choose(page, 'Preview and submit an enhancement run');
   await page.getByRole('textbox', { name: 'Enhancement goal', exact: true }).fill('Practice');

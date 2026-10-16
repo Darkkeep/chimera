@@ -38,7 +38,7 @@ export function ProjectAccessPanel({ project, onClose }: { project: Project; onC
     finally { setBusy(false); }
   }
 
-  return <section className="project-access-panel" aria-labelledby="project-access-title">
+  return <section data-onboarding="workspace.access" className="project-access-panel" aria-labelledby="project-access-title">
     <button className="button button-outline" onClick={onClose}><ArrowLeft size={16} /> Back to storyboard</button>
     <h2 ref={title} tabIndex={-1} id="project-access-title"><Users size={22} aria-hidden="true" /> Project access · {project.title}</h2>
     <p>Manage who can access and work on this project.</p>

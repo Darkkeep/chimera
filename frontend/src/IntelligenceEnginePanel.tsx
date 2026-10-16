@@ -44,7 +44,7 @@ export function IntelligenceEnginePanel({ onClose }: { onClose: () => void }) {
   const providers = status?.providerRegistry.providers || [];
   const events = status?.telemetry.events || [];
 
-  return <EditorDialog labelledBy="intelligence-engine-title" onClose={onClose} busy={loading} className="ai-connection-dialog">
+  return <EditorDialog onboardingTarget="settings.engine" labelledBy="intelligence-engine-title" onClose={onClose} busy={loading} className="ai-connection-dialog">
     <header className="ai-connection-header">
       <h2 id="intelligence-engine-title">Intelligence Engine</h2>
       <div className="ai-connection-actions">

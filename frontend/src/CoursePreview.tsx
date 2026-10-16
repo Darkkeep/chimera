@@ -291,6 +291,7 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
     try {
       const response = await fetch(`/api/projects/${project.id}/enhancement-jobs`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope: "selected-scenes", sceneIds: [comment.sceneId], goal: comment.body, resourceIds: [], commentId: comment.id }) });
       if (!response.ok) throw new Error("Enhancement request could not be started.");
+      reportOnboardingOutcome("comment.enhancement-submitted", project.id, comment.sceneId);
     } catch (error: unknown) { setCommentError(error instanceof Error ? error.message : "Enhancement request could not be started."); }
     finally { setCommentBusy(false); }
   }

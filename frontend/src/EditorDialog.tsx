@@ -1,13 +1,14 @@
 import { ReactNode, useEffect, useRef } from "react";
 
 /** Shared keyboard and focus behavior for the authoring dialogs. */
-export function EditorDialog({ children, labelledBy, onClose, busy = false, className = "", onResumeWalkthrough }: {
+export function EditorDialog({ children, labelledBy, onClose, busy = false, className = "", onResumeWalkthrough, onboardingTarget }: {
   children: ReactNode;
   labelledBy: string;
   onClose: () => void;
   busy?: boolean;
   className?: string;
   onResumeWalkthrough?: () => void;
+  onboardingTarget?: string;
 }) {
   const dialog = useRef<HTMLElement>(null);
   const latest = useRef({ onClose, busy });
@@ -54,7 +55,7 @@ export function EditorDialog({ children, labelledBy, onClose, busy = false, clas
   return <div className="modal-backdrop" onClick={(event) => {
     if (event.target === event.currentTarget && !busy) onClose();
   }}>
-    <section ref={dialog} className={`modal ${className}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy} tabIndex={-1}>
+    <section ref={dialog} data-onboarding={onboardingTarget} className={`modal ${className}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy} tabIndex={-1}>
       {children}
       {onResumeWalkthrough && <button type="button" className="button button-outline" onClick={onResumeWalkthrough} disabled={busy}>Resume walkthrough</button>}
     </section>

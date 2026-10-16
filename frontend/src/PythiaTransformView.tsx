@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, Check, LoaderCircle, Sparkles, X } from "lucide-react";
 import { EditorDialog } from "./EditorDialog";
+import { reportOnboardingOutcome } from "./onboarding-journeys";
 import type { Scene } from "./App";
 
 type EngineStatus = {
@@ -94,7 +95,10 @@ export function PythiaTransformView({ projectId, scene, scenes, onClose }: { pro
               sourceRevision: revision,
             },
           );
-          if (!controller.signal.aborted) { setTask(next); setProposal(saved); }
+          if (!controller.signal.aborted) {
+            setTask(next); setProposal(saved);
+            reportOnboardingOutcome("pythia.transform.saved", projectId, scene.id);
+          }
         } else if (!controller.signal.aborted) {
           setTask(next);
           if (next.status === "failed") setError(typeof next.error === "string" ? next.error : "Pythia transformation failed.");
@@ -141,6 +145,7 @@ export function PythiaTransformView({ projectId, scene, scenes, onClose }: { pro
     try {
       const cancelled = await requestJson<Task>(`/api/projects/${projectId}/pythia-tasks/${encodeURIComponent(task.task_id)}/cancel`, undefined, "POST");
       setTask(cancelled);
+      if (cancelled.status === "cancelled") reportOnboardingOutcome("pythia.task.cancelled", projectId, scene.id);
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : "Pythia task could not be cancelled.");
     }
@@ -154,7 +159,7 @@ export function PythiaTransformView({ projectId, scene, scenes, onClose }: { pro
   const selectedScenes = scenes.filter((item) => sourceSceneIds.includes(item.id) || selectedSceneIds.includes(item.id));
   const selectionLocked = Boolean(task && !["failed", "cancelled"].includes(task.status));
 
-  return <EditorDialog labelledBy="pythia-transform-title" className="pythia-analysis-dialog" onClose={onClose} busy={submitting}>
+  return <EditorDialog onboardingTarget="pythia.transform" labelledBy="pythia-transform-title" className="pythia-analysis-dialog" onClose={onClose} busy={submitting}>
     <div className="modal-head"><div><p className="eyebrow">PYTHIA ENGINE</p><h2 id="pythia-transform-title">Transform selected scene</h2></div><button className="icon-button" onClick={onClose} disabled={submitting} aria-label="Close Pythia transformation"><X size={19} /></button></div>
     <div className="pythia-scene-label"><span>ACTIVE SCENE</span><strong>{scene.title}</strong></div>
     <section className="pythia-engine-state" role="status">

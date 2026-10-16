@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, Check, LoaderCircle, Plus, Sparkles, X } from "lucide-react";
 import { EditorDialog } from "./EditorDialog";
+import { reportOnboardingOutcome } from "./onboarding-journeys";
 import type { Scene } from "./App";
 
 type Capability = { id?: string; capability?: string; capability_id?: string; provider?: string } | string;
@@ -105,7 +106,10 @@ export function PythiaAssessmentDesignView({ projectId, scene, scenes, onClose }
           );
           const result = saved[0]?.sourceArtifact;
           if (!result) throw new Error("Saved assessment proposals are missing their source blueprint.");
-          if (!controller.signal.aborted) { setTask(next); setProposals(saved); setBlueprint(result); }
+          if (!controller.signal.aborted) {
+            setTask(next); setProposals(saved); setBlueprint(result);
+            reportOnboardingOutcome("pythia.assessment.saved", projectId, scene.id);
+          }
         } else if (!controller.signal.aborted) {
           setTask(next);
           if (next.status === "failed") setError(typeof next.error === "string" ? next.error : "Assessment design failed.");
@@ -162,6 +166,7 @@ export function PythiaAssessmentDesignView({ projectId, scene, scenes, onClose }
     try {
       const cancelled = await requestJson<AssessmentTask>(`/api/projects/${projectId}/pythia-tasks/${encodeURIComponent(task.task_id)}/cancel`, undefined, "POST");
       setTask(cancelled);
+      if (cancelled.status === "cancelled") reportOnboardingOutcome("pythia.task.cancelled", projectId, scene.id);
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : "Pythia task could not be cancelled.");
     }
@@ -177,7 +182,7 @@ export function PythiaAssessmentDesignView({ projectId, scene, scenes, onClose }
   const selectedScenes = scenes.filter((item) => sourceSceneIds.includes(item.id) || selectedSceneIds.includes(item.id));
   const canStartTask = !task || ["failed", "cancelled"].includes(task.status);
 
-  return <EditorDialog labelledBy="pythia-assessment-title" className="pythia-analysis-dialog" onClose={onClose} busy={submitting}>
+  return <EditorDialog onboardingTarget="pythia.assessment" labelledBy="pythia-assessment-title" className="pythia-analysis-dialog" onClose={onClose} busy={submitting}>
     <div className="modal-head"><div><p className="eyebrow">PYTHIA ENGINE</p><h2 id="pythia-assessment-title">Design assessment</h2></div><button className="icon-button" onClick={onClose} disabled={submitting} aria-label="Close assessment design"><X size={19} /></button></div>
     <div className="pythia-scene-label"><span>ACTIVE SCENE</span><strong>{scene.title}</strong></div>
     <section className="pythia-engine-state" role="status">
