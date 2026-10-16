@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const assert = require('node:assert/strict');
-const { chromium } = require('@playwright/test');
+const { chromium, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 
 const root = path.resolve(__dirname, '../..');
@@ -71,7 +71,7 @@ async function freePort() {
   const originalElementCount = await page.locator('.visual-editable').count();
   const masterElementCount = project.storyboard.scenes[0].visualLayout.elements.filter(element => element.source === 'master').length;
   await page.getByLabel('Background image', { exact: true }).selectOption(masterBackground.id);
-  assert.equal(await page.locator('.visual-editable').count(), originalElementCount - masterElementCount, 'applying a master backdrop must not draw its inherited artwork twice');
+  await expect(page.locator('.visual-editable'), 'applying a master backdrop must not draw its inherited artwork twice').toHaveCount(originalElementCount - masterElementCount);
   assert(await page.locator('.visual-stage').evaluate(async element => {
     const image = new Image();
     image.src = getComputedStyle(element).backgroundImage.slice(5, -2);
@@ -80,9 +80,9 @@ async function freePort() {
   }), 'generated master SVG should load as a background');
   await page.screenshot({ path: path.join(output, 'master-background.png'), fullPage: true });
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  assert.equal(await page.locator('.visual-editable').count(), originalElementCount);
+  await expect(page.locator('.visual-editable')).toHaveCount(originalElementCount);
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  assert.equal(await page.locator('.visual-editable').count(), originalElementCount - masterElementCount);
+  await expect(page.locator('.visual-editable')).toHaveCount(originalElementCount - masterElementCount);
   await page.getByLabel('Stage width', { exact: true }).fill('0');
   assert.equal(await page.getByLabel('Stage width', { exact: true }).inputValue(), '1280');
   await page.getByLabel('Stage size', { exact: true }).selectOption('square');
@@ -133,7 +133,7 @@ async function freePort() {
   await page.mouse.move(dropPoint.x, dropPoint.y, {steps: 12});
   await page.mouse.move(dropPoint.x + 1, dropPoint.y + 1);
   await page.mouse.up();
-  assert.equal(await page.locator('.visual-editable .visual-image').count(), beforeImages + 1);
+  await expect(page.locator('.visual-editable .visual-image')).toHaveCount(beforeImages + 1);
   const addedImage = page.locator('.visual-editable .visual-image').last();
   await addedImage.click();
   const imageResizeHandle = addedImage.locator('xpath=../..').locator('.visual-resize-handle-se');
@@ -145,16 +145,18 @@ async function freePort() {
   const imageSizeAfter = [Number(await page.getByLabel('Element width', { exact: true }).inputValue()), Number(await page.getByLabel('Element height', { exact: true }).inputValue())];
   assert.notDeepEqual(imageSizeAfter, imageSizeBefore, 'image resize handles should change the selected image size');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  assert.deepEqual([Number(await page.getByLabel('Element width', { exact: true }).inputValue()), Number(await page.getByLabel('Element height', { exact: true }).inputValue())], imageSizeBefore);
+  await expect.poll(async () => [Number(await page.getByLabel('Element width', { exact: true }).inputValue()), Number(await page.getByLabel('Element height', { exact: true }).inputValue())]).toEqual(imageSizeBefore);
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  assert.deepEqual([Number(await page.getByLabel('Element width', { exact: true }).inputValue()), Number(await page.getByLabel('Element height', { exact: true }).inputValue())], imageSizeAfter);
+  await expect.poll(async () => [Number(await page.getByLabel('Element width', { exact: true }).inputValue()), Number(await page.getByLabel('Element height', { exact: true }).inputValue())]).toEqual(imageSizeAfter);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect.poll(async () => [Number(await page.getByLabel('Element width', { exact: true }).inputValue()), Number(await page.getByLabel('Element height', { exact: true }).inputValue())]).toEqual(imageSizeBefore);
   for (let undoCount = 0; undoCount < 5 && await page.locator('.visual-editable .visual-image').count() > beforeImages; undoCount++) {
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   }
-  assert.equal(await page.locator('.visual-editable .visual-image').count(), beforeImages);
+  await expect(page.locator('.visual-editable .visual-image')).toHaveCount(beforeImages);
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  assert.equal(await page.locator('.visual-editable .visual-image').count(), beforeImages + 1);
+  await expect(page.locator('.visual-editable .visual-image')).toHaveCount(beforeImages + 1);
   await page.getByRole('button', { name: 'Add text', exact: true }).click();
   await page.getByLabel('Element text', { exact: true }).fill('Added text');
   const addedText = page.locator('.visual-editable').filter({ hasText: 'Added text' });
