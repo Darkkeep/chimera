@@ -1,5 +1,19 @@
 # SCORM Compatibility Checklist
 
+## Replacement-package LMS acceptance: 2026-10-14
+
+The operator confirmed the retry fix worked, then explicitly confirmed Continue, Start over, and Gradebook score/completion with **“yes to all.”** The replacement SCORM 1.2 fixture passed the requested external LMS checks by operator attestation. Package SHA-256: `48a8c510e5a191946bac07842b03b48fbe56fe2a4698ba35d49e89d400fddb99`. See [live AI and LMS qualification](qualification/live-ai-and-lms-2026-10-14.md) for the package, sequence, earlier retry finding, and evidence limits. The prior failed/open results below describe earlier packages and are retained as history.
+
+## PNutII Tracking Requalification: 2026-10-14
+
+- Subsequent operator retest: "It all worked," with a request to offer Continue or Start over instead of automatic resume. This records successful resume/score/completion by operator attestation for the retested package; its exact hash and profile were not supplied. The earlier failed attempt below remains historical.
+- Returning SCORM learners now see an accessible Continue/Start over choice before course progress is written. Continue preserves the saved state; Start over resets course-owned bookmark, visited scenes, audio completions, assessment responses/attempts, and remediation. This is not a new LMS attempt and cannot override Gradebook retention, review mode, or attempt policies. Both choices passed browser tests for both profiles in Chromium, Firefox, and WebKit; the new prompt still needs target-LMS confirmation.
+- Operator reports no resume and no score/completion in Gradebook. External acceptance is failed/open for this package; historical passes below do not supersede this result.
+- Use SCORM 1.2 for the previously identified target deployment, which does not accept SCORM 2004. Actual profile used in this failed attempt remains unconfirmed.
+- Tracking fixes: bounded parent/opener API discovery with cross-origin guards, checked initialization and false return values, explicit suspend exit, valid 1.2 session-time values, and once-only finalization on pagehide/beforeunload.
+- The runtime reports Connected to LMS tracking only after successful initialization. A rejected-call diagnostic means tracking or grading may not have persisted. No-API preview mode is not a successful LMS connection.
+- Automated tests cover popup discovery, second-session bookmark/visited restoration, status writes, rejection reporting, and finalization. Target-LMS learner launch, Gradebook score/completion, and resume must be retested with a new package.
+
 ## Human SCORM 1.2 qualification: 2026-10-06
 
 Erik Hart confirmed: “SCORM 1.2 export is human-verified,” following delivery of the two-scene qualification ZIP for the authenticated USAFSAM Blackboard session. The supplied package has SHA-256 `b3b023f2ba9c4cb9555281e5d5e08e6baabb96c142f76650d27d58cd238d9725`; its production build and seven archive checks passed without warnings. See the [dated qualification record](release-qualification-2026-10-06.md) for artifact paths, source revision and test sequence.

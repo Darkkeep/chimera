@@ -9,7 +9,7 @@
 .scene-editor > label {
   display: grid;
   gap: 6px;
-  color: var(--ink);
+  color:var(--ink);
   font-size: 12px;
   font-weight: 700;
 }
@@ -19,11 +19,11 @@
 .scene-editor textarea {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: #fff;
-  color: var(--ink);
-  font: 500 13px Manrope, sans-serif;
+  border:1px solid var(--line);
+  border-radius:4px;
+  background:var(--theme-panel);
+  color:var(--ink);
+  font: 500 13px var(--chimera-font-body);
 }
 
 .scene-editor textarea {
@@ -39,7 +39,7 @@
 .required-toggle input {
   width: 16px;
   height: 16px;
-  accent-color: var(--deep);
+  accent-color:var(--deep);
 }
 
 .modal-actions {
@@ -51,13 +51,13 @@
 .scene-row-wrap {
   display: flex;
   align-items: stretch;
-  border-bottom: 1px solid var(--line);
+  border-bottom:1px solid var(--line);
   transition: opacity 120ms ease, background-color 120ms ease;
 }
 
 .scene-row-wrap.dragging {
   opacity: 0.45;
-  background: #e9eee5;
+  background:var(--theme-panel);
 }
 
 .scene-drag-handle {
@@ -65,7 +65,7 @@
   width: 30px;
   flex: 0 0 30px;
   place-items: center;
-  color: #89958d;
+  color:var(--muted);
   cursor: grab;
   touch-action: none;
 }
@@ -77,7 +77,7 @@
 .scene-row-wrap .scene-row {
   flex: 1;
   min-width: 0;
-  border-bottom: 0;
+  border-bottom:0;
 }
 
 .work-area > .scene-list {
@@ -92,7 +92,7 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #fafaf7;
+  background:var(--theme-raised);
 }
 
 .scene-order-actions {
@@ -104,7 +104,7 @@
 .scene-order-actions .icon-button {
   width: 24px;
   height: 20px;
-  color: #718078;
+  color:var(--muted);
 }
 
 .scene-order-actions .icon-button:disabled {
@@ -125,13 +125,13 @@
 }
 
 .scene-signifier {
-  color: #65756c;
+  color:var(--muted);
   text-transform: capitalize;
 }
 
 .scene-signifier + .scene-signifier::before {
   content: "/ ";
-  color: #a0aaa4;
+  color:var(--muted);
 }
 
 .template-library {
@@ -144,7 +144,7 @@
   justify-content: space-between;
   gap: 16px;
   padding-bottom: 22px;
-  border-bottom: 1px solid var(--line);
+  border-bottom:1px solid var(--line);
 }
 
 .template-toolbar h2 {
@@ -162,7 +162,7 @@
   justify-content: space-between;
   gap: 20px;
   padding: 18px 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom:1px solid var(--line);
 }
 
 .template-actions {
@@ -185,7 +185,7 @@
 .template-info small,
 .template-empty span,
 .field-hint {
-  color: var(--muted);
+  color:var(--muted);
   font-size: 12px;
 }
 
@@ -193,7 +193,7 @@
   display: grid;
   gap: 7px;
   padding: 52px 10px;
-  color: var(--ink);
+  color:var(--ink);
 }
 
 .field-hint {

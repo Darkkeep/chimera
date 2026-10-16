@@ -4,11 +4,11 @@ import { Monitor, Moon, Sun } from "lucide-react";
 type Appearance = "light" | "dark" | "system";
 const storageKey = "chimera.appearance";
 const systemQuery = "(prefers-color-scheme: dark)";
-const normalize = (value: string | null): Appearance => value === "light" || value === "dark" ? value : "system";
+const normalize = (value: string | null): Appearance => value === "light" || value === "dark" || value === "system" ? value : "dark";
 
 function readAppearance(): Appearance {
   try { return normalize(window.localStorage.getItem(storageKey)); }
-  catch { return "system"; }
+  catch { return "dark"; }
 }
 
 function applyAppearance(preference: Appearance) {

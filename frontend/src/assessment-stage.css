@@ -1,0 +1,26 @@
+.visual-stage-frame { isolation: isolate; }
+.assessment-stage-region {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: auto;
+  z-index: 2001;
+  padding: 24px;
+  color: #202020;
+  font: 24px/1.4 sans-serif;
+  overflow-wrap: anywhere;
+}
+.assessment-stage-region h2 { font-size: 32px; margin: 0 0 20px; }
+.assessment-stage-region button, .assessment-stage-region input, .assessment-stage-region select { font: inherit; }
+.assessment-stage-region button { padding: 8px 16px; margin-top: 16px; }
+.assessment-stage-choice { display: flex; gap: 16px; margin-bottom: 12px; }
+.assessment-stage-target { display: inline-block; padding: 8px; margin: 8px; border: 1px solid #777777; }
+.assessment-stage-region .course-preview-assessment { margin: 0; padding: 0; border: 0; }
+.assessment-stage-frame { display: flow-root; padding-bottom: 12px; box-sizing: border-box; }
+.assessment-stage-frame > .assessment-stage-region { position: relative; height: auto; overflow: visible; font-size: 18px; padding: 18px; margin-bottom: 0; }
+.assessment-stage-frame > .assessment-stage-region h2 { font-size: 24px; }
+.assessment-stage-frame .course-preview-assessment :is(label, legend, input, select, button, p, span, strong) { font-size: inherit; }
+.assessment-stage-frame .course-preview-assessment-kicker { font-size: 12px; }
+@media (max-width: 600px) {
+  .assessment-stage-frame { aspect-ratio: auto !important; }
+  .assessment-stage-frame > .assessment-stage-region { padding: 12px; }
+}

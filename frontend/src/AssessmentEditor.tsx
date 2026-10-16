@@ -233,7 +233,7 @@ export function AssessmentEditor({ projectId, projectTitle, revision, scene, sce
   }
 
   async function removeQuestion() {
-    if (!scene.assessmentItem || busy || !window.confirm("Remove this question from the assessment scene?")) return;
+    if (!scene.assessmentItem || busy || !window.confirm("Remove the authored question from this question scene?")) return;
     setBusy(true);
     setError("");
     try {

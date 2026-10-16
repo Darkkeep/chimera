@@ -7,7 +7,7 @@ from .identity import OrganizationPolicy
 
 def deployment_profile() -> str | None:
     value = os.environ.get("CHIMERA_DEPLOYMENT_PROFILE")
-    if value not in (None, "local", "encarta", "darkrogue"):
+    if value not in (None, "local", "encarta", "networked"):
         raise RuntimeError("Unknown CHIMERA_DEPLOYMENT_PROFILE")
     return value
 
@@ -23,8 +23,8 @@ def installation_policy(directory) -> OrganizationPolicy:
         return stored
     return OrganizationPolicy.model_validate({
         **stored.model_dump(), "deploymentMode": "team",
-        "identityProvider": "builtin" if profile == "darkrogue" else "encarta",
-        "reviewAccess": os.environ.get("CHIMERA_REVIEW_ACCESS", "no-external-review") if profile == "darkrogue" else "no-external-review", "allowGuestReviewers": False,
+        "identityProvider": "builtin" if profile == "networked" else "encarta",
+        "reviewAccess": os.environ.get("CHIMERA_REVIEW_ACCESS", "no-external-review") if profile == "networked" else "no-external-review", "allowGuestReviewers": False,
     })
 
 
@@ -37,6 +37,6 @@ def public_origin() -> str:
 
 
 def cors_origins() -> list[str]:
-    if deployment_profile() == "darkrogue":
+    if deployment_profile() == "networked":
         return [public_origin()]
     return ["http://localhost:5173", "http://127.0.0.1:5173"]

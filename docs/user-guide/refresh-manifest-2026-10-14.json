@@ -1,0 +1,113 @@
+{
+  "capturedAt": "2026-10-14T19:46:39.972Z",
+  "sourceCommit": "6641162",
+  "fixture": "Fresh isolated demonstration workspace. AI configuration display is an inert fixture; generation endpoints blocked; no provider calls.",
+  "viewport": {
+    "width": 1500,
+    "height": 1400
+  },
+  "screenshots": [
+    {
+      "file": "my-work-current.png"
+    },
+    {
+      "file": "workspace.png"
+    },
+    {
+      "file": "top-actions.png"
+    },
+    {
+      "file": "scene-sequence.png"
+    },
+    {
+      "file": "create-project.png"
+    },
+    {
+      "file": "scene-editor.png"
+    },
+    {
+      "file": "template-selection.png"
+    },
+    {
+      "file": "scene-canvas-editor.png"
+    },
+    {
+      "file": "animation-inspector.png"
+    },
+    {
+      "file": "text-fit.png"
+    },
+    {
+      "file": "new-scene.png"
+    },
+    {
+      "file": "assessment-launch.png"
+    },
+    {
+      "file": "assessment-actions.png"
+    },
+    {
+      "file": "question-single-choice.png"
+    },
+    {
+      "file": "question-multiple-response.png"
+    },
+    {
+      "file": "question-true-false.png"
+    },
+    {
+      "file": "question-ordering.png"
+    },
+    {
+      "file": "question-drag-drop.png"
+    },
+    {
+      "file": "question-matching.png"
+    },
+    {
+      "file": "question-short-answer.png"
+    },
+    {
+      "file": "assessment-rules.png"
+    },
+    {
+      "file": "question-placement.png"
+    },
+    {
+      "file": "review-tools.png"
+    },
+    {
+      "file": "assessments-editor.png"
+    },
+    {
+      "file": "assessments-list.png"
+    },
+    {
+      "file": "learner-question.png"
+    },
+    {
+      "file": "learner-feedback.png"
+    },
+    {
+      "file": "learner-retry.png"
+    },
+    {
+      "file": "learner-result.png"
+    },
+    {
+      "file": "export-dialog.png"
+    },
+    {
+      "file": "scorm-export.png"
+    },
+    {
+      "file": "course-draft-prompt.png"
+    },
+    {
+      "file": "course-draft-review.png"
+    },
+    {
+      "file": "assessment-create.png"
+    }
+  ]
+}

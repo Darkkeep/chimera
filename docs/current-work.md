@@ -1,6 +1,8 @@
 # Current work and handoff
 
-Updated 2026-10-15. The active development branch is `extract-onboarding-repository`.
+Updated 2026-10-16. The active development branch is `extract-onboarding-repository`.
+
+Current next action: submit the reviewed 1.1.0 candidate and verify CI on its exact full SHA. See the [October 16 candidate review](candidate-review-2026-10-16.md) and [completion update](completion-update-2026-10-15.md). The older PR #5 instructions below are historical and superseded. Hosted deployment remains deferred.
 
 ## Completed
 
@@ -31,7 +33,7 @@ On 2026-10-13, the backend suite passed 150 tests, the frontend TypeScript/Vite 
 
 The hosted HTTPS harness also passed login/error handling, secure cookies, recovery/reset, membership display, authenticated review/commenting, reviewer isolation, session expiry, and logout, with zero JavaScript errors or Axe violations. The harness now explicitly resumes authoring from My Work and scopes identity checks to the sidebar. One parallel pre-commit browser run hit a transient Windows metadata replacement lock; the independent full rerun passed without storage changes.
 
-## Next
+## Historical next steps (superseded)
 
 1. **Push the reviewed candidate commits.** `53ce20f` contains the implementation/tests and `5157cc1` the documentation refresh. The generated `docs/user-guide.pdf` and historical `docs/export-enhancement-recovery.md` change were intentionally left uncommitted. The worktree should remain otherwise clean before pushing.
 2. **Wait for fresh PR #5 checks.** Its prior Playwright check predates these commits. Confirm the new head passes CI and no review/change requests appear. The local Chromium suite passed serially; a three-worker run hit one Windows atomic-replacement `PermissionError`, so hosted CI's one-worker configuration is the relevant confirmation.

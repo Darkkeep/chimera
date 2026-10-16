@@ -20,7 +20,8 @@ from pptx.oxml.ns import qn as pptx_qn
 
 from .models import AssessmentItem, ExtractedAsset, ProjectDetail, Scene
 from .render import render_slides
-from .storage import project_path
+from .storage import project_path, list_reference_resources, list_enhancement_proposals, list_review_comments
+from .media import resolved_project
 
 
 DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -225,6 +226,7 @@ def _add_scene(document: DocumentType, project: ProjectDetail, scene: Scene, ind
     assets_by_id = {asset.id: asset for asset in project.storyboard.assets}
     attached_images = [assets_by_id[asset_id] for asset_id in scene.imageAssets if asset_id in assets_by_id]
     attached_audio = [assets_by_id[asset_id] for asset_id in scene.audioAssets if asset_id in assets_by_id]
+    attached_audio += [assets_by_id[asset_id] for asset_id in scene.videoAssets if asset_id in assets_by_id]
     if attached_images or attached_audio:
         document.add_heading("Media", level=2)
         media_table = document.add_table(rows=1, cols=5)
@@ -257,10 +259,14 @@ def _add_scene(document: DocumentType, project: ProjectDetail, scene: Scene, ind
             cells[4].text = _attribution_label(asset)
         for asset in attached_audio:
             cells = media_table.add_row().cells
-            cells[0].text = "Audio"
+            cells[0].text = asset.kind.title()
             cells[2].text = f"{asset.filename} ({asset.id})"
             cells[3].text = "Required for completion" if scene.audioRequired else "Optional playback"
             cells[4].text = _attribution_label(asset)
+            if asset.transcript:
+                document.add_paragraph(f"Transcript — {asset.filename}: {asset.transcript}")
+            if asset.captionsVtt:
+                document.add_paragraph(f"Captions ({asset.language}) — {asset.filename}:\n{asset.captionsVtt}")
 
     if scene.actionDescription:
         document.add_heading("Production directions (authoring material)", level=2)
@@ -365,7 +371,8 @@ def _add_sme_scene(document: DocumentType, project: ProjectDetail, scene: Scene,
     _cell_label(visual, "What the learner sees", style)
     visual_area = visual.add_table(rows=1, cols=1)
     visual_area.autofit = False
-    visual_area.rows[0].height = Inches(2.35)
+    # Leave room for editable video access details and production notes.
+    visual_area.rows[0].height = Inches(2.0 if scene.videoAssets else 2.35)
     visual_area.rows[0].height_rule = WD_ROW_HEIGHT_RULE.AT_LEAST
     visual_area_cell = visual_area.cell(0, 0)
     visual_area_cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
@@ -416,6 +423,8 @@ def _add_sme_scene(document: DocumentType, project: ProjectDetail, scene: Scene,
             content.add_paragraph(f"Answer key (authoring material): {_answer_key(item)}")
     else:
         content.add_paragraph("No feedback or next-screen rule is recorded.")
+    if scene.notes:
+        content.add_paragraph(f"Speaker notes: {scene.notes}")
 
     footer = document.add_table(rows=1, cols=2)
     footer.autofit = False
@@ -423,32 +432,32 @@ def _add_sme_scene(document: DocumentType, project: ProjectDetail, scene: Scene,
     footer.columns[1].width = Inches(3.5)
     _cell_label(footer.cell(0, 0), "Media and access", style)
     assets_by_id = {asset.id: asset for asset in project.storyboard.assets}
-    scene_assets = [assets_by_id[asset_id] for asset_id in scene.imageAssets + scene.audioAssets if asset_id in assets_by_id]
+    scene_assets = [assets_by_id[asset_id] for asset_id in scene.imageAssets + scene.audioAssets + scene.videoAssets if asset_id in assets_by_id]
     if scene_assets:
         media_table = footer.cell(0, 0).add_table(rows=1, cols=4)
         media_table.autofit = False
         media_widths = (0.55, 2.0, 2.5, 1.6)
         for column, width in zip(media_table.columns, media_widths):
             column.width = Inches(width)
-        for cell, width, label in zip(media_table.rows[0].cells, media_widths, ("Preview", "File / reference", "Access", "Credit")):
+        for cell, width, label in zip(media_table.rows[0].cells, media_widths, ("Media", "File / reference", "Access", "Credit")):
             cell.width = Inches(width)
             cell.text = label
         for asset in scene_assets:
             cells = media_table.add_row().cells
             for cell, width in zip(cells, media_widths):
                 cell.width = Inches(width)
-            cells[1].text = f"{asset.filename} ({asset.id})"
+            cells[1].text = asset.filename
             if asset.kind == "image":
                 image_path = _asset_path(project, asset.path, "assets")
                 _add_media_thumbnail(cells[0], image_path)
                 cells[2].text = "Decorative image" if asset.id in scene.decorativeImages else scene.imageAltText.get(asset.id, "") or "Alternative text not recorded"
             else:
-                cells[2].text = "Required audio" if scene.audioRequired else "Optional audio"
+                cells[2].text = "Video with captions" if asset.kind == "video" else "Required audio" if scene.audioRequired else "Optional audio"
+                if asset.transcript:
+                    cells[2].text += "\nTranscript in media appendix."
             cells[3].text = _attribution_label(asset)
     else:
         footer.cell(0, 0).add_paragraph("No attached media is recorded.")
-    if scene.notes:
-        footer.cell(0, 0).add_paragraph(f"Speaker notes: {scene.notes}")
     _cell_label(footer.cell(0, 1), "Review note", style)
     footer.cell(0, 1).add_paragraph("No reviewer note is recorded.")
 
@@ -466,7 +475,7 @@ def _add_sme_scene(document: DocumentType, project: ProjectDetail, scene: Scene,
 
 
 def _normalized_project(project: ProjectDetail) -> ProjectDetail:
-    return ProjectDetail.model_validate(_clean_xml_value(project.model_dump(mode="python")))
+    return ProjectDetail.model_validate(_clean_xml_value(resolved_project(project).model_dump(mode="python")))
 
 
 def _template_slide_dimensions() -> tuple[int, int]:
@@ -592,7 +601,51 @@ def _append_sme_storyboard(document: DocumentType, project: ProjectDetail, inclu
         _add_sme_scene(document, project, scene, index, include_answer_key, style)
 
 
-def build_sme_storyboard_docx(project: ProjectDetail, include_answer_key: bool = False) -> bytes:
+def _add_authoring_appendix(document: DocumentType, project: ProjectDetail, include_review_comments: bool) -> None:
+    media_details = [a for a in project.storyboard.assets if a.kind != "image" and (a.transcript or a.captionsVtt)]
+    if media_details:
+        document.add_page_break()
+        document.add_heading("Media transcripts and captions", level=1)
+        for asset in media_details:
+            document.add_heading(asset.filename, level=2)
+            document.add_paragraph(f"Media ID: {asset.id}")
+            for scene in project.storyboard.scenes:
+                placement = next((p for p in scene.mediaPlacements if p.assetId == asset.id), None)
+                if placement:
+                    document.add_paragraph(f"Scene {scene.title}: {placement.role}, {placement.position} content, order {placement.order}; loop {'on' if placement.loop else 'off'}, start muted {'yes' if placement.muted else 'no'}.")
+            if asset.transcript:
+                document.add_paragraph(asset.transcript)
+            if asset.captionsVtt:
+                document.add_paragraph(f"Captions ({asset.language}):\n{asset.captionsVtt}")
+    resources = list_reference_resources(project.id)
+    proposals = [p for p in list_enhancement_proposals(project.id) if p.status == "accepted" and p.referenceCitations]
+    if proposals:
+        document.add_page_break()
+        document.add_heading("Source citations (accepted enhancement provenance)", level=1)
+        document.add_paragraph("These citations identify the exact source versions behind accepted suggestions. Later author edits may require renewed source review.")
+        for proposal in proposals:
+            document.add_paragraph(f"Proposal {proposal.id} | source revision {proposal.sourceRevision}")
+            for citation in proposal.referenceCitations:
+                resource = next((r for r in resources if r.id == citation.resourceId), None)
+                version = next((v for v in resource.versions if v.version == citation.version), None) if resource else None
+                label = f"{resource.title if resource else citation.resourceId} | version {citation.version} | {citation.locator}"
+                label += f" | SHA-256 {version.sha256}" if version else " | source version unavailable; verify before handoff"
+                document.add_paragraph(str(_clean_xml_value(label)))
+                if citation.excerpt:
+                    document.add_paragraph(str(_clean_xml_value(citation.excerpt)))
+    if include_review_comments:
+        document.add_page_break()
+        document.add_heading("Review discussion (authoring material)", level=1)
+        for comment in list_review_comments(project.id):
+            status = "resolved" if comment.resolved else "unresolved"
+            context = " | outdated/deleted scene context" if comment.outdated or comment.sceneDeleted else ""
+            document.add_heading(str(_clean_xml_value(f"{comment.sceneTitle} | revision {comment.revision} | {status}{context}")), level=2)
+            document.add_paragraph(str(_clean_xml_value(f"{comment.authorLabel}: {comment.body}")))
+            for reply in comment.replies:
+                document.add_paragraph(str(_clean_xml_value(f"Reply — {reply.authorLabel}: {reply.body}")))
+
+
+def build_sme_storyboard_docx(project: ProjectDetail, include_answer_key: bool = False, include_review_comments: bool = False) -> bytes:
     project = _normalized_project(project)
     dimensions = _template_slide_dimensions()
     template = Presentation(str(SME_TEMPLATE_PATH))
@@ -608,12 +661,13 @@ def build_sme_storyboard_docx(project: ProjectDetail, include_answer_key: bool =
             _set_section_artwork(section, artwork)
         for index, scene in enumerate(project.storyboard.scenes, start=1):
             _add_sme_scene(document, project, scene, index, include_answer_key, style)
+        _add_authoring_appendix(document, project, include_review_comments)
         output = io.BytesIO()
         document.save(output)
         return output.getvalue()
 
 
-def build_full_storyboard_docx(project: ProjectDetail, include_answer_key: bool = False) -> bytes:
+def build_full_storyboard_docx(project: ProjectDetail, include_answer_key: bool = False, include_review_comments: bool = False) -> bytes:
     project = _normalized_project(project)
     if not FULL_TEMPLATE_PATH.is_file():
         raise FileNotFoundError(f"Full storyboard template was not found: {FULL_TEMPLATE_PATH.name}")
@@ -652,12 +706,13 @@ def build_full_storyboard_docx(project: ProjectDetail, include_answer_key: bool 
         notice.add_run("Contains answer keys for authoring use only.").bold = True
     for index, scene in enumerate(project.storyboard.scenes, start=1):
         _add_scene(document, project, scene, index, include_answer_key)
+    _add_authoring_appendix(document, project, include_review_comments)
     output = io.BytesIO()
     document.save(output)
     return output.getvalue()
 
 
-def build_storyboard_docx(project: ProjectDetail, include_answer_key: bool = False) -> bytes:
+def build_storyboard_docx(project: ProjectDetail, include_answer_key: bool = False, include_review_comments: bool = False) -> bytes:
     project = _normalized_project(project)
     document = Document()
     document.core_properties.title = f"{project.title} - Storyboard"
@@ -672,6 +727,7 @@ def build_storyboard_docx(project: ProjectDetail, include_answer_key: bool = Fal
         notice.add_run("Contains answer keys for authoring use only.").bold = True
     for index, scene in enumerate(project.storyboard.scenes, start=1):
         _add_scene(document, project, scene, index, include_answer_key)
+    _add_authoring_appendix(document, project, include_review_comments)
 
     output = io.BytesIO()
     document.save(output)

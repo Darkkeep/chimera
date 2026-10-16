@@ -9,11 +9,27 @@ from .models import SceneElement, SceneLayout
 
 
 def extract_slide_layout(presentation: Any, slide: Any, register_image: Callable[[Any], str]) -> SceneLayout:
+    show_master = slide._element.get("showMasterSp", "1") != "0"
+    owners: list[tuple[Any, Literal["master", "layout", "slide"]]] = []
+    if show_master and slide.slide_layout._element.get("showMasterSp", "1") != "0":
+        owners.append((slide.slide_layout.slide_master, "master"))
+    if show_master:
+        owners.append((slide.slide_layout, "layout"))
+    owners.append((slide, "slide"))
+    background_owners = [slide.slide_layout.slide_master, slide.slide_layout, slide]
+    return _extract_layout(presentation, slide.slide_layout.slide_master, owners, background_owners, register_image)
+
+
+def extract_master_layout(presentation: Any, master: Any, register_image: Callable[[Any], str]) -> SceneLayout:
+    return _extract_layout(presentation, master, [(master, "master")], [master], register_image)
+
+
+def _extract_layout(presentation: Any, master: Any, owners: list[tuple[Any, Literal["master", "layout", "slide"]]], background_owners: list[Any], register_image: Callable[[Any], str]) -> SceneLayout:
     scale = 1280 / presentation.slide_width
     layout = SceneLayout(width=1280, height=presentation.slide_height * scale)
     theme: dict[str, str] = {}
     theme_root = None
-    for relationship in slide.slide_layout.slide_master.part.rels.values():
+    for relationship in master.part.rels.values():
         if relationship.reltype == RT.THEME and not relationship.is_external:
             theme_root = ElementTree.fromstring(relationship.target_part.blob)
             for entry in theme_root.findall(".//" + qn("a:clrScheme") + "/*"):
@@ -156,8 +172,7 @@ def extract_slide_layout(presentation: Any, slide: Any, register_image: Callable
             return svg, not no_fill or has_stroke or force_line, True
         return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" preserveAspectRatio="none">{path_svg}</svg>', not no_fill or has_stroke or force_line, False
 
-    owners: list[tuple[Any, Literal["master", "layout", "slide"]]] = [(slide.slide_layout.slide_master, "master"), (slide.slide_layout, "layout"), (slide, "slide")]
-    for owner, _ in reversed(owners):
+    for owner in reversed(background_owners):
         background = owner._element.find(qn("p:cSld") + "/" + qn("p:bg"))
         if background is None:
             continue
@@ -170,7 +185,7 @@ def extract_slide_layout(presentation: Any, slide: Any, register_image: Callable
                 fill_index = int(reference.get("idx", "0")) - 1001
                 if fills is not None and 0 <= fill_index < len(fills):
                     properties = fills[fill_index]
-                    owner = slide.slide_layout.slide_master
+                    owner = master
         if properties is not None:
             layout.backgroundAsset = image_reference(properties, owner)
             if properties.find(qn("a:solidFill")) is not None or properties.tag == qn("a:solidFill"):
@@ -230,12 +245,7 @@ def extract_slide_layout(presentation: Any, slide: Any, register_image: Callable
                 elif not has_shape_visual and source == "slide" and not is_line:
                     layout.warnings.append(f"Unsupported object '{shape.name}' is retained in the source preview only.")
 
-    show_master = slide._element.get("showMasterSp", "1") != "0"
     for owner, source in owners:
-        if source == "master" and (not show_master or slide.slide_layout._element.get("showMasterSp", "1") == "0"):
-            continue
-        if source == "layout" and not show_master:
-            continue
         shapes(owner, owner.shapes, source, source)
     layout.warnings = list(dict.fromkeys(layout.warnings))
     return layout

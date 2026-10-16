@@ -130,6 +130,15 @@ button:disabled, .button.disabled { opacity: .48; cursor: not-allowed; }
 .project-design-documents li span { min-width: 0; overflow-wrap: anywhere; }
 .project-design-documents-status { margin: 12px 0 0; }
 .notice { margin: 12px 20px 0; align-items: center; gap: 15px; line-height: 1.6; border-radius: 5px; }
+.course-draft-prompt { display: grid; gap: 6px; color: var(--ink); font-size: 12px; font-weight: 600; }
+.course-draft-prompt textarea, .course-draft-scene :is(input:not([type="checkbox"]), textarea) { width: 100%; min-width: 0; box-sizing: border-box; padding: 9px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--theme-input, #fff); color: var(--ink); font: 400 13px Manrope, sans-serif; }
+.course-draft-prompt textarea, .course-draft-scene textarea { resize: vertical; line-height: 1.5; }
+.course-draft-review { display: grid; gap: 14px; max-height: min(72dvh, 740px); overflow-y: auto; }
+.course-draft-scenes { display: grid; gap: 10px; max-height: 42dvh; overflow-y: auto; padding-right: 4px; }
+.course-draft-scene { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 4px; }
+.course-draft-scene > label { display: grid; gap: 6px; min-width: 0; color: var(--ink); font-size: 12px; font-weight: 600; }
+.course-draft-scene > .course-draft-include { display: flex; align-items: center; gap: 8px; }
+.course-draft-include input { width: 16px; height: 16px; accent-color: var(--accent); }
 .success-notice { border-color: #c5decf; background: #eff8f2; color: #326146; }
 .modal-backdrop { z-index: 40; padding: 16px; background: #10243e99; }
 .modal { border-radius: 8px; padding: 26px; box-shadow: 0 20px 70px #10243e33; max-height: calc(100dvh - 32px); overflow-y: auto; }
@@ -152,7 +161,7 @@ button:disabled, .button.disabled { opacity: .48; cursor: not-allowed; }
 .export-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .package-threshold { display: flex; align-items: center; margin: 18px 0 14px; white-space: normal; flex-wrap: wrap; font: 400 12px var(--font-inter); color: #526b89; letter-spacing: 0; gap: 9px; }
 .package-threshold input { width: 78px; padding: 8px; }
-.word-answer-key { display: flex; align-items: center; gap: 8px; margin: 12px 0 16px; color: #526b89; font-size: 12px; line-height: 1.5; }
+.word-answer-key { display: flex; align-items: center; gap: 8px; margin: 12px 0 16px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .word-answer-key input { flex: 0 0 16px; width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
 .word-format-select select { min-height: 34px; padding: 6px 28px 6px 9px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--text); font: inherit; letter-spacing: 0; }
 .report-actions .button { font-size: 12px; min-height: 36px; }

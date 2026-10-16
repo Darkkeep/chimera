@@ -1,6 +1,6 @@
 # Chimera backend
 
-Authentication profiles, hosted sign-in/recovery, project membership, and authenticated review links are documented in the [deployment guide](../docs/authentication-deployments.md). Set `CHIMERA_DEPLOYMENT_PROFILE=darkrogue` for password authentication, or `encarta` for the intentionally disabled integration profile. Unimplemented providers never fall back to local identity. The hosted frontend and local HTTPS qualification are implemented; real Linux/Nginx server qualification awaits the deferred connection details.
+Authentication profiles, hosted sign-in/recovery, project membership, and authenticated review links are documented in the [deployment guide](../docs/authentication-deployments.md). Set `CHIMERA_DEPLOYMENT_PROFILE=networked` for password authentication, or `encarta` for the intentionally disabled integration profile. Unimplemented providers never fall back to local identity. The hosted frontend and local HTTPS qualification are implemented; real Linux/Nginx server qualification awaits the deferred connection details.
 
 ```powershell
 python -m venv .venv
@@ -13,7 +13,7 @@ The API stores projects under `workspace/projects` by default. Set `CHIMERA_WORK
 
 ### Pythia Sprint 1 integration
 
-The Pythia Engine API base URL is configured on the Chimera backend with `CHIMERA_PYTHIA_BASE_URL` and defaults to `http://localhost:8000`. The adapter exposes health/capability discovery, task submission, polling/cancellation, and validated draft artifact retrieval. Its browser entry point never receives the Pythia URL or credential. If Pythia client authentication is enabled, configure `CHIMERA_PYTHIA_API_KEY` in the Chimera backend environment; the adapter sends it as a Bearer credential and in the legacy `X-Pythia-API-Key` header. Never place this secret in frontend source or browser storage. Run the contract tests with `python -m pytest backend/tests/test_learning_intelligence.py` from the repository root.
+The Chimera repository pins [`Darkkeep/pythia-contracts`](https://github.com/Darkkeep/pythia-contracts) `v1.0.0` as the `vendor/pythia-contracts` Git submodule. Contract tests require this checkout and validate generated requests and returned drafts against its schemas. Initialize it with `git submodule update --init --recursive` after cloning. The Pythia Engine API base URL is configured on the Chimera backend with `CHIMERA_PYTHIA_BASE_URL` and defaults to `http://localhost:8000`. The adapter exposes health/capability discovery, task submission, polling/cancellation, and validated draft artifact retrieval. Its browser entry point never receives the Pythia URL or credential. If Pythia client authentication is enabled, configure `CHIMERA_PYTHIA_API_KEY` in the Chimera backend environment; the adapter sends it as a Bearer credential and in the legacy `X-Pythia-API-Key` header. Never place this secret in frontend source or browser storage. Run the contract tests with `python -m pytest backend/tests/test_learning_intelligence.py` from the repository root.
 
 Chimera's local API also uses port 8000. To run both services on one workstation, start Pythia on port 8001 and set `$env:CHIMERA_PYTHIA_BASE_URL = "http://localhost:8001"` in the Chimera backend environment before startup. See the [Sprint 1 handoff](../docs/pythia-sprint-1-handoff.md) for the task and artifact contracts.
 

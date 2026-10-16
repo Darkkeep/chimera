@@ -1,0 +1,105 @@
+.assessment-stage-frame > .assessment-stage-region {
+  font-size: 16px;
+  line-height: 1.35;
+  padding: 14px;
+}
+.assessment-stage-frame > .assessment-stage-region :is(h2,h3) {
+  font-size: 20px;
+  line-height: 1.3;
+  margin: 0 0 12px;
+}
+.assessment-stage-region .course-preview-assessment :is(.course-preview-answer,.course-preview-order-row,.course-preview-match-row) {
+  margin: 6px 0;
+  padding: 8px 10px;
+}
+.assessment-stage-region .course-preview-assessment fieldset { margin: 0; padding: 0; }
+.assessment-stage-region .course-preview-assessment-kicker { margin-bottom: 6px; }
+.assessment-stage-region .course-preview-assessment-actions { margin-top: 10px; gap: 8px; }
+.assessment-stage-region .course-preview-assessment-actions button { margin-top: 0; padding: 8px 12px; }
+.assessment-stage-frame > .assessment-stage-region .assessment label { margin: 6px 0; }
+.assessment-stage-frame > .assessment-stage-region .assessment button { margin: 10px 8px 0 0; padding: 8px 12px; }
+.assessment-stage-choice { gap: 10px; margin-bottom: 8px; }
+.assessment-feedback-dialog {
+  color-scheme: light;
+  box-sizing: border-box;
+  width: min(500px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid #8c949d;
+  border-radius: 6px;
+  background: #f1f2f3;
+  color: #24272b;
+  box-shadow: 5px 5px 5px rgba(0,0,0,.32);
+  font: 16px/1.5 sans-serif;
+}
+.assessment-feedback-dialog::backdrop { background: rgba(0,0,0,.5); }
+.assessment-feedback-dialog h2 { margin: 0 0 12px; font-size: 22px; color: #24272b; }
+.assessment-feedback-dialog button { font: inherit; padding: 8px 12px; min-height: 44px; margin: 4px 8px 0 0; }
+.assessment-feedback-dialog .assessment-feedback-message { padding: 12px; border-radius: 3px; }
+.assessment-feedback-dialog .correct { background: #e7f2e8; color: #23552b; }
+.assessment-feedback-dialog .incorrect { background: #fbe9e7; color: #8b2525; }
+.assessment-feedback-dialog button:focus-visible { outline: 2px solid #245b85; outline-offset: 3px; }
+.assessment-stage-region {
+  color-scheme: light;
+  background-color: #d8dadd;
+  background-image: repeating-linear-gradient(0deg, rgba(255,255,255,.16) 0, rgba(255,255,255,.16) 1px, rgba(95,102,110,.06) 1px, rgba(95,102,110,.06) 2px, transparent 2px, transparent 4px), linear-gradient(115deg, #f0f1f2 0%, #d2d5d8 38%, #e6e8ea 68%, #c6cacf 100%);
+  border: 1px solid #a2a8af;
+  border-top-color: #f7f8f9;
+  border-left-color: #edf0f2;
+  border-radius: 6px;
+  box-shadow: inset 1px 1px 1px rgba(255,255,255,.9), inset -1px -1px 2px rgba(62,69,78,.3), 5px 5px 5px rgba(0,0,0,.32);
+  color: #24272b;
+}
+.assessment-stage-region .course-preview-assessment {
+  background: transparent !important;
+  color: #24272b;
+}
+.assessment-stage-region :is(h2,h3,legend,label,strong),
+.assessment-stage-region .course-preview-assessment :is(label span,legend,.course-preview-assessment-kicker) {
+  color: #24272b !important;
+}
+.assessment-stage-region :is(input,select,textarea) {
+  appearance: auto;
+  color-scheme: light;
+  accent-color: #315f80;
+}
+.assessment-stage-region :is(input:not([type=radio]):not([type=checkbox]),select,textarea) {
+  max-width: 100%;
+  box-sizing: border-box;
+  background: #ffffff;
+  color: #24272b;
+  border: 1px solid #858e98;
+  border-radius: 3px;
+  padding: 8px 10px;
+}
+.assessment-stage-region .course-preview-answer,
+.assessment-stage-region .course-preview-answer.selected {
+  background: rgba(255,255,255,.6) !important;
+  border-color: #a2a8af;
+  color: #24272b;
+}
+.assessment-stage-region :is(input,select,textarea,button):focus-visible {
+  outline: 2px solid #245b85;
+  outline-offset: 3px;
+}
+.assessment-stage-region .course-preview-answer.selected {
+  border-color: #315f80 !important;
+}
+.assessment-stage-region .course-preview-assessment :is(.course-preview-assessment-score.correct,.course-preview-assessment-feedback.correct) {
+  color: #23552b !important;
+}
+.assessment-stage-region .course-preview-assessment :is(.course-preview-assessment-score.incorrect,.course-preview-assessment-feedback.incorrect) {
+  color: #8b2525 !important;
+}
+.assessment-stage-region .course-preview-assessment fieldset:disabled {
+  opacity: 1;
+}
+.assessment-stage-region .course-preview-assessment .course-preview-assessment-feedback.correct {
+  background: #e7f2e8 !important;
+  border: 1px solid #87a98b;
+}
+.assessment-stage-region .course-preview-assessment .course-preview-assessment-feedback.incorrect {
+  background: #fbe9e7 !important;
+  border: 1px solid #c4938e;
+}

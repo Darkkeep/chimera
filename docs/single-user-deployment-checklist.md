@@ -2,6 +2,10 @@
 
 Use this checklist for a repeatable local demonstration. Built-in hosted accounts are implemented separately; Encarta remains fail-closed until its integration contract is supplied.
 
+## Current qualification - 2026-10-15
+
+Use the [completion execution record](completion-update-2026-10-15.md) for this update. Earlier records below remain historical: representative SCORM 1.2 LMS acceptance is complete by operator attestation, including the October 14 retry replacement; ordinary interactive Writer acceptance remains distinct. Video/shared media/OCR and resume budgets are described in [media placement and OCR](media-placement-and-ocr.md) and [resume policy](resume-data-policy.md). Hosted deployment is deferred by owner instruction for this update.
+
 ## Install
 
 - [ ] Python 3.11+ is installed.

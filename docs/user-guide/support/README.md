@@ -1,6 +1,6 @@
 # Maintaining the illustrated user guide
 
-The guide is [docs/user-guide.md](../../user-guide.md). PNG screenshots are stored in [images](../images/), and [capture-manifest.json](../capture-manifest.json) records the most recent complete capture.
+The guide is [docs/user-guide.md](../../user-guide.md). PNG screenshots are stored in [images](../images/). [capture-manifest.json](../capture-manifest.json) records the original complete capture; [refresh-manifest-2026-10-14.json](../refresh-manifest-2026-10-14.json) records the refreshed controls.
 
 These helpers run against a separate demonstration workspace. They do not require changes to the application code or use real project content. The demonstration slide image is a repository graphic copied unchanged; it is not evidence of PowerPoint rendering fidelity. The sample suggestion is an author proposal seeded for documentation, not AI-generated output. The generated-media candidate also uses fixture data rather than paid generation.
 
@@ -77,3 +77,21 @@ Review the resulting images and Markdown preview. Confirm that:
 Record the current source commit and any applied recovery snapshot in the guide when refreshing it. A screenshot pass verifies the depicted controls and exercised interactions; it does not substitute for export, accessibility, provider, or LMS qualification.
 
 Stop both demonstration services when finished. The capture browser closes automatically.
+
+## Refresh changed controls and rebuild the PDF
+
+The 2026-10-14 refresh uses a fresh fixture so older demonstration artifacts stay intact. Set `CHIMERA_GUIDE_DIR` to the absolute path of `workspace/user-guide-20261014` before running `seed.py`. Seed refuses to overwrite an existing fixture; reuse it for recapture. Start an isolated API on port 8019 with `CHIMERA_WORKSPACE` pointing to that fixture's `data` folder and provider environment settings empty. Serve the normal frontend on port 5179 with `/api` proxied to 8019. See the configuration pattern above; keep both services separate from the user's normal app.
+
+Run `node docs/user-guide/support/capture-refresh.cjs` from the repository root. It uses installed `@playwright/test`, verifies the fixture identity, and refreshes changed controls. AI configuration display and generated-course content use inert documentation fixtures; no provider request is made. It edits only the demonstration project, resets its named demonstration Assessment for recaptures, creates a temporary course-draft demonstration, and moves that temporary project to the isolated trash afterward. `GUIDE_URL` and `CHIMERA_GUIDE_DIR` override the default address and fixture path. The refresh manifest records which screenshots changed; earlier images remain documented by the original capture manifest.
+
+To produce the PDF from the current Markdown and images:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r docs/user-guide/support/requirements.txt
+.\.venv\Scripts\python.exe docs/user-guide/support/render-pdf.py
+node docs/user-guide/support/render-pdf.cjs
+.\.venv\Scripts\python.exe docs/user-guide/support/finalize-pdf.py
+.\.venv\Scripts\python.exe docs/user-guide/support/verify-guide.py
+```
+
+The Python helper creates ignored print HTML under `workspace/`. Chromium embeds the images and creates `docs/user-guide.pdf` in A4 landscape, with page numbers and repeated table headers. Missing images fail the render. PDF links to repository documents/images use GitHub `main` paths so they do not depend on the maintainer's local filesystem. Markdown links remain relative. Inspect representative PDF pages and check all image/link targets before committing the source, screenshots, manifests, and PDF together.

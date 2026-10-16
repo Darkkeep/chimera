@@ -16,6 +16,7 @@ from PIL import Image, UnidentifiedImageError
 from pptx import Presentation
 
 from .ingest import extract_presentation
+from .content_generation import generate_course_draft, generate_scene_draft
 from .auth import resolve_actor_context
 from .backup import build_project_archive, restore_project_archive
 from .enhancement_jobs import cancel_enhancement_job, preview_enhancement_submission, recover_enhancement_jobs, retry_enhancement_job, start_enhancement_job
@@ -27,6 +28,7 @@ from .references import SUPPORTED_REFERENCE_EXTENSIONS, extract_reference_passag
 from .render import render_slides
 from .qti import assessment_item_xml, assessment_test_package
 from .scorm import persist_scorm_12_build, persist_scorm_build, read_scorm_report
+from .standalone import build_standalone_course
 from .storage import ROOT, EnhancementProposalConflict, StoryboardRevisionConflict, add_project_asset, add_review_reply, approve_generated_candidate, create_enhancement_job, create_enhancement_proposal, create_media_generation_job, create_project, create_pythia_analysis_proposal, create_pythia_course_review, create_pythia_transform_proposal, create_review_comment, create_scene, create_template, decide_enhancement_proposal, decide_pythia_analysis_proposal, decide_pythia_course_finding, decide_pythia_transform_proposal, decide_review_comment, delete_scene, list_enhancement_jobs, list_enhancement_proposals, list_generated_candidates, list_media_generation_jobs, list_projects, list_pythia_analysis_proposals, list_pythia_course_reviews, list_pythia_transform_proposals, list_reference_resources, list_review_comments, list_templates, project_path, read_enhancement_job, read_generated_candidate, read_media_generation_job, read_project, read_template, persist_imported_assets, persist_slide_previews, reorder_scenes, replace_storyboard, replace_template_source, save_reference_resource, slugify, storyboard_transaction, update_from_import, update_project_asset_attribution, update_project_completion_settings, update_project_export_settings, update_generated_candidate, update_media_generation_job, update_scene, update_template, validate_visual_assets, write_project_metadata, write_storyboard, template_path
 from .validation import validate_project
 from .models import ProductionStageUpdate
@@ -34,14 +36,22 @@ from .models import TrashedProject
 from .storage import update_project_production_stage
 from .storage import now_iso
 from .media_generation import media_provider_configured
+from .media_routes import router as media_router
 from .learning_intelligence import PythiaProvider, PythiaUnavailableError, validate_assessment_blueprint, validate_course_review, validate_storyboard_analysis, validate_storyboard_transformation
 from .ai_connection import ConnectionRevision, ConnectionUpdate, connection_status, disconnect_connection, save_connection, test_connection
 from .word_export import DOCX_MEDIA_TYPE, FULL_TEMPLATE_PATH, SME_TEMPLATE_PATH, TemplateArtworkError, build_full_storyboard_docx, build_sme_storyboard_docx, build_storyboard_docx
 from .deployment import cors_origins, installation_policy, public_origin
 from .password_auth import AccountStore, COOKIE, HostedAuthorizationPolicy, LoginRequest, ResetPasswordRequest, ReviewInvitationRequest, SESSION_SECONDS, require_origin
+from .models import AssessmentGroup, AssessmentGroupWrite, CourseDraftRequest, CourseContentDraft, SceneDraftRequest, SceneContentDraft
+from .storage import create_scenes, save_assessment_group
 
 
 ROUTE_ACTIONS = {
+    "get_media_capabilities": "project.view", "patch_media_metadata": "media.manage", "get_media_captions": "project.view",
+    "get_media_usage": "project.view", "delete_project_media": "media.manage", "put_course_media": "media.manage",
+    "put_scene_media": "media.manage", "get_shared_media": "media.manage", "publish_shared_media": "media.manage",
+    "copy_shared_media": "media.manage", "delete_shared_media": "media.manage", "post_reference_ocr": "reference.create",
+    "post_reference_ocr_accept": "reference.create",
     "health": "identity.view", "auth_config": "identity.view", "login": "identity.view",
     "logout": "identity.view", "reset_password": "identity.view", "get_accounts": "admin.policy.manage",
     "get_identity_context": "identity.view", "get_identity_policy": "identity.view",
@@ -87,7 +97,12 @@ ROUTE_ACTIONS = {
     "get_pythia_transform_proposals": "project.view",
     "post_pythia_transform_proposal": "enhancement.proposal.create",
     "post_pythia_transform_proposal_decision": "enhancement.proposal.decide",
+    "get_assessments": "project.view", "post_assessment": "project.settings.update",
+    "patch_assessment": "project.settings.update", "delete_assessment": "project.settings.update",
+    "generate_course_content_draft": "enhancement.job.create", "apply_course_content_draft": "enhancement.job.create",
+    "generate_scene_content_draft": "enhancement.job.create",
     "export_qti_assessment_item": "project.export", "export_qti_assessment_test": "project.export",
+    "export_assessment_group_qti": "project.export", "export_standalone": "project.export",
     "export_scorm_2004": "project.export", "export_scorm_12": "project.export", "get_scorm_report": "project.export",
     "export_storyboard": "project.export", "export_project_backup": "project.export", "import_project_backup": "project.restore",
     "export_storyboard_docx": "project.export", "export_sme_storyboard_docx": "project.export", "export_full_storyboard_docx": "project.export",
@@ -116,6 +131,8 @@ def _hosted_request_action(request: Request) -> str:
         return "workspace.view"
     if path.startswith("/api/ai-connection"):
         return "identity.self" if request.method == "GET" else "admin.policy.manage"
+    if "/shared-media" in path:
+        return "media.manage"
     if path.endswith("/pythia-analysis") and request.method == "POST":
         return "enhancement.job.create"
     if path.endswith("/pythia-transform") and request.method == "POST":
@@ -124,6 +141,12 @@ def _hosted_request_action(request: Request) -> str:
         return "enhancement.job.create"
     if path.endswith("/pythia-course-review") and request.method == "POST":
         return "enhancement.job.create"
+    if "/content-drafts/" in path or path.endswith("/content-draft"):
+        return "enhancement.job.create"
+    if "/assessments" in path:
+        if request.method == "GET":
+            return "project.export" if path.endswith(".zip") else "project.view"
+        return "project.settings.update"
     if "/pythia-tasks/" in path and path.endswith("/cancel") and request.method == "POST":
         return "enhancement.job.manage"
     if "/pythia-analysis-proposals/" in path and path.endswith("/decision") and request.method == "POST":
@@ -246,6 +269,7 @@ async def _require_request_access(
 
 
 app = FastAPI(title="Chimera API", version="0.1.0", dependencies=[Depends(_require_request_access)])
+app.include_router(media_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -1348,6 +1372,65 @@ def patch_project_export_settings(project_id: str, settings: ExportSettings, if_
         raise HTTPException(status_code=404, detail="Project not found") from error
 
 
+@app.get("/api/projects/{project_id}/assessments", response_model=list[AssessmentGroup])
+def get_assessments(project_id: str) -> list[AssessmentGroup]:
+    try:
+        return read_project(project_id).storyboard.assessments
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+
+
+def _save_assessment(project_id: str, data: AssessmentGroupWrite | None, assessment_id: str | None, if_match: str | None) -> ProjectDetail:
+    expected = _expected_revision(if_match)
+    if expected is None:
+        raise HTTPException(status_code=428, detail="An If-Match storyboard revision is required")
+    try:
+        return save_assessment_group(project_id, data, expected, assessment_id)
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Assessment not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/projects/{project_id}/assessments", response_model=ProjectDetail)
+def post_assessment(project_id: str, data: AssessmentGroupWrite, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
+    return _save_assessment(project_id, data, None, if_match)
+
+
+@app.patch("/api/projects/{project_id}/assessments/{assessment_id}", response_model=ProjectDetail)
+def patch_assessment(project_id: str, assessment_id: str, data: AssessmentGroupWrite, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
+    return _save_assessment(project_id, data, assessment_id, if_match)
+
+
+@app.delete("/api/projects/{project_id}/assessments/{assessment_id}", response_model=ProjectDetail)
+def delete_assessment(project_id: str, assessment_id: str, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
+    return _save_assessment(project_id, None, assessment_id, if_match)
+
+
+@app.get("/api/projects/{project_id}/assessments/{assessment_id}/assessment.qti.zip")
+def export_assessment_group_qti(project_id: str, assessment_id: str) -> Response:
+    try:
+        project = read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    group = next((item for item in project.storyboard.assessments if item.id == assessment_id), None)
+    if group is None:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    scenes = {scene.id: scene for scene in project.storyboard.scenes}
+    questions = [scenes[scene_id] for scene_id in group.questionSceneIds if scenes[scene_id].assessmentItem is not None]
+    if len(questions) < 2:
+        raise HTTPException(status_code=422, detail="Assessment QTI export requires at least two authored question scenes in this group")
+    try:
+        package = assessment_test_package(questions, group.title)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return Response(content=package, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{slugify(group.title)}-assessment.qti.zip"'})
+
+
 @app.get("/api/projects/{project_id}/enhancement-proposals", response_model=list[EnhancementProposal])
 def get_enhancement_proposals(project_id: str) -> list[EnhancementProposal]:
     try:
@@ -1809,6 +1892,18 @@ def export_qti_assessment_test(project_id: str) -> Response:
     )
 
 
+@app.get("/api/projects/{project_id}/standalone.zip")
+def export_standalone(project_id: str) -> Response:
+    try:
+        project = read_project(project_id)
+        content, filename = build_standalone_course(project)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return Response(content=content, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
 @app.get("/api/projects/{project_id}/scorm-2004.zip")
 def export_scorm_2004(project_id: str) -> Response:
     try:
@@ -1967,6 +2062,8 @@ async def post_project_asset(project_id: str, file: UploadFile = File(...), if_m
         kind = "image"
     elif extension in AUDIO_UPLOAD_EXTENSIONS:
         kind = "audio"
+    elif extension in {".mp4", ".webm"}:
+        kind = "video"
     else:
         raise HTTPException(status_code=400, detail="Upload a JPG, PNG, GIF, WebP, MP3, M4A, AAC, WAV, or OGG file")
     content = await file.read(MAX_MEDIA_BYTES + 1)
@@ -1980,6 +2077,11 @@ async def post_project_asset(project_id: str, file: UploadFile = File(...), if_m
                 image.verify()
         except (UnidentifiedImageError, OSError) as error:
             raise HTTPException(status_code=422, detail="Could not read image file") from error
+    if kind == "video" and not (
+        extension == ".mp4" and len(content) >= 16 and content[4:8] == b"ftyp"
+        or extension == ".webm" and content.startswith(b"\x1a\x45\xdf\xa3")
+    ):
+        raise HTTPException(status_code=422, detail="Video must have a valid MP4 or WebM container header; verify codec playback in Preview")
     try:
         return add_project_asset(project_id, Path(file.filename).name, content, kind, expected_revision)
     except StoryboardRevisionConflict as error:
@@ -2027,6 +2129,54 @@ def post_scene(project_id: str, data: SceneCreate, if_match: Annotated[str | Non
         raise HTTPException(status_code=404, detail="Project not found") from error
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/projects/{project_id}/content-drafts/course", response_model=CourseContentDraft)
+def generate_course_content_draft(project_id: str, data: CourseDraftRequest) -> CourseContentDraft:
+    try:
+        project = read_project(project_id)
+        return generate_course_draft(project, data.prompt, data.resourceIds)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project or selected course reference not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.post("/api/projects/{project_id}/content-drafts/course/apply", response_model=ProjectDetail)
+def apply_course_content_draft(project_id: str, data: CourseContentDraft, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
+    expected_revision = _expected_revision(if_match)
+    if expected_revision is None:
+        raise HTTPException(status_code=428, detail="An If-Match storyboard revision is required")
+    try:
+        return create_scenes(project_id, [SceneCreate(**scene.model_dump()) for scene in data.scenes], expected_revision)
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found or a referenced template is unavailable") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.post("/api/projects/{project_id}/scenes/{scene_id}/content-draft", response_model=SceneContentDraft)
+def generate_scene_content_draft(project_id: str, scene_id: str, data: SceneDraftRequest) -> SceneContentDraft:
+    try:
+        project = read_project(project_id)
+        scene = next((item for item in project.storyboard.scenes if item.id == scene_id), None)
+        if scene is None:
+            raise HTTPException(status_code=404, detail="Scene not found")
+        if data.currentScene is not None:
+            scene = Scene.model_validate({**scene.model_dump(mode="json"), **data.currentScene.model_dump(mode="json", exclude_unset=True)})
+        return generate_scene_draft(project, scene, data.prompt)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 def _native_scene_layout(scene: Scene) -> SceneLayout:
@@ -2127,7 +2277,7 @@ def patch_scene(project_id: str, scene_id: str, data: SceneUpdate, if_match: Ann
         template_changed = requested_template != scene.templateId
         if requested_mode == "template" and (mode_changed or template_changed or scene.visualLayout is None):
             return _apply_template_scene_layout(project_id, scene_id, data, expected)
-        if (mode_changed and requested_mode == "native") or (requested_mode == "native" and scene.visualLayout is None):
+        if data.visualLayout is None and ((mode_changed and requested_mode == "native") or (requested_mode == "native" and scene.visualLayout is None)):
             native_scene = scene.model_copy(update={
                 "title": data.title if "title" in data.model_fields_set else scene.title,
                 "extractedText": data.extractedText if "extractedText" in data.model_fields_set else scene.extractedText,

@@ -196,7 +196,7 @@ test('Pythia cancellation waits for confirmation and findings require a saved re
 test('canvas authoring and production stage walkthroughs wait for real saves', async ({ page }) => {
   const id = await seed(page);
   await choose(page, 'Author the scene canvas');
-  await page.getByRole('tab', { name: 'Canvas', exact: true }).click();
+  await page.getByRole('tab', { name: 'Stage', exact: true }).click();
   await page.getByRole('button', { name: 'Save scene', exact: true }).click();
   await finish(page);
   await choose(page, 'Record the production and release stage');
@@ -357,7 +357,7 @@ test('media upload, attachment, credit and image description confirm persisted o
 for (const [type, name] of [['single-choice', 'Single-choice question'], ['multiple-response', 'Multiple-answer question'], ['true-false', 'True / false question'], ['ordering', 'Ordering question'], ['drag-drop', 'Drag-and-drop question'], ['matching', 'Matching question'], ['short-answer', 'Short-answer question']]) {
   test(`${name} guide completes only after its matching question is saved`, async ({ page }) => {
     const id = await seed(page); await write(page, id, 'scenes', { title: 'Assessment practice', sceneType: 'assessment' });
-    await page.unroute('**/api/projects'); await reloadAuthoring(page); await expect(page.getByRole('button', { name: /Assessment practice assessment/ })).toBeVisible();
+    await page.unroute('**/api/projects'); await reloadAuthoring(page); await expect(page.getByRole('button', { name: /Assessment practice question/ })).toBeVisible();
     await choose(page, name);
     if (type === 'single-choice') {
       await page.getByRole('combobox', { name: /^Question type/ }).selectOption('true-false');
@@ -426,7 +426,7 @@ test('templates upload, edit, replace and assign; PowerPoint import saves real s
   await page.getByLabel('Upload PPTX template', { exact: true }).setInputFiles({ name: 'practice.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer: deck }); await finish(page);
   await choose(page, 'Edit template details'); await page.getByLabel('Template name', { exact: true }).fill(editedName); await page.getByRole('button', { name: 'Save template', exact: true }).click(); await finish(page);
   await choose(page, 'Replace a template source'); await page.getByRole('article').filter({ hasText: editedName }).getByLabel('Replace template PowerPoint').setInputFiles({ name: 'replacement.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer: deck }); await finish(page);
-  await choose(page, 'Assign a template to a scene'); await page.getByRole('combobox', { name: /^Scene layout/ }).selectOption('template');
+  await choose(page, 'Assign a template to a scene'); await page.getByRole('combobox', { name: /^Rendering mode/ }).selectOption('template');
   await page.getByRole('tab', { name: 'Details', exact: true }).click();
   const select = page.getByRole('dialog').getByRole('combobox', { name: 'Template', exact: true }); const templateId = await select.locator('option').nth(1).getAttribute('value');
   await select.selectOption(templateId); await page.getByRole('button', { name: 'Save scene', exact: true }).click(); await finish(page);

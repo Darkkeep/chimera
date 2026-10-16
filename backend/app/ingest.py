@@ -8,7 +8,8 @@ from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.oxml.ns import qn
 
 from .models import ExtractedAsset, Scene
-from .pptx_layout import extract_slide_layout
+from .pptx_backgrounds import render_master_background
+from .pptx_layout import extract_master_layout, extract_slide_layout
 
 
 IMAGE_EXTENSIONS = {".bmp", ".emf", ".gif", ".jpeg", ".jpg", ".png", ".svg", ".tif", ".tiff", ".wmf"}
@@ -120,5 +121,25 @@ def extract_presentation(source: Path, output_root: Path) -> tuple[list[Scene], 
                 sourceAnimationXml=ElementTree.tostring(timing, encoding="unicode") if timing is not None else None,
                 sourceTransitionXml=ElementTree.tostring(transition, encoding="unicode") if transition is not None else None,
             )
+        )
+    def register_master_image(relationship: Any) -> str:
+        asset = _asset_from_relationship(relationship, "image", output_root)
+        assets_by_id[asset.id] = asset
+        return asset.id
+
+    for index, master in enumerate(presentation.slide_masters, start=1):
+        master_layout = extract_master_layout(presentation, master, register_master_image)
+        content = render_master_background(master_layout, assets_by_id, output_root)
+        digest = hashlib.sha256(content).hexdigest()
+        asset_id = f"master-background-{digest}"
+        if asset_id in assets_by_id:
+            continue
+        relative_path = Path("assets") / "images" / f"{asset_id}.svg"
+        destination = output_root / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(content)
+        assets_by_id[asset_id] = ExtractedAsset(
+            id=asset_id, kind="image", role="background", filename=f"Master background {index}.svg",
+            contentType="image/svg+xml", sizeBytes=len(content), sha256=digest, path=relative_path.as_posix(),
         )
     return scenes, list(assets_by_id.values())

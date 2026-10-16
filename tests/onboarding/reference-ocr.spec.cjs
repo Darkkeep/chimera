@@ -1,0 +1,34 @@
+const { test, expect } = require('@playwright/test');
+
+test('OCR output requires passage inspection and explicit acceptance before reference selection', async ({ page, request }) => {
+  let project = await (await request.post('/api/projects', { data: { title: 'OCR review qualification' } })).json();
+  project = await (await request.post(`/api/projects/${project.id}/scenes`, { data: { title: 'Inspection' } })).json();
+  const uploaded = await request.post(`/api/projects/${project.id}/reference-resources`, { multipart: { file: { name: 'scan.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF synthetic unreadable fixture') }, title: 'Scanned guide' } });
+  expect(uploaded.ok()).toBe(true);
+  const resource = await uploaded.json();
+  const recognized = { ...resource, currentVersion: '2', versions: [...resource.versions, { ...resource.versions[0], version: '2', extractionStatus: 'partial', extractionMessage: 'Local OCR (eng); inspect text.', passages: [{ locator: 'page:1', text: 'Inspect equipment before operation.' }] }] };
+  let calls = 0, acceptances = 0;
+  await page.route(`**/projects/${project.id}/media-capabilities`, route => route.fulfill({ json: { canPublishShared: true, ocr: { available: true, languages: ['eng'], message: 'Synthetic local OCR capability.' } } }));
+  await page.route(`**/reference-resources/${resource.id}/ocr`, route => { calls++; return route.fulfill({ json: recognized }); });
+  await page.route(`**/reference-resources/${resource.id}/ocr/accept`, route => { acceptances++; return route.fulfill({ json: { ...recognized, versions: recognized.versions.map(v => v.version === '2' ? { ...v, extractionStatus: 'complete', extractionMessage: 'OCR inspected by author.' } : v) } }); });
+  await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Review tools', exact: true }).click();
+  await page.getByRole('button', { name: 'Review suggestions', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  const reference = dialog.locator('.enhancement-resource-choice').filter({ hasText: 'Scanned guide' }).getByRole('checkbox');
+  await expect(reference).toBeDisabled();
+  expect(calls).toBe(0);
+  await dialog.getByText('Local PDF text recognition (OCR)', { exact: true }).click();
+  await dialog.getByRole('button', { name: 'Create OCR version', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Use inspected OCR text', exact: true })).toBeVisible();
+  expect(calls).toBe(1); expect(acceptances).toBe(0);
+  await expect(reference).toBeDisabled();
+  await dialog.getByText('Inspect OCR passages', { exact: true }).click();
+  await expect(dialog.getByText('Inspect equipment before operation.', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Use inspected OCR text', exact: true }).click();
+  await expect(reference).toBeEnabled();
+  expect(acceptances).toBe(1);
+  await reference.check();
+  await expect(reference).toBeChecked();
+});

@@ -16,13 +16,15 @@ The Media Library **Project** selector defaults to the active course and switche
 
 Configure an approved OpenAI connection through **Settings > AI connection**. Saved keys use the server account's OS credential store, never browser storage or project backups. Shared-deployment changes require an installation administrator. Existing server environment configuration remains supported; headless services without a supported credential store cannot save connections through the panel. See [AI connection](docs/ai-connection.md) for connection testing, request limits, and data-handling requirements.
 
-Choose **Light**, **Dark**, or **System** under **Appearance** in the sidebar. The preference is remembered in this browser and shared across its tabs. System is the default and follows changes to your device's color scheme. Slide images and uploaded media retain their original colors.
+Choose **Light**, **Dark**, or **System** under **Appearance** in the sidebar. The preference is remembered in this browser and shared across its tabs. Dark is the default; System follows changes to your device's color scheme. Slide images and uploaded media retain their original colors.
 
 Onboarding's reusable engine and standalone demo live in the private [Darkkeep/onboarding repository](https://github.com/Darkkeep/onboarding). Chimera retains its application walkthroughs and installs the pinned release from `vendor/onboarding`, so no sibling checkout or GitHub credentials are needed. See the [implementation record](docs/onboarding-implementation.md) and [artifact update instructions](vendor/onboarding/README.md).
 
+New media controls support explicit scene/course-wide placement, project copies of shared assets, captioned MP4/WebM video and local PDF OCR with author inspection. Word exports can include accepted source citations and optional review discussion. See [media placement and OCR](docs/media-placement-and-ocr.md), [resume-data limits](docs/resume-data-policy.md), and [release policy](docs/release-policy.md).
+
 ## Start locally
 
-For local, Encarta, and darkrogue.io authentication preparation, see the [deployment authentication guide](docs/authentication-deployments.md). Local single-user operation remains the default; hosted profiles use separate workspaces.
+For local, Encarta, and networked authentication preparation, see the [deployment authentication guide](docs/authentication-deployments.md). Local single-user operation remains the default; hosted profiles use separate workspaces.
 
 ### Backend
 
@@ -65,6 +67,12 @@ Open http://localhost:5173. The authoring slice supports local project creation,
 Use the [single-user deployment checklist](docs/single-user-deployment-checklist.md) for the repeatable local demonstration and release evidence.
 
 Editable Word storyboard export is available from **Export**. Choose **SME Master** for editable landscape scene pages styled after the visual slide template, or **Full storyboard** for the Multimedia Instructional template with the SME pages and detailed scene records included. Scene text, tables, and production details remain editable Word content; answer keys are excluded unless explicitly selected.
+
+**Export > Standalone course > Download standalone ZIP** creates a local course directory with its own player and media. Extract the entire ZIP and open `index.html`; no LMS, Chimera server, internet connection, or local web server is needed. Keep all packaged files together. Navigation, visual scenes, audio, and assessments remain available, but progress lasts only while the page is open and no LMS results are reported. The package includes launch instructions. Use SCORM instead when persistent learner tracking is required.
+
+## License
+
+Chimera is licensed under the [MIT License](LICENSE). Third-party components retain their own licenses; for example, the vendored `@guided-workflows/onboarding` package is ISC-licensed, with its license included in the package tarball.
 
 ## Verify changes
 

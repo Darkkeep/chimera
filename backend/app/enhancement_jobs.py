@@ -4,9 +4,10 @@ import os
 import threading
 import time
 from uuid import uuid4
-from typing import Protocol
+from typing import Protocol, get_args
 
-from .models import EnhancementJob, EnhancementJobCreate, EnhancementProposalCreate, EnhancementReferenceCitation
+from .ai_context import course_context, scene_context
+from .models import CourseCompletionSettings, EnhancementField, EnhancementJob, EnhancementJobCreate, EnhancementProposalCreate, EnhancementReferenceCitation, SceneUpdate
 from .models import EnhancementResourceConflict
 from . import storage
 from .learning_intelligence import PythiaProvider, PythiaUnavailableError
@@ -148,24 +149,27 @@ def _load_job_context(job: EnhancementJob) -> tuple[dict[str, object], dict[tupl
             "passages": [passage.model_dump(mode="json") for passage in version.passages],
         })
         locator_text.update({(resource.id, version.version, passage.locator): passage.text for passage in version.passages})
-    selected_scenes = [
-        {
-            "id": scene.id,
-            "title": scene.title,
-            "sceneType": scene.sceneType,
-            "learnerText": scene.extractedText,
-            "actionDescription": scene.actionDescription,
-            "narration": scene.narration,
-            "assessmentItem": scene.assessmentItem.model_dump(mode="json") if scene.assessmentItem else None,
-        }
-        for scene in (scene_map[scene_id] for scene_id in job.sceneIds)
-    ]
+    selected_scenes = [scene_context(scene_map[scene_id]) for scene_id in job.sceneIds]
+    global_fields = {"sceneOrder", "storyboardTitle", "completionSettings"}
+    allowed_fields = [field for field in get_args(EnhancementField) if job.scope == "whole-course" or field not in global_fields]
+    scene_schema = SceneUpdate.model_json_schema()
     payload: dict[str, object] = {
         "projectId": job.projectId,
         "goal": job.goal,
         "sourceRevision": job.sourceRevision,
+        "course": course_context(project),
         "scenes": selected_scenes,
         "references": selected_resources,
+        "allowedFields": allowed_fields,
+        "fieldValueSchemas": {
+            "$defs": scene_schema.get("$defs", {}),
+            "sceneFields": {field: schema for field, schema in scene_schema["properties"].items() if field in allowed_fields},
+            "globalFields": {
+                "sceneOrder": {"type": "array", "items": {"type": "string", "enum": job.sceneIds}, "minItems": len(job.sceneIds), "maxItems": len(job.sceneIds), "uniqueItems": True},
+                "storyboardTitle": {"type": "string", "minLength": 1, "maxLength": 120},
+                "completionSettings": CourseCompletionSettings.model_json_schema(),
+            } if job.scope == "whole-course" else {},
+        },
         "outputSchema": {
             "proposals": [{
                 "changes": [{"targetSceneId": "scene-id", "field": "supported proposal field", "proposedValue": "field value"}],

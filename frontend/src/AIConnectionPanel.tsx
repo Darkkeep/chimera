@@ -66,9 +66,9 @@ export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { 
   }
 
   return <EditorDialog onboardingTarget="settings.media" labelledBy="ai-connection-title" onClose={() => { setApiKey(""); onClose(); }} busy={working} className="ai-connection-dialog">
-    <header className="ai-connection-header"><h2 id="ai-connection-title">Media generation connection</h2><button type="button" className="icon-button" aria-label="Close media provider settings" title="Close media provider settings" disabled={working} onClick={onClose}><X size={18} /></button></header>
+    <header className="ai-connection-header"><h2 id="ai-connection-title">AI connection</h2><button type="button" className="icon-button" aria-label="Close media provider settings" title="Close media provider settings" disabled={working} onClick={onClose}><X size={18} /></button></header>
     {loading ? <p role="status">Loading connection...</p> : status && <>
-      <dl className="ai-connection-status"><div><dt>Media provider</dt><dd>{status.configured ? "Configured" : "Not configured"}</dd></div><div><dt>Source</dt><dd>{status.source === "environment" ? "Server environment" : status.source === "saved" ? "Saved connection" : "None"}</dd></div><div><dt>Credential</dt><dd>{status.keyConfigured ? "Configured" : "Not configured"}</dd></div></dl>
+      <dl className="ai-connection-status"><div><dt>Media provider</dt><dd>{status.configured ? "Configured" : "Not configured"}</dd></div><div><dt>Source</dt><dd>{status.source === "environment" ? "Server environment" : status.source === "saved" ? "Saved connection" : "None"}</dd></div><div><dt>Credential</dt><dd>{status.keyConfigured ? "Configured" : "Credential not stored"}</dd></div></dl>
       {!status.canManage && <p className="ai-connection-notice">Only installation administrators can change media provider settings.</p>}
       {status.canManage && !status.storageAvailable && <p className="ai-connection-notice">Secure credential storage is unavailable for this server account. Saved connections are disabled; server environment configuration remains available.</p>}
       {status.credentialError && <p className="ai-connection-notice">The saved credential could not be read. Check the server credential store.</p>}

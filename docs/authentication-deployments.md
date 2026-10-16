@@ -6,22 +6,27 @@ Chimera uses one backend with installation-specific authentication. No hosted de
 | --- | --- | --- |
 | `local` | Existing local single-user identity | Available; no login required |
 | `encarta` | Encarta adapter | Profile prepared; protected requests return 503 until real validation is implemented |
-| `darkrogue` | Built-in email/password accounts | Login, logout, recovery, project roles, and authenticated review links implemented; live server qualification deferred |
+| `networked` | Built-in email/password accounts | Login, logout, recovery, project roles, and authenticated review links implemented; live server qualification deferred |
 
 The examples under `deploy/` describe environment variables. They are not automatically loaded. Each hosted profile must use its own `CHIMERA_WORKSPACE`; do not reuse the local authoring workspace. Profiles take precedence over stored installation identity settings. A `local` profile cannot override a workspace already configured for team identity. Unimplemented OIDC, SAML, or generic adapters never fall back to local identity.
 
-## darkrogue.io
+## Networked deployment
+
+The `networked` profile supports shared LAN and web installations; its name does
+not depend on the hostname. `darkrogue.io` below is the planned host example.
+For an existing installation, retain its current workspace path when updating
+the profile setting so that accounts and project data remain available.
 
 Set these variables in the service environment:
 
 ```text
-CHIMERA_DEPLOYMENT_PROFILE=darkrogue
+CHIMERA_DEPLOYMENT_PROFILE=networked
 CHIMERA_PUBLIC_ORIGIN=https://darkrogue.io
-CHIMERA_WORKSPACE=/srv/chimera/darkrogue-workspace
+CHIMERA_WORKSPACE=/srv/chimera/networked-workspace
 CHIMERA_REVIEW_ACCESS=authenticated
 ```
 
-If the application will use a subdomain, set its exact HTTPS origin instead. Serve the frontend and `/api` at that same origin behind an HTTPS reverse proxy. Bind Uvicorn to a private interface and configure trusted proxy addresses explicitly. CORS permits the configured origin in the darkrogue profile; it does not accept wildcards.
+If the application will use a subdomain, set its exact HTTPS origin instead. Serve the frontend and `/api` at that same origin behind an HTTPS reverse proxy. Bind Uvicorn to a private interface and configure trusted proxy addresses explicitly. CORS permits the configured origin in the networked profile; it does not accept wildcards.
 
 Provision the initial operator account from the server, using the same workspace environment:
 
@@ -81,9 +86,9 @@ Before enabling browser-based saves on Linux, provision and unlock a supported S
 
 The user selected an existing Linux server with Nginx. Server/SSH details and live qualification are explicitly deferred.
 
-- `deploy/darkrogue.env.example`: service environment, dedicated workspace, exact public origin, authenticated review mode.
-- `deploy/darkrogue.nginx.conf`: same-origin static SPA and reverse proxy, TLS certificate paths, security headers, login/API rate limits, body-size limits, and loopback upstream.
-- `deploy/chimera-darkrogue.service`: service-user API process, restrictive file creation, filesystem boundary, and trusted loopback proxy settings.
+- `deploy/networked.env.example`: service environment, dedicated workspace, exact public origin, authenticated review mode.
+- `deploy/networked.nginx.conf`: same-origin static SPA and reverse proxy, TLS certificate paths, security headers, login/API rate limits, body-size limits, and loopback upstream.
+- `deploy/chimera-networked.service`: service-user API process, restrictive file creation, filesystem boundary, and trusted loopback proxy settings.
 
 Before enabling the live site, adapt the hostname, certificate paths, checkout directory, service user, and workspace to the actual server. Build `frontend/dist`, install Python dependencies into the server's virtual environment, provision accounts under the service identity, and restrict workspace ownership/permissions. Validate `nginx -t` and service startup before switching traffic. These configuration templates were not installed or tested against the real Nginx server in this session.
 

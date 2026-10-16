@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.PYTHIA_CONTRACTS_READ_TOKEN || github.token }}
+        submodules: recursive
     - uses: actions/setup-node@v4
       with:
         node-version: '24.19.0'
@@ -34,7 +37,13 @@ jobs:
       run: npm run build --prefix frontend
     - name: Run onboarding browser tests
       run: npm run test:onboarding
+    - name: Qualify visual editing and exported rendering
+      if: ${{ success() || failure() }}
+      run: npm run test:visual
+      env:
+        CHIMERA_TEST_PYTHON: python
     - name: Qualify hosted authentication over HTTPS
+      if: ${{ success() || failure() }}
       run: npm run test:auth
       env:
         CHIMERA_TEST_PYTHON: python
@@ -49,4 +58,10 @@ jobs:
       with:
         name: authentication-qualification
         path: workspace/auth-qualification/
+        retention-days: 30
+    - uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: visual-qualification
+        path: workspace/visual-qualification/
         retention-days: 30

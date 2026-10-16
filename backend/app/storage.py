@@ -5,12 +5,13 @@ import os
 import shutil
 import re
 import uuid
+import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import RLock, local
 from typing import Iterator, Literal
-from .models import ProductionStageUpdate
+from .models import AssessmentGroup, AssessmentGroupWrite, ProductionStageUpdate
 from .ai_connection import connection_status
 from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalChange, EnhancementProposalChangeCreate, EnhancementProposalCreate, EnhancementProposalDecisionRecord, ExportSettings, ExtractedAsset, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, PythiaAnalysisProposal, PythiaAnalysisProposalCreate, PythiaAnalysisProposalDecisionRecord, PythiaCourseFindingDecision, PythiaCourseFindingDecisionRecord, PythiaCourseFindingReview, PythiaCourseReview, PythiaCourseReviewCreate, PythiaTransformProposal, PythiaTransformProposalCreate, PythiaTransformProposalDecisionRecord, ReferencePassage, ReferenceResource, ReferenceResourceVersion, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewCommentReply, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate, TrashedProject
 ROOT = Path(os.environ.get("CHIMERA_WORKSPACE", Path(__file__).resolve().parents[2] / "workspace"))
@@ -214,6 +215,19 @@ def read_project(project_id: str) -> ProjectDetail:
         )
 
 
+def replace_project_file(source: Path, destination: Path) -> None:
+    # Windows readers and scanners can briefly deny an otherwise atomic rename.
+    # Keep the existing file intact and retry only Windows access/sharing errors.
+    for attempt in range(6):
+        try:
+            source.replace(destination)
+            return
+        except PermissionError as error:
+            if getattr(error, "winerror", None) not in {5, 32, 33} or attempt == 5:
+                raise
+            time.sleep(0.02 * (attempt + 1))
+
+
 def write_project_metadata(path: Path, metadata: dict[str, str]) -> None:
     with _storyboard_write_lock:
         project_file = path / "project.json"
@@ -226,11 +240,12 @@ def write_project_metadata(path: Path, metadata: dict[str, str]) -> None:
         }
         temporary = path / f".project-{uuid.uuid4().hex}.json.tmp"
         temporary.write_text(json.dumps(persisted, indent=2), encoding="utf-8")
-        temporary.replace(project_file)
+        replace_project_file(temporary, project_file)
 
 
 def write_storyboard(path: Path, storyboard: Storyboard, expected_revision: int | None = None) -> None:
     with storyboard_transaction():
+        storyboard = Storyboard.model_validate(storyboard.model_dump())
         storyboard_file = path / "storyboard.json"
         revision = 1
         if storyboard_file.exists():
@@ -245,7 +260,7 @@ def write_storyboard(path: Path, storyboard: Storyboard, expected_revision: int 
         temp_file = path / f".storyboard-{uuid.uuid4().hex}.tmp"
         persisted = storyboard.model_copy(update={"revision": revision})
         temp_file.write_text(persisted.model_dump_json(indent=2), encoding="utf-8")
-        temp_file.replace(storyboard_file)
+        replace_project_file(temp_file, storyboard_file)
 
 
 def create_project(data: ProjectCreate, context: ActorContext | None = None) -> ProjectDetail:
@@ -504,6 +519,10 @@ def replace_storyboard(project_id: str, imported: Storyboard, expected_revision:
         "title": current.title,
         "scenes": normalized_scenes,
     })
+    from .media import validate_placements, validate_captions
+    validate_placements(current.model_copy(update={"storyboard": storyboard}))
+    for asset in storyboard.assets:
+        validate_captions(asset.captionsVtt)
     write_storyboard(path, storyboard, expected_revision or current.storyboard.revision)
     metadata = {"id": project_id, "title": current.title, "updatedAt": now_iso()}
     write_project_metadata(path, metadata)
@@ -526,9 +545,39 @@ def create_scene(project_id: str, data: SceneCreate, expected_revision: int | No
         audioRequired=data.audioRequired,
         narration=data.narration,
         notes=data.notes,
+        assessmentItem=data.assessmentItem,
+        assessmentSettings=data.assessmentSettings,
     )
     storyboard = current.storyboard.model_copy(update={"scenes": [*current.storyboard.scenes, scene]})
     write_storyboard(path, storyboard, expected_revision or current.storyboard.revision)
+    metadata = {"id": project_id, "title": current.title, "updatedAt": now_iso()}
+    write_project_metadata(path, metadata)
+    return read_project(project_id)
+
+
+def create_scenes(project_id: str, scenes: list[SceneCreate], expected_revision: int) -> ProjectDetail:
+    path = project_path(project_id)
+    current = read_project(project_id)
+    created_scenes = []
+    for data in scenes:
+        validate_scene_template(data.layoutMode, data.templateId)
+        created_scenes.append(Scene(
+            id=f"scene-{uuid.uuid4().hex[:8]}",
+            title=data.title,
+            sceneType=data.sceneType,
+            extractedText=data.extractedText,
+            actionDescription=data.actionDescription,
+            layoutMode=data.layoutMode,
+            templateId=data.templateId,
+            required=data.required,
+            audioRequired=data.audioRequired,
+            narration=data.narration,
+            notes=data.notes,
+            assessmentItem=data.assessmentItem,
+            assessmentSettings=data.assessmentSettings,
+        ))
+    storyboard = current.storyboard.model_copy(update={"scenes": [*current.storyboard.scenes, *created_scenes]})
+    write_storyboard(path, storyboard, expected_revision)
     metadata = {"id": project_id, "title": current.title, "updatedAt": now_iso()}
     write_project_metadata(path, metadata)
     return read_project(project_id)
@@ -599,13 +648,15 @@ def update_scene(project_id: str, scene_id: str, data: SceneUpdate, expected_rev
                 "decorativeImages": [asset_id for asset_id in updated_scene.decorativeImages if asset_id in attached_image_ids],
             })
             known_asset_ids = {asset.id for asset in current.storyboard.assets}
-            referenced_asset_ids = set(updated_scene.imageAssets + updated_scene.audioAssets)
+            referenced_asset_ids = set(updated_scene.imageAssets + updated_scene.audioAssets + updated_scene.videoAssets)
             if not referenced_asset_ids.issubset(known_asset_ids):
                 raise ValueError("Scene references an asset that is not in this project")
             if any(asset.kind != "image" for asset in current.storyboard.assets if asset.id in updated_scene.imageAssets):
                 raise ValueError("Image scene references must point to image assets")
             if any(asset.kind != "audio" for asset in current.storyboard.assets if asset.id in updated_scene.audioAssets):
                 raise ValueError("Audio scene references must point to audio assets")
+            if any(asset.kind != "video" for asset in current.storyboard.assets if asset.id in updated_scene.videoAssets):
+                raise ValueError("Video scene references must point to video assets")
             if set(updated_scene.imageAltText) - attached_image_ids or set(updated_scene.decorativeImages) - attached_image_ids:
                 raise ValueError("Image accessibility metadata must refer to attached images")
             if set(updated_scene.imageAltText) & set(updated_scene.decorativeImages):
@@ -616,6 +667,8 @@ def update_scene(project_id: str, scene_id: str, data: SceneUpdate, expected_rev
         raise KeyError(scene_id)
     validate_remediation_targets(scenes)
     storyboard = current.storyboard.model_copy(update={"scenes": scenes})
+    from .media import validate_placements
+    validate_placements(current.model_copy(update={"storyboard": storyboard}))
     write_storyboard(path, storyboard, expected_revision or current.storyboard.revision)
     metadata = {"id": project_id, "title": current.title, "updatedAt": now_iso()}
     write_project_metadata(path, metadata)
@@ -636,11 +689,38 @@ def delete_scene(project_id: str, scene_id: str, expected_revision: int | None =
                 "assessmentSettings": settings.model_copy(update={"remediationSceneId": None}),
             })
 
-    storyboard = current.storyboard.model_copy(update={"scenes": scenes})
+    assessments = [group.model_copy(update={"questionSceneIds": [member for member in group.questionSceneIds if member != scene_id]}) for group in current.storyboard.assessments]
+    storyboard = current.storyboard.model_copy(update={"scenes": scenes, "assessments": assessments})
     write_storyboard(path, storyboard, expected_revision if expected_revision is not None else current.storyboard.revision)
     metadata = {"id": project_id, "title": current.title, "updatedAt": now_iso()}
     write_project_metadata(path, metadata)
     return read_project(project_id)
+
+
+def save_assessment_group(project_id: str, data: AssessmentGroupWrite | None, expected_revision: int, assessment_id: str | None = None) -> ProjectDetail:
+    with storyboard_transaction():
+        current = read_project(project_id)
+        if expected_revision != current.storyboard.revision:
+            raise StoryboardRevisionConflict(expected_revision, current.storyboard.revision)
+        groups = list(current.storyboard.assessments)
+        if assessment_id is None:
+            if data is None:
+                raise ValueError("Assessment fields are required")
+            groups.append(AssessmentGroup(id=f"assessment-{uuid.uuid4().hex[:8]}", **data.model_dump()))
+        else:
+            for index, group in enumerate(groups):
+                if group.id == assessment_id:
+                    if data is None:
+                        groups.pop(index)
+                    else:
+                        groups[index] = AssessmentGroup(id=assessment_id, **data.model_dump())
+                    break
+            else:
+                raise KeyError(assessment_id)
+        path = project_path(project_id)
+        write_storyboard(path, current.storyboard.model_copy(update={"assessments": groups}), expected_revision)
+        write_project_metadata(path, {"updatedAt": now_iso()})
+        return read_project(project_id)
 
 
 def validate_remediation_targets(scenes: list[Scene]) -> None:
@@ -1719,7 +1799,7 @@ def decide_enhancement_proposal(
         raise KeyError(proposal_id)
 
 
-def add_project_asset(project_id: str, filename: str, content: bytes, kind: Literal["image", "audio"], expected_revision: int | None = None) -> ProjectDetail:
+def add_project_asset(project_id: str, filename: str, content: bytes, kind: Literal["image", "audio", "video"], expected_revision: int | None = None, *, source_metadata: dict | None = None) -> ProjectDetail:
     path = project_path(project_id)
     current = read_project(project_id)
     digest = hashlib.sha256(content).hexdigest()
@@ -1727,7 +1807,7 @@ def add_project_asset(project_id: str, filename: str, content: bytes, kind: Lite
     content_type = mimetypes.guess_type(filename)[0] or ("application/octet-stream")
     asset_id = f"{kind}-{digest}"
     safe_filename = f"{asset_id}{extension}"
-    relative_path = Path("assets") / ("images" if kind == "image" else "audio") / safe_filename
+    relative_path = Path("assets") / {"image": "images", "audio": "audio", "video": "video"}[kind] / safe_filename
     destination = path / relative_path
     destination.parent.mkdir(parents=True, exist_ok=True)
     created_destination = False
@@ -1745,7 +1825,14 @@ def add_project_asset(project_id: str, filename: str, content: bytes, kind: Lite
         sha256=digest,
         path=relative_path.as_posix(),
     )
-    assets = [existing for existing in current.storyboard.assets if existing.id != asset.id]
+    existing = next((item for item in current.storyboard.assets if item.id == asset.id), None)
+    if existing:
+        if expected_revision is not None and expected_revision != current.storyboard.revision:
+            raise StoryboardRevisionConflict(expected_revision, current.storyboard.revision)
+        return current
+    if source_metadata:
+        asset = ExtractedAsset.model_validate({**asset.model_dump(), **source_metadata})
+    assets = list(current.storyboard.assets)
     assets.append(asset)
     storyboard = current.storyboard.model_copy(update={"assets": assets})
     try:

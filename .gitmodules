@@ -1,0 +1,3 @@
+[submodule "vendor/pythia-contracts"]
+	path = vendor/pythia-contracts
+	url = https://github.com/Darkkeep/pythia-contracts.git

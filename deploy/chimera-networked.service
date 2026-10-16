@@ -1,5 +1,5 @@
 [Unit]
-Description=Chimera darkrogue.io API
+Description=Chimera networked API
 After=network.target
 
 [Service]
@@ -7,7 +7,7 @@ Type=simple
 User=chimera
 Group=chimera
 WorkingDirectory=/srv/chimera/backend
-EnvironmentFile=/etc/chimera/darkrogue.env
+EnvironmentFile=/etc/chimera/networked.env
 ExecStart=/srv/chimera/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips 127.0.0.1
 Restart=on-failure
 UMask=0077
@@ -15,7 +15,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/srv/chimera/darkrogue-workspace
+ReadWritePaths=/srv/chimera/networked-workspace
 
 [Install]
 WantedBy=multi-user.target
