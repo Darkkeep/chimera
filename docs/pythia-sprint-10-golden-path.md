@@ -2,13 +2,13 @@
 
 ## Qualification
 
-The cross-service regression runner creates a two-slide legacy PowerPoint in
-memory, imports it through Chimera, and connects Chimera's API adapter to a
-temporary local Pythia Engine. It exercises storyboard analysis, analysis
-review, storyboard transformation and revision-bound acceptance, assessment
-design and native-item acceptance, course review, production validation, and
-SCORM 2004 export. Project data and Engine state are kept in temporary
-directories and removed when the run ends.
+The cross-service regression runner starts a temporary local Pythia Engine and
+invokes Chimera's full golden-path integration test. That test creates a
+two-slide legacy PowerPoint in memory, imports it through Chimera, and exercises
+storyboard analysis and review, revision-bound transformation acceptance,
+assessment design and native-item acceptance, course review, the production
+approval gate, and SCORM 2004 export/report checks. Project data and Engine
+state are kept in temporary directories and removed when the run ends.
 
 Use a Python environment with Pythia's runtime and Chimera's backend development
 requirements installed. From the Chimera repository root in PowerShell:
@@ -34,6 +34,7 @@ at the analysis, transformation, assessment, course-review, and release gates
 for the responsible people to make and record their decisions. Export only
 after the authorized release decision.
 
-The qualification currently verifies the SCORM 2004 package entry point and
-manifest. It does not establish LMS conformance, course validity, accessibility
-conformance, or readiness for deployment.
+The qualification verifies the SCORM 2004 package entry point, manifest, build
+status, and reported compatibility checks. It does not establish LMS
+conformance, course validity, accessibility conformance, or readiness for
+deployment.
