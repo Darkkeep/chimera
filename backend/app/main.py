@@ -2277,7 +2277,7 @@ def patch_scene(project_id: str, scene_id: str, data: SceneUpdate, if_match: Ann
         template_changed = requested_template != scene.templateId
         if requested_mode == "template" and (mode_changed or template_changed or scene.visualLayout is None):
             return _apply_template_scene_layout(project_id, scene_id, data, expected)
-        if (mode_changed and requested_mode == "native") or (requested_mode == "native" and scene.visualLayout is None):
+        if data.visualLayout is None and ((mode_changed and requested_mode == "native") or (requested_mode == "native" and scene.visualLayout is None)):
             native_scene = scene.model_copy(update={
                 "title": data.title if "title" in data.model_fields_set else scene.title,
                 "extractedText": data.extractedText if "extractedText" in data.model_fields_set else scene.extractedText,

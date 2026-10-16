@@ -3,6 +3,7 @@ import { ChangeEvent, useEffect, useState } from "react";
 import { Check, FileUp, RotateCw, Sparkles, X } from "lucide-react";
 import type { Project } from "./App";
 import { revisionConflictMessage, storyboardWriteHeaders } from "./revision";
+import { ReferenceOcrPanel } from "./ReferenceOcrPanel";
 import "./enhancement-review.css";
 import "./enhancement-proposal-details.css";
 import "./enhancement-submission.css";
@@ -444,6 +445,7 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
       <div className="enhancement-submission-scroll">
         <section className="enhancement-submission" aria-labelledby="enhancement-submit-title">
           <div className="enhancement-section-heading"><div><p className="eyebrow">STEP 9 · SUBMIT FOR REVIEW</p><h3 id="enhancement-submit-title">New enhancement run</h3></div><label className="button button-outline enhancement-upload-button"><FileUp size={14} /> Add reference<input type="file" accept=".pdf,.docx,.pptx,.txt,.md" onChange={(event) => void uploadReference(event)} disabled={jobBusy} /></label></div>
+          <ReferenceOcrPanel projectId={project.id} resources={resources} onUpdated={(updated) => setResources((current) => current.map((resource) => resource.id === updated.id ? { ...resource, ...updated } : resource))} />
           <div className="enhancement-submit-grid">
             <label className="enhancement-form-field">Scope<select value={scope} onChange={(event) => { setScope(event.target.value as JobRequest["scope"]); setPreview(null); }}><option value="whole-course">Whole course</option><option value="selected-scenes">Selected scenes</option></select></label>
             <label className="enhancement-form-field enhancement-goal-field">Enhancement goal<textarea value={goal} maxLength={2000} rows={2} onChange={(event) => { setGoal(event.target.value); setPreview(null); }} /></label>

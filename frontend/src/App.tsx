@@ -1114,13 +1114,13 @@ export function App() {
       <div className="sidebar-review">
         <button className="nav-item review-toggle" aria-expanded={showReviewTools} aria-controls="review-tools" onClick={() => setShowReviewTools(!showReviewTools)}><ShieldCheck size={18} /><span>Review tools</span><ChevronDown size={15} className={showReviewTools ? "expanded" : ""} /></button>
         {showReviewTools && <div id="review-tools" className="review-tools">
-          <button onClick={() => setShowGoldenPath(true)}><Route size={16} /> Guided review</button>
-          <button onClick={() => setShowAccessibility(true)} disabled={!project.id || busy}><Accessibility size={16} /> Check image descriptions</button>
-          <button onClick={() => setShowValidation(true)} disabled={!project.id || busy}><ShieldCheck size={16} /> Validate storyboard</button>
-          <button onClick={() => setShowCompletionSettings(true)} disabled={!project.id || busy}><Settings2 size={16} /> Completion rules</button>
-          <button onClick={() => setShowAssessments(true)} disabled={!project.id || busy || !permissions.canEdit}><ClipboardList size={16} /> Assessments</button>
-          <button onClick={() => setShowEnhancementReview(true)} disabled={!project.id || busy}><Sparkles size={16} /> Review suggestions</button>
-          <button onClick={() => setShowPythiaCourseReview(true)} disabled={!project.id || busy}><Sparkles size={16} /> Review course with Pythia</button>
+          <button onClick={() => { setShowGoldenPath(true); setShowReviewTools(false); }}><Route size={16} /> Guided review</button>
+          <button onClick={() => { setShowAccessibility(true); setShowReviewTools(false); }} disabled={!project.id || busy}><Accessibility size={16} /> Check image descriptions</button>
+          <button onClick={() => { setShowValidation(true); setShowReviewTools(false); }} disabled={!project.id || busy}><ShieldCheck size={16} /> Validate storyboard</button>
+          <button onClick={() => { setShowCompletionSettings(true); setShowReviewTools(false); }} disabled={!project.id || busy}><Settings2 size={16} /> Completion rules</button>
+          <button onClick={() => { setShowAssessments(true); setShowReviewTools(false); }} disabled={!project.id || busy || !permissions.canEdit}><ClipboardList size={16} /> Assessments</button>
+          <button onClick={() => { setShowEnhancementReview(true); setShowReviewTools(false); }} disabled={!project.id || busy}><Sparkles size={16} /> Review suggestions</button>
+          <button onClick={() => { setShowPythiaCourseReview(true); setShowReviewTools(false); }} disabled={!project.id || busy}><Sparkles size={16} /> Review course with Pythia</button>
         </div>}
       </div>
       <div className="sidebar-bottom">
