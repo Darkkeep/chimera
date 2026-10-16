@@ -11,6 +11,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
+        token: ${{ secrets.PYTHIA_CONTRACTS_READ_TOKEN || github.token }}
         submodules: recursive
     - uses: actions/setup-node@v4
       with:
