@@ -23,9 +23,10 @@ class LearningIntelligenceProvider(Protocol):
 
 
 class PythiaUnavailableError(RuntimeError):
-    def __init__(self, message: str, status_code: int | None = None) -> None:
+    def __init__(self, message: str, status_code: int | None = None, request_id: str | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
+        self.request_id = request_id
 
 
 class PythiaProvider:
@@ -38,13 +39,19 @@ class PythiaProvider:
 
     def _request(self, method: str, path: str, body: dict[str, object] | None = None) -> dict[str, object]:
         try:
-            response = httpx.request(method, f"{self.base_url}{path}", json=body, timeout=10.0)
+            request_options: dict[str, object] = {"json": body, "timeout": 10.0}
+            api_key = os.environ.get("CHIMERA_PYTHIA_API_KEY", "").strip()
+            if api_key:
+                request_options["headers"] = {"Authorization": f"Bearer {api_key}"}
+            response = httpx.request(method, f"{self.base_url}{path}", **request_options)
             response.raise_for_status()
             result = response.json()
         except httpx.HTTPStatusError as error:
             status_code = error.response.status_code
             detail = error.response.text[:500]
-            raise PythiaUnavailableError(f"Pythia returned HTTP {status_code}: {detail}", status_code) from error
+            request_id = error.response.headers.get("X-Pythia-Request-Id")
+            reference = f" (Engine request ID: {request_id})" if request_id else ""
+            raise PythiaUnavailableError(f"Pythia returned HTTP {status_code}: {detail}{reference}", status_code, request_id) from error
         except (httpx.RequestError, ValueError) as error:
             raise PythiaUnavailableError(f"Pythia request failed: {error}") from error
         if not isinstance(result, dict):
@@ -56,6 +63,12 @@ class PythiaProvider:
 
     def capabilities(self) -> dict[str, object]:
         return self._request("GET", "/capabilities")
+
+    def providers(self) -> dict[str, object]:
+        return self._request("GET", "/providers")
+
+    def telemetry(self) -> dict[str, object]:
+        return self._request("GET", "/telemetry")
 
     def submit_task(self, request: dict[str, object]) -> dict[str, object]:
         return self._request("POST", "/tasks", request)

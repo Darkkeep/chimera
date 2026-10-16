@@ -16,6 +16,13 @@ type GoldenPathViewProps = {
   onOpenAccessibility: () => void;
   onOpenPreview: () => void;
   onRunValidation: () => void;
+  onOpenPythiaAnalysis: () => void;
+  onOpenPythiaTransform: () => void;
+  onOpenPythiaAssessment: () => void;
+  onOpenSuggestions: () => void;
+  onOpenCourseReview: () => void;
+  onOpenManagement: () => void;
+  onOpenExport: () => void;
 };
 
 type StepStatus = "done" | "next" | "waiting" | "optional" | "review";
@@ -29,7 +36,7 @@ type GuideStep = {
   action?: () => void;
 };
 
-export function GoldenPathView({ onStartWalkthrough, onSelectWalkthrough, walkthroughStatuses, project, onClose, onCreateProject, onOpenStoryboard, onOpenMedia, onOpenAccessibility, onOpenPreview, onRunValidation }: GoldenPathViewProps) {
+export function GoldenPathView({ onStartWalkthrough, onSelectWalkthrough, walkthroughStatuses, project, onClose, onCreateProject, onOpenStoryboard, onOpenMedia, onOpenAccessibility, onOpenPreview, onRunValidation, onOpenPythiaAnalysis, onOpenPythiaTransform, onOpenPythiaAssessment, onOpenSuggestions, onOpenCourseReview, onOpenManagement, onOpenExport }: GoldenPathViewProps) {
   const [walkthroughQuery, setWalkthroughQuery] = useState("");
   const visibleJourneys = chimeraJourneys.filter(journey => `${journey.title} ${journey.steps[0].instruction}`.toLowerCase().includes(walkthroughQuery.trim().toLowerCase()));
   const scenes = project.storyboard.scenes;
@@ -63,6 +70,38 @@ export function GoldenPathView({ onStartWalkthrough, onSelectWalkthrough, walkth
       action: scenes.length > 0 ? onOpenStoryboard : undefined,
     },
     {
+      title: "Analyze the source with Pythia",
+      instructions: "Submit a selected scene for learning analysis. Pythia returns a draft; it does not change the storyboard.",
+      status: scenes.length > 0 ? "next" : "waiting",
+      statusLabel: scenes.length > 0 ? "Ready" : "After importing content",
+      actionLabel: "Analyze selected scene",
+      action: scenes.length > 0 ? onOpenPythiaAnalysis : undefined,
+    },
+    {
+      title: "Review the analysis proposal",
+      instructions: "Inspect evidence and uncertainty in Review suggestions. Accept, edit, or reject the proposal explicitly.",
+      status: scenes.length > 0 ? "review" : "waiting",
+      statusLabel: scenes.length > 0 ? "Human review" : "After analysis",
+      actionLabel: "Open Review suggestions",
+      action: project.id ? onOpenSuggestions : undefined,
+    },
+    {
+      title: "Propose a storyboard transformation",
+      instructions: "Ask Pythia to propose a revised scene sequence from the imported source scenes.",
+      status: scenes.length > 0 ? "next" : "waiting",
+      statusLabel: scenes.length > 0 ? "Ready" : "After importing content",
+      actionLabel: "Transform with Pythia",
+      action: scenes.length > 0 ? onOpenPythiaTransform : undefined,
+    },
+    {
+      title: "Approve the transformed storyboard",
+      instructions: "Review the proposed sequence and accept it only after human review. Acceptance updates the canonical storyboard.",
+      status: scenes.length > 0 ? "review" : "waiting",
+      statusLabel: scenes.length > 0 ? "Human approval" : "After transformation",
+      actionLabel: "Open Review suggestions",
+      action: project.id ? onOpenSuggestions : undefined,
+    },
+    {
       title: "Add supporting media",
       instructions: "Upload images or audio in the media library, then attach assets to the scenes where they belong.",
       status: project.storyboard.assets.length > 0 ? "done" : "optional",
@@ -77,6 +116,22 @@ export function GoldenPathView({ onStartWalkthrough, onSelectWalkthrough, walkth
       statusLabel: imageCount === 0 ? "When images are added" : imagesNeedingDescriptions > 0 ? "Needs attention" : "Complete",
       actionLabel: "Edit image descriptions",
       action: project.id ? onOpenAccessibility : undefined,
+    },
+    {
+      title: "Design and implement an assessment",
+      instructions: "Use Pythia to draft an objective-aligned assessment, then review and accept the native item in Review suggestions.",
+      status: scenes.length > 0 ? "next" : "waiting",
+      statusLabel: scenes.length > 0 ? "Ready" : "After adding scenes",
+      actionLabel: "Design with Pythia",
+      action: scenes.length > 0 ? onOpenPythiaAssessment : undefined,
+    },
+    {
+      title: "Review the complete course",
+      instructions: "Run Pythia course review, inspect its findings and limitations, and record resolutions with notes.",
+      status: scenes.length > 0 ? "next" : "waiting",
+      statusLabel: scenes.length > 0 ? "Ready" : "After adding scenes",
+      actionLabel: "Review course with Pythia",
+      action: project.id ? onOpenCourseReview : undefined,
     },
     {
       title: "Preview as a learner",
@@ -94,6 +149,22 @@ export function GoldenPathView({ onStartWalkthrough, onSelectWalkthrough, walkth
       actionLabel: "Run validation",
       action: project.id ? onRunValidation : undefined,
     },
+    {
+      title: "Make the release decision",
+      instructions: "After reviewing course findings, use My Work to record the human release stage as Approved.",
+      status: project.id ? "review" : "waiting",
+      statusLabel: project.id ? "Human release gate" : "After project setup",
+      actionLabel: "Open My Work",
+      action: project.id ? onOpenManagement : undefined,
+    },
+    {
+      title: "Build the approved SCORM package",
+      instructions: "Open Export and build the package after the release decision. Inspect the build report before handoff.",
+      status: project.id ? "next" : "waiting",
+      statusLabel: project.id ? "Final delivery" : "After project setup",
+      actionLabel: "Open Export",
+      action: project.id ? onOpenExport : undefined,
+    },
   ];
 
   return <div className="golden-path-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -102,7 +173,7 @@ export function GoldenPathView({ onStartWalkthrough, onSelectWalkthrough, walkth
         <div className="golden-path-title-mark"><CircleHelp size={19} /><div><p className="eyebrow">CHIMERA WORKFLOW</p><h2 id="golden-path-title">Golden Path</h2></div></div>
         <button className="icon-button" onClick={onClose} aria-label="Close Golden Path"><X size={18} /></button>
       </header>
-      <p className="golden-path-intro">A practical route from a new project to a reviewed storyboard.</p>
+      <p className="golden-path-intro">From legacy PowerPoint to a human-approved, Pythia-reviewed SCORM course.</p>
       <button type="button" className="button button-accent" onClick={onStartWalkthrough}>Start / resume walkthrough</button>
       <details><summary>All functionality walkthroughs ({chimeraJourneys.length})</summary>
         <p>Choose a task. Saves and downloads advance only on success; review steps need acknowledgment. Pause preserves forms. Some tasks require existing content or a configured provider.</p>

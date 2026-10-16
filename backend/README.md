@@ -13,7 +13,7 @@ The API stores projects under `workspace/projects` by default. Set `CHIMERA_WORK
 
 ### Pythia Sprint 1 integration
 
-The Pythia Engine API base URL is configured on the Chimera backend with `CHIMERA_PYTHIA_BASE_URL` and defaults to `http://localhost:8000`. The adapter exposes project-scoped health/capability discovery, scene analysis submission, task polling/cancellation, and validated draft artifact retrieval. Its browser entry point never receives the Pythia URL. Run the contract tests with `python -m pytest backend/tests/test_learning_intelligence.py` from the repository root.
+The Pythia Engine API base URL is configured on the Chimera backend with `CHIMERA_PYTHIA_BASE_URL` and defaults to `http://localhost:8000`. The adapter exposes health/capability discovery, task submission, polling/cancellation, and validated draft artifact retrieval. Its browser entry point never receives the Pythia URL or credential. If Pythia client authentication is enabled, configure `CHIMERA_PYTHIA_API_KEY` in the Chimera backend environment; the adapter sends it as a Bearer credential and in the legacy `X-Pythia-API-Key` header. Never place this secret in frontend source or browser storage. Run the contract tests with `python -m pytest backend/tests/test_learning_intelligence.py` from the repository root.
 
 Chimera's local API also uses port 8000. To run both services on one workstation, start Pythia on port 8001 and set `$env:CHIMERA_PYTHIA_BASE_URL = "http://localhost:8001"` in the Chimera backend environment before startup. See the [Sprint 1 handoff](../docs/pythia-sprint-1-handoff.md) for the task and artifact contracts.
 
@@ -23,9 +23,9 @@ Enhancement references accept PDF, DOCX, PPTX, TXT, and Markdown files up to 25 
 
 Enhancement jobs are persisted under each project and resume queued or interrupted work when the API starts. Jobs snapshot the storyboard revision and exact reference versions; a changed storyboard prevents proposal creation. Jobs can be cancelled and retried. They create pending proposals only; only the existing author decision endpoint can apply a proposal.
 
-To enable provider submission, use **Settings > AI connection** as the local operator or a shared-installation administrator. The approved OpenAI preset stores keys in the server account's OS credential store through `keyring`; no plaintext fallback is permitted. Other authenticated users see status only. See [AI connection](../docs/ai-connection.md) for service-account provisioning, safe connection tests, request limits, and deployment restrictions.
+**Settings > Media generation connection** is only for the temporary production image/audio adapters. It is not used for text reasoning. Enhancement and other learning-intelligence work is submitted to Pythia. Configure `CHIMERA_PYTHIA_BASE_URL` on the backend and, when Engine authentication is enabled, set the matching `CHIMERA_PYTHIA_API_KEY` server-side. The browser never receives this credential. See [AI connection](../docs/ai-connection.md) for the media adapter's OS credential-store and deployment restrictions.
 
-Alternatively, configure these environment variables on the API server. Do not put credentials in frontend source or browser storage:
+For the temporary media adapters only, configure these environment variables on the API server. Do not put credentials in frontend source or browser storage:
 
 ```powershell
 $env:CHIMERA_AI_BASE_URL = "https://your-provider.example/v1"

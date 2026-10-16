@@ -62,6 +62,7 @@ ROUTE_ACTIONS = {
     "post_enhancement_proposal": "enhancement.proposal.create", "post_enhancement_proposal_decision": "enhancement.proposal.decide",
     "get_reference_resources": "project.view", "post_reference_resource": "reference.create",
     "get_enhancement_jobs": "project.view", "get_ai_connection": "identity.view",
+    "get_intelligence_engine": "identity.view",
     "put_ai_connection": "admin.policy.manage", "post_ai_disconnect": "admin.policy.manage", "post_ai_test": "admin.policy.manage",
     "get_media_generation_capability": "project.view", "get_media_generation_jobs": "project.view",
     "post_media_generation_job": "media.job.create", "get_media_generation_job": "project.view",
@@ -705,8 +706,10 @@ def get_project(project_id: str) -> ProjectDetail:
 
 
 def _pythia_error(error: PythiaUnavailableError) -> HTTPException:
-    status_code = error.status_code if error.status_code in {400, 404, 409, 422} else 503 if error.status_code is None else 502
-    return HTTPException(status_code=status_code, detail=str(error))
+    expected_statuses = {400, 401, 403, 404, 409, 413, 422, 429, 503}
+    status_code = error.status_code if error.status_code in expected_statuses else 503 if error.status_code is None else 502
+    headers = {"X-Pythia-Request-Id": error.request_id} if error.request_id else None
+    return HTTPException(status_code=status_code, detail=str(error), headers=headers)
 
 
 def _pythia_provider() -> PythiaProvider:
@@ -1533,6 +1536,28 @@ def _record_ai_event(name: str) -> None:
 @app.get("/api/ai-connection")
 def get_ai_connection() -> dict:
     return {**connection_status(ROOT), "canManage": get_authorization_policy().allows(get_actor_context(), "admin.policy.manage")}
+
+
+@app.get("/api/intelligence-engine", name="get_intelligence_engine")
+def get_intelligence_engine() -> dict[str, object]:
+    provider = _pythia_provider()
+    can_view_usage = get_authorization_policy().allows(get_actor_context(), "admin.policy.manage")
+    try:
+        health = provider.health()
+        capabilities = provider.capabilities()
+        registry = provider.providers()
+        telemetry = provider.telemetry() if can_view_usage else {"schema_version": "1.0", "events": []}
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+    entries = capabilities.get("capabilities", {})
+    return {
+        "available": health.get("status") == "ok",
+        "health": health,
+        "capabilities": entries,
+        "providerRegistry": registry,
+        "telemetry": telemetry,
+        "canViewUsage": can_view_usage,
+    }
 
 
 @app.put("/api/ai-connection")

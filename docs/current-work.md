@@ -1,6 +1,6 @@
 # Current work and handoff
 
-Updated 2026-10-13. The active development branch is `extract-onboarding-repository`.
+Updated 2026-10-15. The active development branch is `extract-onboarding-repository`.
 
 ## Completed
 
@@ -21,8 +21,11 @@ Updated 2026-10-13. The active development branch is `extract-onboarding-reposit
 - Evidence Before Impact proof v0.1 approved by user direction on 2026-10-07 for continued illustrative use only. Editable DOCX/PPTX and visual-review PDFs remain local under `workspace/storyboard-proof`; PDFs were checked as 20 and 6 pages. This is not SME approval, production handoff, or release approval. Named SME, production owner, and release approver remain pending.
 - Scene layout choices now select rendering behavior: Fidelity uses the source slide, Hybrid enables extracted editable layers, Native uses an editable white canvas, and Template applies the selected PPTX first-slide/master treatment. Template, visual-canvas, course-preview, and SCORM paths are covered by backend and browser qualification. Existing scene editing uses one Details/Canvas editor and one save action.
 - My Work now supports owner/admin-authorized project trash, title-independent checkbox confirmation, archive download before removal, 30-day restore, expiry purge, and active-generation-job protection. The project is cleared from active workspace state when trashed. Trash/restore and access boundaries have isolated backend and browser regressions.
+- Added and passed the local Sprint 10 Golden Path integration regression: legacy PPTX import, Pythia analysis/transform/assessment/course review, explicit proposal and release-stage decisions, and SCORM 2004 package/report checks. The run uses deterministic local providers and isolated storage; it is not an LMS or human SME qualification. See [Sprint 10 handoff](pythia-sprint-10-golden-path-handoff.md).
 
 ## Latest verification
+
+On 2026-10-15, the complete backend suite passed 190 tests, the frontend TypeScript/Vite production build passed, and the opt-in Sprint 10 Golden Path regression passed against local Pythia's deterministic providers using isolated test storage. The regression covers PPTX import, analysis, transformation, assessment design, course review, explicit release-stage approval, and SCORM 2004 packaging/report checks. The focused Chromium Golden Path test could not run because Playwright is not installed in this checkout; the shared browser page was non-interactable. These Sprint 10 checks do not qualify live LMS playback, model quality, or a human SME/release decision.
 
 On 2026-10-13, the backend suite passed 150 tests, the frontend TypeScript/Vite production build passed, the full Chromium onboarding suite passed all 66 tests with one worker, visual qualification passed for unified Details/Canvas editing, master-layer rendering, save/reload and both SCORM profiles, and the hosted-auth HTTPS harness passed with no Axe or JavaScript errors and no mobile overflow. Running the browser suite with three workers once caused a Windows `PermissionError` during atomic storyboard replacement; the complete serial rerun passed. Guide screenshots were recaptured from the isolated `user-guide-restored` workspace and reviewed for the unified editor and Trash confirmation. Project-trash tests cover ownership, expiry, active-job protection, failed-restore recovery, API audit routing, checkbox confirmation and restore. No existing user project was modified in qualification. These local checks do not qualify live Linux/Nginx deployment, external-provider behavior, Firefox/WebKit, or interactive Word editing.
 

@@ -4,7 +4,12 @@
 		{
 			"label": "Chimera Backend",
 			"type": "shell",
-			"command": ".\\.venv\\Scripts\\python.exe -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000",
+			"command": ".\\backend\\.venv\\Scripts\\python.exe -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000",
+			"options": {
+				"env": {
+					"CHIMERA_PYTHIA_BASE_URL": "http://127.0.0.1:8001"
+				}
+			},
 			"isBackground": true,
 			"problemMatcher": []
 		},

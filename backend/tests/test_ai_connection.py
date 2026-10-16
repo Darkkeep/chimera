@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from jsonschema import Draft202012Validator
 from pydantic import SecretStr, ValidationError
 from fastapi.testclient import TestClient
 
@@ -104,24 +105,82 @@ class AIConnectionTests(unittest.TestCase):
             self.assertNotIn("test-secret-only", audit)
             self.assertEqual(client.put("/api/ai-connection", json=payload, headers={"Origin": "http://127.0.0.1:5173"}).status_code, 409)
 
-    def test_jobs_bind_connection_revision_and_providers_share_settings(self):
+    def test_only_media_jobs_bind_to_media_provider_settings(self):
         saved = self.save()
         project = storage.create_project(ProjectCreate(title="Bound connection"))
         project = storage.create_scene(project.id, SceneCreate(title="Scene"))
         scene_id = project.storyboard.scenes[0].id
         enhancement = storage.create_enhancement_job(project.id, EnhancementJobCreate(scope="whole-course", goal="Check content"))
         media = storage.create_media_generation_job(project.id, MediaGenerationJobCreate(kind="image", sceneId=scene_id, purpose="Illustration", prompt="Fixture"))
-        self.assertEqual(enhancement.aiConnectionRevision, saved["revision"])
+        self.assertIsNone(enhancement.aiConnectionRevision)
         self.assertEqual(media.aiConnectionRevision, saved["revision"])
-        self.assertEqual(enhancement_jobs._provider(saved["revision"]).model, "gpt-4.1-mini")
+        self.assertEqual(enhancement_jobs._provider().name, "Pythia Engine")
         self.assertEqual(media_generation._provider(saved["revision"]).image_model, "gpt-image-1")
-        self.assertTrue(enhancement_jobs.preview_enhancement_submission(project.id, EnhancementJobCreate(scope="whole-course", goal="Check"))["providerConfigured"])
+        with patch.object(enhancement_jobs.PythiaProvider, "health", return_value={"status": "ok"}), patch.object(
+            enhancement_jobs.PythiaProvider, "capabilities", return_value={"capabilities": {"storyboard.enhance": {}}},
+        ):
+            self.assertTrue(enhancement_jobs.preview_enhancement_submission(
+                project.id, EnhancementJobCreate(scope="whole-course", goal="Check"),
+            )["engineConfigured"])
         self.save(textModel="gpt-4.1")
-        for factory in (enhancement_jobs._provider, media_generation._provider):
+        for factory in (media_generation._provider,):
             with self.assertRaisesRegex(RuntimeError, "changed"):
                 factory(saved["revision"])
         for path in (self.root / "projects").rglob("*.json"):
             self.assertNotIn("test-secret-only", path.read_text())
+
+    def test_enhancement_provider_submits_and_retrieves_a_pythia_artifact(self):
+        engine = Mock()
+        engine.health.return_value = {"status": "ok"}
+        engine.capabilities.return_value = {"capabilities": {"storyboard.enhance": {}}}
+        engine.submit_task.side_effect = lambda request: {"task_id": request["task_id"], "status": "submitted"}
+        engine.task_status.return_value = {"status": "awaiting_review", "artifact_id": "enhancement-artifact"}
+        engine.artifact.return_value = {
+            "schema_version": "1.0",
+            "artifact": {"type": "storyboard-enhancement", "id": "enhancement-artifact", "version": 1},
+            "producer": {"skill": "storyboard-producer", "version": "0.1.0"},
+            "sources": ["chimera://course-123/scenes/scene-1"],
+            "status": "draft",
+            "validation": {"state": "passed", "validators": ["storyboard-enhancement-1.0"]},
+            "payload": {
+                "project_id": "course-123",
+                "source_revision": 4,
+                "source_scene_ids": ["scene-1"],
+                "rationale": "No supported change was needed for this fixture.",
+                "proposals": [],
+                "resource_conflicts": [],
+            },
+        }
+        payload = {
+            "projectId": "course-123",
+            "sourceRevision": 4,
+            "goal": "Improve clarity",
+            "scenes": [{"id": "scene-1", "title": "Scene", "learnerText": ["Submitted text"], "actionDescription": "", "narration": ""}],
+            "references": [],
+        }
+
+        with patch.object(enhancement_jobs, "PythiaProvider", return_value=engine):
+            output = enhancement_jobs.PythiaEnhancementProvider().generate(payload)
+
+        self.assertEqual({"proposals": [], "resourceConflicts": []}, output)
+        task_request = engine.submit_task.call_args.args[0]
+        self.assertEqual("storyboard.enhance", task_request["capability"])
+        self.assertEqual("Submitted text", task_request["inputs"][0]["scene_content"]["body_text"])
+        self.assertEqual(4, task_request["context"]["source_revision"])
+        schemas = Path(__file__).resolve().parents[3] / "pythia-contracts" / "schemas"
+        if not schemas.is_dir():
+            self.skipTest("The sibling pythia-contracts package is not checked out")
+        documents = [
+            ("task-request.schema.json", task_request),
+            ("storyboard-enhancement-input.schema.json", task_request["inputs"][0]),
+            ("storyboard-enhancement-context.schema.json", task_request["context"]),
+            ("artifact-envelope.schema.json", engine.artifact.return_value),
+            ("storyboard-enhancement.schema.json", engine.artifact.return_value["payload"]),
+        ]
+        for schema_name, document in documents:
+            with self.subTest(schema=schema_name):
+                schema = json.loads((schemas / schema_name).read_text(encoding="utf-8"))
+                self.assertEqual([], list(Draft202012Validator(schema).iter_errors(document)))
 
     def test_environment_key_is_not_reused_for_a_different_provider(self):
         with patch.dict(os.environ, {"CHIMERA_AI_BASE_URL": "https://other-provider.test/v1", "CHIMERA_AI_API_KEY": "other-secret", "CHIMERA_AI_MODEL": "other-model"}):

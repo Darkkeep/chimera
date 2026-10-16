@@ -1230,7 +1230,6 @@ def create_enhancement_job(
             id=f"enhancement-{uuid.uuid4().hex[:12]}",
             projectId=project_id,
             sourceRevision=project.storyboard.revision,
-            aiConnectionRevision=connection_status(ROOT)["revision"],
             scope=data.scope,
             sceneIds=scene_ids,
             goal=data.goal,

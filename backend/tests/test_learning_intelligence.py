@@ -3,12 +3,15 @@ import tempfile
 import time
 import unittest
 from contextlib import ExitStack
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import httpx
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from pptx import Presentation
+from pptx.util import Inches
 from starlette.requests import Request
 
 from backend.app import main, storage
@@ -167,16 +170,89 @@ class LearningIntelligenceTests(unittest.TestCase):
             "POST", "http://localhost:8000/tasks", json={"task_id": "chimera-test"}, timeout=10.0,
         )
 
+    def test_provider_sends_server_configured_authentication_to_engine(self):
+        response = Mock()
+        response.json.return_value = {"status": "ok"}
+        with patch.dict("os.environ", {"CHIMERA_PYTHIA_API_KEY": "chimera-client-token"}), patch(
+            "backend.app.learning_intelligence.httpx.request", return_value=response,
+        ) as request:
+            self.assertEqual({"status": "ok"}, PythiaProvider("http://localhost:8001").health())
+
+        request.assert_called_once_with(
+            "GET", "http://localhost:8001/health", json=None, timeout=10.0,
+            headers={"Authorization": "Bearer chimera-client-token"},
+        )
+
+    def test_provider_diagnostics_read_engine_registry_and_telemetry(self):
+        responses = [Mock(), Mock()]
+        responses[0].json.return_value = {"providers": []}
+        responses[1].json.return_value = {"events": []}
+        with patch("backend.app.learning_intelligence.httpx.request", side_effect=responses) as request:
+            provider = PythiaProvider("http://localhost:8000")
+            self.assertEqual({"providers": []}, provider.providers())
+            self.assertEqual({"events": []}, provider.telemetry())
+
+        self.assertEqual("GET", request.call_args_list[0].args[0])
+        self.assertEqual("http://localhost:8000/providers", request.call_args_list[0].args[1])
+        self.assertEqual("http://localhost:8000/telemetry", request.call_args_list[1].args[1])
+
+    def test_intelligence_engine_status_exposes_read_only_engine_diagnostics(self):
+        provider = Mock()
+        provider.health.return_value = {"status": "ok", "version": "1.0"}
+        provider.capabilities.return_value = {"capabilities": {"storyboard.enhance": {"provider": "storyboard-producer"}}}
+        provider.providers.return_value = {"budget": {"max_concurrent_tasks": 4}, "providers": []}
+        provider.telemetry.return_value = {"events": []}
+        policy = Mock()
+        policy.allows.return_value = True
+        with patch.object(main, "_pythia_provider", return_value=provider), patch.object(
+            main, "get_authorization_policy", return_value=policy,
+        ):
+            status = main.get_intelligence_engine()
+
+        self.assertTrue(status["available"])
+        self.assertIn("storyboard.enhance", status["capabilities"])
+        self.assertEqual(4, status["providerRegistry"]["budget"]["max_concurrent_tasks"])
+        self.assertEqual([], status["telemetry"]["events"])
+        self.assertTrue(status["canViewUsage"])
+
+    def test_intelligence_engine_hides_global_usage_from_non_admins(self):
+        provider = Mock()
+        provider.health.return_value = {"status": "ok", "version": "1.0"}
+        provider.capabilities.return_value = {"capabilities": {"storyboard.enhance": {}}}
+        provider.providers.return_value = {"providers": []}
+        policy = Mock()
+        policy.allows.return_value = False
+        with patch.object(main, "_pythia_provider", return_value=provider), patch.object(
+            main, "get_authorization_policy", return_value=policy,
+        ):
+            status = main.get_intelligence_engine()
+
+        self.assertFalse(status["canViewUsage"])
+        self.assertEqual([], status["telemetry"]["events"])
+        provider.telemetry.assert_not_called()
+
     def test_http_errors_preserve_status_for_route_translation(self):
         response = Mock()
         response.status_code = 409
         response.text = "duplicate task ID"
+        response.headers = {"X-Pythia-Request-Id": "engine-request-123"}
         response.raise_for_status.side_effect = httpx.HTTPStatusError("conflict", request=Mock(), response=response)
         with patch("backend.app.learning_intelligence.httpx.request", return_value=response):
             with self.assertRaises(PythiaUnavailableError) as raised:
                 PythiaProvider().health()
 
         self.assertEqual(raised.exception.status_code, 409)
+        self.assertEqual(raised.exception.request_id, "engine-request-123")
+        self.assertIn("Engine request ID: engine-request-123", str(raised.exception))
+        translated = main._pythia_error(raised.exception)
+        self.assertEqual(translated.status_code, 409)
+        self.assertEqual(translated.headers["X-Pythia-Request-Id"], "engine-request-123")
+
+    def test_engine_auth_limit_and_capacity_statuses_remain_recoverable(self):
+        for status_code in (401, 403, 413, 422, 429, 503):
+            with self.subTest(status_code=status_code):
+                translated = main._pythia_error(PythiaUnavailableError("Engine request failed", status_code))
+                self.assertEqual(status_code, translated.status_code)
 
     def test_storyboard_analysis_envelope_must_match_scene_and_schema(self):
         envelope = {
@@ -1080,6 +1156,199 @@ class PythiaRouteTests(unittest.TestCase):
         self.assertEqual(decided.findings[0].status, "resolved")
         self.assertEqual(decided.artifact["artifact"]["type"], "course-review")
         self.assertEqual(storage.read_project(self.project.id).storyboard.revision, source_revision)
+
+    @unittest.skipUnless(os.environ.get("CHIMERA_PYTHIA_GOLDEN_PATH_INTEGRATION") == "1", "set CHIMERA_PYTHIA_GOLDEN_PATH_INTEGRATION=1 to run the complete local Pythia golden path")
+    def test_live_pythia_golden_path_imports_reviews_transforms_assesses_and_exports(self):
+        presentation = Presentation()
+        for title, body, notes in [
+            ("Respond to an evacuation alarm", "Use the nearest marked exit. Leave personal items behind.", "Emphasize the designated assembly area."),
+            ("Continue to the assembly area", "Report to the designated assembly area and wait for instructions.", "Do not re-enter the building."),
+        ]:
+            slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+            title_box = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(8), Inches(1))
+            title_box.text_frame.text = title
+            body_box = slide.shapes.add_textbox(Inches(1), Inches(2), Inches(8), Inches(2))
+            body_box.text_frame.text = body
+            slide.notes_slide.notes_text_frame.text = notes
+        deck = BytesIO()
+        presentation.save(deck)
+
+        project = storage.create_project(ProjectCreate(title="Sprint 10 Golden Path"))
+        base_url = os.environ.get("CHIMERA_PYTHIA_BASE_URL", "http://127.0.0.1:8001")
+
+        with patch.dict("os.environ", {"CHIMERA_PYTHIA_BASE_URL": base_url}), TestClient(main.app) as client:
+            def wait_for_task(task):
+                deadline = time.monotonic() + 60
+                while task.get("status") in {"submitted", "queued", "running"} and time.monotonic() < deadline:
+                    time.sleep(0.1)
+                    response = client.get(f"/api/projects/{project.id}/pythia-tasks/{task['task_id']}")
+                    self.assertEqual(response.status_code, 200, response.text)
+                    task = response.json()
+                self.assertEqual(task.get("status"), "awaiting_review", task)
+                self.assertIsInstance(task.get("artifact_id"), str)
+                return task
+
+            status = client.get(f"/api/projects/{project.id}/pythia-status")
+            self.assertEqual(status.status_code, 200, status.text)
+            self.assertEqual(status.json()["health"]["status"], "ok")
+            self.assertTrue(status.json()["supportsStoryboardAnalyze"])
+            self.assertTrue(status.json()["supportsStoryboardTransform"])
+            self.assertTrue(status.json()["supportsAssessmentDesign"])
+            self.assertTrue(status.json()["supportsCourseReview"])
+
+            imported = client.post(
+                f"/api/projects/{project.id}/source",
+                files={"file": ("legacy-evacuation.pptx", deck.getvalue(), "application/vnd.openxmlformats-officedocument.presentationml.presentation")},
+                headers={"If-Match": f'"{project.storyboard.revision}"'},
+            )
+            self.assertEqual(imported.status_code, 200, imported.text)
+            imported_project = imported.json()
+            self.assertTrue(imported_project["hasSourceDeck"])
+            source_scene_ids = [scene["id"] for scene in imported_project["storyboard"]["scenes"]]
+            self.assertEqual(len(source_scene_ids), 2)
+            source_revision = imported_project["storyboard"]["revision"]
+
+            analysis = client.post(f"/api/projects/{project.id}/scenes/{source_scene_ids[0]}/pythia-analysis")
+            self.assertEqual(analysis.status_code, 202, analysis.text)
+            analysis_task = wait_for_task(analysis.json())
+            analysis_artifact = client.get(
+                f"/api/projects/{project.id}/scenes/{source_scene_ids[0]}/pythia-artifacts/{analysis_task['artifact_id']}"
+            )
+            self.assertEqual(analysis_artifact.status_code, 200, analysis_artifact.text)
+            self.assertTrue(analysis_artifact.json()["payload"]["findings"])
+            analysis_proposal = client.post(
+                f"/api/projects/{project.id}/pythia-analysis-proposals",
+                json={
+                    "taskId": analysis_task["task_id"],
+                    "artifactId": analysis_task["artifact_id"],
+                    "sceneId": source_scene_ids[0],
+                    "sourceRevision": source_revision,
+                },
+            )
+            self.assertEqual(analysis_proposal.status_code, 201, analysis_proposal.text)
+            analysis_decision = client.post(
+                f"/api/projects/{project.id}/pythia-analysis-proposals/{analysis_proposal.json()['id']}/decision",
+                json={"decision": "accept"},
+            )
+            self.assertEqual(analysis_decision.status_code, 200, analysis_decision.text)
+            self.assertEqual(analysis_decision.json()["status"], "accepted")
+            self.assertEqual(storage.read_project(project.id).storyboard.revision, source_revision)
+
+            transform = client.post(
+                f"/api/projects/{project.id}/pythia-transform",
+                json={"sceneIds": source_scene_ids, "constraints": {}},
+            )
+            self.assertEqual(transform.status_code, 202, transform.text)
+            transform_task = wait_for_task(transform.json())
+            transform_proposal = client.post(
+                f"/api/projects/{project.id}/pythia-transform-proposals",
+                json={
+                    "taskId": transform_task["task_id"],
+                    "artifactId": transform_task["artifact_id"],
+                    "sourceSceneIds": source_scene_ids,
+                    "sourceRevision": source_revision,
+                },
+            )
+            self.assertEqual(transform_proposal.status_code, 201, transform_proposal.text)
+            transformed = client.post(
+                f"/api/projects/{project.id}/pythia-transform-proposals/{transform_proposal.json()['id']}/decision",
+                json={"decision": "accept"},
+                headers={"If-Match": f'"{source_revision}"'},
+            )
+            self.assertEqual(transformed.status_code, 200, transformed.text)
+            self.assertEqual(transformed.json()["proposal"]["status"], "accepted")
+            transformed_project = transformed.json()["project"]
+            target_scene_id = transformed_project["storyboard"]["scenes"][0]["id"]
+            transformed_revision = transformed_project["storyboard"]["revision"]
+
+            assessment = client.post(
+                f"/api/projects/{project.id}/pythia-assessment-design",
+                json={
+                    "sceneIds": [target_scene_id],
+                    "objectives": [{
+                        "id": "objective-evacuation",
+                        "statement": "Choose the safe response to an evacuation alarm.",
+                        "sceneIds": [target_scene_id],
+                    }],
+                    "audience": "New staff",
+                    "desiredDifficulty": "application",
+                    "completionRules": "One correct response is required.",
+                    "constraints": {},
+                },
+            )
+            self.assertEqual(assessment.status_code, 202, assessment.text)
+            assessment_task = wait_for_task(assessment.json())
+            assessment_proposals = client.post(
+                f"/api/projects/{project.id}/pythia-assessment-proposals",
+                json={
+                    "taskId": assessment_task["task_id"],
+                    "artifactId": assessment_task["artifact_id"],
+                    "sourceSceneIds": [target_scene_id],
+                    "objectiveIds": ["objective-evacuation"],
+                    "sourceRevision": transformed_revision,
+                },
+            )
+            self.assertEqual(assessment_proposals.status_code, 201, assessment_proposals.text)
+            self.assertTrue(assessment_proposals.json())
+            assessment_proposal = assessment_proposals.json()[0]
+            assessment_decision = client.post(
+                f"/api/projects/{project.id}/enhancement-proposals/{assessment_proposal['id']}/decision",
+                json={"decision": "accept"},
+                headers={"If-Match": f'"{transformed_revision}"'},
+            )
+            self.assertEqual(assessment_decision.status_code, 200, assessment_decision.text)
+            self.assertEqual(assessment_decision.json()["proposal"]["status"], "accepted")
+            released_revision = assessment_decision.json()["project"]["storyboard"]["revision"]
+            self.assertIsNotNone(next(
+                scene for scene in assessment_decision.json()["project"]["storyboard"]["scenes"]
+                if scene["id"] == target_scene_id
+            )["assessmentItem"])
+
+            course_review_task_response = client.post(f"/api/projects/{project.id}/pythia-course-review")
+            self.assertEqual(course_review_task_response.status_code, 202, course_review_task_response.text)
+            course_review_task = wait_for_task(course_review_task_response.json())
+            course_review_response = client.post(
+                f"/api/projects/{project.id}/pythia-course-reviews",
+                json={
+                    "taskId": course_review_task["task_id"],
+                    "artifactId": course_review_task["artifact_id"],
+                    "sourceRevision": released_revision,
+                },
+            )
+            self.assertEqual(course_review_response.status_code, 201, course_review_response.text)
+            review = course_review_response.json()
+            findings = review["artifact"]["payload"]["findings"]
+            self.assertTrue(findings)
+            reviewed = review
+            for finding in findings:
+                decision = client.patch(
+                    f"/api/projects/{project.id}/pythia-course-reviews/{review['id']}/findings/{finding['finding_id']}",
+                    json={"status": "resolved", "resolutionNote": "Reviewed against the accepted course content."},
+                )
+                self.assertEqual(decision.status_code, 200, decision.text)
+                reviewed = decision.json()
+            self.assertTrue(all(item["status"] == "resolved" for item in reviewed["findings"]))
+            self.assertEqual(storage.read_project(project.id).storyboard.revision, released_revision)
+
+            release = client.patch(
+                f"/api/projects/{project.id}/production-stage",
+                json={"productionStage": "approved"},
+            )
+            self.assertEqual(release.status_code, 200, release.text)
+            self.assertEqual(release.json()["productionStage"], "approved")
+
+            package = client.get(f"/api/projects/{project.id}/scorm-2004.zip")
+            self.assertEqual(package.status_code, 200, package.text[:500])
+            from zipfile import ZipFile
+
+            with ZipFile(BytesIO(package.content)) as archive:
+                self.assertIn("imsmanifest.xml", archive.namelist())
+                self.assertIn("index.html", archive.namelist())
+            report = client.get(f"/api/projects/{project.id}/scorm-report/scorm2004")
+            self.assertEqual(report.status_code, 200, report.text)
+            self.assertEqual(report.json()["exportProfile"], "SCORM 2004 4th Edition")
+            self.assertEqual(report.json()["buildStatus"], "passed")
+            self.assertTrue(all(check["passed"] for check in report.json()["compatibilityChecks"]))
 
 
 if __name__ == "__main__":
