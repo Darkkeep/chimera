@@ -196,7 +196,7 @@ test('Pythia cancellation waits for confirmation and findings require a saved re
 test('canvas authoring and production stage walkthroughs wait for real saves', async ({ page }) => {
   const id = await seed(page);
   await choose(page, 'Author the scene canvas');
-  await page.getByRole('tab', { name: 'Canvas', exact: true }).click();
+  await page.getByRole('tab', { name: 'Stage', exact: true }).click();
   await page.getByRole('button', { name: 'Save scene', exact: true }).click();
   await finish(page);
   await choose(page, 'Record the production and release stage');

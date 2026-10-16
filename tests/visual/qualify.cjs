@@ -282,7 +282,7 @@ async function freePort() {
   project = await readProject();
   assert.equal(project.storyboard.scenes[0].layoutMode, 'native');
   assert.equal(project.storyboard.scenes[0].visualLayout.enabled, true);
-  assert.equal(project.storyboard.scenes[0].visualLayout.backgroundColor, '#ffffff');
+  assert.equal(project.storyboard.scenes[0].visualLayout.backgroundColor, '#ddeeff');
   await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
   await page.getByRole('tab', { name: 'Details', exact: true }).click();
   await page.getByLabel('Rendering mode', { exact: true }).selectOption('fidelity');
