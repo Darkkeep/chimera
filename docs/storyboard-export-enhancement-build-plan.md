@@ -257,6 +257,8 @@ Acceptance:
 
 #### Step 12. Define the optional external review milestone
 
+The [external-review design](external-review-design.md) now defines the adapter-first, single-organization, guests-disabled pilot, fixed snapshot contracts, reviewer action grants, expiry/revocation, concurrency/idempotency and an acceptance matrix. This is a design deliverable; review links and invitation delivery remain unimplemented. Actual provider/host/content-policy/collector configuration and pilot qualification are required before exposure.
+
 - Specify hosting, reviewer authentication or controlled invitations, permissions, and link expiry before adding shareable review links.
 - Serve a fixed review revision and preserve comments against that revision.
 - Add concurrency handling for multiple reviewers.
@@ -356,4 +358,4 @@ These decisions do not block the publishing foundation, but must be resolved bef
 
 Word inspection and representative SCORM 1.2 LMS qualification are complete; see the [dated evidence](release-qualification-2026-10-06.md). External review design remains the next product milestone after platform foundations. Keep the richer media backlog explicit rather than making it a prerequisite for external review: structured placement, shared/course-wide media, video, OCR, and provider-specific generation controls are separate follow-up work.
 
-The broader platform foundation precedes that milestone: settle identity/tenancy, membership permissions, centralized tracking, and audit retention in the [Product Operating Model](product-operating-model.md), then implement those foundations before exposing external review links or adding further workflow breadth. The [2026-10-06 readiness audit](platform-foundation-readiness-2026-10-06.md) identifies the remaining gaps in the existing local scaffolding.
+The broader platform foundation precedes that milestone: settle identity/tenancy, membership permissions, centralized tracking, and audit retention in the [Product Operating Model](product-operating-model.md), then implement those foundations before exposing external review links or adding further workflow breadth. The [2026-10-06 readiness audit](platform-foundation-readiness-2026-10-06.md) records the historical gaps; [foundation implementation](platform-foundation-implementation.md) records the hardening and remaining real-deployment gates. The [external-review design](external-review-design.md) is the resulting design deliverable; implementation and rollout are separate stages.
