@@ -120,6 +120,7 @@ export function App() {
   const [draggingSceneId, setDraggingSceneId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [deepLinkError, setDeepLinkError] = useState("");
   const [feedback, setFeedback] = useState("");
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   useEffect(() => {
@@ -259,19 +260,51 @@ export function App() {
   }
 
   useEffect(() => {
+    const requestedProjectId = new URLSearchParams(window.location.search).get("project_id");
     fetch("/api/projects").then(async (response) => {
       if (!response.ok) throw new Error("Project list could not be loaded.");
       return response.json() as Promise<ProjectSummary[]>;
     }).then(async (availableProjects) => {
       setProjects(availableProjects);
-      if (availableProjects.length === 0) return;
+      if (availableProjects.length === 0) {
+        if (requestedProjectId)
+          setDeepLinkError("The linked project is unavailable or not accessible.");
+        return;
+      }
+      const parameters = new URLSearchParams(window.location.search);
+      const requestedObjectId = parameters.get("object_id");
+      const linkedProject = requestedProjectId
+        ? availableProjects.find((item) => item.id === requestedProjectId)
+        : undefined;
       const rememberedId = window.localStorage.getItem("chimera.activeProjectId");
-      const selectedProject = availableProjects.find((item) => item.id === rememberedId)
+      const selectedProject = linkedProject
+        ?? availableProjects.find((item) => item.id === rememberedId)
         ?? [...availableProjects].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+      if (requestedProjectId && !linkedProject)
+        setDeepLinkError("The linked project is unavailable or not accessible.");
       const response = await fetch(`/api/projects/${selectedProject.id}`);
       if (!response.ok) throw new Error("Selected project could not be loaded.");
-      applyProject(await response.json() as Project);
-    }).catch(() => setError("Start the API to connect project storage.")).finally(() => setRestoringProject(false));
+      const selected = await response.json() as Project;
+      applyProject(selected);
+      if (linkedProject) {
+        setShowManagement(false);
+        if (requestedObjectId) {
+          const sceneIndex = selected.storyboard.scenes.findIndex(
+            (item) => item.id === requestedObjectId,
+          );
+          if (sceneIndex >= 0) {
+            setSelectedScene(sceneIndex);
+            setActiveView("storyboard");
+          } else {
+            setDeepLinkError("The linked scene is unavailable in this project.");
+          }
+        }
+      }
+    }).catch(() => {
+      if (requestedProjectId)
+        setDeepLinkError("The linked project is unavailable or not accessible.");
+      else setError("Start the API to connect project storage.");
+    }).finally(() => setRestoringProject(false));
     fetch("/api/templates").then((response) => response.ok ? response.json() : []).then(setTemplates).catch(() => setError("Template library could not be loaded."));
   }, []);
 
@@ -1133,6 +1166,7 @@ export function App() {
     {showAIConnection && <AIConnectionPanel onboardingScope={project.id || "workspace"} onClose={() => setShowAIConnection(false)} />}
     {showIntelligenceEngine && <IntelligenceEnginePanel onClose={() => setShowIntelligenceEngine(false)} />}
     <main className="main-content" id="workspace-content" tabIndex={-1}>
+      {deepLinkError && <div className="notice" role="alert"><span>{deepLinkError}</span><button className="icon-button" onClick={() => setDeepLinkError("")} aria-label="Dismiss deep link error"><X size={16} /></button></div>}
       {showManagement ? <ManagementView busy={busy || restoringProject} canCreateProject={canCreateProject} onCreateProject={() => setIsCreating(true)} canResume={Boolean(project.id)} onOpenProject={(projectId) => switchProject(projectId, true)} onProjectTrashed={handleProjectTrashed} onProjectsRestored={handleProjectsRestored} onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} /> : showProjectAccess ? <ProjectAccessPanel project={project} onClose={() => setShowProjectAccess(false)} /> : !permissions.canEdit && session && project.id ? <section className="project-access-panel"><h1>{project.title}</h1><p>You have review access to this project.</p><button className="button button-dark" onClick={() => setShowPreview(true)}>Open course review</button></section> : <>
       <header className="topbar">
         <div className="project-heading"><p className="eyebrow">COURSE AUTHORING / {activeView === "storyboard" ? "STORYBOARD" : activeView === "media" ? "MEDIA LIBRARY" : "TEMPLATES"}</p><h1 title={project.title}>{project.title || "Your workspace"}</h1></div>
