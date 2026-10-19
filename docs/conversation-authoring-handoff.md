@@ -224,3 +224,48 @@ Chimera's staged README and two dirty historical handoffs were preserved.
 Next: actual loopback qualification against the opt-in synthetic engine, followed
 by real application actor/session/source setup. No UI, provider traffic, generated
 files, live-model output, hosted acceptance or G3/G4 completion is claimed here.
+
+
+## Actual loopback transport evidence synchronized from Pythia
+
+2026-10-18, documentation-only update. Pythia engineering reported and owns the
+execution evidence in
+[the engine record](../../Pythia/docs/conversation/g3-candidate-evidence.md) and
+[test](../../Pythia/tests/evals/test_conversation_loopback.py). Chimera inspected
+that test and the checkout state; it did not rerun a runtime suite for this sync.
+
+Committed engine baseline: `5c66b818e60819d05169c3f7dd86bc6ebfac48bf`.
+Chimera client: `69a9b6d6e159c1b0a1e0898aee4c9622654bfeeb`.
+Public candidate pins: `e80144585ca7432865b558404cde6c9351002566`.
+Pythia's command from its root with its repository virtualenv:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests/evals -p test_conversation_loopback.py -v
+```
+
+The committed baseline record reports 1 test passed in 3.020s using actual
+HTTP to an ephemeral 127.0.0.1 server, the public Chimera client and public schemas,
+ephemeral synthetic service bearer/EdDSA actor identity, hash-verified partial UTF-8
+source, submit/read/exact replay/cancel and current access revocation. It verifies
+one synthetic producer execution. Cancellation after completion preserves the
+completed operation; this test does not itself qualify an in-flight cancel race.
+
+Pythia then reported the updated test passed in 2.656s using its actual private
+SQLite source store/reader. At this inspection that extension was working-tree
+work above the committed engine baseline: modified `service/conversation_candidate.py`
+and loopback test, with new `service/conversation_sources.py` and source tests.
+It must not be attributed to committed `5c66b81` bytes. Inspected file SHA-256:
+
+- `tests/evals/test_conversation_loopback.py`:
+  `7b576c4855b3791c44440b766cbee9fd2ba7359a30c0b68ec95c7bc8e71068c4`.
+- `service/conversation_sources.py`:
+  `7ef0c7780d8d49a9168e5f3bb60ed26ef7351b608951612e12c6476efa9bc0cb`.
+
+This establishes narrow **qualified-synthetic transport**, not merely a stubbed
+HTTP check. The producer and actor/source identity remain synthetic. It does not
+qualify live inference/answer quality, real application sessions/authorization,
+full client integration, additional file formats, generated exports, hosted
+behavior or owner acceptance. G3 remains in-progress; G4 remains blocked.
+No Chimera code changed, no runtime tests rerun, and unrelated dirty files remain
+preserved. Next authoring work depends on agreed application source/session and
+additional source-format contracts, not a second chat UI or automatic scene edits.

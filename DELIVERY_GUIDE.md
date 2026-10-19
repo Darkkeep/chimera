@@ -1,7 +1,7 @@
 # Chimera Delivery Guide
 
 Last reviewed: 2026-10-18. Shared journey: `conversation-explainable-answers-files`.
-Guide revision: 5. This is a maintained snapshot, not automatic telemetry.
+Guide revision: 6. This is a maintained snapshot, not automatic telemetry.
 
 ## Start Here
 
@@ -114,7 +114,9 @@ Focused synthetic checks pass; these guards are not wired to a conversation rout
 or application route. An independent opt-in
 [public candidate HTTP client](backend/app/conversation_client.py) now implements
 submit/read/cancel with strict schema/semantic validation and current authoring
-checks; its transport is qualified against stubbed public HTTP responses only.
+checks. Its narrow transport is now `qualified-synthetic` against actual ephemeral
+loopback HTTP in Pythia, in addition to stubbed HTTP checks. This used synthetic
+credentials/source/producer, not live inference or application actor integration.
 The internal authoring mapping is qualified synthetically against
 unreleased contracts `d7b904d772730a7365388623a59d3f07828c07e1`
 using explicit sibling schemas; no vendor pin changed. Integrated HTTP/session
@@ -167,8 +169,8 @@ manual production-stage label, or schema check grants formal release authority.
 
 ## Next Developer Action
 
-Qualify the candidate HTTP client against the opt-in engine synthetic runtime and
-real actor/session authorization boundary, using the
+Integrate the real application actor/session authorization and source-format
+boundaries after their contracts are agreed, using the
 [authoring handoff requirements](docs/conversation-authoring-handoff.md), especially
 scope attestation, exact source identity, revision/replay/cancellation and return
 access. Then qualify the actual Chimera adapter. Do not continue the old
@@ -213,6 +215,14 @@ exact owned files only; no push/merge/release/deploy/training or formal approval
 is authorized by this guide.
 
 ## Change Record
+
+- 2026-10-18: Recorded Pythia-owned actual loopback qualification using Chimera
+  `69a9b6d6e159c1b0a1e0898aee4c9622654bfeeb`, engine baseline
+  `5c66b818e60819d05169c3f7dd86bc6ebfac48bf` and contracts `e801445`.
+  Parent reported one passing test; latest private SQLite source-reader rerun
+  passed in 2.656s against ongoing engine source-store work. Exact distinction
+  and evidence: `docs/conversation-authoring-handoff.md`. Narrow transport only
+  is qualified-synthetic; G3 remains in-progress. No Chimera code/tests changed.
 
 - 2026-10-18: Added independent public candidate HTTP submit/read/cancel transport,
   with exact content-pinned public schema/semantics, service bearer and trusted
