@@ -64,10 +64,11 @@ inspection route/store. Chimera's client remains PDF/DOCX-only, with no media/ZI
 application binding at this checkpoint. MP3 route qualification uses the synthetic
 local fixture; the MP4 fixture exceeds Pythia's current source byte cap. Neither
 proves Manteion session integration, production behavior, nor owner acceptance.
-Pythia `505c515` adds in-memory ZIP member lineage normalization only. Chimera has
-no ZIP client, member-level grant, or application binding.
-Contracts `af742cc` adds the ZIP upload-metadata candidate, but Pythia has not yet
-consumed it in a runtime pin and Chimera has no ZIP transfer client.
+Contracts `af742cc` defines ZIP upload metadata, and Pythia `505c515`, `d108e3e`,
+and `c35a8ac` add lineage normalization, signed grant verification, and an
+explicitly injected private archive runtime. Its three tests are synthetic local
+route checks. Chimera still has no ZIP transfer client, member-level grant, or
+application binding; no member bytes or citations are exposed by Pythia.
 
 ## 2026-10-19 Metadata-only media client
 
