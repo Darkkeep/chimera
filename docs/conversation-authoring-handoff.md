@@ -410,3 +410,20 @@ client pin, project/scene mutation policy or default vendor changed. Chimera
 application binding/persistence and broader format integration remain open;
 G3 is not complete and G4-G6 remain blocked. Dirty historical handoffs and the
 staged README remain outside this task's commits.
+
+## 2026-10-19 Narrow Citation Resolution Compatibility
+
+The public candidate client now has an explicit conformance case preserving a
+narrow `[5,8)` citation exactly, including its original source hash binding. It
+does not widen the span to full source coverage or normalize offsets. The focused
+client/boundary/candidate command above passed 34 tests in 0.237s, no skips.
+Client implementation, public pins, default vendor and edit authority are unchanged.
+
+Manteion separately qualifies a creator-private stored-citation read endpoint;
+its [evidence](../../Manteion/manteion/docs/product/g3-operation-acceptance.md#2026-10-19-private-txt-citation-excerpts)
+owns original-byte validation, bounded retrieval, current read authorization and
+post-I/O denial checks. That endpoint is local to Manteion, not an engine API or
+a newly wired Chimera application feature. The shared producer/data/storage fixture
+remain synthetic; no production storage, browser/email login, live inference,
+independent review or owner acceptance is inferred. G3 remains in progress and
+G4-G6 remain blocked. Existing dirty/staged work remains preserved.

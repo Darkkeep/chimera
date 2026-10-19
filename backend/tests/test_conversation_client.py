@@ -155,6 +155,18 @@ class ConversationClientTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(ConversationClientError):
                 self.make_client(lambda _: httpx.Response(200, json=operation)).read(self.request, "operation-1")
 
+    def test_narrow_citation_spans_are_preserved_without_widening_source_coverage(self):
+        operation = copy.deepcopy(self.operation)
+        citation = operation['result']['citations'][0]
+        citation['span'] = {'start': 5, 'end': 8}
+        operation['result']['answer_sha256'] = self.contract.semantics.digest(
+            {key: value for key, value in operation['result'].items() if key != 'answer_sha256'})
+        client = self.make_client(lambda _: httpx.Response(200, json=operation))
+        result = client.read(self.request, operation['operation_id'])
+        self.assertEqual(result['result']['citations'][0], citation)
+        self.assertEqual(result['result']['citations'][0]['span'], {'start': 5, 'end': 8})
+        self.assertEqual(self.issuer.call_args.args[4], [citation['content_sha256']])
+
     def test_source_backed_correction_retains_exact_identity_and_history(self):
         client = self.make_client()
         first = client.submit(self.request)
