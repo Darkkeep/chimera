@@ -60,10 +60,11 @@ revocation rollback and worker allowlisting.
 2026-10-19 cross-repository checkpoint: Contracts `41aa2f8` defines media upload
 metadata; Pythia `b45b85a`, `866410d`, `0aea7ec`, and `1279d9c` add metadata-only
 normalization, exact pinning, signed grant verification, and an opt-in private
-inspection route/store. Chimera's client remains PDF/DOCX-only, with no media/ZIP
-application binding at this checkpoint. MP3 route qualification uses the synthetic
-local fixture; the MP4 fixture exceeds Pythia's current source byte cap. Neither
-proves Manteion session integration, production behavior, nor owner acceptance.
+inspection route/store. Chimera now has a separate metadata-only media client,
+but no user-facing media upload workflow. MP3 route qualification uses the
+synthetic local fixture; the MP4 fixture exceeds Pythia's current source byte cap.
+Neither proves Manteion session integration, production behavior, nor owner
+acceptance.
 Contracts `af742cc` defines ZIP upload metadata, and Pythia `505c515`, `d108e3e`,
 and `c35a8ac` add lineage normalization, signed grant verification, and an
 explicitly injected private archive runtime. Its three tests are synthetic local
@@ -97,6 +98,21 @@ and Pythia's opt-in pin references that exact revision. The normalized metadata
 schema digest is `9ed42383f6fdf05d8322b2f6b9dfaabf0a5c64b3c66821525f84b65640f5d0ed`.
 The default vendor is unchanged. No held-out cases, production data, live model,
 release, publication or G3 owner acceptance are claimed.
+
+## 2026-10-19 ZIP lineage client
+
+`backend/app/archive_source_client.py` pins the ZIP metadata, lineage manifest,
+archive inspection schema and semantic helper. It verifies original hash/size,
+source/scope binding, member paths/hashes and current worker trust before returning
+a trusted lineage record. It does not return member text as a trusted transcript,
+or issue member-level grants or citations.
+
+The focused `backend.tests.test_archive_source_client` suite passed 4 tests in
+0.538s with mocked HTTP. Pythia's `tests/evals/test_archive_source_loopback.py`
+passed one actual restricted-worker loopback in 4.969s: signed PUT, immutable
+replay and authorized manifest GET for synthetic text and unsupported members.
+This does not qualify Manteion session policy, production ZIP upload, or a
+user-facing archive workflow.
 
 ## Next work
 
