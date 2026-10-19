@@ -49,3 +49,32 @@ source transfer and Chimera table client `74c6af5`; it did not use this new sour
 client. Next qualification replaces that raw source HTTP with this client and
 feeds only its validated authenticated records into the table client. No live
 provider, full application integration or G3 owner acceptance is claimed.
+
+## 2026-10-19 actual producer loopback
+
+The exact `CsvSourceCandidateClient` is now exercised against the actual opt-in
+Pythia source/turn service in the cross-repository harness
+`Pythia/tests/evals/test_table_conversation_loopback.py`. The focused command, run
+from the Pythia root with
+`PYTHIA_TEST_SOURCE_WORKER_IMAGE=sha256:2cdfcf80f1f3e70148305efe5363918fd4652e592df963566e58c155255a6fc8`,
+passed 1 test in 12.299s on 2026-10-19.
+
+That test uses real ephemeral HTTP and the restricted worker: client PUT201,
+immutable replay200 and manifest GET200; authenticated receipt plus retained bytes
+reconstructs the trusted extraction record; the table client then submits, reads,
+replays and cancels a 1.1 turn. Only row 2 reaches the synthetic producer, which
+runs once and returns a citation matching original/extraction/worker/header/row/
+column/span identities. Worker and source revocation, stale scene revision, and
+absence of task submission are verified. This is `qualified-synthetic` for that
+exact boundary, not production actor/session wiring, live inference, G3 acceptance
+or publication. The stub checks remain useful adversarial coverage, not the sole
+transport evidence.
+
+Revisions: Chimera client `d96bcd3247e19747c33d32161ba2fe89058ba954`; Pythia
+engine `a99b298e72273598ac6b54a44c727998a8c7c9fd` plus the integration test change;
+contracts checkout `8eb5469a1762b20430c7c8185058eac6990e4533`, with the CSV source
+content still pinned to candidate `0fb76c5cf6517db5db6e8aeb0ff217410c189614`.
+
+Next: qualify a Chimera PDF/DOCX manifest client against Pythia's explicit local
+document source runtime. Application actor/session integration and Manteion's
+private persistence remain separate work.

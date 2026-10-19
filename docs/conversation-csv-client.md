@@ -80,3 +80,12 @@ public CSV upload cap262144. PDF/DOCX/Markdown/media/ZIP original/extraction and
 format-anchor contracts, generated files, live answer quality and complete G3
 acceptance remain separate pending work. No route names or vendor promotion were
 invented by this client slice.
+
+2026-10-19 update: the planned exact CSV source-client loopback is complete. The
+cross-repository test exercises actual source PUT/replay/manifest GET through
+`CsvSourceCandidateClient`, then passes its authenticated reconstructed record to
+the table client for a real synthetic turn. See
+[CSV source-client evidence](conversation-csv-source-client.md) for the command,
+revisions, results and limitations. Next integration work is the PDF/DOCX manifest
+client and the separate Manteion session boundary; no live or overall G3
+qualification follows from the CSV loopback.

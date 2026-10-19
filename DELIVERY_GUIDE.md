@@ -150,15 +150,17 @@ CSV parsing exists internally in Pythia. An additive
 [CSV1.1 public conversation client](docs/conversation-csv-client.md) now has pinned
 schema/semantic/authoritative-record guards and stubbed HTTP qualification against
 contracts `0fb76c5cf6517db5db6e8aeb0ff217410c189614`: 90 focused tests OK,
-6 existing skips. Pythia `fec9bce` now reports actual synthetic CSV source and
-table-turn loopback using raw signed source HTTP plus Chimera's table client; this
-does not exercise Chimera's newer `CsvSourceCandidateClient`. Its source-client
-checks remain HTTP stubs, so that exact-client loopback is still pending. Pythia
-also qualified actual PDF/DOCX worker output and added an opt-in private signed
-manifest path; 4 Pythia actual-container route tests pass against its committed
-synthetic fixtures. Chimera has not exercised that route with a document client.
-Integrated HTTP/session compatibility, required file formats and overall G3 exit
-remain pending. See Pythia's
+6 existing skips. On 2026-10-19 the exact `CsvSourceCandidateClient` passed an
+actual synthetic source/table-turn loopback against Pythia: signed upload/replay/
+manifest GET, authenticated trusted-record reconstruction, then table submit/read/
+replay/cancel. One actual restricted-worker test passed in 12.299s; details are in
+[CSV source-client evidence](docs/conversation-csv-source-client.md). This is
+scoped transport qualification, not application actor/session integration or G3
+exit. Pythia also qualified actual PDF/DOCX worker output and added an opt-in
+private signed manifest path; 4 Pythia actual-container route tests pass against
+its committed synthetic fixtures. Chimera has not exercised that route with a
+document client. Integrated HTTP/session compatibility, required file formats and
+overall G3 exit remain pending. See Pythia's
 [document worker evidence](../Pythia/docs/conversation/g3-parser-worker-evidence.md)
 and [CSV HTTP evidence](../Pythia/docs/conversation/g3-csv-http-evidence.md).
 
@@ -209,15 +211,10 @@ manual production-stage label, or schema check grants formal release authority.
 
 ## Next Developer Action
 
-Qualify the new [CSV source client](docs/conversation-csv-source-client.md) against
-actual source/turn HTTP, using authenticated reconstructed records and a fresh
-worker allowlist. The earlier Pythia loopback used raw httpx source upload before
-the table client; it is not evidence for this new source client. Pythia now has a
-local opt-in PDF/DOCX manifest route, but no Chimera document client qualification.
-See
-the [CSV integration slice](docs/conversation-csv-client.md#next-integration-slice)
-and Pythia's [document worker evidence](../Pythia/docs/conversation/g3-parser-worker-evidence.md).
-Integrate application actor/session boundaries using the
+Qualify a Chimera PDF/DOCX manifest client against Pythia's explicit opt-in source
+route; the CSV source-client loopback is complete. Pythia's document route is not
+a released/default endpoint and its manifest does not enable document turns or
+citations. Integrate application actor/session boundaries using the
 [authoring handoff requirements](docs/conversation-authoring-handoff.md), especially
 scope attestation, exact source identity, revision/replay/cancellation and return
 access. Then qualify the actual Chimera adapter. Do not continue the old
@@ -299,6 +296,14 @@ is authorized by this guide.
   release, vendor promotion or live provider is qualified. Next consumer action
   remains the exact CSV source-client loopback, followed by a document client
   boundary check against Pythia's current signed manifest candidate.
+
+- 2026-10-19: Exact Chimera CSV source-client and table-turn loopback passed in
+  Pythia's harness: one test in 12.299s with the qualified restricted worker.
+  Signed source PUT/replay/manifest GET, trusted record reconstruction, row-2-only
+  producer input, matching citation, turn lifecycle, revocation, stale-scene and
+  no-task checks passed. Evidence is cross-repository and parent-run; Chimera's
+  focused stubs were not rerun in this cycle. G3 remains in-progress. Next:
+  qualify a Chimera PDF/DOCX manifest client and application/session boundary.
 
 - 2026-10-18: Added exact-byte raw source PUT/manifest GET client against the new
   candidate; shared bounded HTTP behavior with the conversation client. Source
