@@ -8,13 +8,13 @@ provider call, application persistence or released/default route.
 ## Client boundary
 
 `backend/app/document_source_client.py` supplies `PublicDocumentSourceCandidate`
-and `DocumentSourceCandidateClient`. Its content pins cover the document
-extraction, manifest and citation schemas plus the contracts-owned semantic helper.
-The client also uses the existing exact source metadata and authoring-boundary
-helpers. A source grant binds action, scope, source ID/version, original hash/size
-and MIME for ingest. It sends the exact retained PDF/DOCX bytes by bounded PUT;
-manifest GET sends no body. Redirects, retries, environment proxies and task
-fallback are not used.
+and `DocumentSourceCandidateClient`. Its content pins cover the new
+`document-source-ingestion-metadata` schema plus the document extraction, manifest
+and citation schemas and contracts-owned semantic helper. The client uses the
+source metadata digest and authoring-boundary helpers. A source grant binds action,
+scope, source ID/version, original hash/size and PDF/DOCX MIME for ingest. It sends
+exact retained bytes by bounded PUT; manifest GET sends no body. Redirects, retries,
+environment proxies and task fallback are not used.
 
 Before credential issuance and again before returning a receipt, the caller's
 current authoring binding, source action, policy and scene revision are checked.
@@ -57,9 +57,11 @@ worker provenance, and authenticated manifest reconstruction. Existing tests in
 the same module also cover unreadable input, wrong MIME/service scope, access
 revocation rollback and worker allowlisting.
 
-Evidence revisions: Chimera source client/tests are working-tree changes following
-`575f86d`; Pythia engine is `a99b298e72273598ac6b54a44c727998a8c7c9fd` with the
-loopback test change; contracts source is `8eb5469a1762b20430c7c8185058eac6990e4533`.
+Evidence revisions: Chimera document client/tests extend `adcab3a`; Pythia engine
+is `a99b298e72273598ac6b54a44c727998a8c7c9fd` with the loopback test change;
+contracts metadata schema is committed at `136fa58c83bfee86e953ad98a2cbe7dac98bda05`
+and Pythia's opt-in pin references that exact revision. The normalized metadata
+schema digest is `9ed42383f6fdf05d8322b2f6b9dfaabf0a5c64b3c66821525f84b65640f5d0ed`.
 The default vendor is unchanged. No held-out cases, production data, live model,
 release, publication or G3 owner acceptance are claimed.
 

@@ -161,8 +161,10 @@ private signed manifest path; 4 Pythia actual-container route tests pass against
 its committed synthetic fixtures. Chimera's document client has now passed the
 actual-worker manifest loopback; see
 [document client evidence](docs/conversation-document-source-client.md).
-Integrated HTTP/session compatibility, required file formats and overall G3 exit
-remain pending. See Pythia's
+That client now validates signed pre-ingestion metadata against contracts 1.2.0
+commit `136fa58c83bfee86e953ad98a2cbe7dac98bda05`; this does not add a document
+turn or citation operation. Integrated HTTP/session compatibility, required file
+formats and overall G3 exit remain pending. See Pythia's
 [document worker evidence](../Pythia/docs/conversation/g3-parser-worker-evidence.md)
 and [CSV HTTP evidence](../Pythia/docs/conversation/g3-csv-http-evidence.md).
 
@@ -230,6 +232,12 @@ then wire the Chimera application actor/session boundary using the
   Prisma/type validation passed. This does not establish the Pythia accepted-context
   revision, source association, signed attestation or an integrated application turn.
   Next cross-repo boundary is source/revision semantics and application access wiring.
+
+- 2026-10-19: Contracts added PDF/DOCX pre-ingestion metadata to unreleased 1.2.0
+  at `136fa58c83bfee86e953ad98a2cbe7dac98bda05`; Chimera’s source client validates
+  that exact schema. Pythia pin and worker route tests pass; package verification
+  reports 49 schemas. No release/default route or document turn is added. Manteion
+  source association and local/engine revision mapping remain the next boundary.
 session metadata but not messages, source attachments or engine attestations.
 Next, integrate Manteion session/message/source revisions and current access, then
 wire the Chimera application actor/session boundary using the

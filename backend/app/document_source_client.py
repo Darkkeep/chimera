@@ -2,7 +2,6 @@
 import builtins
 import hashlib
 import json
-import re
 from pathlib import Path
 from types import ModuleType
 
@@ -16,14 +15,13 @@ from .source_provenance import PublicSourceCandidate
 PDF = 'application/pdf'
 DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 DOCUMENT_TYPES = frozenset({PDF, DOCX})
-_SCOPE_KEYS = {'tenant_id', 'consumer_id', 'actor_id', 'session_id', 'policy_revision'}
-_IDENTIFIER = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$')
-_SHA256 = re.compile(r'^[0-9a-f]{64}$')
 
 
 class PublicDocumentSourceCandidate:
     """Validate exact candidate manifests, source bytes and current worker trust."""
     CONTENT_PINS = {
+        'schemas/document-source-ingestion-metadata.schema.json':
+            '9ed42383f6fdf05d8322b2f6b9dfaabf0a5c64b3c66821525f84b65640f5d0ed',
         'schemas/document-extraction-document.schema.json':
             '718d49977d80938da0ff26c94579c5ece531d5f82d225a3b6f248ddc30579b5c',
         'schemas/document-source-manifest.schema.json':
@@ -44,11 +42,13 @@ class PublicDocumentSourceCandidate:
         checked = {}
         for relative, expected in self.CONTENT_PINS.items():
             raw = (self.root / relative).read_bytes().replace(b'\r\n', b'\n')
-            if hashlib.sha256(raw).hexdigest() != expected:
-                raise ValueError('Public document candidate content pin mismatch')
+            actual = hashlib.sha256(raw).hexdigest()
+            if actual != expected:
+                raise ValueError(f'Public document candidate content pin mismatch: {relative} ({actual})')
             checked[relative] = raw
         self.validators = {}
-        for name in ('document-extraction-document', 'document-source-manifest', 'document-text-citation'):
+        for name in ('document-source-ingestion-metadata', 'document-extraction-document',
+                 'document-source-manifest', 'document-text-citation'):
             schema = json.loads(checked[f'schemas/{name}.schema.json'])
             Draft202012Validator.check_schema(schema)
             self.validators[name] = Draft202012Validator(schema)
@@ -75,19 +75,7 @@ class PublicDocumentSourceCandidate:
 
     def metadata(self, value):
         try:
-            raw = self.turn.semantics.canonical_bytes(value)
-            metadata = self.turn.semantics.strict_loads(raw)
-            if (set(metadata) != {'schema_version', 'scope', 'source_id', 'version',
-                    'content_sha256', 'byte_size', 'media_type'} or
-                    metadata['schema_version'] != '1.0' or metadata['media_type'] not in DOCUMENT_TYPES or
-                    not isinstance(metadata['scope'], dict) or set(metadata['scope']) != _SCOPE_KEYS or
-                    any(not isinstance(item, str) or not _IDENTIFIER.fullmatch(item)
-                        for item in (*metadata['scope'].values(), metadata['source_id'], metadata['version'])) or
-                    not isinstance(metadata['content_sha256'], str) or
-                    not _SHA256.fullmatch(metadata['content_sha256']) or
-                    type(metadata['byte_size']) is not int or not 1 <= metadata['byte_size'] <= 262144):
-                raise ValueError('Invalid signed document source metadata')
-            return metadata
+            return self._validated('document-source-ingestion-metadata', value)
         except Exception:
             raise ConversationClientError('Invalid document source metadata') from None
 
