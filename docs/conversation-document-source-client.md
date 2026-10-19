@@ -67,8 +67,9 @@ release, publication or G3 owner acceptance are claimed.
 
 ## Next work
 
-The next cross-repository dependency is Manteion's trusted actor/session/source
-persistence and access wiring. It must retain exact source identities and current
-policy through session operations before these clients are used by an application.
-Other formats, document turns/citations, full G3, live answer quality and G4-G6
-remain separate open gates.
+Manteion now stores creator-private PDF/DOCX originals as quarantined records under
+the current session owner. The remaining cross-repository dependency is to reconcile
+uncertain `uploading` reservations and attach a fresh, signed source grant/manifest
+to the authenticated session boundary. Manteion must retain exact source identities
+and current policy before these clients are used by an application. Other formats,
+document turns/citations, full G3, live answer quality and G4-G6 remain open gates.

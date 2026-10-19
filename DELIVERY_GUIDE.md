@@ -217,13 +217,14 @@ manual production-stage label, or schema check grants formal release authority.
 
 The CSV source/table and PDF/DOCX manifest clients are qualified only for their
 synthetic HTTP boundaries. Pythia's routes remain unreleased opt-in candidates and
-do not enable document turns or citations. Manteion has creator-private session
-and append-only user-message records, plus a separate zero-initialized
-engine-context revision mirror; no source association, accepted-operation
-transition or access attestation is implemented.
+do not enable document turns or citations. Manteion has creator-private session/
+message history, quarantined PDF/DOCX bytes and a separate engine-context mirror,
+but no signed source association, accepted-operation transition or access
+attestation.
 
-Next: agree the source association and atomic local-history/engine-context
-revision transition with current actor/policy authorization. Then wire the
+Next: reconcile uncertain upload reservations, then qualify the signed
+source-grant/manifest association under current actor/policy authorization. Agree
+the atomic local-history/engine-context revision transition and wire the
 Chimera application actor/session boundary using the
 [authoring handoff requirements](docs/conversation-authoring-handoff.md), especially
 scope attestation, exact source identity, revision/replay/cancellation and return
@@ -324,12 +325,19 @@ is authorized by this guide.
   agreed session/message/source revision and authorization semantics before
   application turn or upload wiring.
 
- 2026-10-19: Manteion now persists a separate zero-initialized
+- 2026-10-19: Manteion now persists a separate zero-initialized
   `engineContextRevision` alongside local history revision. Local message writes
   do not advance it; there is still no accepted-operation transition, source
   association, or Pythia access attestation. The field is not evidence of engine
   state. Next: agree source association and atomic accepted-turn advancement before
   wiring the Chimera application session boundary.
+
+- 2026-10-19: Manteion added reservation-first PDF/DOCX source association. Current
+  membership/session is rechecked before quarantine promotion; uncertain storage
+  outcomes remain non-readable `uploading` records. Manteion reports 10 focused
+  source tests and 122 unit tests passed, plus Prisma/type checks. No parser,
+  Pythia grant/manifest or download integration is enabled. Next: reconcile exact
+  bytes for uncertain reservations and qualify the signed source grant/manifest.
 
 - 2026-10-19: Chimera's PDF/DOCX source client passed 5 stub/adversarial tests and
   5 actual-worker HTTP tests in Pythia's cross-repository harness. Both formats
