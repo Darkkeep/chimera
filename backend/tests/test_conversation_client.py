@@ -89,6 +89,47 @@ class ConversationClientTests(unittest.TestCase):
                 result = self.make_client().read(self.request, "operation-1")
                 self.assertEqual(result["status"], status)
                 self.assertIsNone(result["result"])
+                self.assertEqual(result['context_revision'], self.request['expected_context_revision'] + 1)
+                self.assertIsNone(result['answer_revision'])
+
+    def test_explicit_replay_after_response_loss_preserves_intent_and_reauthorizes(self):
+        self.operation.update(status='cancelled', result=None, answer_revision=None, error_code=None)
+        wire_bodies = []
+
+        def lose_first_response(request):
+            wire_bodies.append(request.content)
+            if len(wire_bodies) == 1:
+                raise httpx.ReadError('Synthetic response lost after acceptance')
+            return httpx.Response(202, json=self.operation)
+
+        original = copy.deepcopy(self.request)
+        client = self.make_client(lose_first_response)
+        with self.assertRaises(ConversationClientError):
+            client.submit(self.request)
+        self.assertEqual(len(wire_bodies), 1)
+        accepted = client.submit(self.request)
+        self.assertEqual(wire_bodies[0], wire_bodies[1])
+        self.assertEqual(self.request, original)
+        self.assertEqual(accepted['context_revision'], original['expected_context_revision'] + 1)
+        self.assertEqual(accepted['status'], 'cancelled')
+        self.assertEqual(self.issuer.call_count, 2)
+        self.assertGreaterEqual(self.current.call_count, 3)
+
+    def test_explicit_replay_after_uncertainty_cannot_bypass_current_access(self):
+        attempts = []
+
+        def lose_response(request):
+            attempts.append(request.content)
+            raise httpx.ReadError('Synthetic uncertain acceptance')
+
+        client = self.make_client(lose_response)
+        with self.assertRaises(ConversationClientError):
+            client.submit(self.request)
+        self.policy.return_value = False
+        with self.assertRaises(PermissionError):
+            client.submit(self.request)
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(self.issuer.call_count, 1)
 
     def test_schema_or_semantic_failure_never_returns_advice(self):
         baseline = copy.deepcopy(self.operation)

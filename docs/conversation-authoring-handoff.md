@@ -352,3 +352,40 @@ checks.90focused tests passed6existing skips; new CSV1.1 HTTP uses synthetic stu
 Existing1.0 client/schema/helper pins remain unchanged. Producer CSV source and
 turn integration with real ephemeral HTTP and qualified immutable extraction
 records is next. No live provider, hosted acceptance or complete G3 qualification.
+
+## 2026-10-19 Acceptance Reconciliation Compatibility
+
+Contracts' existing conversation wire schemas/helper pins are unchanged. The
+[candidate acceptance rules](../../pythia-contracts/docs/conversation/candidate-1.2.0.md#durable-consumer-acceptance-reconciliation-2026-10-19)
+now make the durable consumer intent and atomic local mirror/receipt transition
+explicit. Context is consumed on acceptance, including failed/cancelled/interrupted
+operations; only successful substantive answers consume answer revisions.
+
+Chimera's existing client already preserves these receipts without mutating
+application revisions or automatically retrying HTTP. New conformance tests
+verify that every noncompleted lifecycle receipt retains expected context plus
+one and null answer revision; an explicit retry after simulated response loss
+sends exactly the original canonical request, reissues authorization and receives
+the same bound acceptance state. Revocation before that retry prevents a second
+HTTP call or token issuance. These are stub-transport consumer checks, not new
+Chimera application persistence or an integrated authoring session.
+
+Command from Chimera with the explicitly configured contracts path:
+
+```powershell
+$env:CHIMERA_CONVERSATION_CONTRACTS_ROOT='C:/inetpub/pythia-contracts'
+.\backend\.venv\Scripts\python.exe -W error::ResourceWarning -m unittest backend.tests.test_conversation_client backend.tests.test_conversation_boundary backend.tests.test_conversation_candidate -v
+```
+
+Result: 32 tests passed in 0.358s, no skips. No client implementation, historical
+vendor, project/scene mutation policy or content pin changed.
+
+The cross-repository task also qualified Manteion's real NextAuth session boundary
+with a synthetic database-session cookie, PostgreSQL durable intents and signed
+Pythia turns. Its [acceptance evidence](../../Manteion/manteion/docs/product/g3-operation-acceptance.md)
+owns those harness results and exact limits; the producer remains synthetic, and
+there is no browser/email login, production storage, live inference or owner
+acceptance. Chimera's next work is application-owned durable intent storage and
+current project/scene/session binding under the same rules, not a second engine
+or automatic storyboard edits. G3 remains in progress; G4-G6 remain blocked.
+Pre-existing staged README and both dirty historical handoffs were preserved.
