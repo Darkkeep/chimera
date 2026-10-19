@@ -1,7 +1,7 @@
 # Chimera Delivery Guide
 
 Last reviewed: 2026-10-18. Shared journey: `conversation-explainable-answers-files`.
-Guide revision: 1. This is a maintained snapshot, not automatic telemetry.
+Guide revision: 2. This is a maintained snapshot, not automatic telemetry.
 
 ## Start Here
 
@@ -44,7 +44,7 @@ Chimera's existing PPTX/image/OCR authoring support is not being removed.
 
 ## How Far Along We Are
 
-**Journey status: planning prepared; G1-G6 not accepted.** Existing authoring,
+**Journey status: Pythia G1 packet accepted; G2-G6 not accepted.** Existing authoring,
 media, export, and deterministic Pythia task workflows are reusable foundations,
 not a qualified conversational answer/file capability.
 
@@ -81,15 +81,19 @@ engine or build a second competing chat UX without an explicit design decision.
 
 ### G1 - Reference Conversations And Evaluation Baseline
 
-Status: `planned`. Owner: product owner with all affected engineers.
+Status: `accepted` for the Pythia packet only; independent evaluation freeze and
+separate client acceptance remain pending. Owner: product owner with affected engineers.
 
 Manteion's [synthetic reference cases](../manteion/manteion/docs/product/conversation-reference-cases.md)
 are complemented by Pythia's [G1 packet](../Pythia/docs/conversation/g1-reference-packet.md),
 whose file-comparison example includes exact synthetic scene provenance, a
 correction, and an explicit no-storyboard-edit boundary. The packet is committed
-locally in Pythia through `c8324242350395e1b1cca9edbd297e6f43e4805d`, not frozen
-or accepted. Chimera review of the source identity, authorization, and
-advice-versus-edit boundary remains pending.
+locally with [owner acceptance](../Pythia/docs/conversation/g1-owner-acceptance.md)
+recorded on 2026-10-18 in Pythia `8daf30d`. This accepts the Pythia target packet,
+not a complete frozen evaluation corpus or live capability. Chimera's
+[authoring handoff review](docs/conversation-authoring-handoff.md) records source
+identity, return-access, authorization and advice-versus-edit requirements.
+No conversation adapter has been implemented or qualified.
 
 ### G2 - Clearly Synthetic Consult Prototype
 
@@ -151,10 +155,11 @@ manual production-stage label, or schema check grants formal release authority.
 
 ## Next Developer Action
 
-Contribute the G1 authoring scenario and inventory the minimal authorized source/
-return handoff needed by G2/G3. Coordinate with Manteion and contracts before
-changing the provider protocol. Do not continue the old candidate-push/release
-next step or wait for a published contract to discuss the new candidate exchange.
+Settle the candidate exchange with Manteion and contracts using the
+[authoring handoff requirements](docs/conversation-authoring-handoff.md), especially
+scope attestation, exact source identity, revision/replay/cancellation and return
+access. Then qualify the actual Chimera adapter. Do not continue the old
+candidate-push/release next step or wait for publication to discuss the candidate.
 
 ## Verification And Status Updates
 
@@ -195,6 +200,12 @@ exact owned files only; no push/merge/release/deploy/training or formal approval
 is authorized by this guide.
 
 ## Change Record
+
+- 2026-10-18: Recorded attributable Pythia G1 packet acceptance and completed
+  Chimera's documentation review of Reference C/G3 source and return boundaries.
+  Evidence: `docs/conversation-authoring-handoff.md`; Pythia acceptance `8daf30d`.
+  No runtime tests, new API, frozen corpus, client compatibility or release claim.
+  Next: agree candidate exchange with contracts/Manteion before adapter changes.
 
 - 2026-10-18: Recorded the Manteion G1 reference-case draft and pending
   authoring-grounded review. Pythia's committed packet supplies a synthetic scene case;
