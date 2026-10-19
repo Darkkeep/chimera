@@ -269,3 +269,30 @@ behavior or owner acceptance. G3 remains in-progress; G4 remains blocked.
 No Chimera code changed, no runtime tests rerun, and unrelated dirty files remain
 preserved. Next authoring work depends on agreed application source/session and
 additional source-format contracts, not a second chat UI or automatic scene edits.
+
+
+## Committed private-source follow-through and next consumer contract
+
+The private SQLite UTF-8 source-store work described above is now committed in
+Pythia `ffe6fa41afce4910add630b30f71b407229f6d6a`. Its
+[source evidence](../../Pythia/docs/conversation/g3-source-evidence.md) records
+10 source tests passed in 0.148s and updated actual SQLite-backed loopback passed
+in 2.785s. The source store enforces exact original bytes/version/scope, byte/chunk
+and transactional tenant quotas, including the empty-chunk regression. These
+committed results supersede the earlier working-tree-only status; they do not
+retroactively change what was committed at `5c66b81`.
+
+Parent engineering also reports the completed full synthetic suite at that source
+baseline: 225 tests passed in 142.678s using Pythia's repository virtualenv and
+`-m unittest discover -s tests/evals -p "test_*.py" -v`. Chimera did not rerun that
+suite; this is explicitly sister-owner-reported evidence, not a local test claim.
+The consumed public conversation pin and Chimera client remain `e801445` and
+`69a9b6d` respectively. No source upload API, CSV turn support, live provider,
+application session acceptance or full G3 completion follows from these results.
+
+Next cycle [source grants/CSV requirements](conversation-source-grants.md) and
+`backend/tests/fixtures/conversation-source-consumer-cases.json` contribute
+19 typed negative development examples before the additive source contract is
+finalized. They distinguish schema, current permission, immutable byte integrity,
+local scene revision and actual anchor-resolution failures. They are proposals,
+not a new passing runtime test matrix. No held-out corpus files were used.

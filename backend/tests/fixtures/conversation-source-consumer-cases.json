@@ -1,0 +1,234 @@
+{
+  "fixture_revision": 1,
+  "synthetic": true,
+  "status": "proposed-consumer-requirements-not-runtime-results",
+  "source_utf8": "Synthetic authoring source.\r\n",
+  "source_metadata": {
+    "schema_version": "1.0",
+    "scope": {
+      "tenant_id": "tenant-a",
+      "consumer_id": "chimera",
+      "actor_id": "actor-a",
+      "session_id": "session-a",
+      "policy_revision": "policy-1"
+    },
+    "source_id": "synthetic-note",
+    "version": "1",
+    "content_sha256": "2482166e722d00ef1431aee29c4890429045c8fbc53a95e12a611075fb33b8d1",
+    "byte_size": 29,
+    "media_type": "text/plain"
+  },
+  "trusted_authoring_context": {
+    "project_id": "dispatch-demo",
+    "scene_id": "night-handoff",
+    "scene_revision": "scene-3"
+  },
+  "csv_source_utf8": "value,value\r\n\"first\ncontinued\",10\r\nsecond,20\r\n",
+  "csv_anchor": {
+    "schema_version": "1.0",
+    "source_id": "synthetic-csv",
+    "version": "1",
+    "content_sha256": "e37995ce37d8b008e40e4ac3e64c4abef66522b42ca8ed04b17e830caa1fbf4a",
+    "parser_revision": "csv-strict-utf8-v1",
+    "header_sha256": "84d363147d09b4bf507e958117e5644d0eca2025cda4b280aa678797294f33a5",
+    "data_row_number": 2,
+    "column_index": 1,
+    "span": {
+      "start": 35,
+      "end": 46
+    }
+  },
+  "negative_cases": [
+    {
+      "case_id": "foreign-tenant_id",
+      "payload_type": "source-ingestion-metadata",
+      "change": {
+        "path": "scope.tenant_id",
+        "value": "foreign"
+      },
+      "expected_rejection_layer": "authorization",
+      "reason": "A schema-valid assertion is not current actor/project/source permission."
+    },
+    {
+      "case_id": "foreign-consumer_id",
+      "payload_type": "source-ingestion-metadata",
+      "change": {
+        "path": "scope.consumer_id",
+        "value": "foreign"
+      },
+      "expected_rejection_layer": "authorization",
+      "reason": "A schema-valid assertion is not current actor/project/source permission."
+    },
+    {
+      "case_id": "foreign-actor_id",
+      "payload_type": "source-ingestion-metadata",
+      "change": {
+        "path": "scope.actor_id",
+        "value": "foreign"
+      },
+      "expected_rejection_layer": "authorization",
+      "reason": "A schema-valid assertion is not current actor/project/source permission."
+    },
+    {
+      "case_id": "foreign-session_id",
+      "payload_type": "source-ingestion-metadata",
+      "change": {
+        "path": "scope.session_id",
+        "value": "foreign"
+      },
+      "expected_rejection_layer": "authorization",
+      "reason": "A schema-valid assertion is not current actor/project/source permission."
+    },
+    {
+      "case_id": "foreign-policy_revision",
+      "payload_type": "source-ingestion-metadata",
+      "change": {
+        "path": "scope.policy_revision",
+        "value": "foreign"
+      },
+      "expected_rejection_layer": "authorization",
+      "reason": "A schema-valid assertion is not current actor/project/source permission."
+    },
+    {
+      "case_id": "read-grant-cannot-ingest",
+      "payload_type": "source-ingestion-metadata",
+      "change": {
+        "trusted_grant_action": "source:read",
+        "requested_action": "source:ingest"
+      },
+      "expected_rejection_layer": "authorization",
+      "reason": "Read authority cannot create an immutable source version."
+    },
+    {
+      "case_id": "scene-changed-during-transfer",
+      "payload_type": "source-ingestion-metadata",
+      "change": {
+        "trusted_scene_revision": "scene-4",
+        "submitted_scene_revision": "scene-3"
+      },
+      "expected_rejection_layer": "scene-revision",
+      "reason": "Do not attach an apparently successful transfer to changed authoring state."
+    },
+    {
+      "case_id": "same-hash-foreign-source",
+      "payload_type": "source-ingestion-metadata",
+      "change": {
+        "path": "source_id",
+        "value": "foreign-source"
+      },
+      "expected_rejection_layer": "authorization",
+      "reason": "Content equality does not grant access to another source identity."
+    },
+    {
+      "case_id": "declared-csv-is-not-plain-text",
+      "payload_type": "source-ingestion-metadata",
+      "change": {
+        "path": "media_type",
+        "value": "text/csv"
+      },
+      "expected_rejection_layer": "schema",
+      "reason": "This candidate ingestion metadata supports plain UTF8 only."
+    },
+    {
+      "case_id": "byte-count-mismatch",
+      "payload_type": "source-ingestion-metadata",
+      "change": {
+        "path": "byte_size",
+        "value": 30
+      },
+      "expected_rejection_layer": "source-integrity",
+      "reason": "A valid-shaped count must match actual streamed bytes and signed metadata."
+    },
+    {
+      "case_id": "original-hash-mismatch",
+      "payload_type": "source-ingestion-metadata",
+      "change": {
+        "path": "content_sha256",
+        "value": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "expected_rejection_layer": "source-integrity",
+      "reason": "Original bytes must match signed source digest without newline normalization."
+    },
+    {
+      "case_id": "stale-version-rebind",
+      "payload_type": "source-ingestion-metadata",
+      "change": {
+        "original_bytes_utf8": "Changed synthetic bytes.\r\n"
+      },
+      "expected_rejection_layer": "source-integrity",
+      "reason": "An existing immutable identity/version cannot bind changed bytes."
+    },
+    {
+      "case_id": "header-is-not-data-row-zero",
+      "payload_type": "csv-source-anchor",
+      "change": {
+        "path": "data_row_number",
+        "value": 0
+      },
+      "expected_rejection_layer": "schema",
+      "reason": "CSV data rows start at one after the required header."
+    },
+    {
+      "case_id": "header-order-substitution",
+      "payload_type": "csv-source-anchor",
+      "change": {
+        "path": "header_sha256",
+        "value": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "expected_rejection_layer": "anchor-resolution",
+      "reason": "Ordered exact header cells, including duplicate names, bind the header digest."
+    },
+    {
+      "case_id": "parser-version-drift",
+      "payload_type": "csv-source-anchor",
+      "change": {
+        "path": "parser_revision",
+        "value": "other-parser"
+      },
+      "expected_rejection_layer": "anchor-resolution",
+      "reason": "Parser semantics and exact original source identity must remain bound."
+    },
+    {
+      "case_id": "multiline-record-is-not-physical-line",
+      "payload_type": "csv-source-anchor",
+      "change": {
+        "path": "data_row_number",
+        "value": 3
+      },
+      "expected_rejection_layer": "anchor-resolution",
+      "reason": "Fixture has two logical data records; quoted embedded newline creates no third record."
+    },
+    {
+      "case_id": "duplicate-header-names-need-column-index",
+      "payload_type": "csv-source-anchor",
+      "change": {
+        "path": "column_index",
+        "value": 2
+      },
+      "expected_rejection_layer": "anchor-resolution",
+      "reason": "Two-column fixture has duplicate names; only zero-based indexes zero and one resolve."
+    },
+    {
+      "case_id": "csv-anchor-cannot-enter-text-turn",
+      "payload_type": "conversation-operation",
+      "change": {
+        "replace_text_citation_with_csv_anchor": true
+      },
+      "expected_rejection_layer": "turn-schema",
+      "reason": "Design-only CSV anchor is not supported by existing text-only operation citations."
+    },
+    {
+      "case_id": "physical-line-span-is-not-logical-record",
+      "payload_type": "csv-source-anchor",
+      "change": {
+        "path": "span",
+        "value": {
+          "start": 20,
+          "end": 35
+        }
+      },
+      "expected_rejection_layer": "anchor-resolution",
+      "reason": "A physical-line fragment inside a multiline quoted record is not the complete logical data-record span."
+    }
+  ]
+}

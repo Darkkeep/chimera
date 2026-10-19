@@ -1,7 +1,7 @@
 # Chimera Delivery Guide
 
 Last reviewed: 2026-10-18. Shared journey: `conversation-explainable-answers-files`.
-Guide revision: 6. This is a maintained snapshot, not automatic telemetry.
+Guide revision: 7. This is a maintained snapshot, not automatic telemetry.
 
 ## Start Here
 
@@ -119,7 +119,11 @@ loopback HTTP in Pythia, in addition to stubbed HTTP checks. This used synthetic
 credentials/source/producer, not live inference or application actor integration.
 The internal authoring mapping is qualified synthetically against
 unreleased contracts `d7b904d772730a7365388623a59d3f07828c07e1`
-using explicit sibling schemas; no vendor pin changed. Integrated HTTP/session
+using explicit sibling schemas; no vendor pin changed. Parent source-store evidence
+is now committed at `ffe6fa41afce4910add630b30f71b407229f6d6a`; parent reports
+225 full-suite tests passed in 142.678s. Chimera did not rerun that suite.
+[Source-grant/CSV requirements](docs/conversation-source-grants.md) and 19 typed
+negative consumer examples are prepared for the next contract before implementation. Integrated HTTP/session
 compatibility, required file formats and overall G3 exit remain pending.
 
 Qualify the additive public contract against the actual Chimera adapter, including
@@ -169,8 +173,10 @@ manual production-stage label, or schema check grants formal release authority.
 
 ## Next Developer Action
 
-Integrate the real application actor/session authorization and source-format
-boundaries after their contracts are agreed, using the
+Finalize the additive source metadata/manifest/grants and CSV anchor contract with
+contracts/Pythia using the [typed consumer examples](docs/conversation-source-grants.md).
+Then qualify a pinned provenance adapter. Integrate application actor/session
+boundaries using the
 [authoring handoff requirements](docs/conversation-authoring-handoff.md), especially
 scope attestation, exact source identity, revision/replay/cancellation and return
 access. Then qualify the actual Chimera adapter. Do not continue the old
@@ -215,6 +221,12 @@ exact owned files only; no push/merge/release/deploy/training or formal approval
 is authorized by this guide.
 
 ## Change Record
+
+- 2026-10-18: Synchronized committed parent private-source evidence `ffe6fa41`;
+  parent reports 225 full-suite tests passed in 142.678s, not rerun by Chimera.
+  Prepared 19 typed negative source/scene-grant and CSV-anchor consumer examples
+  for contracts review. No transfer/CSV runtime capability claimed. Next: exact
+  additive contract and pinned consumer validation before source-transfer code.
 
 - 2026-10-18: Recorded Pythia-owned actual loopback qualification using Chimera
   `69a9b6d6e159c1b0a1e0898aee4c9622654bfeeb`, engine baseline
