@@ -150,8 +150,17 @@ CSV parsing exists internally in Pythia. An additive
 [CSV1.1 public conversation client](docs/conversation-csv-client.md) now has pinned
 schema/semantic/authoritative-record guards and stubbed HTTP qualification against
 contracts `0fb76c5cf6517db5db6e8aeb0ff217410c189614`: 90 focused tests OK,
-6 existing skips. Actual CSV source/turn producer integration remains pending. Integrated HTTP/session
-compatibility, required file formats and overall G3 exit remain pending.
+6 existing skips. Pythia `fec9bce` now reports actual synthetic CSV source and
+table-turn loopback using raw signed source HTTP plus Chimera's table client; this
+does not exercise Chimera's newer `CsvSourceCandidateClient`. Its source-client
+checks remain HTTP stubs, so that exact-client loopback is still pending. Pythia
+also qualified actual PDF/DOCX worker output and added an opt-in private signed
+manifest path; 4 Pythia actual-container route tests pass against its committed
+synthetic fixtures. Chimera has not exercised that route with a document client.
+Integrated HTTP/session compatibility, required file formats and overall G3 exit
+remain pending. See Pythia's
+[document worker evidence](../Pythia/docs/conversation/g3-parser-worker-evidence.md)
+and [CSV HTTP evidence](../Pythia/docs/conversation/g3-csv-http-evidence.md).
 
 Qualify the additive public contract against the actual Chimera adapter, including
 consumer `chimera`, tenant/project/session access, exact source versions/hashes,
@@ -202,11 +211,13 @@ manual production-stage label, or schema check grants formal release authority.
 
 Qualify the new [CSV source client](docs/conversation-csv-source-client.md) against
 actual source/turn HTTP, using authenticated reconstructed records and a fresh
-worker allowlist. Its focused stub checks pass; actual HTTP remains the next slice.
-Pythia transport `fec9bce` passed the parent's reported 298-test suite; the earlier
-actual table loopback used raw httpx uploads, not this new source client. See
-[CSV integration slice](docs/conversation-csv-client.md#next-integration-slice). Integrate application actor/session
-boundaries using the
+worker allowlist. The earlier Pythia loopback used raw httpx source upload before
+the table client; it is not evidence for this new source client. Pythia now has a
+local opt-in PDF/DOCX manifest route, but no Chimera document client qualification.
+See
+the [CSV integration slice](docs/conversation-csv-client.md#next-integration-slice)
+and Pythia's [document worker evidence](../Pythia/docs/conversation/g3-parser-worker-evidence.md).
+Integrate application actor/session boundaries using the
 [authoring handoff requirements](docs/conversation-authoring-handoff.md), especially
 scope attestation, exact source identity, revision/replay/cancellation and return
 access. Then qualify the actual Chimera adapter. Do not continue the old
@@ -269,6 +280,25 @@ is authorized by this guide.
   OK13.077s. Parent final suite reports243passed156.622s; no own full rerun.
   Narrow source transport qualified-synthetic; G3 remains in-progress. Next:
   additive CSV source/projection/citation semantics before implementation.
+
+- 2026-10-18: Recorded Pythia `fec9bcea7b081c061565c9f6ac33db98ceb6d60c` follow-up:
+  signed CSV source plus table-turn loopback passed using raw source HTTP and the
+  public table client; this does not exercise Chimera's new CSV source client.
+  Pythia's PDF/DOCX normalizer passed 7 focused tests against the pinned worker and
+  committed synthetic fixtures; Chimera has not qualified a client against the
+  document receipt route.
+  Chimera's CSV source-client HTTP remains the next consumer check; application
+  actor/session integration and G3 exit remain open. Evidence is parent-reported,
+  not rerun by Chimera. No contract release, vendor promotion or live provider.
+
+- 2026-10-18: Recorded Pythia's follow-up private PDF/DOCX source candidate:
+  its opt-in route passed 4 actual-container HTTP tests for signed ingest, replay,
+  manifest-only GET, unreadable input, revoked access and current worker allowlist.
+  Evidence is parent-reported, not rerun by Chimera. No Chimera document client,
+  application actor/session integration, document turn/citation route, contract
+  release, vendor promotion or live provider is qualified. Next consumer action
+  remains the exact CSV source-client loopback, followed by a document client
+  boundary check against Pythia's current signed manifest candidate.
 
 - 2026-10-18: Added exact-byte raw source PUT/manifest GET client against the new
   candidate; shared bounded HTTP behavior with the conversation client. Source
