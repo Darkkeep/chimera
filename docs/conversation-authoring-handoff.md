@@ -119,3 +119,50 @@ no pin update or skipped schema assertion. `git diff --check` passed.
 No frontend change, frontend build, provider request or hosted validation.
 Pythia owner acceptance remains at `8daf30d`; current public conversation candidate
 compatibility is a separate pending slice, not implied by the historical vendor.
+
+
+## Exact public candidate mapping qualification
+
+Contracts candidate: `d7b904d772730a7365388623a59d3f07828c07e1`, unreleased 1.2.0.
+Chimera preceding revision: `af0f973c7f8f6616685eb914cd6986eab42a1a9d` plus
+this owned mapping/test change. Pythia observed HEAD:
+`6a5cab0c2abfaf95172ee6b4f587f57fe25237c2`, with unrelated staged README,
+conversation-state work and untracked assets; no engine execution used here.
+Contracts retained its unrelated staged README. Chimera retained its unrelated
+staged README and two dirty historical handoffs. No vendor pin changed.
+
+`validate_candidate_authoring_scope` maps the exact public `scope` identity and
+source content identities to trusted local authoring state, reauthorizing first.
+Source ordering is immaterial, duplicate source IDs fail, and scope policy revision
+must match the caller's trusted current policy. Project/scene/revision are retained
+in local session state because this candidate has no such wire fields; IDs must
+never be smuggled into unsupported schema properties. Return checks still use the
+separate immutable submitted/current binding. This is a pure mapping, not HTTP
+transport or proof of authentication, parsing, persistence or byte access.
+
+The candidate supports qualified text/plain source snapshots and empty
+`requested_outputs` only. Extraction identity/coverage, canonical context/request/
+answer hashes, operation lifecycle and advisory-only results must also pass the
+public schema and semantic verifier. The scope mapper alone does not establish
+these guarantees. It must not be used as a replacement for public validation.
+
+Opt-in tests load explicitly selected public schemas and the contracts-owned
+semantic verifier, never private Pythia code. They validate a synthetic Chimera
+scope and recomputed request digest; reject foreign scope and source substitutions,
+rehashed citations with foreign extraction identity/outside coverage, and an edit
+boundary. No source bytes were ingested and no provider answer was generated.
+
+```powershell
+$env:CHIMERA_CONVERSATION_CONTRACTS_ROOT='C:/inetpub/pythia-contracts'
+.\backend\.venv\Scripts\python.exe -m unittest backend.tests.test_conversation_boundary backend.tests.test_conversation_candidate backend.tests.test_learning_intelligence
+```
+
+Result after verifying exact committed candidate and no scoped candidate diff:
+56 tests OK, 6 existing skips; `git diff --check` passed. Candidate tests intentionally
+skip without an explicitly configured candidate path; that skip is not qualification.
+No frontend changes/build, provider calls, publication or hosted acceptance.
+
+Next: wire the real operation/session adapter only after those boundaries exist,
+with trusted storage/current actor authorization and full schema/semantic checks.
+Required PDF/DOCX/CSV/media/archive ingestion and generated outputs remain G3/G4
+work, not supported features inferred from this text-only candidate.

@@ -4,6 +4,7 @@ from unittest.mock import Mock
 
 from backend.app.conversation_boundary import (
     AuthoringBinding, SourceIdentity, authorize_binding, validate_advice_return,
+    validate_candidate_authoring_scope,
 )
 
 
@@ -79,6 +80,30 @@ class ConversationBoundaryTests(unittest.TestCase):
         for digest in ("A" * 64, "a" * 63, "z" * 64, "", None):
             with self.subTest(digest=digest), self.assertRaises(ValueError):
                 replace(self.source, sha256=digest)
+
+    def test_candidate_source_order_does_not_change_authorized_identity(self):
+        second = SourceIdentity("pilot", "1", "b" * 64)
+        binding = replace(self.binding, sources=(self.source, second))
+        request = {
+            "scope": dict(tenant_id=binding.tenant_id, actor_id=binding.actor_id,
+                          consumer_id="chimera", session_id=binding.session_id,
+                          policy_revision="policy-1"),
+            "context": {"source_snapshots": [
+                dict(source_id=s.source_id, version=s.version, content_sha256=s.sha256,
+                     media_type="text/plain") for s in reversed(binding.sources)]},
+            "requested_outputs": [],
+        }
+        validate_candidate_authoring_scope(request, binding, lambda *_: True,
+                                           policy_revision="policy-1")
+        request["context"]["source_snapshots"] *= 2
+        with self.assertRaises(ValueError):
+            validate_candidate_authoring_scope(request, binding, lambda *_: True,
+                                               policy_revision="policy-1")
+
+    def test_candidate_mapping_reauthorizes_before_scope_details(self):
+        with self.assertRaises(PermissionError):
+            validate_candidate_authoring_scope({}, self.binding, lambda *_: False,
+                                               policy_revision="policy-1")
 
 
 if __name__ == "__main__":

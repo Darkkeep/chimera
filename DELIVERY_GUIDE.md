@@ -1,7 +1,7 @@
 # Chimera Delivery Guide
 
 Last reviewed: 2026-10-18. Shared journey: `conversation-explainable-answers-files`.
-Guide revision: 3. This is a maintained snapshot, not automatic telemetry.
+Guide revision: 4. This is a maintained snapshot, not automatic telemetry.
 
 ## Start Here
 
@@ -111,7 +111,10 @@ Status: `in-progress`. Owners: contracts/Pythia; Chimera owns its consumer bound
 Internal [source/return guards](backend/app/conversation_boundary.py) now check
 immutable authoring bindings, current authorization and advice-only semantics.
 Focused synthetic checks pass; these guards are not wired to a conversation route
-or adapter. Public candidate compatibility remains pending.
+or adapter. The internal authoring mapping is now qualified synthetically against
+unreleased contracts `d7b904d772730a7365388623a59d3f07828c07e1`
+using explicit sibling schemas; no vendor pin changed. Integrated HTTP/session
+compatibility, required file formats and overall G3 exit remain pending.
 
 Qualify the additive public contract against the actual Chimera adapter, including
 consumer `chimera`, tenant/project/session access, exact source versions/hashes,
@@ -160,7 +163,8 @@ manual production-stage label, or schema check grants formal release authority.
 
 ## Next Developer Action
 
-Settle the candidate exchange with Manteion and contracts using the
+Integrate the exact candidate after Pythia/Manteion operation/session boundaries
+are available, using the
 [authoring handoff requirements](docs/conversation-authoring-handoff.md), especially
 scope attestation, exact source identity, revision/replay/cancellation and return
 access. Then qualify the actual Chimera adapter. Do not continue the old
@@ -205,6 +209,12 @@ exact owned files only; no push/merge/release/deploy/training or formal approval
 is authorized by this guide.
 
 ## Change Record
+
+- 2026-10-18: Qualified the internal authoring scope mapping synthetically against
+  unreleased contracts `d7b904d772730a7365388623a59d3f07828c07e1`.
+  56 targeted tests OK, 6 existing skips. Candidate is text-only and has no exports;
+  no public HTTP adapter or full G3 qualification claimed. Next: integrate actual
+  operation/session boundaries and source extraction when available.
 
 - 2026-10-18: G3 consumer boundary planned -> in-progress. Added pure internal
   source/return authorization guards and 9 synthetic test methods. New plus

@@ -86,3 +86,42 @@ def validate_advice_return(
         raise ValueError("Returned advice does not match the submitted authoring binding")
     if current != submitted:
         raise ValueError("Authoring scope, scene revision or source identity changed")
+
+
+def validate_candidate_authoring_scope(
+    request: dict,
+    binding: AuthoringBinding,
+    authorize: Authorize,
+    *,
+    policy_revision: str,
+) -> None:
+    """Bind a schema/semantics-qualified public 1.2.0 candidate to local state.
+
+    This checks authoring scope only. Schema, canonical digests, citations and
+    operation lifecycle must also pass public contract validation before use.
+    Project/scene revisions stay in trusted local session state; this candidate
+    has no project/scene wire fields. It supports text snapshots and no exports.
+    """
+    authorize_binding(binding, authorize)
+    _identifier(policy_revision)
+    expected_scope = dict(tenant_id=binding.tenant_id, consumer_id=binding.consumer,
+                          actor_id=binding.actor_id, session_id=binding.session_id,
+                          policy_revision=policy_revision)
+    if request.get("scope") != expected_scope:
+        raise ValueError("Candidate request does not match authorized authoring scope")
+    context = request.get("context")
+    if not isinstance(context, dict) or not isinstance(context.get("source_snapshots"), list):
+        raise ValueError("Candidate source snapshots are unavailable")
+    sources = context["source_snapshots"]
+    identities = []
+    for source in sources:
+        if not isinstance(source, dict) or source.get("media_type") != "text/plain":
+            raise ValueError("Candidate supports qualified text snapshots only")
+        identities.append(SourceIdentity(source.get("source_id"), source.get("version"),
+                                         source.get("content_sha256")))
+    if len({s.source_id for s in identities}) != len(identities):
+        raise ValueError("Candidate source IDs must be unique for the authoring binding")
+    if set(identities) != set(binding.sources):
+        raise ValueError("Candidate sources differ from authorized authoring sources")
+    if request.get("requested_outputs") != []:
+        raise ValueError("Candidate does not support generated authoring files")
