@@ -86,3 +86,36 @@ owner record and G3 proposal; guide/document diff review. No runtime tests were
 needed or run for this documentation-only change. No model calls, UI, provider
 protocol, consumer pins or hosted state changed. Existing dirty README and two
 handoff documents were preserved. G2-G6 qualification remains outstanding.
+
+
+## Internal boundary implementation and synthetic qualification
+
+Chimera now supplies `backend/app/conversation_boundary.py`: immutable local
+source identities and authoring bindings, an explicitly trusted policy callback,
+and an advice-return guard. They are internal types, not speculative public API
+fields. The callback rechecks tenant/actor/consumer access to session, project,
+scene and each source. Only literal `True` grants access; exceptions propagate.
+Return validation requires unchanged submitted identity and freshly server-loaded
+scene/source state, and refuses all edit flags except literal `False`.
+
+`backend/tests/test_conversation_boundary.py` covers matching advice, each revoked
+resource, policy failure, foreign tenant/actor/session/project/scene, stale scene,
+source version/hash/identity substitution, invalid identities, mutable/duplicate
+sources and attempted edits. These tests establish pure local checks, not an auth
+implementation, source ingestion, public response validation or integrated route.
+The future adapter must obtain current state from trusted storage and supply a
+real server-side policy; caller-provided IDs cannot grant authorization.
+
+Verification on 2026-10-18:
+
+```powershell
+.\backend\.venv\Scripts\python.exe -m unittest backend.tests.test_conversation_boundary backend.tests.test_learning_intelligence
+```
+
+Result: 49 tests, OK, 6 existing skips. First run failed eight existing schema
+checks because the vendor submodule was uninitialized. Initialized at the existing
+tracked pin `1fb6584a36552ca3f9f77ba1479fef45f8137b73` and reran successfully;
+no pin update or skipped schema assertion. `git diff --check` passed.
+No frontend change, frontend build, provider request or hosted validation.
+Pythia owner acceptance remains at `8daf30d`; current public conversation candidate
+compatibility is a separate pending slice, not implied by the historical vendor.

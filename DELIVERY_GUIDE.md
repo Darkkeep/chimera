@@ -1,7 +1,7 @@
 # Chimera Delivery Guide
 
 Last reviewed: 2026-10-18. Shared journey: `conversation-explainable-answers-files`.
-Guide revision: 2. This is a maintained snapshot, not automatic telemetry.
+Guide revision: 3. This is a maintained snapshot, not automatic telemetry.
 
 ## Start Here
 
@@ -106,7 +106,12 @@ project/scene IDs does not grant the destination permission to read them.
 
 ### G3 - Versioned Exchange And Safe File Ingestion
 
-Status: `planned`. Owners: contracts/Pythia; Chimera owns its consumer boundary.
+Status: `in-progress`. Owners: contracts/Pythia; Chimera owns its consumer boundary.
+
+Internal [source/return guards](backend/app/conversation_boundary.py) now check
+immutable authoring bindings, current authorization and advice-only semantics.
+Focused synthetic checks pass; these guards are not wired to a conversation route
+or adapter. Public candidate compatibility remains pending.
 
 Qualify the additive public contract against the actual Chimera adapter, including
 consumer `chimera`, tenant/project/session access, exact source versions/hashes,
@@ -200,6 +205,13 @@ exact owned files only; no push/merge/release/deploy/training or formal approval
 is authorized by this guide.
 
 ## Change Record
+
+- 2026-10-18: G3 consumer boundary planned -> in-progress. Added pure internal
+  source/return authorization guards and 9 synthetic test methods. New plus
+  existing learning-intelligence regression: 49 tests, OK, 6 existing skips.
+  Initialized the previously absent vendor at existing pin
+  `1fb6584a36552ca3f9f77ba1479fef45f8137b73`; no pin change. Evidence and limits:
+  `docs/conversation-authoring-handoff.md`. Next: map/qualify exact public candidate.
 
 - 2026-10-18: Recorded attributable Pythia G1 packet acceptance and completed
   Chimera's documentation review of Reference C/G3 source and return boundaries.
