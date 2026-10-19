@@ -1,5 +1,6 @@
 """Opt-in MP4/MP3 metadata-only inspection source transfer."""
 import builtins
+from collections.abc import Callable
 import hashlib
 import json
 from pathlib import Path
@@ -27,7 +28,7 @@ class PublicMediaSourceCandidate:
             'c9cff2bbe11d272148f593121c5147641e14deba0286870e1c6cb2fc7616b0ae',
     }
 
-    def __init__(self, root: Path, *, allowed_workers):
+    def __init__(self, root: Path, *, allowed_workers: Callable[[], set[str]]):
         if not callable(allowed_workers):
             raise ValueError('Fresh trusted worker configuration is required')
         self.root = Path(root)
@@ -108,11 +109,21 @@ class PublicMediaSourceCandidate:
 class MediaSourceInspectionClient(SourceCandidateClient):
     MAX_RESPONSE_BYTES = 1048576
 
+    def __init__(self, *, base_url, service_bearer, contract: PublicMediaSourceCandidate,
+                 binding, authorize, authorize_action, current_binding,
+                 current_policy_revision, issue_access, transport=None):
+        self.media_contract = contract
+        super().__init__(base_url=base_url, service_bearer=service_bearer,
+            contract=contract.source, binding=binding, authorize=authorize,
+            authorize_action=authorize_action, current_binding=current_binding,
+            current_policy_revision=current_policy_revision, issue_access=issue_access,
+            transport=transport)
+
     def _exchange(self, metadata, original_bytes, action):
-        metadata = self.contract.metadata(metadata)
+        metadata = self.media_contract.metadata(metadata)
         self._bind(metadata, action)
-        self.contract.original(metadata, original_bytes)
-        digest = self.contract.source.semantics.metadata_digest(metadata) if action == 'source:ingest' else None
+        self.media_contract.original(metadata, original_bytes)
+        digest = self.media_contract.source.semantics.metadata_digest(metadata) if action == 'source:ingest' else None
         token = _header(self.issue_access(action, dict(metadata['scope']), metadata['source_id'],
             metadata['version'], digest, [metadata['content_sha256']]))
         headers = {'Authorization': f'Bearer {self._service_bearer}',
@@ -130,7 +141,7 @@ class MediaSourceInspectionClient(SourceCandidateClient):
             manifest = self.contract.turn.semantics.strict_loads(raw)
         except Exception:
             raise ConversationClientError('Invalid media inspection manifest JSON') from None
-        result = self.contract.receipt(metadata, manifest, original_bytes)
+        result = self.media_contract.receipt(metadata, manifest, original_bytes)
         self._bind(metadata, action)
-        self.contract.trusted_record(metadata, result, original_bytes)
+        self.media_contract.trusted_record(metadata, result, original_bytes)
         return result
