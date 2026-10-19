@@ -213,9 +213,23 @@ manual production-stage label, or schema check grants formal release authority.
 
 ## Next Developer Action
 
+Last reviewed: 2026-10-18. Shared journey: `conversation-explainable-answers-files`.
+Guide revision: 13. This is a maintained snapshot, not automatic telemetry.
+
+The CSV source/table and PDF/DOCX manifest clients are qualified only for their
 The CSV source/table and PDF/DOCX manifest clients are qualified only for their
 synthetic HTTP boundaries. Pythia's routes remain unreleased opt-in candidates and
-do not enable document turns or citations. Manteion has added creator-private
+do not enable document turns or citations. Manteion has creator-private session
+metadata and append-only user-message history with a local revision, but not source
+attachments, engine context/operation records or signed access attestations. Next,
+agree the local/engine revision mapping and source association,
+then wire the Chimera application actor/session boundary using the
+ - 2026-10-19: Chimera's PDF/DOCX source client passed 5 stub/adversarial tests and
+- 2026-10-19: Manteion extended its creator-private session metadata with append-only
+  user-message history and a local CAS revision. Its full unit suite passed 112;
+  Prisma/type validation passed. This does not establish the Pythia accepted-context
+  revision, source association, signed attestation or an integrated application turn.
+  Next cross-repo boundary is source/revision semantics and application access wiring.
 session metadata but not messages, source attachments or engine attestations.
 Next, integrate Manteion session/message/source revisions and current access, then
 wire the Chimera application actor/session boundary using the
