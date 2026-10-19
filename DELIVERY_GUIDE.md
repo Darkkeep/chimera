@@ -158,9 +158,9 @@ replay/cancel. One actual restricted-worker test passed in 12.299s; details are 
 scoped transport qualification, not application actor/session integration or G3
 exit. Pythia also qualified actual PDF/DOCX worker output and added an opt-in
 private signed manifest path; 4 Pythia actual-container route tests pass against
-its committed synthetic fixtures. Chimera has not exercised that route with a
-document client. Chimera's document client has now passed the actual-worker
-manifest loopback; see [document client evidence](docs/conversation-document-source-client.md).
+its committed synthetic fixtures. Chimera's document client has now passed the
+actual-worker manifest loopback; see
+[document client evidence](docs/conversation-document-source-client.md).
 Integrated HTTP/session compatibility, required file formats and overall G3 exit
 remain pending. See Pythia's
 [document worker evidence](../Pythia/docs/conversation/g3-parser-worker-evidence.md)
@@ -213,12 +213,12 @@ manual production-stage label, or schema check grants formal release authority.
 
 ## Next Developer Action
 
-Qualify a Chimera PDF/DOCX manifest client against Pythia's explicit opt-in source
-route; this client is now qualified against the actual worker and ephemeral
-producer HTTP. See the [document client record](docs/conversation-document-source-client.md).
-Pythia's route remains an unreleased opt-in candidate and manifests do not enable
-document turns or citations. Next, integrate application actor/session boundaries
-using the
+The CSV source/table and PDF/DOCX manifest clients are qualified only for their
+synthetic HTTP boundaries. Pythia's routes remain unreleased opt-in candidates and
+do not enable document turns or citations. Manteion has added creator-private
+session metadata but not messages, source attachments or engine attestations.
+Next, integrate Manteion session/message/source revisions and current access, then
+wire the Chimera application actor/session boundary using the
 [authoring handoff requirements](docs/conversation-authoring-handoff.md), especially
 scope attestation, exact source identity, revision/replay/cancellation and return
 access. Then qualify the actual Chimera adapter. Do not continue the old
@@ -308,6 +308,14 @@ is authorized by this guide.
   no-task checks passed. Evidence is cross-repository and parent-run; Chimera's
   focused stubs were not rerun in this cycle. G3 remains in-progress. Next:
   qualify a Chimera PDF/DOCX manifest client and application/session boundary.
+
+- 2026-10-19: Manteion added metadata-only creator-private conversation sessions,
+  with workspace/creator-filtered list/read and transactional active-membership
+  recheck on create. Manteion reports 103 unit tests passed plus Prisma/type
+  validation; no turns, source attachments or engine attestations are included.
+  This is parent-reported and not run by Chimera. Next cross-repo dependency is
+  agreed session/message/source revision and authorization semantics before
+  application turn or upload wiring.
 
 - 2026-10-19: Chimera's PDF/DOCX source client passed 5 stub/adversarial tests and
   5 actual-worker HTTP tests in Pythia's cross-repository harness. Both formats
