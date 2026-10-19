@@ -61,9 +61,25 @@ revocation rollback and worker allowlisting.
 metadata; Pythia `b45b85a`, `866410d`, `0aea7ec`, and `1279d9c` add metadata-only
 normalization, exact pinning, signed grant verification, and an opt-in private
 inspection route/store. Chimera's client remains PDF/DOCX-only, with no media/ZIP
-application binding. MP3 route qualification uses the synthetic local fixture;
-the MP4 fixture exceeds Pythia's current source byte cap. Neither proves Manteion
-session integration, production behavior, nor owner acceptance.
+application binding at this checkpoint. MP3 route qualification uses the synthetic
+local fixture; the MP4 fixture exceeds Pythia's current source byte cap. Neither
+proves Manteion session integration, production behavior, nor owner acceptance.
+
+## 2026-10-19 Metadata-only media client
+
+`backend/app/media_source_client.py` is a separate opt-in client for signed MP4/MP3
+metadata and inspection manifests. It pins the exact media metadata, inspection,
+manifest and semantic-helper bytes from the local Contracts candidate; checks
+original hash/size/MIME; binds source transfer to the current authoring scene and
+policy; and rechecks the trusted worker set after HTTP. It does not inspect media
+content, expose transcripts, add media citations, or bind this client to a user
+facing upload workflow.
+
+The focused `backend.tests.test_media_source_client` suite passed 5 tests in 0.593s
+with mocked HTTP and synthetic bytes. It covers exact PUT/GET envelopes, metadata
+and manifest binding, source/worker substitution, current-policy changes, and
+redacted no-retry errors. This is client-boundary evidence only, not a loopback
+against Pythia's media route or Manteion's session policy.
 
 Evidence revisions: Chimera document client/tests extend `adcab3a`; Pythia engine
 is `a99b298e72273598ac6b54a44c727998a8c7c9fd` with the loopback test change;
