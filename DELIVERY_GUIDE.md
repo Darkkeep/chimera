@@ -1,7 +1,7 @@
 # Chimera Delivery Guide
 
 Last reviewed: 2026-10-18. Shared journey: `conversation-explainable-answers-files`.
-Guide revision: 11. This is a maintained snapshot, not automatic telemetry.
+Guide revision: 12. This is a maintained snapshot, not automatic telemetry.
 
 ## Start Here
 
@@ -98,6 +98,12 @@ No conversation adapter has been implemented or qualified.
 ### G2 - Clearly Synthetic Consult Prototype
 
 Status: `planned`. Primary owner: Manteion; Chimera reviews authoring handoff.
+
+Chimera completed the [pinned guided-practice core audit](docs/guided-review-practice-package-audit.md)
+for Manteion's optional synthetic human-review practice. Exact0.1.1 archive and
+installed exports verified; React/storage concerns were sent to the consumer and
+addressed in the inspected working tree. Manteion owns final UI/test/commit
+qualification. Practice history is never a real review/owner acceptance gate.
 
 Confirm how users reach the primary Consult experience from a project/scene and
 return without losing authoring context. Prototype links with inert fixtures.
@@ -234,6 +240,11 @@ exact owned files only; no push/merge/release/deploy/training or formal approval
 is authorized by this guide.
 
 ## Change Record
+
+- 2026-10-18: Audited exact onboarding0.1.1 tarball/core/license for Manteion's
+  optional synthetic review practice; archive/installed exports and exact copied
+  members verified. Documented storage allowlist and React subscription/lifecycle
+  fixes reviewed in the sister working tree. Docs only; Manteion owns UI evidence.
 
 - 2026-10-18: Added separate CSV1.1 public conversation contract/client with fresh
   authoritative extraction/worker/current authoring checks before and after I/O.
