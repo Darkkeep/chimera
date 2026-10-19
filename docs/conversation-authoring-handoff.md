@@ -389,3 +389,24 @@ acceptance. Chimera's next work is application-owned durable intent storage and
 current project/scene/session binding under the same rules, not a second engine
 or automatic storyboard edits. G3 remains in progress; G4-G6 remain blocked.
 Pre-existing staged README and both dirty historical handoffs were preserved.
+
+## 2026-10-19 TXT Source-Retaining Correction Conformance
+
+The unchanged public client now has an explicit source-backed correction check:
+its exact source snapshots survive the accepted user/assistant history, the
+signed hash set remains bound, and source removal under the current authoring
+binding fails before a second HTTP request. The existing extraction/hash/coverage
+negatives still reject rehashed citations outside readable scope.
+
+Using the focused command above, 33 client/boundary/candidate tests passed in
+0.276s with no skips. This is stub-transport consumer conformance, not Chimera
+application persistence or a new real-engine correction loopback.
+
+The shared task also qualifies Manteion's actual authenticated TXT upload-to-cited-
+turn path with synthetic data/producer and an owned object response fixture. Its
+[evidence](../../Manteion/manteion/docs/product/g3-operation-acceptance.md#2026-10-19-txt-attachment-and-citation-follow-through)
+records exact boundaries, repeated runs and remaining work. No wire schema,
+client pin, project/scene mutation policy or default vendor changed. Chimera
+application binding/persistence and broader format integration remain open;
+G3 is not complete and G4-G6 remain blocked. Dirty historical handoffs and the
+staged README remain outside this task's commits.

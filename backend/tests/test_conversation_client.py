@@ -155,6 +155,32 @@ class ConversationClientTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(ConversationClientError):
                 self.make_client(lambda _: httpx.Response(200, json=operation)).read(self.request, "operation-1")
 
+    def test_source_backed_correction_retains_exact_identity_and_history(self):
+        client = self.make_client()
+        first = client.submit(self.request)
+        correction = copy.deepcopy(self.request)
+        correction.update(message_id='message-2', idempotency_key='synthetic-correction-key', expected_context_revision=1)
+        correction['context']['messages'] = [
+            {'message_id': self.request['message_id'], 'role': 'user', 'content': self.request['message']},
+            {'message_id': first['operation_id'], 'role': 'assistant', 'content': first['result']['content']}]
+        correction['context_sha256'] = self.contract.semantics.digest(correction['context'])
+        self.operation.update(operation_id='operation-2', message_id='message-2', context_revision=2,
+            answer_revision=2, request_sha256=self.contract.semantics.request_digest(correction),
+            context_sha256=correction['context_sha256'])
+        result = client.submit(correction)
+        sent = json.loads(self.calls[-1].content)
+        self.assertEqual(sent['context'], correction['context'])
+        self.assertEqual(sent['context']['source_snapshots'], self.request['context']['source_snapshots'])
+        self.assertEqual(result['result']['citations'], first['result']['citations'])
+        self.assertEqual(self.issuer.call_args.args[4], [self.binding.sources[0].sha256])
+        changed = copy.deepcopy(correction)
+        changed['context']['source_snapshots'] = []
+        changed['context_sha256'] = self.contract.semantics.digest(changed['context'])
+        attempts = len(self.calls)
+        with self.assertRaises(ValueError):
+            client.submit(changed)
+        self.assertEqual(len(self.calls), attempts)
+
     def test_http_errors_are_sanitized_and_never_retried(self):
         for status in (200, 301, 401, 403, 404, 409, 503):
             handler = Mock(return_value=httpx.Response(status, text="private source secret",
