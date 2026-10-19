@@ -1,7 +1,7 @@
 # Chimera Delivery Guide
 
 Last reviewed: 2026-10-18. Shared journey: `conversation-explainable-answers-files`.
-Guide revision: 8. This is a maintained snapshot, not automatic telemetry.
+Guide revision: 9. This is a maintained snapshot, not automatic telemetry.
 
 ## Start Here
 
@@ -125,8 +125,10 @@ is now committed at `ffe6fa41afce4910add630b30f71b407229f6d6a`; parent reports
 [Source-grant/CSV requirements](docs/conversation-source-grants.md) and 19 typed
 negative consumer examples now have pinned pure provenance validation against
 contracts source candidate `ef7b85cfa31e0e8961663fbb6da4dcb112f55533`.
-75 focused tests passed, 6 existing skips. No source-transfer HTTP or CSV parser/
-turn support is implemented by this consumer slice. Integrated HTTP/session
+An independent [source candidate client](backend/app/source_client.py) now sends
+exact raw PUT and manifest-only GET with source-specific grants and current
+provenance checks. 82 focused tests passed, 6 existing skips; source HTTP is tested
+with synthetic stubs only. CSV parser/turn support remains absent. Integrated HTTP/session
 compatibility, required file formats and overall G3 exit remain pending.
 
 Qualify the additive public contract against the actual Chimera adapter, including
@@ -224,6 +226,12 @@ exact owned files only; no push/merge/release/deploy/training or formal approval
 is authorized by this guide.
 
 ## Change Record
+
+- 2026-10-18: Added exact-byte raw source PUT/manifest GET client against the new
+  candidate; shared bounded HTTP behavior with the conversation client. Source
+  action-specific grants and current authoring state are checked before/after I/O.
+  82 focused tests OK, 6 existing skips; source transport tests use HTTP stubs,
+  not producer integration. Next: actual synthetic source endpoint loopback.
 
 - 2026-10-18: Added pinned public source metadata/receipt and design-only CSV-anchor
   validators with local source-action/scene grants. All 19 typed consumer negatives

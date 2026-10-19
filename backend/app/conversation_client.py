@@ -97,6 +97,32 @@ def _header(value: str) -> str:
     return value
 
 
+def _base_url(value: str) -> str:
+    parsed = urlsplit(value)
+    if (parsed.scheme not in {"http", "https"} or not parsed.netloc
+            or parsed.username or parsed.password or parsed.query or parsed.fragment
+            or (parsed.scheme == "http" and parsed.hostname not in {"localhost", "127.0.0.1", "::1"})):
+        raise ValueError("Explicit HTTPS conversation URL required; HTTP is loopback-only")
+    return value.rstrip("/")
+
+
+def _http_bytes(base_url, method, path, headers, body, accepted_statuses, transport, max_bytes):
+    try:
+        with httpx.Client(timeout=10.0, follow_redirects=False, trust_env=False,
+                          transport=transport) as client:
+            with client.stream(method, f"{base_url}{path}", headers=headers, content=body) as response:
+                if response.status_code not in accepted_statuses:
+                    raise ConversationClientError("Conversation service rejected the operation", response.status_code)
+                raw = bytearray()
+                for chunk in response.iter_bytes():
+                    if len(raw) + len(chunk) > max_bytes:
+                        raise ConversationClientError("Conversation response exceeds transport limit")
+                    raw.extend(chunk)
+                return bytes(raw)
+    except httpx.HTTPError:
+        raise ConversationClientError("Conversation transport is unavailable") from None
+
+
 class ConversationCandidateClient:
     MAX_REQUEST_BYTES = 1_048_576
     MAX_RESPONSE_BYTES = 2_097_152
@@ -107,12 +133,7 @@ class ConversationCandidateClient:
         current_binding: Callable[[], AuthoringBinding], current_policy_revision: Callable[[], str],
         issue_access: IssueAccess, transport: httpx.BaseTransport | None = None,
     ):
-        parsed = urlsplit(base_url)
-        if (parsed.scheme not in {"http", "https"} or not parsed.netloc
-                or parsed.username or parsed.password or parsed.query or parsed.fragment
-                or (parsed.scheme == "http" and parsed.hostname not in {"localhost", "127.0.0.1", "::1"})):
-            raise ValueError("Explicit HTTPS conversation URL required; HTTP is loopback-only")
-        self.base_url = base_url.rstrip("/")
+        self.base_url = _base_url(base_url)
         self._service_bearer = _header(service_bearer)
         self.contract = contract
         self.binding = binding
@@ -160,22 +181,10 @@ class ConversationCandidateClient:
                    "X-Pythia-Conversation-Access": token, "Accept": "application/json"}
         if operation_id is None:
             headers["Content-Type"] = "application/json"
-        try:
-            with httpx.Client(timeout=10.0, follow_redirects=False, trust_env=False,
-                              transport=self.transport) as client:
-                with client.stream(method, f"{self.base_url}{path}", headers=headers,
-                                   content=body if operation_id is None else None) as response:
-                    if response.status_code != expected_status:
-                        raise ConversationClientError("Conversation service rejected the operation",
-                                                      response.status_code)
-                    raw = bytearray()
-                    for chunk in response.iter_bytes():
-                        if len(raw) + len(chunk) > self.MAX_RESPONSE_BYTES:
-                            raise ConversationClientError("Conversation response exceeds transport limit")
-                        raw.extend(chunk)
-        except httpx.HTTPError:
-            raise ConversationClientError("Conversation transport is unavailable") from None
-        result = self.contract.operation(bytes(raw), snapshot)
+        raw = _http_bytes(self.base_url, method, path, headers,
+                          body if operation_id is None else None, {expected_status},
+                          self.transport, self.MAX_RESPONSE_BYTES)
+        result = self.contract.operation(raw, snapshot)
         if operation_id is not None and result["operation_id"] != operation_id:
             raise ConversationClientError("Conversation operation identity mismatch")
         # Recheck current policy, actor/source access and scene state after I/O.

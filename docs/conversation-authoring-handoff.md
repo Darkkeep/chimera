@@ -310,3 +310,15 @@ Chimera focused source/client/boundary/learning-intelligence run: 75 tests OK,
 Current source:ingest/read authority and unchanged local scene provenance remain
 separate checks before and after any future source transfer. Next: exercise the
 producer's exact source PUT/GET boundary when explicitly configured.
+
+
+## Source transfer client follow-through
+
+The [source-grant record](conversation-source-grants.md) now documents independent
+raw PUT/manifest GET client transport, exact original-byte eligibility/receipt
+validation and current source:ingest/read plus scene/policy rechecks. Its source
+JWT issuer is an explicit trusted callback, not an implicit token fallback.
+82 focused synthetic tests passed with 6 existing skips, including existing
+conversation/task regressions after shared bounded transport extraction. Source
+HTTP cases are stubbed; actual producer source endpoint integration is next.
+No source parsing beyond plain UTF8, CSV turns, UI, provider or publication changed.

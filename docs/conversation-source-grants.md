@@ -123,3 +123,52 @@ plus this owned change; parent engine source store `ffe6fa41`; new contracts abo
 Next: producer source PUT/GET integration and exact-byte/action-grant loopback.
 This pure provenance qualification does not qualify ingestion HTTP, signed source
 grants, real actor/source storage integration, CSV turns, or the overall G3 gate.
+
+
+## Raw source HTTP client: stub qualification
+
+`backend/app/source_client.py::SourceCandidateClient` implements the finalized
+candidate PUT `/conversation/sources/{source_id}/versions/{version}` and GET
+manifest on the same path. Explicit constructor dependencies mirror the existing
+conversation client, adding a source-action authorization callback and source JWT
+issuer. Issuer arguments are action, exact scope, source ID/version, metadata
+digest for ingest or null for read, and the exact original hash list. The actual
+signer must add the source-specific claims, including operation_id:null, and
+implement the contracts-owned EdDSA trust/expiry rules. Stub token callbacks do not
+qualify real signing infrastructure.
+
+`ingest(metadata, original_bytes)` sends exact retained UTF-8 bytes with text/plain,
+Content-Length and X-Pythia-Content-SHA256; accepts 201 creation or 200 replay.
+`read_manifest(metadata, original_bytes)` sends GET with no source body and expects
+200. It needs retained trusted original bytes to check the returned receipt. No
+bytes/storage key/download URL are expected from the manifest-only GET response.
+Metadata is strict/schema-qualified and bound to current source-action/authoring
+state; byte length/hash/eligibility are checked before token issuance and transfer.
+No locally prepared eligibility check is returned as if the engine accepted it.
+
+Actual responses must pass strict JSON, new manifest schema and public semantic
+checks against those originals, followed by fresh authorization/action/scene/policy
+checks. Failure states remain explicit; unreadable snapshots cannot be consumed.
+The source client shares the conversation client's bounded no-retry/no-redirect,
+10-second, no-environment-proxy HTTP helper, preserving sanitized errors. Source
+manifest responses are bounded to 262144 bytes. No client/task fallback is used.
+
+```powershell
+$env:CHIMERA_CONVERSATION_CONTRACTS_ROOT='C:/inetpub/pythia-contracts'
+.\backend\.venv\Scripts\python.exe -m unittest backend.tests.test_source_client backend.tests.test_source_provenance backend.tests.test_conversation_client backend.tests.test_conversation_boundary backend.tests.test_conversation_candidate backend.tests.test_learning_intelligence
+```
+
+2026-10-18: 82 tests OK, 6 existing skips, `git diff --check` passed. New HTTP tests
+use `httpx.MockTransport`: raw bytes/routes/headers and exact signer binding,
+creation/replay statuses, GET without body, invalid originals before issuance,
+read-grant/ingest denial, changed scene/revocation after I/O, foreign/unreadable
+receipts, HTTP errors without retry/body leakage, strict JSON and response limits.
+Existing conversation and task-provider regressions pass after extracting the
+shared transport helper. No frontend changed or required a build.
+
+Baseline Chimera `d4895e0c862d54138463c82ee2de81c874da1a1e` plus this owned
+client/test/documentation slice; source candidate ef7b85cf with later test-only
+20d2527; producer baseline ffe6fa41. Next: actual ephemeral HTTP qualification
+against the producer's explicitly configured source verifier/store. These stub
+checks do not yet establish source endpoint interoperability, real actor/source
+integration, CSV turn support, live inference or G3 completion.
