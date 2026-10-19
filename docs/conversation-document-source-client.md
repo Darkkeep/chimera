@@ -66,6 +66,8 @@ local fixture; the MP4 fixture exceeds Pythia's current source byte cap. Neither
 proves Manteion session integration, production behavior, nor owner acceptance.
 Pythia `505c515` adds in-memory ZIP member lineage normalization only. Chimera has
 no ZIP client, member-level grant, or application binding.
+Contracts `af742cc` adds the ZIP upload-metadata candidate, but Pythia has not yet
+consumed it in a runtime pin and Chimera has no ZIP transfer client.
 
 ## 2026-10-19 Metadata-only media client
 
