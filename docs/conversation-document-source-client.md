@@ -111,8 +111,8 @@ The focused `backend.tests.test_archive_source_client` suite passed 4 tests in
 0.538s with mocked HTTP. Pythia's `tests/evals/test_archive_source_loopback.py`
 passed one actual restricted-worker loopback in 4.969s: signed PUT, immutable
 replay and authorized manifest GET for synthetic text and unsupported members.
-This does not qualify Manteion session policy, production ZIP upload, or a
-user-facing archive workflow.
+Chimera commit `fc9123e` contains this client. This does not qualify Manteion
+session policy, production ZIP upload, or a user-facing archive workflow.
 
 ## Next work
 
