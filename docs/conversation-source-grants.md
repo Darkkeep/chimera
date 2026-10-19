@@ -1,7 +1,7 @@
 # Authoring source-transfer and CSV consumer requirements
 
-2026-10-18. Proposed consumer requirements against the next additive contracts
-candidate, not implemented upload/CSV support or a public release.
+2026-10-18. Consumer requirements and narrow synthetic provenance qualification against the
+additive source contracts candidate. No upload/CSV turn support or public release.
 
 ## Trust and authoring context
 
@@ -76,3 +76,50 @@ No source bytes were sent to a service, no producer invoked and no new runtime
 qualification is claimed by these fixtures. Next: finalize the exact source
 metadata/manifest/grant contract, then add a pinned consumer validator and focused
 negative tests. Do not extend the current text-only pin by assumption.
+
+
+## Pinned provenance adapter qualification
+
+`backend/app/source_provenance.py::PublicSourceCandidate` now validates exact
+source metadata and receipts using new public schemas/semantics pinned at
+`ef7b85cfa31e0e8961663fbb6da4dcb112f55533`. Latest contracts
+`20d2527d63e1f744436037728f204fe487446be1` adds only a shared CSV vector/test;
+consumed schema/helper bytes remain identical. Existing turn schemas/helpers and
+vendor pin remain untouched. The new helper imports only the already-pinned public
+conversation helper through a scoped import mapping; no mutable global import
+path/module registry or private engine dependency is used.
+
+Receipt validation requires actual immutable original bytes, strict safe JSON,
+matching metadata/snapshot identities and hashes, matching lifecycle, and exact
+text coverage. Unreadable receipts cannot include a readable snapshot. Source
+failure remains an explicit failure, never evidence of readability. Metadata alone
+is not receipt validation or authorization.
+
+`bind_source_transfer` separately binds schema-qualified metadata to trusted local
+authoring state and current policy. Its trusted action callback must grant the
+specific source:ingest/read purpose with literal True. All existing scope/source
+permissions are checked and current project/scene/source revisions must match.
+Call this guard before signing/sending and again before attaching a returned
+receipt; this module itself performs no transport or durable attachment.
+
+The CSV resolver validates design-only anchors against trusted parsed table
+metadata. The tests provide explicit synthetic parser metadata; they do not execute
+or qualify an actual CSV parser. Existing text-only turn schemas still reject CSV
+anchors. Original file bytes, ordered duplicate headers, logical record spans,
+parser revision, coverage and bounds remain material to any future integration.
+
+```powershell
+$env:CHIMERA_CONVERSATION_CONTRACTS_ROOT='C:/inetpub/pythia-contracts'
+.\backend\.venv\Scripts\python.exe -m unittest backend.tests.test_source_provenance backend.tests.test_conversation_client backend.tests.test_conversation_boundary backend.tests.test_conversation_candidate backend.tests.test_learning_intelligence
+```
+
+2026-10-18: 75 tests OK, 6 existing skips; `git diff --check` passed. The new test
+module exercises every one of the 19 typed negative examples, plus exact receipt,
+revocation/foreign authoring state, unreadable/overclaimed snapshots, absent bytes
+and public schema/helper content drift. No service, provider, UI or held-out case
+was used. Evidence baseline: Chimera `bb9a22cb08c23716bc3e8e1e199213cae863e39f`
+plus this owned change; parent engine source store `ffe6fa41`; new contracts above.
+
+Next: producer source PUT/GET integration and exact-byte/action-grant loopback.
+This pure provenance qualification does not qualify ingestion HTTP, signed source
+grants, real actor/source storage integration, CSV turns, or the overall G3 gate.

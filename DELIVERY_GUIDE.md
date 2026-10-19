@@ -1,7 +1,7 @@
 # Chimera Delivery Guide
 
 Last reviewed: 2026-10-18. Shared journey: `conversation-explainable-answers-files`.
-Guide revision: 7. This is a maintained snapshot, not automatic telemetry.
+Guide revision: 8. This is a maintained snapshot, not automatic telemetry.
 
 ## Start Here
 
@@ -123,7 +123,10 @@ using explicit sibling schemas; no vendor pin changed. Parent source-store evide
 is now committed at `ffe6fa41afce4910add630b30f71b407229f6d6a`; parent reports
 225 full-suite tests passed in 142.678s. Chimera did not rerun that suite.
 [Source-grant/CSV requirements](docs/conversation-source-grants.md) and 19 typed
-negative consumer examples are prepared for the next contract before implementation. Integrated HTTP/session
+negative consumer examples now have pinned pure provenance validation against
+contracts source candidate `ef7b85cfa31e0e8961663fbb6da4dcb112f55533`.
+75 focused tests passed, 6 existing skips. No source-transfer HTTP or CSV parser/
+turn support is implemented by this consumer slice. Integrated HTTP/session
 compatibility, required file formats and overall G3 exit remain pending.
 
 Qualify the additive public contract against the actual Chimera adapter, including
@@ -173,9 +176,9 @@ manual production-stage label, or schema check grants formal release authority.
 
 ## Next Developer Action
 
-Finalize the additive source metadata/manifest/grants and CSV anchor contract with
-contracts/Pythia using the [typed consumer examples](docs/conversation-source-grants.md).
-Then qualify a pinned provenance adapter. Integrate application actor/session
+Qualify source-transfer HTTP against the producer's explicitly configured source
+grant/PUT/GET boundary after it is ready, using the pinned provenance adapter and
+[typed consumer examples](docs/conversation-source-grants.md). Integrate application actor/session
 boundaries using the
 [authoring handoff requirements](docs/conversation-authoring-handoff.md), especially
 scope attestation, exact source identity, revision/replay/cancellation and return
@@ -221,6 +224,12 @@ exact owned files only; no push/merge/release/deploy/training or formal approval
 is authorized by this guide.
 
 ## Change Record
+
+- 2026-10-18: Added pinned public source metadata/receipt and design-only CSV-anchor
+  validators with local source-action/scene grants. All 19 typed consumer negatives
+  are exercised; 75 focused tests OK, 6 existing skips. Contracts source candidate
+  `ef7b85cf`; no source HTTP transport/parser or G3 completion implied. Next:
+  qualify producer source PUT/GET boundary with current grants and exact bytes.
 
 - 2026-10-18: Synchronized committed parent private-source evidence `ffe6fa41`;
   parent reports 225 full-suite tests passed in 142.678s, not rerun by Chimera.

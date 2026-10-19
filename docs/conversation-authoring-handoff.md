@@ -296,3 +296,17 @@ Next cycle [source grants/CSV requirements](conversation-source-grants.md) and
 finalized. They distinguish schema, current permission, immutable byte integrity,
 local scene revision and actual anchor-resolution failures. They are proposals,
 not a new passing runtime test matrix. No held-out corpus files were used.
+
+
+## Additive source candidate provenance follow-through
+
+The [source grant/CSV consumer requirements](conversation-source-grants.md) now
+include a pinned pure validator and 19 exercised negative consumer examples.
+Contracts source candidate `ef7b85cfa31e0e8961663fbb6da4dcb112f55533` adds new
+source metadata/manifest and separate design-only CSV anchor schemas without
+changing the existing turn contract. Test-only `20d2527` preserves consumed bytes.
+Chimera focused source/client/boundary/learning-intelligence run: 75 tests OK,
+6 existing skips; no new provider, HTTP upload or CSV parser qualification.
+Current source:ingest/read authority and unchanged local scene provenance remain
+separate checks before and after any future source transfer. Next: exercise the
+producer's exact source PUT/GET boundary when explicitly configured.
