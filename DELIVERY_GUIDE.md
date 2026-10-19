@@ -1,7 +1,7 @@
 # Chimera Delivery Guide
 
 Last reviewed: 2026-10-18. Shared journey: `conversation-explainable-answers-files`.
-Guide revision: 9. This is a maintained snapshot, not automatic telemetry.
+Guide revision: 10. This is a maintained snapshot, not automatic telemetry.
 
 ## Start Here
 
@@ -127,8 +127,13 @@ negative consumer examples now have pinned pure provenance validation against
 contracts source candidate `ef7b85cfa31e0e8961663fbb6da4dcb112f55533`.
 An independent [source candidate client](backend/app/source_client.py) now sends
 exact raw PUT and manifest-only GET with source-specific grants and current
-provenance checks. 82 focused tests passed, 6 existing skips; source HTTP is tested
-with synthetic stubs only. CSV parser/turn support remains absent. Integrated HTTP/session
+provenance checks. 82 focused tests passed, 6 existing skips. Source HTTP is now also narrowly
+`qualified-synthetic` against parent `4ca5ef6a32a4420278980f95b4e32245a6b87fc7`
+and candidate `aee473954047fe0b384da8e7934e51cedacee9b6` over real loopback.
+Chimera reverified three source blockers fixed and 11 producer source tests passed.
+Parent reports final full suite 243 tests passed in 156.622s; not rerun by Chimera.
+CSV parsing exists internally in Pythia, but public CSV ingestion/turn support
+remains absent. Integrated HTTP/session
 compatibility, required file formats and overall G3 exit remain pending.
 
 Qualify the additive public contract against the actual Chimera adapter, including
@@ -178,9 +183,9 @@ manual production-stage label, or schema check grants formal release authority.
 
 ## Next Developer Action
 
-Qualify source-transfer HTTP against the producer's explicitly configured source
-grant/PUT/GET boundary after it is ready, using the pinned provenance adapter and
-[typed consumer examples](docs/conversation-source-grants.md). Integrate application actor/session
+Agree the additive original-CSV source, structured table projection/coverage and
+turn citation contract before wiring the existing bounded parser into public
+transport or clients. See [next format boundary](docs/conversation-source-grants.md#next-independent-format-boundary). Integrate application actor/session
 boundaries using the
 [authoring handoff requirements](docs/conversation-authoring-handoff.md), especially
 scope attestation, exact source identity, revision/replay/cancellation and return
@@ -226,6 +231,13 @@ exact owned files only; no push/merge/release/deploy/training or formal approval
 is authorized by this guide.
 
 ## Change Record
+
+- 2026-10-18: Synchronized actual raw-source+turn loopback at engine `4ca5ef6a`,
+  Chimera client `3fbe048d` and contracts `aee47395`. Independently reverified
+  framing400/rows0, revoked-grant403/rows0, HEAD-write403/rows0 and 11 source tests
+  OK13.077s. Parent final suite reports243passed156.622s; no own full rerun.
+  Narrow source transport qualified-synthetic; G3 remains in-progress. Next:
+  additive CSV source/projection/citation semantics before implementation.
 
 - 2026-10-18: Added exact-byte raw source PUT/manifest GET client against the new
   candidate; shared bounded HTTP behavior with the conversation client. Source

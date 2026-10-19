@@ -172,3 +172,78 @@ client/test/documentation slice; source candidate ef7b85cf with later test-only
 against the producer's explicitly configured source verifier/store. These stub
 checks do not yet establish source endpoint interoperability, real actor/source
 integration, CSV turn support, live inference or G3 completion.
+
+
+## Actual source transport qualification and independent re-review
+
+Final committed engine:
+`4ca5ef6a32a4420278980f95b4e32245a6b87fc7`.
+Chimera source client: `3fbe048d49cd7b57f7168eb5ab8cbdbc23c40b1b`.
+Public candidate: `aee473954047fe0b384da8e7934e51cedacee9b6`; its attributes-only
+follow-through preserves the pinned source schema/helper content introduced at
+ef7b85cf. Parent-owned [source transport evidence](../../Pythia/docs/conversation/g3-source-transport-evidence.md)
+records actual ephemeral HTTP raw PUT201, exact replay200 and manifest GET,
+followed by a partial-source conversation turn/read/replay/cancel-completed and
+revocation using synthetic EdDSA/service identity and one synthetic producer.
+Bytes were transferred through HTTP rather than inserted directly into storage.
+
+Chimera's read-only independent review reproduced three blockers in the earlier
+working tree: HEAD accidentally entering PUT under service read authority,
+Content-Length plus Transfer-Encoding accepted together, and full grant revocation
+checked only after source insertion committed. Parent fixed method dispatch,
+framing/encoding checks and full grant revalidation inside the write transaction.
+The transaction callback runs after INSERT before commit; denial rolls back bytes.
+
+Chimera independently reran each exact reproduction using isolated temporary
+synthetic fixtures: framing returned400 with zero stored rows; transaction grant
+revocation returned403 with zero rows; HEAD write attempt returned403 with zero
+rows. Then, from Pythia root:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests/evals -p test_source_candidate.py -v
+```
+
+Result: 11 tests passed in13.077s. No blocking finding remained in that reviewed
+source/client/auth/store scope. This is scoped review evidence, not a security
+certification. No source/client code was edited during the review.
+
+Parent separately reports its final full synthetic suite at the committed engine
+above: 243 tests passed in156.622s, including source11, CSV7, prior regressions and
+actual source/turn loopback. Kernel validation and the sibling34-schema unreleased
+candidate verification passed. Chimera did not rerun that full suite or claim it
+as its own execution. Existing source/client82-test result remains its local
+consumer regression evidence. No live model, real application identity integration,
+held-out content, hosted gate, publication or overall G3 acceptance is supplied.
+
+## Next independent format boundary
+
+The next bounded step is to make the internal CSV parser consumable through an
+agreed public source/answer boundary. The current source metadata/verifier assumes
+original text/plain, and the current snapshot/turn citation schemas allow only
+text extraction spans. A design-only CSV anchor and a passing internal parser do
+not define CSV transport, provider input or turn compatibility.
+
+Contracts and producer/consumer owners must settle these semantics before code:
+
+- Original CSV MIME/byte identity, strict encoding/BOM policy and immutable source
+  grant metadata; preserve original hashes/newlines and current actor/session/
+  policy/source authority without relabelling CSV as plain text.
+- Structured parser projection and its immutable parser/extraction identity,
+  ordered exact headers, logical record/column identity and explicit read coverage.
+  Define exactly which rows/cells reach the producer and distinguish unread rows.
+- The public turn source/citation extension needed to bind full logical record
+  spans and column indexes to that exact table. Preserve existing text fixtures,
+  schema semantics and canonical digest behavior for unchanged text requests.
+- Whether permission remains source-wide; do not invent row-sharing grants or
+  treat a row filter as authorization. Recheck current source access before turn
+  acceptance/result publication and retain the exact source in corrected history.
+- Failure/unsupported states, bounded parser worker/time limits and source
+  retrieval. Keep quoted multiline records, duplicate headers, formulas as inert
+  data, BOM/Unicode, malformed/ragged records and out-of-coverage anchors in the
+  negative qualification set. Do not expose private storage handles.
+
+These are semantic inputs, not proposed endpoint names or payload field guesses.
+After agreement: pin the exact additive contract, reuse the bounded parser,
+qualify actual source-transfer/turn/citation HTTP against those bytes and guards,
+then update client compatibility. PDF/DOCX/Markdown/media/ZIP and exports remain
+separate first-gate obligations; this CSV slice cannot close G3 by itself.

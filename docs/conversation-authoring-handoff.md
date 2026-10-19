@@ -322,3 +322,22 @@ JWT issuer is an explicit trusted callback, not an implicit token fallback.
 conversation/task regressions after shared bounded transport extraction. Source
 HTTP cases are stubbed; actual producer source endpoint integration is next.
 No source parsing beyond plain UTF8, CSV turns, UI, provider or publication changed.
+
+
+## Final source HTTP snapshot and review closeout
+
+Engine `4ca5ef6a32a4420278980f95b4e32245a6b87fc7`, Chimera public/source client
+`3fbe048d49cd7b57f7168eb5ab8cbdbc23c40b1b` and candidate
+`aee473954047fe0b384da8e7934e51cedacee9b6` now have actual synthetic loopback
+evidence for raw PUT201/replay200/manifest GET before the bounded conversation.
+Chimera independently reverified three source authorization/framing blockers fixed,
+zero committed rows in each rejected reproduction, and producer source11tests
+passed13.077s. Parent reports final full243tests passed156.622s; not rerun here.
+Exact commands, source review and limits are in the
+[source-grant record](conversation-source-grants.md).
+
+Narrow source+turn transport is qualified-synthetic; full application identity,
+format pipeline, live answer quality and overall G3 remain unfinished. The next
+independent blocker input is an agreed additive CSV original-source/structured
+projection/coverage/turn-citation contract. The internal CSV parser/design-only
+anchor must not be relabelled as current text-only public compatibility.
