@@ -1,7 +1,7 @@
 # Chimera Delivery Guide
 
 Last reviewed: 2026-10-18. Shared journey: `conversation-explainable-answers-files`.
-Guide revision: 4. This is a maintained snapshot, not automatic telemetry.
+Guide revision: 5. This is a maintained snapshot, not automatic telemetry.
 
 ## Start Here
 
@@ -111,7 +111,11 @@ Status: `in-progress`. Owners: contracts/Pythia; Chimera owns its consumer bound
 Internal [source/return guards](backend/app/conversation_boundary.py) now check
 immutable authoring bindings, current authorization and advice-only semantics.
 Focused synthetic checks pass; these guards are not wired to a conversation route
-or adapter. The internal authoring mapping is now qualified synthetically against
+or application route. An independent opt-in
+[public candidate HTTP client](backend/app/conversation_client.py) now implements
+submit/read/cancel with strict schema/semantic validation and current authoring
+checks; its transport is qualified against stubbed public HTTP responses only.
+The internal authoring mapping is qualified synthetically against
 unreleased contracts `d7b904d772730a7365388623a59d3f07828c07e1`
 using explicit sibling schemas; no vendor pin changed. Integrated HTTP/session
 compatibility, required file formats and overall G3 exit remain pending.
@@ -163,8 +167,8 @@ manual production-stage label, or schema check grants formal release authority.
 
 ## Next Developer Action
 
-Integrate the exact candidate after Pythia/Manteion operation/session boundaries
-are available, using the
+Qualify the candidate HTTP client against the opt-in engine synthetic runtime and
+real actor/session authorization boundary, using the
 [authoring handoff requirements](docs/conversation-authoring-handoff.md), especially
 scope attestation, exact source identity, revision/replay/cancellation and return
 access. Then qualify the actual Chimera adapter. Do not continue the old
@@ -209,6 +213,12 @@ exact owned files only; no push/merge/release/deploy/training or formal approval
 is authorized by this guide.
 
 ## Change Record
+
+- 2026-10-18: Added independent public candidate HTTP submit/read/cancel transport,
+  with exact content-pinned public schema/semantics, service bearer and trusted
+  access-token issuer. 70 targeted tests OK, 6 existing skips. HTTP tests use
+  synthetic stubs only; application/session integration and actual engine roundtrip
+  remain pending. Evidence: `docs/conversation-authoring-handoff.md`.
 
 - 2026-10-18: Qualified the internal authoring scope mapping synthetically against
   unreleased contracts `d7b904d772730a7365388623a59d3f07828c07e1`.

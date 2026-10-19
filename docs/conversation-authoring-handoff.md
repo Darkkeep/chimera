@@ -166,3 +166,61 @@ Next: wire the real operation/session adapter only after those boundaries exist,
 with trusted storage/current actor authorization and full schema/semantic checks.
 Required PDF/DOCX/CSV/media/archive ingestion and generated outputs remain G3/G4
 work, not supported features inferred from this text-only candidate.
+
+
+## Public HTTP candidate client: synthetic transport qualification
+
+`backend/app/conversation_client.py` supplies an independent opt-in
+`ConversationCandidateClient`; the existing task provider is unchanged. Its
+explicit base URL supports HTTPS and loopback-only HTTP, with no implicit default,
+task fallback, redirects, automatic retry or proxy-environment inheritance.
+It sends the agreed public POST `/conversation/turns`, GET
+`/conversation/operations/{operation_id}` and POST cancellation routes; reads and
+cancellation send no body. Expected HTTP statuses are 202/200/200 respectively.
+
+Configuration must supply the service bearer, trusted current authorization,
+current local authoring binding/policy callbacks and server-side access JWT issuer.
+The issuer receives action/scope, submit request hash or read/cancel operation ID,
+and deduplicated source hashes; tokens stay in headers. The real configured issuer
+must implement the contracts-owned EdDSA claims, audience, expiry and key policy.
+Tests substitute synthetic token callbacks and do not qualify real signing or
+revocation infrastructure. The engine must independently verify both credentials.
+
+`PublicConversationContract(root)` loads explicit reviewed public schemas and
+executable semantics from a trusted configured checkout. Content pins correspond
+to contracts `e80144585ca7432865b558404cde6c9351002566`; CRLF checkout normalization
+is supported, while other schema/helper changes fail closed before executing the
+verified public helper source. No private engine code, unchecked bytecode or
+implicit vendor override is used. This is still unreleased candidate integration.
+
+The client snapshots and validates canonical request bytes, local scope and exact
+source identities before token issuance/HTTP. It bounds request/decoded-response
+sizes to 1 MiB/2 MiB, uses a 10-second transport timeout, validates strict JSON,
+public operation schema and semantic hashes/citations, and verifies read/cancel
+operation ID. After I/O it rechecks current actor/source access, policy and scene
+revision before returning even a valid answer. Errors omit HTTP response bodies
+and credential details; failed/interrupted/cancelled states remain explicit rather
+than becoming synthetic answers. The client never mutates a storyboard.
+
+Qualification uses `httpx.MockTransport` only. Tests cover exact routes/headers/
+request bodies and token-issuer binding; all operation states; foreign scope or
+operation; invalid revisions/request/answer hashes; rehashed extraction/coverage
+substitution; HTTP failures, redirects, network errors and no retry; strict JSON,
+limits, invalid URL/token/path, access revocation and stale scene/policy before or
+after HTTP; issuer mutation isolation; and content-pin/line-ending behavior.
+
+```powershell
+$env:CHIMERA_CONVERSATION_CONTRACTS_ROOT='C:/inetpub/pythia-contracts'
+.\backend\.venv\Scripts\python.exe -m unittest backend.tests.test_conversation_client backend.tests.test_conversation_boundary backend.tests.test_conversation_candidate backend.tests.test_learning_intelligence
+```
+
+2026-10-18 result: 70 tests OK, 6 existing skips; `git diff --check` passed.
+Chimera preceding revision `2e083b89ef27981e66f5c97f0c0c10705b13cb9d` plus this
+owned module/test/documentation change; contracts candidate above has only its
+unrelated staged README dirty. Pythia observed `6a5cab0c2abfaf95172ee6b4f587f57fe25237c2`
+with ongoing opt-in-runtime work; no engine was called by these tests.
+Chimera's staged README and two dirty historical handoffs were preserved.
+
+Next: actual loopback qualification against the opt-in synthetic engine, followed
+by real application actor/session/source setup. No UI, provider traffic, generated
+files, live-model output, hosted acceptance or G3/G4 completion is claimed here.
