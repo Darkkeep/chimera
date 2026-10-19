@@ -78,8 +78,12 @@ facing upload workflow.
 The focused `backend.tests.test_media_source_client` suite passed 5 tests in 0.593s
 with mocked HTTP and synthetic bytes. It covers exact PUT/GET envelopes, metadata
 and manifest binding, source/worker substitution, current-policy changes, and
-redacted no-retry errors. This is client-boundary evidence only, not a loopback
-against Pythia's media route or Manteion's session policy.
+redacted no-retry errors. Pythia's `tests/evals/test_media_source_loopback.py`
+then passed one test in 4.451s using the actual opt-in route and restricted MP3
+worker for signed PUT, immutable replay and manifest GET. It uses a synthetic
+signer, service principal and current-access callback; it does not qualify Manteion
+session policy, a browser upload workflow, production storage, or live media
+understanding.
 
 Evidence revisions: Chimera document client/tests extend `adcab3a`; Pythia engine
 is `a99b298e72273598ac6b54a44c727998a8c7c9fd` with the loopback test change;
