@@ -1,7 +1,7 @@
 # Chimera Delivery Guide
 
 Last reviewed: 2026-10-18. Shared journey: `conversation-explainable-answers-files`.
-Guide revision: 12. This is a maintained snapshot, not automatic telemetry.
+Guide revision: 13. This is a maintained snapshot, not automatic telemetry.
 
 ## Start Here
 
@@ -44,7 +44,7 @@ Chimera's existing PPTX/image/OCR authoring support is not being removed.
 
 ## How Far Along We Are
 
-**Journey status: Pythia G1 packet accepted; G2-G6 not accepted.** Existing authoring,
+**Journey status: G1 and G2 accepted; G3 in progress; G4-G6 not accepted.** Existing authoring,
 media, export, and deterministic Pythia task workflows are reusable foundations,
 not a qualified conversational answer/file capability.
 
@@ -93,11 +93,19 @@ recorded on 2026-10-18 in Pythia `8daf30d`. This accepts the Pythia target packe
 not a complete frozen evaluation corpus or live capability. Chimera's
 [authoring handoff review](docs/conversation-authoring-handoff.md) records source
 identity, return-access, authorization and advice-versus-edit requirements.
-No conversation adapter has been implemented or qualified.
+That G1 packet did not qualify a conversation adapter; current narrow synthetic
+transport evidence is recorded under G3 below.
 
 ### G2 - Clearly Synthetic Consult Prototype
 
-Status: `planned`. Primary owner: Manteion; Chimera reviews authoring handoff.
+Status: `accepted`. Primary owner: Manteion; Chimera reviews authoring handoff.
+
+Owner explicitly accepted the reviewed G2 packet `9ab9acfc4394faedd09161cfff57b5292b4ce49b`
+on 2026-10-18. Manteion acceptance record `65d3209a3775fed25f2114f8049e781e3b05c66f`
+and provenance clarification `bc5854ce24afa7cf0af1148a190a58612b1ed379` preserve that
+exact target, including committed-LF versus local-CRLF manifest distinctions.
+This accepts synthetic interaction/practice only; it grants no live-provider,
+G4 usefulness or production qualification.
 
 Chimera completed the [pinned guided-practice core audit](docs/guided-review-practice-package-audit.md)
 for Manteion's optional synthetic human-review practice. Exact0.1.1 archive and
@@ -192,8 +200,11 @@ manual production-stage label, or schema check grants formal release authority.
 
 ## Next Developer Action
 
-Qualify the exact additive CSV1.1 client against authoritative producer extraction
-records/worker allowlist and actual source/turn HTTP. See
+Qualify the new [CSV source client](docs/conversation-csv-source-client.md) against
+actual source/turn HTTP, using authenticated reconstructed records and a fresh
+worker allowlist. Its focused stub checks pass; actual HTTP remains the next slice.
+Pythia transport `fec9bce` passed the parent's reported 298-test suite; the earlier
+actual table loopback used raw httpx uploads, not this new source client. See
 [CSV integration slice](docs/conversation-csv-client.md#next-integration-slice). Integrate application actor/session
 boundaries using the
 [authoring handoff requirements](docs/conversation-authoring-handoff.md), especially
