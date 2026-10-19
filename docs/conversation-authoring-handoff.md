@@ -341,3 +341,14 @@ format pipeline, live answer quality and overall G3 remain unfinished. The next
 independent blocker input is an agreed additive CSV original-source/structured
 projection/coverage/turn-citation contract. The internal CSV parser/design-only
 anchor must not be relabelled as current text-only public compatibility.
+
+
+## Additive CSV1.1 client follow-through
+
+The separate [CSV client record](conversation-csv-client.md) captures exact candidate
+`0fb76c5cf6517db5db6e8aeb0ff217410c189614`, full original/extraction/worker/header/
+row provenance, fresh trusted-record/allowlist callbacks and current authoring
+checks.90focused tests passed6existing skips; new CSV1.1 HTTP uses synthetic stubs.
+Existing1.0 client/schema/helper pins remain unchanged. Producer CSV source and
+turn integration with real ephemeral HTTP and qualified immutable extraction
+records is next. No live provider, hosted acceptance or complete G3 qualification.

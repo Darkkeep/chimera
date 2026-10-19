@@ -1,7 +1,7 @@
 # Chimera Delivery Guide
 
 Last reviewed: 2026-10-18. Shared journey: `conversation-explainable-answers-files`.
-Guide revision: 10. This is a maintained snapshot, not automatic telemetry.
+Guide revision: 11. This is a maintained snapshot, not automatic telemetry.
 
 ## Start Here
 
@@ -132,8 +132,11 @@ provenance checks. 82 focused tests passed, 6 existing skips. Source HTTP is now
 and candidate `aee473954047fe0b384da8e7934e51cedacee9b6` over real loopback.
 Chimera reverified three source blockers fixed and 11 producer source tests passed.
 Parent reports final full suite 243 tests passed in 156.622s; not rerun by Chimera.
-CSV parsing exists internally in Pythia, but public CSV ingestion/turn support
-remains absent. Integrated HTTP/session
+CSV parsing exists internally in Pythia. An additive
+[CSV1.1 public conversation client](docs/conversation-csv-client.md) now has pinned
+schema/semantic/authoritative-record guards and stubbed HTTP qualification against
+contracts `0fb76c5cf6517db5db6e8aeb0ff217410c189614`: 90 focused tests OK,
+6 existing skips. Actual CSV source/turn producer integration remains pending. Integrated HTTP/session
 compatibility, required file formats and overall G3 exit remain pending.
 
 Qualify the additive public contract against the actual Chimera adapter, including
@@ -183,9 +186,9 @@ manual production-stage label, or schema check grants formal release authority.
 
 ## Next Developer Action
 
-Agree the additive original-CSV source, structured table projection/coverage and
-turn citation contract before wiring the existing bounded parser into public
-transport or clients. See [next format boundary](docs/conversation-source-grants.md#next-independent-format-boundary). Integrate application actor/session
+Qualify the exact additive CSV1.1 client against authoritative producer extraction
+records/worker allowlist and actual source/turn HTTP. See
+[CSV integration slice](docs/conversation-csv-client.md#next-integration-slice). Integrate application actor/session
 boundaries using the
 [authoring handoff requirements](docs/conversation-authoring-handoff.md), especially
 scope attestation, exact source identity, revision/replay/cancellation and return
@@ -231,6 +234,12 @@ exact owned files only; no push/merge/release/deploy/training or formal approval
 is authorized by this guide.
 
 ## Change Record
+
+- 2026-10-18: Added separate CSV1.1 public conversation contract/client with fresh
+  authoritative extraction/worker/current authoring checks before and after I/O.
+  Exact contracts0fb76c5c; 90 focused tests OK6existing skips; CSV HTTP is stubbed.
+  Existing1.0 clients/pins unchanged. Next: actual CSV source/turn loopback with
+  qualified server-owned worker records; no full G3/live quality claim.
 
 - 2026-10-18: Synchronized actual raw-source+turn loopback at engine `4ca5ef6a`,
   Chimera client `3fbe048d` and contracts `aee47395`. Independently reverified

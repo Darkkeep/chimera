@@ -247,3 +247,15 @@ After agreement: pin the exact additive contract, reuse the bounded parser,
 qualify actual source-transfer/turn/citation HTTP against those bytes and guards,
 then update client compatibility. PDF/DOCX/Markdown/media/ZIP and exports remain
 separate first-gate obligations; this CSV slice cannot close G3 by itself.
+
+
+## CSV semantic blocker resolved at contract/client scope
+
+The requirements above are now captured in additive candidate
+`0fb76c5cf6517db5db6e8aeb0ff217410c189614` and a separate
+[CSV1.1 client](conversation-csv-client.md). Full extraction identity is independent
+of selected row coverage; worker provenance resolves through trusted server records
+and current allowlist, not actor claims. Client schema/semantic/authoritative-record
+HTTP stub checks and existing regressions total90testsOK6existing skips. Actual
+CSV source/worker/turn integration remains next; no endpoint was guessed and no
+existing text-only pin changed.
