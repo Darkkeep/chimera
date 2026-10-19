@@ -51,6 +51,13 @@ $env:PYTHIA_TEST_SOURCE_WORKER_IMAGE='sha256:2cdfcf80f1f3e70148305efe5363918fd46
 Result: 5 tests passed in 26.499s. The cross-repo test uses a real ephemeral HTTP
 server, the restricted worker, and Manteion's committed synthetic PDF/DOCX files.
 Chimera's client performs signed PUT201, immutable replay200, and manifest GET200
+
+2026-10-19 cross-repository checkpoint: Pythia `b45b85a` adds an internal,
+in-memory MP4/MP3 metadata normalizer. Contracts commit `41aa2f8` adds a candidate
+upload-metadata schema and digest vector; Pythia `866410d` pins and validates them.
+Chimera's client remains PDF/DOCX-only; there is no media upload grant, persisted
+inspection manifest route, or application binding for media/ZIP. Existing PDF/DOCX
+loopback evidence remains synthetic.
 for each format. Worker execution occurs exactly once per source. The test validates
 partial status, exact original and extraction hashes, typed anchors, qualified
 worker provenance, and authenticated manifest reconstruction. Existing tests in
