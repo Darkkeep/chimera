@@ -159,8 +159,10 @@ scoped transport qualification, not application actor/session integration or G3
 exit. Pythia also qualified actual PDF/DOCX worker output and added an opt-in
 private signed manifest path; 4 Pythia actual-container route tests pass against
 its committed synthetic fixtures. Chimera has not exercised that route with a
-document client. Integrated HTTP/session compatibility, required file formats and
-overall G3 exit remain pending. See Pythia's
+document client. Chimera's document client has now passed the actual-worker
+manifest loopback; see [document client evidence](docs/conversation-document-source-client.md).
+Integrated HTTP/session compatibility, required file formats and overall G3 exit
+remain pending. See Pythia's
 [document worker evidence](../Pythia/docs/conversation/g3-parser-worker-evidence.md)
 and [CSV HTTP evidence](../Pythia/docs/conversation/g3-csv-http-evidence.md).
 
@@ -212,9 +214,11 @@ manual production-stage label, or schema check grants formal release authority.
 ## Next Developer Action
 
 Qualify a Chimera PDF/DOCX manifest client against Pythia's explicit opt-in source
-route; the CSV source-client loopback is complete. Pythia's document route is not
-a released/default endpoint and its manifest does not enable document turns or
-citations. Integrate application actor/session boundaries using the
+route; this client is now qualified against the actual worker and ephemeral
+producer HTTP. See the [document client record](docs/conversation-document-source-client.md).
+Pythia's route remains an unreleased opt-in candidate and manifests do not enable
+document turns or citations. Next, integrate application actor/session boundaries
+using the
 [authoring handoff requirements](docs/conversation-authoring-handoff.md), especially
 scope attestation, exact source identity, revision/replay/cancellation and return
 access. Then qualify the actual Chimera adapter. Do not continue the old
@@ -304,6 +308,14 @@ is authorized by this guide.
   no-task checks passed. Evidence is cross-repository and parent-run; Chimera's
   focused stubs were not rerun in this cycle. G3 remains in-progress. Next:
   qualify a Chimera PDF/DOCX manifest client and application/session boundary.
+
+- 2026-10-19: Chimera's PDF/DOCX source client passed 5 stub/adversarial tests and
+  5 actual-worker HTTP tests in Pythia's cross-repository harness. Both formats
+  passed signed upload/replay/manifest-read and trusted-record checks; the worker
+  ran once per immutable source. See `docs/conversation-document-source-client.md`.
+  This remains opt-in synthetic qualification, not application session wiring,
+  document turns/citations, G3 exit or release. Next: integrate trusted actor,
+  session and source access in the application boundary.
 
 - 2026-10-18: Added exact-byte raw source PUT/manifest GET client against the new
   candidate; shared bounded HTTP behavior with the conversation client. Source

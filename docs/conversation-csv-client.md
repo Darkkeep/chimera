@@ -86,6 +86,7 @@ cross-repository test exercises actual source PUT/replay/manifest GET through
 `CsvSourceCandidateClient`, then passes its authenticated reconstructed record to
 the table client for a real synthetic turn. See
 [CSV source-client evidence](conversation-csv-source-client.md) for the command,
-revisions, results and limitations. Next integration work is the PDF/DOCX manifest
-client and the separate Manteion session boundary; no live or overall G3
-qualification follows from the CSV loopback.
+revisions, results and limitations. The PDF/DOCX manifest client has since passed
+an actual-worker loopback; next integration work is the application actor/session
+boundary and Manteion private persistence. No live or overall G3 qualification
+follows from these loopbacks.

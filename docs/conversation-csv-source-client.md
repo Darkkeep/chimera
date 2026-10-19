@@ -75,6 +75,7 @@ engine `a99b298e72273598ac6b54a44c727998a8c7c9fd` plus the integration test chan
 contracts checkout `8eb5469a1762b20430c7c8185058eac6990e4533`, with the CSV source
 content still pinned to candidate `0fb76c5cf6517db5db6e8aeb0ff217410c189614`.
 
-Next: qualify a Chimera PDF/DOCX manifest client against Pythia's explicit local
-document source runtime. Application actor/session integration and Manteion's
-private persistence remain separate work.
+Next: integrate the qualified source clients with Chimera's trusted application
+actor/session boundary and Manteion's private session persistence. Keep the
+Pythia document route opt-in; application authorization, storage and return
+checks are separate qualification gates.
