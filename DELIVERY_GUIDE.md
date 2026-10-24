@@ -272,6 +272,25 @@ is authorized by this guide.
 
 ## Change Record
 
+- 2026-10-24: Enlarged the metallic wings into the upper blank space and moved
+  them behind the shoulders and all three heads, preserving the dragon ear and
+  original dark anatomy in the foreground. Rebuilt matching marks/icons and
+  revised cache keys; export validation now checks rear wing layer order.
+  Validation: regeneration and frontend build passed; inspected the full-size
+  mark and 128px icon, and confirmed the browser loads the rear-wings revision.
+  Foreground checks preserve original dragon-ear pixels and opacity.
+
+- 2026-10-24: Refined the existing metallic logo at owner request, preserving
+  the lion/eagle/dragon composition while broadening the lion jaw and adding a
+  fuller faceted mane and layered wings. Shared app icons, favicon/PWA and kit
+  treatments derive from preserved original art plus an editable SVG overlay.
+  Identity-only work; no G1-G6 capability or approval change.
+  Validation: `python scripts/refine-brand.py --verify` passed icon dimensions,
+  ICO resolutions, transparency, kit parity and manifest hashes;
+  `npm run build --prefix frontend` passed (existing chunk-size warning).
+  Live sidebar inspection confirmed the revised 128px asset loads at 44px
+  display width; frontend and backend both returned HTTP 200.
+
 - 2026-10-18: Audited exact onboarding0.1.1 tarball/core/license for Manteion's
   optional synthetic review practice; archive/installed exports and exact copied
   members verified. Documented storage allowlist and React subscription/lifecycle

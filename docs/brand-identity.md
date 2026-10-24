@@ -2,16 +2,29 @@
 
 **Distinct parts. Deliberate design. Powerful learning.**
 
-Chimera represents the instructional designer's work: assembling different disciplines, materials, and technologies into a coherent learning experience. Its mark combines an ascending copper wing, a silver creature's head and body, and a slate tail. The silhouette expresses their integration.
+Chimera represents the instructional designer's work: assembling different disciplines, materials, and technologies into a coherent learning experience. The current application uses the metallic Mechanicus Trinity artwork: a central lion, eagle and dragon with layered wings. The 2026-10-24 refinement preserves that existing composition, glowing eyes and silver/copper palette, adding a broader feline jaw, fuller swept mane and matching faceted wing layers.
 
 ## Assets and implementation
 
-- Master transparent PNG: `frontend/public/brand/chimera-mark.png`.
+- Composite master: `frontend/public/brand/chimera-mark.svg`.
+- Transparent PNG: `frontend/public/brand/chimera-mark.png`.
+- Editable refinement: `docs/brand/Chimera_Production_Kit_v1/assets/marks/leonine-refinement.svg`.
+- Preserved original artwork: `docs/brand/Chimera_Production_Kit_v1/assets/source/`.
 - Reusable application component: `frontend/src/BrandMark.tsx`.
 - Brand styling: `frontend/src/brand.css`.
 - Application placements: navigation wordmark, welcome state, learner-preview header, and browser favicon.
 
-The master is a generated raster asset, not an editable vector. Preserve its transparency and proportions. Use a midnight background for larger placements so the silver remains visible in either appearance mode. The small navigation mark has been visually checked at 36–44px. The PNG favicon uses the same silhouette.
+The master is a hybrid SVG: it embeds the original raster creature and overlays editable faceted details. It is not a fully vectorized redraw, and exporting at higher resolution does not recover detail missing from the original raster. Original source files are retained for reversible refinements. Use the dark-backed app icons for small placements and the matching transparent treatment for larger dark surfaces.
+
+Run `python scripts/refine-brand.py` with Pillow and Inkscape installed to rebuild the master, PNG treatments, ten icon sizes, multi-resolution ICO, production-kit copies and SHA-256 manifest. Use `--inkscape` for another executable location. Run `python scripts/refine-brand.py --verify` to validate dimensions, favicon resolutions, kit parity and hashes without regenerating anything.
+
+All application placements use the shared component. Favicon, Apple-touch and PWA references use the refreshed icon family with a revision query to avoid stale cached artwork. Historical PDF and reference boards remain inspiration, not the current asset specification. Interface styling is unchanged.
+
+The enlarged wings sweep upward from behind the shoulders into the space above
+the side heads. In the composite, wings precede the original creature layer:
+all three heads, the dragon's ear/horns and their dark shadows remain in front.
+Do not place wing facets over facial or ear details. The rebuild verifier checks
+this rear-to-front layer order.
 
 | Color | Value | Role |
 | --- | --- | --- |
@@ -23,9 +36,9 @@ The master is a generated raster asset, not an editable vector. Preserve its tra
 
 These are identity tokens; the generated artwork has tonal variation. Interface actions retain blue, and course images retain their authored colors. Avoid adding shields, insignia, or agency seals to imply official endorsement. The existing workspace layout and Light/Dark/System behavior remain in place.
 
-## Generation record
+## Historical generation record
 
-Created with the built-in image generation tool. Two concepts were generated. The user selected the first, more illustrative concept; that original is the shipped asset. The navigation lockup contains only the mark and CHIMERA, without a descriptor. Original generations remain in the generator's output directory, while the application uses the repository copy.
+The earlier wing/body/tail mark was created with an image generation tool. Two concepts were generated and the first was selected. The application later adopted the production kit's metallic three-headed artwork; that existing artwork is the basis of the 2026-10-24 refinement. No AI image model was used for this refinement. The prompts below are historical, not instructions to remove the mane.
 
 Initial prompt:
 

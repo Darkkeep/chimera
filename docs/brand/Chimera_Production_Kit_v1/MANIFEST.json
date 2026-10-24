@@ -1,106 +1,111 @@
 {
   "name": "CHIMERA Production Asset Kit",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "files": [
     {
-      "path": "README.md",
-      "bytes": 1575,
-      "sha256": "82e8d1499b51d3096564b2e9c017b99c50993c60d16b4870a214e50af7fafe37"
-    },
-    {
       "path": "assets/app-icons/chimera-1024.png",
-      "bytes": 591291,
-      "sha256": "b4ff22ca137939a0878920cae51132b4c31344456f4acd7f1ee9121b2717f3b9"
+      "bytes": 591448,
+      "sha256": "c872aa89183ad7f99a451b4d065ab00596e39b44b473acea9fc9b0824cdb960c"
     },
     {
       "path": "assets/app-icons/chimera-128.png",
-      "bytes": 28163,
-      "sha256": "727a044702440d2b65d06fc713c57f554265e8f5b4a06d9a2f939c9901b7b704"
+      "bytes": 20324,
+      "sha256": "84a29c4fac866a2c25fb5c32acc7e8e4a03f221f560c401294e11aa003086a5a"
     },
     {
       "path": "assets/app-icons/chimera-16.png",
-      "bytes": 818,
-      "sha256": "9e9bdea2a0932fd407f048b04079161579e87827f17d317717d64e1fba4d2e8a"
+      "bytes": 745,
+      "sha256": "0c60697652b7102d78a3b1bbb3dae9b57d384f102b365bbdb3cf2ee496cb3bd9"
     },
     {
       "path": "assets/app-icons/chimera-180.png",
-      "bytes": 47583,
-      "sha256": "e103dffcd53251ee9ba25de56b94435479241e93687b812110631d7f6c80cb6e"
+      "bytes": 36177,
+      "sha256": "5bf41b41c1dddb3f585148ede75774f8486ffd29a5db189589260122906e6492"
     },
     {
       "path": "assets/app-icons/chimera-192.png",
-      "bytes": 52360,
-      "sha256": "06e417aae244c0321e6c901ba9f1f5d22d06339c24b7e6e94733ae7664d4a029"
+      "bytes": 40412,
+      "sha256": "8b654bbc8d0a1706f09b0ce7f1b8e3e0cbfddbde66d931c599580091992f0018"
     },
     {
       "path": "assets/app-icons/chimera-256.png",
-      "bytes": 79739,
-      "sha256": "e893d664f806df67dc63ba7c6bb9fc13099bb82b2330a8b5c6315ff6bceb1bd6"
+      "bytes": 65499,
+      "sha256": "e04360171cc2cd6d93af168f16b5506ef7d512f24891421c77ad4c76202402dc"
     },
     {
       "path": "assets/app-icons/chimera-32.png",
-      "bytes": 2584,
-      "sha256": "69fd84d31a7691c8d75dd479b200d46d5effd04f0ca4507d9bbf66d28a74f197"
+      "bytes": 2048,
+      "sha256": "35c4b4939e4d2c19f1fa31ee1b9ac86490dcdf5d874bbdd51954883b0e845984"
     },
     {
       "path": "assets/app-icons/chimera-48.png",
-      "bytes": 5179,
-      "sha256": "d969c5732685225cf4433a23b3a97cfe8957487d9f8d114cf0c550d6004ec91e"
+      "bytes": 3949,
+      "sha256": "aa1022f6c492d19eddbadc5081f0a90cb60de9cc955d7d1c57001180114a23b8"
     },
     {
       "path": "assets/app-icons/chimera-512.png",
-      "bytes": 221192,
-      "sha256": "510c18da4a19d394f5c836097f3377830bc778a03b67536da7979416b074332c"
+      "bytes": 203753,
+      "sha256": "ade694bfae7ce08c5197548107a2f5f9e395cca040422a201ac6f8bce4738ae9"
     },
     {
       "path": "assets/app-icons/chimera-64.png",
-      "bytes": 8515,
-      "sha256": "03b96567d1094d39bc045960c58d94e830a29940a20fa19b3925e8a52919b54f"
+      "bytes": 6302,
+      "sha256": "34d77ae39778e58a78428821ee7ab28fbb80278087ca8cb35f4daf9ceb732cce"
     },
     {
       "path": "assets/app-icons/favicon.ico",
-      "bytes": 125690,
-      "sha256": "af6ec9e825b12cc07a6822e8339e9d00040ad0634d3be30e0c29b8fe83771013"
+      "bytes": 175590,
+      "sha256": "6cb27313597ec6e2d2db11a8b95971e7d4b939cded9fe3bd825e078ea1fa58b3"
+    },
+    {
+      "path": "assets/marks/chimera-mark.svg",
+      "bytes": 162034,
+      "sha256": "178859d8f29774ba0a54d809ce59624ec91d819306fd5734fe4048f9ebee3a41"
     },
     {
       "path": "assets/marks/chimera-primary-creature-dark.png",
-      "bytes": 116063,
-      "sha256": "9ecef066271b40fc66009818095c4ac232677ed1ed032fb06edbf9f1e77cb809"
+      "bytes": 778368,
+      "sha256": "fd37ac2bbb7447c777bdeb8c222f1d1a92abc617029ef0d0db6d24986a53e709"
     },
     {
       "path": "assets/marks/chimera-primary-lockup-dark.png",
-      "bytes": 197146,
-      "sha256": "b402b48a5eaaf43af0d1a6e913042880189c345bd66bbd1d9ad1c63b2cbcd43d"
+      "bytes": 1277620,
+      "sha256": "c1e1597ef38d15b8c049c10ef0ae22d6dab8483542af827b5f0fdd522f87e228"
     },
     {
       "path": "assets/marks/chimera-trinity-dark.png",
-      "bytes": 24572,
-      "sha256": "f246478a2363539d01391499b2f8be088e2623c24539a35565a0d37b174cabd0"
+      "bytes": 197365,
+      "sha256": "6a63fea342cf92c8bd238c9b83e35341c49ed68484bc0f1eee380f40a224330d"
     },
     {
       "path": "assets/marks/chimera-trinity-light.png",
-      "bytes": 25639,
-      "sha256": "f5821f1e5f582dac73a09752ab001dcfa5254a506e70cfcb1bc7fd6337d96353"
+      "bytes": 204637,
+      "sha256": "70157c178043d748d57605bc78d0c8e1fb4633a00eff16d32ddfe22d2b761511"
     },
     {
       "path": "assets/marks/chimera-trinity-mono.png",
-      "bytes": 23949,
-      "sha256": "207e0e11f54e45c75ffec4cedf2c486770454df9982a2c11aeb38659f952227c"
+      "bytes": 107011,
+      "sha256": "82ffdd84ab5d5f80e0b97d71d96fd71b97ba6d0d982887efd6a5bd98692325c4"
     },
     {
       "path": "assets/marks/chimera-trinity-split.png",
-      "bytes": 24098,
-      "sha256": "00e0a0206ad17c25093ef841b334cc71f5942835278e5d0ae09a0184edffc06f"
+      "bytes": 197365,
+      "sha256": "6a63fea342cf92c8bd238c9b83e35341c49ed68484bc0f1eee380f40a224330d"
     },
     {
       "path": "assets/marks/chimera-trinity-transparent-1024.png",
-      "bytes": 1051224,
-      "sha256": "7f0366afbaa0799d12e7c62ed4c9ff25c85707ada96ccb258dc5f22d1f96d2a5"
+      "bytes": 610680,
+      "sha256": "eab4910477cdb6926b3a458a780fb3b4de4c1a6b485f1f70eb0a1db23419338c"
     },
     {
       "path": "assets/marks/chimera-trinity-transparent.png",
-      "bytes": 27656,
-      "sha256": "06865ebb738911d6491e5717e2745748c1e069082df1088ed5245374a0f78427"
+      "bytes": 206987,
+      "sha256": "265ba8771d4328dcdbd67253522c02df6a614b5471675191015754b019e9a847"
+    },
+    {
+      "path": "assets/marks/leonine-refinement.svg",
+      "bytes": 3668,
+      "sha256": "cce964c565d2eebd6ee5b63ba159aca26ab0d6eae371f9360c3c04c081abf054"
     },
     {
       "path": "assets/reference/app_icons.png",
@@ -148,9 +153,19 @@
       "sha256": "022d3127d4ac5658483ecd159456e858e01368cde306b152736765dd6d47a8ab"
     },
     {
+      "path": "assets/source/chimera-primary-creature-original.png",
+      "bytes": 116063,
+      "sha256": "9ecef066271b40fc66009818095c4ac232677ed1ed032fb06edbf9f1e77cb809"
+    },
+    {
+      "path": "assets/source/chimera-primary-lockup-original.png",
+      "bytes": 197146,
+      "sha256": "b402b48a5eaaf43af0d1a6e913042880189c345bd66bbd1d9ad1c63b2cbcd43d"
+    },
+    {
       "path": "docs/ACCESSIBILITY.md",
-      "bytes": 637,
-      "sha256": "802a731a1a880a0ab90257cfd1c60bba2aa9aba5fa1b71c2230491f4721f7c97"
+      "bytes": 648,
+      "sha256": "6fa591c6bbad4924c3063a73d3fc59ecb3362dd93116af00e8808368d36b7985"
     },
     {
       "path": "docs/Chimera_Brand_Bible_v1.pdf",
@@ -159,18 +174,18 @@
     },
     {
       "path": "docs/IMPLEMENTATION_GUIDE.md",
-      "bytes": 2512,
-      "sha256": "7445a5e0bc7bbe4ac4842f2459cb08704e21120507543a115a1bc9c8e5cfff4c"
+      "bytes": 2562,
+      "sha256": "572d73cdc8249889402e23a47a5681b9329e36c364c9dae0d19c5cefec9d98a5"
     },
     {
       "path": "docs/LOGO_USAGE.md",
-      "bytes": 968,
-      "sha256": "4b24b195873ddff823393c11048327bf27498a6939e2f286c08f4dabcddcfaf7"
+      "bytes": 1316,
+      "sha256": "a7f12c4f573a0d00735e92f6630987f623d8a6dbe77f86d4cd0511743173cfdd"
     },
     {
       "path": "docs/MOTION.md",
-      "bytes": 665,
-      "sha256": "b7ed95073aa424513f900602875f669aff530e406e46725a16e9f856107830f0"
+      "bytes": 687,
+      "sha256": "bd2c0c343847c61615198f80d6c90dedc0d751b5c1d3113c06b361cf4775e492"
     },
     {
       "path": "examples/index.html",
@@ -178,34 +193,39 @@
       "sha256": "7d3f55acc966ffce11cb3587e1373106c7b15f4b8e08a8010c322b046e75245a"
     },
     {
+      "path": "README.md",
+      "bytes": 2224,
+      "sha256": "210eba6850742329840d302e3e2ff63e4e4320910618f02c7c7946a203990cbb"
+    },
+    {
       "path": "src/chimera-components.css",
-      "bytes": 3924,
-      "sha256": "d18e5a57d1faa57d6109230f079596bfe580b4faa1a5235990ce5619263de588"
+      "bytes": 3951,
+      "sha256": "474efc3718e8e2581ed50cf36694819c2642e66f8d30c12e841dea3a81355928"
     },
     {
       "path": "src/chimera-theme.css",
-      "bytes": 69,
-      "sha256": "443e2675485f6fc0cde3b3ed7ab4ede4ce6ecda787dc4ab4cdc2054da8b906f6"
+      "bytes": 71,
+      "sha256": "581bcc83b70450951df17fbb94d661b97c6d9699c7d4e2bf51fac5ef59690f81"
     },
     {
       "path": "src/chimera-theme.ts",
-      "bytes": 564,
-      "sha256": "94b21da91a503ede9e6a9f9c1ef54c6be55205fdef23a6bc227670e3c2bb385f"
+      "bytes": 592,
+      "sha256": "4c096a0b821b62c72148a8c5fc65fde385db37bb2ca2eaa6400bd6a7c7110e34"
     },
     {
       "path": "src/tailwind.chimera.preset.js",
-      "bytes": 495,
-      "sha256": "c51d4b00a1d51af67886a657a1a2401c2a927e7b5a2b11b0199ba7f4d8e5245d"
+      "bytes": 510,
+      "sha256": "cfcf2b79da7611389e554a492b2c00ef4a7a137a48669189fac8ccda72ad0fa5"
     },
     {
       "path": "tokens/chimera.css",
-      "bytes": 1325,
-      "sha256": "104ecdbd8d50e790b44994076ecda54c0f64af0917c5bf3f8a3cf7f496e48fa9"
+      "bytes": 1364,
+      "sha256": "79eb6b1b58b126667ecbd1f2805249c9bb34ca464963c740dc39634d6cdfcbf4"
     },
     {
       "path": "tokens/chimera.tokens.json",
-      "bytes": 1296,
-      "sha256": "12818823d47d267069a702979ea165fa7969173a2364e8e951d1612aab56c71f"
+      "bytes": 1349,
+      "sha256": "117bf2118b20d7368b09c300aa30c556bc9abd0810238e2c7ab6d96bd69dfab1"
     }
   ]
 }
