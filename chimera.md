@@ -7,9 +7,29 @@
 
 Chimera will use a **filesystem-backed project model** and a **canonical storyboard JSON format**. It will preserve imported PowerPoint slides as visual references while allowing authors to edit text, narration, media, assessments, navigation, accessibility metadata, and completion rules before exporting a single-SCO SCORM package.
 
-**Primary export target:** SCORM 2004 4th Edition for Blackboard Learn.  
-**Compatibility export:** SCORM 1.2.  
-**Deployment model:** Localhost application; no external database, cloud dependency, or required media hosting.
+**Primary export target:** SCORM 1.2 for the currently documented target LMS.
+**Additional export:** SCORM 2004 4th Edition; local qualification does not imply acceptance by every target LMS.
+**Deployment model:** Local single-user operation remains supported; networked authentication is available. External media hosting is not required.
+
+## 1.1 Current Status and Roadmap Authority
+
+This document records the original product requirements and delivery sequence. It is not the authoritative implementation-status record: completed capabilities and their evidence are tracked in [current work and handoff](docs/current-work.md), the [1.1.0 completion update](docs/completion-update-2026-10-15.md), and the [SCORM compatibility checklist](docs/scorm-compatibility-checklist.md).
+
+The current product follows the separate [Pythia + Chimera integrated build plan](Pythia_Chimera_Integrated_Build_Plan.md): Pythia provides learning-intelligence analysis and proposals; Chimera owns authoring, review and acceptance, preview, and package production. Pythia proposals must not silently mutate canonical project content.
+
+| Original phase | Current status |
+|---|---|
+| 0 — Foundation | Delivered. |
+| 1 — PPTX import and rendering | Delivered. |
+| 2 — Storyboard editor | Delivered for the documented authoring workflows; see the current-work handoff for supported editing behavior and limits. |
+| 3 — Audio/video authoring | Core media authoring, captions, transcripts, and packaging are delivered. Advanced cue-point workflows and video-watch completion requirements remain open unless separately verified. |
+| 4 — Assessments and completion | Delivered for the documented assessment formats, scoring, completion rules, and remediation workflows. |
+| 5 — SCORM 2004 export | Export and local qualification are delivered. External acceptance is target-LMS- and package-specific. |
+| 6 — SCORM 1.2 export | Export and local qualification are delivered. Human acceptance evidence applies only to the packages and checks recorded in the compatibility checklist. |
+| 7 — Blackboard validation and hardening | Partially complete and environment-specific; do not infer acceptance of one SCORM profile from another. |
+| 8 — Release-candidate qualification | Local qualification is delivered. Human, target-LMS, and release-candidate gates remain distinct and must be recorded against the exact candidate. |
+
+The capability checkboxes in the original backlog below are a historical feature inventory, not a complete current roadmap. Use the linked handoff and integrated plan to decide subsequent work. Automated package checks, local browser tests, human acceptance, and release approval are separate evidence types.
 
 ---
 
@@ -24,7 +44,7 @@ Chimera will use a **filesystem-backed project model** and a **canonical storybo
 - Support captions, transcripts, cue points, media completion rules, and media-linked interactions.
 - Export portable SCORM packages compatible with Blackboard Learn.
 - Track completion, score, bookmark/resume state, and optional question-level interactions.
-- Operate without a database.
+- Keep filesystem-backed project content as a supported local persistence model without requiring a relational database.
 
 ### Non-Objectives for Initial Release
 - Perfect conversion of all PowerPoint animation behavior.
@@ -349,6 +369,8 @@ Warning: Slide 18 contains chart data. Chart retained as a visual background.
 - Add timestamp-based cue points.
 - Add media-linked interactions.
 - Add media completion gates.
+
+Required-view tracking is opt-in per video and defaults to a 90% watched threshold. Required videos save playback position and actual played ranges in Browser Preview and SCORM suspend data; ordinary videos are not tracked. Seeking past content does not count toward watched coverage.
 
 ### Initial Media Types
 
@@ -727,7 +749,7 @@ Errors:
 - [x] Browser and Blackboard evidence is recorded with the tested workflow and any observed limitations.
 - [x] The release checklist contains no stale or contradictory verification state.
 
-Local Phase 8 qualification is complete. The Blackboard record covers SCORM 2004; SCORM 1.2 remains locally qualified but has not been uploaded to Blackboard. Both package reports retain content warnings for missing image alt text and an empty assessment scene, which must be resolved before treating this storyboard as content-ready.
+Local Phase 8 qualification is complete for both profiles. Human LMS acceptance is package-specific: the compatibility checklist records SCORM 1.2 acceptance for the identified replacement package and states that the current target LMS does not accept SCORM 2004. Do not generalize that acceptance to other packages or environments. Both package reports retain content warnings for missing image alt text and an empty assessment scene, which must be resolved before treating that qualification storyboard as content-ready.
 
 ---
 
@@ -759,13 +781,13 @@ Local Phase 8 qualification is complete. The Blackboard record covers SCORM 2004
 - [x] Export/import storyboard JSON.
 
 ### Priority 2
-- [ ] Add editable text overlays.
-- [ ] Add audio narration.
-- [ ] Add video block.
-- [ ] Add captions and transcripts.
+- [x] Add editable text overlays.
+- [x] Add audio narration.
+- [x] Add video block.
+- [x] Add captions and transcripts.
 - [x] Add local preview player.
-- [ ] Add media resume and required-view tracking.
-- [ ] Add pre-build validation.
+- [x] Add media resume and required-view tracking.
+- [x] Add pre-build validation.
 
 ### Priority 3
 - [x] Add all supported QTI 2.1 assessment item types, assessment-test export, and local preview scoring.
@@ -778,7 +800,7 @@ Local Phase 8 qualification is complete. The Blackboard record covers SCORM 2004
 ### Priority 4
 - [x] Add additional assessment types.
 - [ ] Add hotspot and branching interactions.
-- [ ] Add native editable layouts.
+- [x] Add native editable layouts.
 - [ ] Add optional FFmpeg media optimization.
 - [x] Add template library.
 - [ ] Add advanced PowerPoint conversion support.

@@ -38,12 +38,14 @@ test('course-wide video, scene exclusions, captions, shared copies and revision 
   const tools = page.getByRole('region', { name: 'Media placement and shared library', exact: true });
   await tools.getByText('Placement, captions, and shared media', { exact: true }).click();
   await tools.getByRole('combobox', { name: 'Placement scope', exact: true }).selectOption('course');
+  await tools.getByRole('checkbox', { name: 'Require viewing to complete the course', exact: true }).check();
+  await expect(tools.getByRole('spinbutton', { name: 'Required viewing threshold (%)', exact: true })).toHaveValue('90');
   await tools.getByRole('combobox', { name: 'Position', exact: true }).selectOption('before');
   await tools.getByRole('button', { name: 'Save placement', exact: true }).click();
   await expect(tools.getByRole('status')).toHaveText('Saved locally.');
   const read = async () => (await request.get(`/api/projects/${project.id}`)).json();
   project = await read();
-  expect(project.storyboard.courseMedia[0]).toMatchObject({ assetId: video.id, position: 'before' });
+  expect(project.storyboard.courseMedia[0]).toMatchObject({ assetId: video.id, position: 'before', requiredViewing: true, viewingThresholdPercent: 90, loop: false });
   await tools.getByText('Transcript and timed captions', { exact: true }).click();
   await tools.getByRole('textbox', { name: 'Transcript', exact: true }).fill('Inspect equipment before operation.');
   await tools.getByRole('textbox', { name: 'WebVTT captions', exact: true }).fill('WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nInspect equipment before operation.');
@@ -62,8 +64,30 @@ test('course-wide video, scene exclusions, captions, shared copies and revision 
   expect(await page.locator('.course-preview-shell video').evaluate(v => v.textTracks[0]?.kind)).toBe('captions');
   const playerVideo = page.locator('.course-preview-shell video');
   await expect.poll(() => playerVideo.evaluate(v => v.readyState)).toBeGreaterThanOrEqual(2);
-  await playerVideo.evaluate(v => { v.muted = true; void v.play().catch(() => {}); });
-  await expect.poll(() => playerVideo.evaluate(v => v.ended)).toBe(true);
+  await playerVideo.evaluate(v => { v.currentTime = v.duration * 0.4; });
+  await expect.poll(async () => page.evaluate(id => {
+    const progress = Object.values(JSON.parse(localStorage.getItem(`chimera.preview.${id}`) || '{}').videoProgress || {})[0];
+    return progress?.position || 0;
+  }, project.id)).toBeGreaterThan(0);
+  const savedPosition = await page.evaluate(id => {
+    const value = JSON.parse(localStorage.getItem(`chimera.preview.${id}`) || '{}');
+    const progress = Object.values(value.videoProgress || {})[0];
+    return progress.position;
+  }, project.id);
+  expect(await page.evaluate(id => {
+    const value = JSON.parse(localStorage.getItem(`chimera.preview.${id}`) || '{}');
+    const progress = Object.values(value.videoProgress || {})[0];
+    const watched = (progress?.watchedRanges || []).reduce((total, range) => total + range[1] - range[0], 0);
+    return progress?.duration ? Math.floor(watched / progress.duration * 100) : 0;
+  }, project.id)).toBeLessThan(90);
+  await page.getByRole('button', { name: 'Close course preview', exact: true }).click();
+  await page.getByRole('button', { name: 'Preview course', exact: true }).click();
+  const resumedVideo = page.locator('.course-preview-shell video');
+  await expect.poll(() => resumedVideo.evaluate(v => v.readyState)).toBeGreaterThanOrEqual(2);
+  await expect.poll(() => resumedVideo.evaluate((v, position) => !v.seeking && v.currentTime > position - 0.05, savedPosition)).toBe(true);
+  await resumedVideo.evaluate(v => { v.currentTime = 0; v.muted = true; void v.play().catch(() => {}); });
+  await expect.poll(() => resumedVideo.evaluate(v => v.ended)).toBe(true);
+  await expect(page.getByText('Viewing complete', { exact: true })).toBeVisible();
   await page.getByText('Transcript: qualification.mp4', { exact: true }).click();
   await expect(page.locator('.course-preview-shell')).toContainText('Inspect equipment before operation.');
   await page.getByRole('button', { name: 'Close course preview', exact: true }).click();

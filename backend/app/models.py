@@ -11,6 +11,21 @@ SceneType = Annotated[
 
 class ProjectCreate(BaseModel):
     title: str = Field(min_length=1, max_length=120)
+    parentProjectId: str | None = None
+
+
+class ProjectRelationshipUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    parentProjectId: str | None
+    siblingOrder: int = Field(ge=0, le=2147483647, strict=True)
+    metadataRevision: int = Field(ge=1, strict=True)
+
+
+class ProjectRestore(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    parentProjectId: str | None = None
 
 
 class EntranceAnimation(BaseModel):
@@ -102,12 +117,17 @@ class SceneLayout(BaseModel):
     height: float = Field(default=720, gt=0, le=10000, allow_inf_nan=False)
     backgroundColor: str = Field(default="#ffffff", pattern=r"^#[0-9a-fA-F]{6}$")
     backgroundAsset: str | None = None
+    backgroundMode: Literal["inherit", "image", "none"] | None = None
     elements: list[SceneElement] = Field(default_factory=list, max_length=2000)
     warnings: list[str] = Field(default_factory=list)
     assessmentRegion: AssessmentRegion | None = None
 
     @model_validator(mode="after")
     def validate_identifiers(self) -> "SceneLayout":
+        if self.backgroundMode == "image" and not self.backgroundAsset:
+            raise ValueError("Choose a scene background image")
+        if self.backgroundMode in {"inherit", "none"} and self.backgroundAsset is not None:
+            raise ValueError("Inherited or empty backgrounds cannot specify a scene image")
         if len({element.id for element in self.elements}) != len(self.elements):
             raise ValueError("Scene element identifiers must be unique")
         region = self.assessmentRegion
@@ -150,6 +170,8 @@ class MediaPlacement(BaseModel):
     position: Literal["before", "after"] = "after"
     loop: bool = False
     muted: bool = False
+    requiredViewing: bool = False
+    viewingThresholdPercent: int = Field(default=90, ge=1, le=100)
     altText: str = Field(default="", max_length=2000)
     decorative: bool = False
 
@@ -1030,6 +1052,7 @@ class Storyboard(BaseModel):
     projectId: str
     title: str
     description: str = ""
+    backgroundAsset: str | None = None
     completionSettings: CourseCompletionSettings = Field(default_factory=CourseCompletionSettings)
     exportSettings: ExportSettings = Field(default_factory=ExportSettings)
     scenes: list[Scene] = Field(default_factory=list)
@@ -1055,6 +1078,11 @@ class ProductionStageUpdate(BaseModel):
     productionStage: ProductionStage
 
 
+class ProjectBackgroundUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    backgroundAsset: str | None
+
+
 class ProjectSummary(BaseModel):
     id: str
     title: str
@@ -1064,6 +1092,9 @@ class ProjectSummary(BaseModel):
     installationId: str = "local-installation"
     ownerId: str = "local-user"
     productionStage: ProductionStage = "not-set"
+    metadataRevision: int = Field(default=1, ge=1)
+    parentProjectId: str | None = None
+    siblingOrder: int = 0
 
 
 class ProjectDetail(ProjectSummary):
