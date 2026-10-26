@@ -6,13 +6,14 @@ import { AssessmentStageContent } from "./AssessmentStageContent";
 import "./assessment-stage.css";
 import "../../backend/app/static/assessment-surface.css";
 import { playStageAnimations } from "../../backend/app/static/stage-animations.js";
+import { effectiveBackgroundAsset } from "./background";
 
 export type AnimationStep = { effect: string; durationMs: number; delayMs: number; iterations?: number };
 export type ElementAnimations = { entrance: AnimationStep; presentation: AnimationStep; exit: AnimationStep };
 
 export type SceneElement = { id: string; kind: "text" | "image" | "shape"; x: number; y: number; width: number; height: number; rotation: number; text: string; assetId: string | null; fontSize: number; fontFamily: string; color: string; bold: boolean; italic: boolean; align: "left" | "center" | "right"; crop: number[]; shapeSvg: string | null; shapeName: string | null; source: "slide" | "layout" | "master" | "manual"; locked: boolean; animations?: ElementAnimations | null };
 export type AssessmentRegion = { x: number; y: number; width: number; height: number };
-export type SceneLayout = { version: 1; enabled: boolean; width: number; height: number; backgroundColor: string; backgroundAsset: string | null; elements: SceneElement[]; warnings: string[]; assessmentRegion?: AssessmentRegion | null };
+export type SceneLayout = { version: 1; enabled: boolean; width: number; height: number; backgroundColor: string; backgroundAsset: string | null; backgroundMode?: "inherit" | "image" | "none" | null; elements: SceneElement[]; warnings: string[]; assessmentRegion?: AssessmentRegion | null };
 
 export function assessmentRegion(layout: SceneLayout, title?: string): AssessmentRegion {
   const heading = layout.elements.find(element => element.kind === "text" && element.text.trim() === title?.trim());
@@ -27,6 +28,17 @@ export function newElement(kind: "text" | "image", changes: Partial<SceneElement
 
 export function initialLayout(scene: Scene): SceneLayout {
   return scene.visualLayout ? structuredClone(scene.visualLayout) : { version: 1, enabled: false, width: 1280, height: 720, backgroundColor: "#ffffff", backgroundAsset: scene.backgroundAsset ?? null, warnings: [], elements: [scene.title, ...scene.extractedText].filter(Boolean).map((text, index) => newElement("text", { text, x: 60, y: 40 + index * 110, width: 1160, height: 100, fontSize: index ? 28 : 40 })) };
+}
+
+export function resolvedSceneBackground(project: Project, scene: Scene): Scene {
+  const backgroundAsset = effectiveBackgroundAsset(project, scene);
+  const layout = scene.visualLayout || (backgroundAsset && (scene.layoutMode === "native" || scene.assessmentItem) ? initialLayout(scene) : null);
+  const masterBackground = project.storyboard.assets.some(asset => asset.id === backgroundAsset && asset.role === "background");
+  return { ...scene, backgroundAsset, visualLayout: layout ? {
+    ...layout, backgroundAsset, backgroundMode: backgroundAsset ? "image" : "none",
+    elements: masterBackground ? layout.elements.filter(element => element.source !== "master") : layout.elements,
+    enabled: layout.enabled || Boolean(backgroundAsset && scene.layoutMode === "native"),
+  } : null };
 }
 
 export function ElementContent({ element, project, scene }: { element: SceneElement; project: Project; scene: Scene }) {
@@ -56,7 +68,8 @@ export function SceneSurface({ project, scene, assessment, animate = false }: { 
     if (!animate || !animationRoot.current) return;
     return playStageAnimations(animationRoot.current, JSON.parse(animationSignature));
   }, [scene.id, animate, animationSignature]);
-  const layout = scene.assessmentItem ? initialLayout(scene) : scene.visualLayout;
+  const resolved = resolvedSceneBackground(project, scene);
+  const layout = scene.assessmentItem ? initialLayout(resolved) : resolved.visualLayout;
   if (!layout) return null;
   const region = assessmentRegion(scene.visualLayout || layout, scene.title);
   const question = scene.assessmentItem ? <div className="assessment-stage-region" style={{ left: `${region.x / layout.width * 100}%`, marginTop: `${region.y / layout.width * 100}%`, width: `${region.width / layout.width * 100}%` }}>{assessment ?? <AssessmentStageContent item={scene.assessmentItem} />}</div> : undefined;

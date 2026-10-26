@@ -44,9 +44,13 @@ from .deployment import cors_origins, installation_policy, public_origin
 from .password_auth import AccountStore, COOKIE, HostedAuthorizationPolicy, LoginRequest, ResetPasswordRequest, ReviewInvitationRequest, SESSION_SECONDS, require_origin
 from .models import AssessmentGroup, AssessmentGroupWrite, CourseDraftRequest, CourseContentDraft, SceneDraftRequest, SceneContentDraft
 from .storage import create_scenes, save_assessment_group
+from .models import ProjectBackgroundUpdate, ProjectRelationshipUpdate, ProjectRestore
+from .storage import update_project_background, update_project_relationship, ProjectMetadataConflict
 
 
 ROUTE_ACTIONS = {
+    "patch_project_relationship": "project.settings.update",
+    "patch_project_background": "project.settings.update",
     "get_media_capabilities": "project.view", "patch_media_metadata": "media.manage", "get_media_captions": "project.view",
     "get_media_usage": "project.view", "delete_project_media": "media.manage", "put_course_media": "media.manage",
     "put_scene_media": "media.manage", "get_shared_media": "media.manage", "publish_shared_media": "media.manage",
@@ -224,7 +228,7 @@ def _hosted_request_action(request: Request) -> str:
         return "project.import"
     if "/assets" in path:
         return "media.manage"
-    if "/completion-settings" in path or "/export-settings" in path or path.endswith("/production-stage"):
+    if "/completion-settings" in path or "/export-settings" in path or path.endswith(("/production-stage", "/background", "/relationship")):
         return "project.settings.update"
     if "/scenes" in path:
         return "scene.manage"
@@ -572,6 +576,11 @@ def get_project_health() -> list[dict[str, object]]:
             "canSetStage": get_authorization_policy().allows(get_actor_context(), "project.settings.update", summary.id),
             "canTrash": project.ownerId == get_actor_context().actorId or get_authorization_policy().allows(get_actor_context(), "project.membership.manage", summary.id) or get_authorization_policy().allows(get_actor_context(), "project.membership.manage"),
             "updatedAt": summary.updatedAt,
+            "parentProjectId": summary.parentProjectId,
+            "siblingOrder": summary.siblingOrder,
+            "metadataRevision": summary.metadataRevision,
+            "canManageRelationship": get_authorization_policy().allows(get_actor_context(), "project.settings.update", summary.id),
+            "canCreateSubproject": summary.parentProjectId is None and get_authorization_policy().allows(get_actor_context(), "project.create") and get_authorization_policy().allows(get_actor_context(), "project.settings.update", summary.id),
         })
     return health
 
@@ -635,7 +644,7 @@ def trash_project(project_id: str) -> dict[str, object]:
 
 
 @app.post("/api/projects/{project_id}/restore", response_model=ProjectDetail)
-def restore_project(project_id: str) -> ProjectDetail:
+def restore_project(project_id: str, data: ProjectRestore | None = None) -> ProjectDetail:
     from .storage import list_trashed_projects, restore_trashed_project
 
     actor = get_actor_context()
@@ -647,11 +656,18 @@ def restore_project(project_id: str) -> ProjectDetail:
         is_administrator = policy.allows(actor, "project.membership.manage", project_id) or policy.allows(actor, "project.membership.manage")
         if trash_item.ownerId != actor.actorId and not is_administrator:
             raise HTTPException(status_code=403, detail="Only the project owner or an administrator can restore this project.")
-        return restore_trashed_project(project_id)
+        explicit_parent = data is not None and "parentProjectId" in data.model_fields_set
+        parent_id = data.parentProjectId if explicit_parent and data else trash_item.parentProjectId
+        with storyboard_transaction():
+            if parent_id is not None:
+                _require_action(policy, actor, "project.settings.update", parent_id)
+            return restore_trashed_project(project_id, parent_project_id=parent_id, explicit_parent=explicit_parent)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Trashed project not found or its recovery period has expired.") from error
     except FileExistsError as error:
         raise HTTPException(status_code=409, detail="A project with this identifier already exists.") from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.get("/api/templates", response_model=list[TemplateRecord])
@@ -715,10 +731,33 @@ def post_project(
     actor = context or LOCAL_ACTOR
     _require_action(policy or get_authorization_policy(), actor, "project.create")
     with storyboard_transaction():
-        project = create_project(data, actor)
+        if data.parentProjectId is not None:
+            _require_action(policy or get_authorization_policy(), actor, "project.settings.update", data.parentProjectId)
+        try:
+            project = create_project(data, actor)
+        except RuntimeError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
         if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider == "builtin":
             AccountStore(ROOT).add_project_membership(ProjectMembership(projectId=project.id, userId=actor.actorId, role="instructional-designer"))
     return project
+
+
+@app.patch("/api/projects/{project_id}/relationship", response_model=ProjectDetail)
+def patch_project_relationship(project_id: str, data: ProjectRelationshipUpdate) -> ProjectDetail:
+    actor = get_actor_context()
+    policy = get_authorization_policy()
+    try:
+        with storyboard_transaction():
+            project = read_project(project_id)
+            for affected_id in {project_id, project.parentProjectId, data.parentProjectId} - {None}:
+                _require_action(policy, actor, "project.settings.update", affected_id)
+            return update_project_relationship(project_id, data.parentProjectId, data.siblingOrder, data.metadataRevision)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except ProjectMetadataConflict as error:
+        raise HTTPException(status_code=412, detail=str(error)) from error
+    except (RuntimeError, ValueError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.get("/api/projects/{project_id}", response_model=ProjectDetail)
@@ -1370,6 +1409,18 @@ def patch_project_export_settings(project_id: str, settings: ExportSettings, if_
         raise _revision_conflict(error) from error
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
+
+
+@app.patch("/api/projects/{project_id}/background", response_model=ProjectDetail)
+def patch_project_background(project_id: str, settings: ProjectBackgroundUpdate, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
+    try:
+        return update_project_background(project_id, settings.backgroundAsset, _expected_revision(if_match))
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @app.get("/api/projects/{project_id}/assessments", response_model=list[AssessmentGroup])

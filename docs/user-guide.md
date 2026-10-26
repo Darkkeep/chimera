@@ -53,9 +53,25 @@ For the PowerPoint-to-SCORM path, start with [Work with Pythia](#14-work-with-py
 | 1 | Open the **PROJECT** selector and choose the desired course. | The selected storyboard and project media load. | <a href="user-guide/images/project-controls.png"><img src="user-guide/images/project-controls.png" alt="Project selector and Create project button" width="240"></a> |
 | 2 | Check the course title above the workspace before continuing. | Subsequent edits apply to the intended project. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a> |
 
+### Organize subprojects
+
+Subprojects are full projects attached to a top-level project. Only two levels are supported; a subproject cannot have its own children. Attachment organizes work without combining content or granting access.
+
+1. In **My Work**, open a top-level project's **Project actions**.
+2. Choose **Create subproject** to name and create an empty child, or **Attach existing project** to attach a standalone project. A project that already has children cannot become a subproject.
+3. Expand **visible subprojects** to see children you can access. Each retains its own production stage, blockers, and approval workflow. The parent summary counts only visible children and does not change the parent's stage.
+4. Open a child's **Project actions > Manage subproject** to select a different **Parent project**, choose **None (detach to top level)**, or change **Display order**. Lower numbers appear first; ties use a stable project-ID order.
+5. Use the grouped **PROJECT** or Media library selector to navigate. In child authoring, the parent breadcrumb opens the parent. Close or save current forms before switching projects.
+
+Scenes, media, background defaults, review records, permissions, completion rules, and exports remain independent. A child's scenes inherit only that child's project background, not the parent's background. Viewing a parent does not grant access to its children. Managing relationships requires settings access on the child and the affected parents; creating a subproject also requires permission to create projects. Unavailable parents are labeled without exposing their titles.
+
+Exports and project archives include only the selected project's content, not its parent or children. Archive restore preserves the current live attachment rather than applying an old relationship from the archive.
+
 ### Move a project to Trash and restore it
 
 Project owners can move a project to Trash from its row in **My Work**. Projects remain recoverable for 30 days; opening Trash removes expired entries. Projects with queued or running generation jobs must wait until those jobs finish. In shared installations, administrators can also manage project trash.
+
+A parent with active subprojects cannot be trashed: first move, detach, or individually trash its children. Trashing a child affects only that child. In Trash, a child's **Restore parent** defaults to its original parent, provided that parent remains available and authorized. If it is unavailable, explicitly select another permitted top-level parent or **None (restore to top level)** before restoring. No content is silently reassigned.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
@@ -134,7 +150,7 @@ Open **Edit scene**, then choose **Canvas**. The canvas editor saves an editable
 2. Double-click a text box, or focus it and press Enter, to edit its text directly. The **Text** field also edits the selected box. Drag boxes to move them, use resize handles, or enter exact position and size in the properties panel. Text resize handles preserve the box's current aspect ratio; image resize handles allow freeform sizing. Arrow keys move the focused element; Shift changes the step from one to ten slide-space units.
 3. Drag an **Attached images** thumbnail onto the canvas. Clicking the thumbnail adds it without dragging. The media-library selector can add other project images. Selecting an image exposes replacement and crop-reset controls.
 4. Use **Layers** to select overlapping or inherited content. Master and layout artwork starts locked; unlock it before editing. Toolbar controls add text, undo/redo, duplicate/delete elements, and change stacking order. Text properties include size, color, typeface, alignment, bold, and italic.
-5. Choose a background color or project image in the properties panel. Imported picture backgrounds and supported inherited master/layout images are available as project assets. **Source slide**, when available, temporarily shows the original flattened rendering for comparison.
+5. Expand **Background** in the properties panel to choose a color and open the **Background image** thumbnail picker. Choose **Use project background**, a scene image, or **None** to explicitly opt out of the project image. Imported PowerPoint master backgrounds are labeled in the picker. Set the default under **Settings > Project background**; changing it affects only inheriting scenes, not scene-specific images or explicit None choices. Add images in Media library first. Backgrounds fill the stage and are decorative; check contrast and keep instructional information in accessible text. **Source slide**, when available, temporarily shows the original flattened rendering for comparison and is not changed by background settings.
 6. Choose **Save scene**, then check **Preview course**. The saved canvas replaces the source preview in authoring, preview, and both SCORM profiles. **Cancel** discards unsaved canvas changes.
 
 New imports capture editable text, images, common PowerPoint shapes, line connectors, custom freeform geometry, rotation, cropping, slide dimensions, inherited graphics, and solid/picture backgrounds. Byte-identical images are shared as one Media library asset while every source placement stays separate on the canvas. Most extracted shapes can be moved, resized, rotated, layered, locked, or deleted like other canvas elements; text inside a shape remains separately editable. The original preview remains available for comparison. Less-common preset geometry, gradients, group rotation, mixed text formatting, bullets, and some inherited styles may be approximated and are listed under **Import limitations**; charts and SmartArt remain unsupported objects. This is not full PowerPoint-equivalent editing.

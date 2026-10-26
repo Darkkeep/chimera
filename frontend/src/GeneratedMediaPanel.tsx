@@ -37,7 +37,12 @@ export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated }: 
   const [capability, setCapability] = useState<{ providerConfigured: boolean; canGenerate: boolean } | null>(null);
   const [capabilityError, setCapabilityError] = useState(false);
   const [connectionVersion, setConnectionVersion] = useState(0);
+  const [creatorOpen, setCreatorOpen] = useState(false);
   const generationEnabled = Boolean(capability?.providerConfigured && capability.canGenerate);
+
+  useEffect(() => {
+    if (!generationEnabled) setCreatorOpen(false);
+  }, [generationEnabled]);
 
   useEffect(() => {
     let alive = true;
@@ -114,8 +119,12 @@ export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated }: 
 
   const visibleCandidates = candidates.filter((candidate) => !scene || candidate.sceneId === scene.id);
   return <section data-onboarding="media.generated" className="generated-media-panel" aria-labelledby="generated-media-title">
-    <details className={`generation-creator${generationEnabled ? "" : " is-unavailable"}`}>
-    <summary className="generated-media-heading"><Sparkles size={18} /><h2 id="generated-media-title">Create a media candidate</h2>{!generationEnabled && <span className="generation-availability">{capabilityError ? "AI status unavailable" : !project.id ? "No project selected" : !capability ? "Checking media provider..." : !capability.providerConfigured ? "AI not configured" : "Generation access unavailable"}</span>}<ChevronRight size={18} className="generation-chevron" /></summary>
+    <details className={`generation-creator${generationEnabled ? "" : " is-unavailable"}`} open={creatorOpen && generationEnabled} onToggle={event => setCreatorOpen(event.currentTarget.open && generationEnabled)}>
+    <summary className="generated-media-heading" aria-disabled={!generationEnabled} onClick={event => {
+      if (!generationEnabled) event.preventDefault();
+    }} onKeyDown={event => {
+      if (!generationEnabled && (event.key === "Enter" || event.key === " ")) event.preventDefault();
+    }}><Sparkles size={18} /><h2 id="generated-media-title">Create a media candidate</h2>{!generationEnabled && <span className="generation-availability">{capabilityError ? "AI status unavailable" : !project.id ? "No project selected" : !capability ? "Checking media provider..." : !capability.providerConfigured ? "AI not configured" : "Generation access unavailable"}</span>}<ChevronRight size={18} className="generation-chevron" /></summary>
     <fieldset className="generated-media-form" disabled={!generationEnabled || busy || working} aria-label="Media candidate settings">
       <label>Scene<select value={scene?.id || ""} disabled><option>{scene?.title || "Select a scene first"}</option></select></label>
       <label>Media type<select value={kind} onChange={(event) => setKind(event.target.value as "image" | "narration")}><option value="image">Image</option><option value="narration">Narration</option></select></label>

@@ -11,6 +11,7 @@ import { MediaToolsPanel } from "./MediaToolsPanel";
 import { MediaLibraryItem } from "./MediaLibraryItem";
 import { GeneratedMediaPanel } from "./GeneratedMediaPanel";
 import { ManagementView } from "./ManagementView";
+import { ProjectOptions } from "./ProjectOptions";
 import { AIConnectionPanel } from "./AIConnectionPanel";
 import { IntelligenceEnginePanel } from "./IntelligenceEnginePanel";
 import "./readiness.css";
@@ -39,6 +40,9 @@ import { PythiaAnalysisView } from "./PythiaAnalysisView";
 import { PythiaTransformView } from "./PythiaTransformView";
 import { PythiaAssessmentDesignView } from "./PythiaAssessmentDesignView";
 import { PythiaCourseReviewView } from "./PythiaCourseReviewView";
+import { PythiaSceneActions } from "./PythiaSceneActions";
+import { ProjectBackgroundPanel } from "./ProjectBackgroundPanel";
+import { effectiveBackgroundAsset } from "./background";
 
 type LayoutMode = "fidelity" | "hybrid" | "native" | "template";
 type SceneType = "content" | "title" | "question" | "media" | "interaction" | "summary";
@@ -59,9 +63,9 @@ export type CourseCompletionSettings = { passingScore: number; includeOptionalAs
 export type ExportSettings = { packageWarningThresholdMB: number };
 export type Scene = { videoAssets?: string[]; mediaPlacements?: MediaPlacement[]; excludedCourseMedia?: string[]; visualLayout?: SceneLayout | null; backgroundAsset?: string | null; id: string; sourceSlide: number | null; title: string; sceneType: SceneType; layoutMode: LayoutMode; templateId: string | null; required: boolean; audioRequired: boolean; assessmentItem: AssessmentItem | null; assessmentSettings: AssessmentSettings | null; extractedText: string[]; actionDescription: string; narration: string; imageAssets: string[]; imageAltText: Record<string, string>; decorativeImages: string[]; audioAssets: string[]; previewImage: string | null; renderWarning: string | null; sourceAnimationXml: string | null; sourceTransitionXml: string | null; notes: string };
 export type Asset = { id: string; kind: "image" | "audio" | "video"; transcript?: string; captionsVtt?: string; language?: string; sharedSourceId?: string | null; role?: "content" | "background"; filename: string; contentType: string; sizeBytes: number; sha256: string; path: string; attributionText: string; attributionStatus: "draft" | "complete" };
-export type ProjectSummary = { id: string; title: string; sceneCount: number; updatedAt: string; hasSourceDeck: boolean };
+export type ProjectSummary = { id: string; title: string; sceneCount: number; updatedAt: string; hasSourceDeck: boolean; parentProjectId?: string | null; siblingOrder?: number; metadataRevision?: number };
 export type Assessment = { id: string; title: string; questionSceneIds: string[] };
-export type Project = ProjectSummary & { storyboard: { courseMedia?: MediaPlacement[]; revision: number; scenes: Scene[]; assets: Asset[]; assessments?: Assessment[]; completionSettings: CourseCompletionSettings; exportSettings: ExportSettings } };
+export type Project = ProjectSummary & { storyboard: { backgroundAsset?: string | null; courseMedia?: MediaPlacement[]; revision: number; scenes: Scene[]; assets: Asset[]; assessments?: Assessment[]; completionSettings: CourseCompletionSettings; exportSettings: ExportSettings } };
 type SceneDraft = { id: string | null; title: string; screenText: string; actionDescription: string; notes: string; required: boolean; audioRequired: boolean; sceneType: SceneType; layoutMode: LayoutMode; templateId: string };
 type Template = { id: string; title: string; description: string; filename: string; sizeBytes: number; updatedAt: string };
 type TemplateDraft = { id: string; title: string; description: string };
@@ -81,6 +85,8 @@ export function App() {
   const [restoringProject, setRestoringProject] = useState(true);
   const [selectedScene, setSelectedScene] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
+  const [creatingParent, setCreatingParent] = useState<{ id: string; title: string } | null>(null);
+  useEffect(() => { if (!isCreating) setCreatingParent(null); }, [isCreating]);
   const [title, setTitle] = useState("");
   const [aiConfiguredForProject, setAiConfiguredForProject] = useState<boolean | null>(null);
   const [courseDesignFiles, setCourseDesignFiles] = useState<File[]>([]);
@@ -111,6 +117,7 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAIConnection, setShowAIConnection] = useState(false);
   const [showIntelligenceEngine, setShowIntelligenceEngine] = useState(false);
+  const [showProjectBackground, setShowProjectBackground] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showManagement, setShowManagement] = useState(true);
   const managementButtonRef = useRef<HTMLButtonElement>(null);
@@ -168,12 +175,12 @@ export function App() {
     showPythiaAssessmentDesign ? "pythia.assessment" : showIntelligenceEngine ? "settings.engine" :
     showAccessibility ? "review.accessibility" : showValidation ? "review.validation" :
     showGoldenPath ? "catalog" : showManagement ? "workspace.management" : activeView;
-  const hasOpenForm = Boolean(visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showAccessibility || showValidation);
+  const hasOpenForm = Boolean(visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showProjectBackground || showAccessibility || showValidation);
   guideNavigate.current = (step) => {
     const target = step.target;
     if (!target) return;
     if (step.id === "review") return;
-    if (step.id === "project") { setIsCreating(true); return; }
+    if (step.id === "project") { beginProjectCreate(); return; }
     if (step.id === "scene") { setShowManagement(false); setActiveView("storyboard"); if (!sceneDraft) beginSceneCreate(); return; }
     // Keep the same form mounted across steps/resume so application drafts survive.
     if (target === currentSurface || (target === "preview.comments" && showPreview)) return;
@@ -254,6 +261,9 @@ export function App() {
       sceneCount: updatedProject.sceneCount,
       updatedAt: updatedProject.updatedAt,
       hasSourceDeck: updatedProject.hasSourceDeck,
+      parentProjectId: updatedProject.parentProjectId,
+      siblingOrder: updatedProject.siblingOrder,
+      metadataRevision: updatedProject.metadataRevision,
     };
     setProjects((current) => [summary, ...current.filter((item) => item.id !== summary.id)]);
   }
@@ -282,6 +292,7 @@ export function App() {
 
   async function switchProject(projectId: string, openAuthoring = false, destination: "storyboard" | "media" = "storyboard"): Promise<boolean> {
     if (!projectId || (projectId === project.id && !openAuthoring) || busy) return false;
+    if (hasOpenForm) { setFeedback("Finish or close your current form before switching projects. Your edits are preserved."); return false; }
     onboarding.controller.pause();
     setBusy(true);
     setError("");
@@ -344,6 +355,19 @@ export function App() {
     }
   }
 
+  async function handleRelationshipUpdated(updatedProject: Project) {
+    const response = await fetch("/api/projects");
+    if (!response.ok) throw new Error("Relationship saved, but the project list could not be refreshed. Reload My Work.");
+    setProjects(await response.json() as ProjectSummary[]);
+    if (updatedProject.id === project.id) applyProject(updatedProject);
+  }
+
+  function beginProjectCreate(parent?: { id: string; title: string }) {
+    setCreatingParent(parent ?? null);
+    setError("");
+    setIsCreating(true);
+  }
+
   async function createProject() {
     if (!title.trim() || busy) return;
     const designFiles = aiConfiguredForProject ? courseDesignFiles : [];
@@ -355,8 +379,11 @@ export function App() {
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) });
-      if (!response.ok) throw new Error("Project could not be created.");
+      const response = await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, parentProjectId: creatingParent?.id ?? null }) });
+      if (!response.ok) {
+        const body = await response.json() as { detail?: string };
+        throw new Error(body.detail || "Project could not be created.");
+      }
       const createdProject = await response.json() as Project;
       const failedAttachments: string[] = [];
       const attachedResourceIds: string[] = [];
@@ -397,8 +424,8 @@ export function App() {
       }
       setFeedback(designFiles.length > 0 && failedAttachments.length === 0 ? "Course design documents added as references. Select them in an enhancement prompt." : "");
       if (failedAttachments.length > 0) setError(`Project created, but these documents could not be attached: ${failedAttachments.join(", ")}. Add them from Storyboard suggestions.`);
-    } catch {
-      setError("Project could not be created. Check that the API is running and try again.");
+    } catch (issue) {
+      setError(issue instanceof Error ? issue.message : "Project could not be created. Check that the API is running and try again.");
     } finally {
       setBusy(false);
     }
@@ -1066,7 +1093,9 @@ export function App() {
   const scenes = project.storyboard.scenes;
   const assessmentItemCount = scenes.filter((item) => item.assessmentItem !== null).length;
   const scene = scenes[selectedScene];
+  const hasSceneStage = Boolean(scene && (scene.visualLayout?.enabled || scene.assessmentItem || scene.layoutMode === "native" && effectiveBackgroundAsset(project, scene)));
   const canCreateProject = !session || session.memberships.some(item => ["author", "instructional-designer", "administrator"].includes(item.role));
+  const parentProject = projects.find(parent => parent.id === project.parentProjectId);
 
   function openCourseReviewObject(objectType: "course" | "scene" | "objective" | "assessment" | "asset", objectId: string) {
     setShowPythiaCourseReview(false);
@@ -1100,8 +1129,8 @@ export function App() {
     <aside className="sidebar" aria-label="Workspace navigation">
       <div className="brand"><BrandMark /><div className="brand-wordmark"><span>CHIMERA</span></div></div>
       <div className="sidebar-project">
-        <label data-onboarding="workspace.project" className="project-switcher"><span>PROJECT</span><select value={project.id} onChange={(event) => void switchProject(event.target.value)} disabled={busy || projects.length === 0} aria-label="Switch project"><option value="" disabled>Select a project</option>{[...projects].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)).map((item) => <option key={item.id} value={item.id}>{item.title} · {item.sceneCount} scenes</option>)}</select></label>
-        <button className="new-project-button" onClick={() => setIsCreating(true)} disabled={busy || !canCreateProject}><Plus size={15} /> Create project</button>
+        <label data-onboarding="workspace.project" className="project-switcher"><span>PROJECT</span><select value={project.id} onChange={(event) => void switchProject(event.target.value)} disabled={busy || hasOpenForm || projects.length === 0} aria-label="Switch project"><option value="" disabled>Select a project</option><ProjectOptions projects={projects} sceneCounts recentFirst /></select></label>
+        <button className="new-project-button" onClick={() => beginProjectCreate()} disabled={busy || hasOpenForm || !canCreateProject}><Plus size={15} /> Create project</button>
         <button className="new-project-button" onClick={() => startOnboarding()} disabled={busy}><Route size={15} /> Start / resume walkthrough</button>
       </div>
       <div className="workspace-label">WORKSPACE</div>
@@ -1125,17 +1154,24 @@ export function App() {
       </div>
       <div className="sidebar-bottom">
         <button className="nav-item settings-toggle" aria-expanded={showSettings} aria-controls="workspace-settings" onClick={() => setShowSettings((open) => !open)}><Settings2 size={18} /><span>Settings</span><ChevronDown size={15} className={showSettings ? "expanded" : ""} /></button>
-        {showSettings && <div id="workspace-settings" className="workspace-settings"><AppearanceSelector /><button type="button" className="nav-item" disabled={busy} onClick={() => setShowIntelligenceEngine(true)}><Sparkles size={16} />Intelligence Engine</button><button type="button" className="nav-item" disabled={busy} onClick={event => { event.currentTarget.focus(); setShowAIConnection(true); }}><Sparkles size={16} />AI connection</button>{session && permissions.canManageMembers && <button className="nav-item" disabled={!project.id} onClick={() => setShowProjectAccess(true)}>Project access</button>}</div>}
+        {showSettings && <div id="workspace-settings" className="workspace-settings">
+          <AppearanceSelector />
+          <button type="button" className="nav-item" disabled={busy || !project.id || !permissions.canEdit} onClick={() => setShowProjectBackground(true)}>Project background</button>
+          <button type="button" className="nav-item" disabled={busy} onClick={() => setShowIntelligenceEngine(true)}><Sparkles size={16} />Intelligence Engine</button>
+          <button type="button" className="nav-item" disabled={busy} onClick={event => { event.currentTarget.focus(); setShowAIConnection(true); }}><Sparkles size={16} />AI connection</button>
+          {session && permissions.canManageMembers && <button className="nav-item" disabled={!project.id} onClick={() => setShowProjectAccess(true)}>Project access</button>}
+        </div>}
         {session && <div className="hosted-session"><span>{session.actor.actorDisplayName}</span><button onClick={() => { if (window.confirm("Sign out? Unsaved changes will be discarded.")) void logout().catch(issue => setError(issue instanceof Error ? issue.message : "Sign-out failed.")); }}>Sign out</button></div>}
         <div className="sidebar-footer"><span className="status-dot" />{session ? "Hosted workspace" : "Local workspace"}</div>
       </div>
     </aside>
     {showAIConnection && <AIConnectionPanel onboardingScope={project.id || "workspace"} onClose={() => setShowAIConnection(false)} />}
     {showIntelligenceEngine && <IntelligenceEnginePanel onClose={() => setShowIntelligenceEngine(false)} />}
+    {showProjectBackground && <ProjectBackgroundPanel key={project.id} project={project} onClose={() => setShowProjectBackground(false)} onProjectUpdated={applyProject} />}
     <main className="main-content" id="workspace-content" tabIndex={-1}>
-      {showManagement ? <ManagementView busy={busy || restoringProject} canCreateProject={canCreateProject} onCreateProject={() => setIsCreating(true)} canResume={Boolean(project.id)} onOpenProject={(projectId) => switchProject(projectId, true)} onProjectTrashed={handleProjectTrashed} onProjectsRestored={handleProjectsRestored} onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} /> : showProjectAccess ? <ProjectAccessPanel project={project} onClose={() => setShowProjectAccess(false)} /> : !permissions.canEdit && session && project.id ? <section className="project-access-panel"><h1>{project.title}</h1><p>You have review access to this project.</p><button className="button button-dark" onClick={() => setShowPreview(true)}>Open course review</button></section> : <>
+      {showManagement ? <ManagementView busy={busy || restoringProject || hasOpenForm} canCreateProject={canCreateProject} onCreateProject={beginProjectCreate} canResume={Boolean(project.id)} onOpenProject={(projectId) => switchProject(projectId, true)} onProjectTrashed={handleProjectTrashed} onProjectsRestored={handleProjectsRestored} onRelationshipUpdated={handleRelationshipUpdated} onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} /> : showProjectAccess ? <ProjectAccessPanel project={project} onClose={() => setShowProjectAccess(false)} /> : !permissions.canEdit && session && project.id ? <section className="project-access-panel"><h1>{project.title}</h1><p>You have review access to this project.</p><button className="button button-dark" onClick={() => setShowPreview(true)}>Open course review</button></section> : <>
       <header className="topbar">
-        <div className="project-heading"><p className="eyebrow">COURSE AUTHORING / {activeView === "storyboard" ? "STORYBOARD" : activeView === "media" ? "MEDIA LIBRARY" : "TEMPLATES"}</p><h1 title={project.title}>{project.title || "Your workspace"}</h1></div>
+        <div className="project-heading">{project.parentProjectId && <nav className="project-breadcrumb" aria-label="Project hierarchy">{parentProject ? <button type="button" disabled={busy || hasOpenForm} onClick={() => void switchProject(parentProject.id, true)}>{parentProject.title}</button> : <span>Parent project unavailable</span>}<span aria-hidden="true"> / </span><span aria-current="page">{project.title}</span></nav>}<p className="eyebrow">COURSE AUTHORING / {activeView === "storyboard" ? "STORYBOARD" : activeView === "media" ? "MEDIA LIBRARY" : "TEMPLATES"}</p><h1 title={project.title}>{project.title || "Your workspace"}</h1></div>
         <div className="top-actions"><span className="save-state" role="status">{busy ? "Working…" : project.id ? <><Check size={14} /> Saved locally</> : "Local authoring"}</span><button className="button button-outline" onClick={() => setShowPreview(true)} disabled={!project.id || !scenes.length || busy}><Play size={15} /> Preview course</button><button className="button button-accent" onClick={() => setShowExport(true)} disabled={!project.id || busy}><Download size={15} /> Export</button></div>
       </header>
       <nav className="production-workflow" aria-label="Authoring workflow">
@@ -1165,16 +1201,19 @@ export function App() {
           </div>
           <div className="sequence-hint"><GripVertical size={14} /> Drag scenes to reorder</div>
         </section>
-        <section data-onboarding="scene.saved" className={`canvas-panel ${scene?.visualLayout?.enabled ? "visual-active" : ""}`} aria-label="Selected scene">{scene ? <>
+        <section data-onboarding="scene.saved" className={`canvas-panel ${hasSceneStage ? "visual-active" : ""}`} aria-label="Selected scene">{scene ? <>
           <div className="scene-context-header">
-            <div className="scene-context-actions"><button className="button button-accent" onClick={() => beginSceneEdit()} disabled={busy || !permissions.canEdit}><Pencil size={16} /> Edit scene</button><button className="button button-outline" onClick={() => setShowPythiaAnalysis(true)} disabled={busy || !permissions.canEnhance}><Sparkles size={16} /> Analyze with Pythia</button><button className="button button-outline" onClick={() => setShowPythiaTransform(true)} disabled={busy || !permissions.canEnhance}><Sparkles size={16} /> Transform with Pythia</button><button className="button button-outline" onClick={() => setShowPythiaAssessmentDesign(true)} disabled={busy || !permissions.canEnhance}><Sparkles size={16} /> Design assessment</button></div>
+            <div className="scene-context-actions">
+              <button className="button button-accent" onClick={() => beginSceneEdit()} disabled={busy || !permissions.canEdit}><Pencil size={16} /> Edit scene</button>
+              <PythiaSceneActions key={`${project.id}-${scene.id}`} projectId={project.id} disabled={busy || !permissions.canEnhance} onAnalyze={() => setShowPythiaAnalysis(true)} onTransform={() => setShowPythiaTransform(true)} onDesignAssessment={() => setShowPythiaAssessmentDesign(true)} />
+            </div>
             <div className="scene-context-title"><h2>{scene.title}</h2><span>Scene {selectedScene + 1} of {scenes.length} · {scene.required ? "Required" : "Optional"}</span></div>
           </div>
           {scene.sceneType === "question" && <section className="assessment-authoring-launch" aria-label="Scene question">
             <div><strong>{scene.assessmentItem ? "Question authored" : "Add a knowledge check"}</strong><span>Author a question and set its scoring rules.</span></div>
             <button className="button button-outline" onClick={() => setShowAssessmentEditor(true)} disabled={busy}><ClipboardList size={15} />{scene.assessmentItem ? "Edit question" : "Create question"}</button>
           </section>}
-          {(scene.visualLayout?.enabled || scene.assessmentItem) && <div className="visual-authoring-surface"><SceneSurface project={project} scene={scene} /></div>}
+          {hasSceneStage && <div className="visual-authoring-surface"><SceneSurface project={project} scene={scene} /></div>}
           <div className="canvas-body"><div className="canvas-meta"><span>SCENE {String(selectedScene + 1).padStart(2, "0")} · {scene.sceneType.toUpperCase()}</span><span>{scene.layoutMode === "template" ? templates.find((template) => template.id === scene.templateId)?.title || "TEMPLATE LAYOUT" : `${scene.layoutMode.toUpperCase()} LAYOUT`}{scene.sourceSlide ? ` · SOURCE SLIDE ${scene.sourceSlide}` : " · NEW SCENE"}</span></div><div className="slide-canvas">{scene.previewImage ? <img className="slide-preview" src={`/api/projects/${project.id}/${scene.previewImage}`} alt={scene.sourceSlide ? `Rendered source slide ${scene.sourceSlide}` : scene.title} /> : <><div className="canvas-grid" /><div className="slide-label">{scene.title}</div><div className="slide-subtitle">{scene.extractedText.join(" · ") || "No additional slide text extracted"}</div></>}<div className="canvas-chip">{scene.previewImage ? "SOURCE SLIDE PREVIEW" : `${scene.layoutMode.toUpperCase()} LAYOUT`}</div></div><div className="canvas-footer"><div><strong>{scene.title}</strong><span>Speaker notes: {scene.notes || "None extracted"}</span><span>{scene.imageAssets.length} images / {scene.audioAssets.length} audio files{scene.sourceAnimationXml ? " / Native animation captured" : ""}{scene.sourceTransitionXml ? " / Transition captured" : ""}</span>{scene.renderWarning && <span className="render-warning">{scene.renderWarning}</span>}</div></div>{(scene.imageAssets.length > 0 || scene.audioAssets.length > 0) && <div className="scene-media-strip">{scene.imageAssets.map((assetId) => { const asset = project.storyboard.assets.find((item) => item.id === assetId); return asset ? <img key={assetId} src={`/api/projects/${project.id}/assets/${assetId}`} alt={asset.filename} title={asset.filename} /> : null; })}{scene.audioAssets.map((assetId) => { const asset = project.storyboard.assets.find((item) => item.id === assetId); return asset ? <div className="scene-audio" key={assetId}><span>{asset.filename}</span><audio controls preload="metadata" src={`/api/projects/${project.id}/assets/${assetId}`} /></div> : null; })}</div>}
           {scene.audioAssets.length > 0 && <section data-onboarding="scene.audio" className="audio-requirement-setting"><label><input type="checkbox" checked={scene.audioRequired} onChange={(event) => void setSceneAudioRequired(event.target.checked)} disabled={busy} /><span><strong>Require attached audio to finish</strong><small>Learners must play every attached track to the end.</small></span></label></section>}
           </div></> : <div className="canvas-empty"><div className="brand-emblem"><BrandMark /></div><span className="brand-signature">Distinct parts. Deliberate design. Powerful learning.</span><strong>{project.id ? "Your storyboard starts here" : "Build your next learning experience"}</strong><span>{project.id ? "Bring in a PowerPoint or start with a blank scene." : "Create a project to organize scenes, media, and assessments."}</span>
@@ -1182,7 +1221,7 @@ export function App() {
       </div></> : activeView === "media" ? <section data-onboarding="media.library" className="template-library media-library">
         <div className="template-toolbar">
           <div><p className="eyebrow">PROJECT ASSETS</p><h2>Media library</h2><span className="field-hint">{scene ? `Selected scene: ${scene.title}` : "Select a scene to attach media"}</span></div>
-          <label className="media-project-filter">Project<select aria-label="Media library project" value={project.id} disabled={busy || restoringProject || projects.length === 0} onChange={(event) => void switchProject(event.target.value, false, "media")}><option value="" disabled>Select a project</option>{[...projects].sort((left, right) => left.title.localeCompare(right.title)).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
+          <label className="media-project-filter">Project<select aria-label="Media library project" value={project.id} disabled={busy || restoringProject || hasOpenForm || projects.length === 0} onChange={(event) => void switchProject(event.target.value, false, "media")}><option value="" disabled>Select a project</option><ProjectOptions projects={projects} /></select></label>
           <label className={`button button-accent upload-control ${!project.id || busy ? "disabled" : ""}`} title="Add an image, audio, MP4, or WebM file to this project."><Plus size={15} /> Add media<input type="file" accept="image/jpeg,image/png,image/gif,image/webp,audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/ogg,video/mp4,video/webm,.mp4,.webm,.jpg,.jpeg,.png,.gif,.webp,.mp3,.m4a,.aac,.wav,.ogg" aria-label="Add media" onChange={uploadMedia} disabled={!project.id || busy} /></label>
         </div>{project.id && permissions.canEdit && <MediaToolsPanel project={project} scene={scene ?? undefined} onProjectUpdated={applyProject} />}{project.storyboard.assets.length ? <div className="media-grid">{project.storyboard.assets.map((asset) => <MediaLibraryItem project={project} key={`${project.id}:${asset.id}`} projectId={project.id} revision={project.storyboard.revision} asset={asset} scenes={scenes} selectedScene={scene ?? undefined} attached={Boolean(scene && (asset.kind === "image" ? scene.imageAssets : asset.kind === "video" ? scene.videoAssets ?? [] : scene.audioAssets).includes(asset.id))} canAttach={permissions.canEdit && Boolean(scene) && !busy} onAttach={() => void attachAsset(asset)} onProjectUpdated={applyProject} />)}</div> : <div className="template-empty"><strong>No media in this project</strong><span>No images, audio, or video added yet.</span></div>}</section> : <section data-onboarding="templates.library" className="template-library"><div className="template-toolbar"><div><p className="eyebrow">AUTHORING LIBRARY</p><h2>Scene templates</h2></div><label className={`button button-accent upload-control ${busy ? "disabled" : ""}`} title="Upload a PowerPoint template."><Upload size={15} /> Upload PPTX template<input type="file" accept=".pptx" aria-label="Upload PPTX template" onChange={uploadTemplate} disabled={busy} /></label></div>{templates.length ? <div className="template-list">{templates.map((template) => <article className="template-row" key={template.id}><div className="template-info"><strong>{template.title}</strong><span>{template.description || "No description"}</span><small>{template.filename} · {(template.sizeBytes / 1024 / 1024).toFixed(1)} MB</small></div><div className="template-actions"><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`} title="Replace this template from a PPTX file."><FileUp size={14} /> Replace PPTX<input type="file" accept=".pptx" aria-label="Replace template PowerPoint" onChange={(event) => replaceTemplateSource(event, template.id)} disabled={busy} /></label><button className="button button-outline" onClick={() => setTemplateDraft({ id: template.id, title: template.title, description: template.description })} disabled={busy}>Edit details</button></div></article>)}</div> : <div className="template-empty"><strong>No templates yet</strong><span>Upload a PowerPoint template to use it when creating scenes.</span></div>}</section>}
 
@@ -1192,6 +1231,7 @@ export function App() {
     {showExport && <EditorDialog labelledBy="export-title" className="export-dialog" onClose={() => setShowExport(false)} busy={busy}>
       <div data-onboarding="export.panel" className="modal-head"><div><p className="eyebrow">DELIVER & EXPORT</p><h2 id="export-title">Export course</h2></div><button className="icon-button" onClick={() => setShowExport(false)} disabled={busy} aria-label="Close export"><X size={19} /></button></div>
       <p className="export-project-name">{project.title}</p>
+      <p className="field-hint">Exports and archives include only this project's content, not its parent or subprojects. Archive restore preserves the current project attachment.</p>
       <section className="export-section"><h3>Learning management system</h3><p>Build a portable course package for your LMS.</p><div className="export-actions"><button className="button button-accent" onClick={() => void exportScorm2004()} disabled={busy}><Download size={16} /> Build SCORM 2004</button><button className="button button-outline" onClick={() => void exportScorm12()} disabled={busy}>Build SCORM 1.2</button></div>
         <label className="package-threshold"><span>Warn when a package exceeds</span><input aria-label="Package warning threshold in MB" type="number" min="1" max="4096" key={`${project.id}-${project.storyboard.exportSettings.packageWarningThresholdMB}`} defaultValue={project.storyboard.exportSettings.packageWarningThresholdMB} onBlur={(event) => { if (event.currentTarget.validity.valid && event.currentTarget.value !== "") void updatePackageWarningThreshold(Number(event.currentTarget.value)); else event.currentTarget.value = String(project.storyboard.exportSettings.packageWarningThresholdMB); }} disabled={busy} /><span>MB</span></label>
         <div className="export-actions report-actions"><button className="button button-outline" onClick={() => void downloadScormReport("scorm2004")} disabled={busy}>Report 2004 <Download size={14} /></button><button className="button button-outline" onClick={() => void downloadScormReport("scorm12")} disabled={busy}>Report 1.2 <Download size={14} /></button></div>
@@ -1221,6 +1261,7 @@ export function App() {
     {isCreating && <EditorDialog onResumeWalkthrough={guidePaused ? () => onboarding.controller.start() : undefined} labelledBy="create-project-title" onClose={() => { if (createdCourseForDraft) setTitle(""); setIsCreating(false); setCourseDesignFiles([]); setCourseResourceIds([]); setCreatedCourseForDraft(false); setCourseDraft(null); setCourseDraftError(""); setCoursePrompt(""); }} busy={busy}>
       <div className="modal-head"><div><p className="eyebrow">{createdCourseForDraft ? "COURSE DRAFTING" : "NEW PROJECT"}</p><h2 id="create-project-title">{createdCourseForDraft ? "Draft course scenes" : "Name your course"}</h2></div><button className="icon-button" onClick={() => { if (createdCourseForDraft) setTitle(""); setIsCreating(false); setCourseDesignFiles([]); setCourseResourceIds([]); setCreatedCourseForDraft(false); setCourseDraft(null); setCourseDraftError(""); setCoursePrompt(""); }} disabled={busy} aria-label={createdCourseForDraft ? "Close course drafting" : "Close new project"}><X size={18} /></button></div>
       {!createdCourseForDraft ? <>
+        {creatingParent && <p className="field-hint">Creating a subproject of <strong>{creatingParent.title}</strong>. Content, settings, permissions, and exports are independent.</p>}
         <input data-onboarding="project.name" aria-label="Course name" value={title} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => event.key === "Enter" && createProject()} placeholder="e.g. Equipment Inspection Fundamentals" />
         {aiConfiguredForProject && <section className="project-design-documents" aria-label="Course design documents">
           <div><strong>Course design documents</strong><span>Upload source material and add a course-level prompt. PDF, DOCX, PPTX, TXT, or Markdown, up to 25 MB each.</span></div>
