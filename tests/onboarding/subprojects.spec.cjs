@@ -32,7 +32,7 @@ async function seed(page, request, theme = 'light') {
     const summary = row(project).locator('.project-hierarchy-actions > summary');
     if (await row(project).locator('.project-hierarchy-actions').getAttribute('open') === null) await summary.click();
   };
-  await expect(row(parent)).toBeVisible();
+  await expect(row(parent)).toBeVisible({ timeout: 20000 });
   return { prefix, parent, other, standalone, first, second, row, actions };
 }
 

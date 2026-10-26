@@ -128,8 +128,8 @@ for (const [theme, width] of [['light', 1440], ['dark', 390]]) {
     await page.keyboard.press('Enter');
     await expect(picker).toContainText('Use project background');
     await page.getByRole('button', { name: 'Save scene', exact: true }).click();
+    await expect.poll(async () => (await read()).storyboard.scenes[1].visualLayout.backgroundMode).toBe('inherit');
     saved = await read();
-    expect(saved.storyboard.scenes[1].visualLayout.backgroundMode).toBe('inherit');
     expect(saved.storyboard.scenes[1].backgroundAsset).toBeNull();
   });
 }

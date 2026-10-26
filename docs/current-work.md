@@ -4,8 +4,9 @@ Updated 2026-10-16. The active development branch is `extract-onboarding-reposit
 
 Current next action: submit the reviewed 1.1.0 candidate and verify CI on its exact full SHA. See the [October 16 candidate review](candidate-review-2026-10-16.md) and [completion update](completion-update-2026-10-15.md). The older PR #5 instructions below are historical and superseded. Hosted deployment remains deferred.
 
-## Completed
+Release-gate status (2026-10-16 addendum): backend 252 passed/6 skipped, frontend build passes, and the full onboarding suite passes in Chromium, Firefox and WebKit after test-stability fixes (collapsed inspector sections expanded in tests, WebKit button focus, polled saves, longer seed waits, and a WebKit project-switcher overflow clip at 390px). The full suite is slow and shares a growing project list; CI runs one worker with one retry. Still human-owned: Writer/LibreOffice inspection of the SME Master and Full Storyboard exports, live Linux/Nginx inspection, and Encarta verification.
 
+## Completed
 - Portable LibreOffice discovery and Word rendering/edit-save-reopen checks.
 - TestFrame revision 8 production validation and local qualification of both SCORM profiles. The user confirmed SCORM 1.2 passes their LMS; that LMS does not accept SCORM 2004.
 - Local, Encarta, and darkrogue.io authentication profiles. Local single-user operation is retained; Encarta remains denied until its real contract is supplied.

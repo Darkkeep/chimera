@@ -103,7 +103,7 @@ for (const theme of ['light', 'dark']) {
   test(`Pythia group fits desktop and mobile in ${theme} appearance`, async ({ page }) => {
     await page.addInitScript(theme => localStorage.setItem('chimera.appearance', theme), theme);
     const toggle = await setup(page, route => route.fulfill({ json: online }));
-    for (const width of [1440, 390]) {
+    for (const width of [390, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await expect(toggle).toBeEnabled();
       await toggle.click();
@@ -113,7 +113,9 @@ for (const theme of ['light', 'dark']) {
       expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
       expect((await new AxeBuilder({ page }).include('.scene-context-actions').withTags(['wcag2a', 'wcag2aa']).analyze()).violations).toEqual([]);
       await page.screenshot({ path: test.info().outputPath(`${theme}-${width}.png`) });
+      await toggle.focus();
       await page.keyboard.press('Escape');
+      await expect(group).toHaveCount(0);
     }
   });
 }
