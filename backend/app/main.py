@@ -1,4 +1,5 @@
 import io
+import hashlib
 import json
 import mimetypes
 import tempfile
@@ -46,9 +47,12 @@ from .models import AssessmentGroup, AssessmentGroupWrite, CourseDraftRequest, C
 from .storage import create_scenes, save_assessment_group
 from .models import ProjectBackgroundUpdate, ProjectRelationshipUpdate, ProjectRestore
 from .storage import update_project_background, update_project_relationship, ProjectMetadataConflict
+from .question_import import parse_questions, question_template, question_spreadsheet
 
 
 ROUTE_ACTIONS = {
+    "preview_question_import": "project.import", "commit_question_import": "project.import",
+    "get_question_template": "project.view", "export_question_spreadsheet": "project.export",
     "patch_project_relationship": "project.settings.update",
     "patch_project_background": "project.settings.update",
     "get_media_capabilities": "project.view", "patch_media_metadata": "media.manage", "get_media_captions": "project.view",
@@ -127,6 +131,10 @@ def get_authorization_policy() -> AuthorizationPolicy:
 
 def _hosted_request_action(request: Request) -> str:
     path = request.url.path
+    if "/question-import" in path:
+        return "project.view" if request.method == "GET" else "project.import"
+    if path.endswith(("/questions.csv", "/questions.xlsx")):
+        return "project.export"
     if path.endswith("/trash") and request.method == "POST":
         return "project.delete"
     if path.endswith("/restore") and request.method == "POST":
@@ -1429,6 +1437,117 @@ def get_assessments(project_id: str) -> list[AssessmentGroup]:
         return read_project(project_id).storyboard.assessments
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
+
+
+def _review_question_upload(project: ProjectDetail, file: UploadFile) -> tuple[bytes, list[dict]]:
+    content = file.file.read(10 * 1024 * 1024 + 1)
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Question imports are limited to 10 MB")
+    try:
+        rows = parse_questions(file.filename or "", content)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    existing = {scene.assessmentItem.identifier for scene in project.storyboard.scenes if scene.assessmentItem}
+    identifiers = [row["item"]["identifier"] for row in rows if row.get("item")]
+    for row in rows:
+        if row.get("item"):
+            identifier = row["item"]["identifier"]
+            if identifier in existing:
+                row["errors"].append(f"Stable identifier {identifier} already exists in this project. Existing questions will not be overwritten.")
+            if identifiers.count(identifier) > 1:
+                row["errors"].append(f"Stable identifier {identifier} appears more than once in this upload.")
+    return content, rows
+
+
+@app.post("/api/projects/{project_id}/question-import/preview")
+def preview_question_import(project_id: str, file: UploadFile = File(...)) -> dict:
+    try:
+        project = read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    content, rows = _review_question_upload(project, file)
+    return {"revision": project.storyboard.revision, "digest": hashlib.sha256(content).hexdigest(), "questions": rows}
+
+
+@app.post("/api/projects/{project_id}/question-import", response_model=ProjectDetail)
+def commit_question_import(
+    project_id: str, file: UploadFile = File(...), selected: str = Form(...),
+    digest: str = Form(...), assessment_id: str = Form(""), confirm_warnings: bool = Form(False),
+    if_match: Annotated[str | None, Header()] = None,
+) -> ProjectDetail:
+    expected = _expected_revision(if_match)
+    if expected is None:
+        raise HTTPException(status_code=428, detail="An If-Match storyboard revision is required")
+    try:
+        indices = json.loads(selected)
+    except json.JSONDecodeError as error:
+        raise HTTPException(status_code=422, detail="Selected questions must be a JSON array of row indexes") from error
+    if not isinstance(indices, list) or not 1 <= len(indices) <= 500 or any(type(index) is not int or index < 0 for index in indices) or len(set(indices)) != len(indices):
+        raise HTTPException(status_code=422, detail="Select 1-500 unique question row indexes")
+    try:
+        with storyboard_transaction():
+            project = read_project(project_id)
+            _check_expected_revision(expected, project.storyboard.revision)
+            content, rows = _review_question_upload(project, file)
+            if hashlib.sha256(content).hexdigest() != digest:
+                raise HTTPException(status_code=422, detail="The upload changed. Review it again before importing.")
+            by_index = {row["index"]: row for row in rows}
+            if any(index not in by_index or by_index[index]["errors"] or not by_index[index].get("item") for index in indices):
+                raise HTTPException(status_code=422, detail="Only valid, nonduplicate reviewed questions can be imported")
+            chosen = [by_index[index] for index in indices]
+            if any(row["warnings"] for row in chosen) and not confirm_warnings:
+                raise HTTPException(status_code=422, detail="Acknowledge the selected questions' import warnings before continuing")
+            groups = list(project.storyboard.assessments)
+            group = next((group for group in groups if group.id == assessment_id), None)
+            if assessment_id and group is None:
+                raise HTTPException(status_code=404, detail="Assessment not found")
+            if group and len(group.questionSceneIds) + len(chosen) > 500:
+                raise HTTPException(status_code=422, detail="An assessment can contain at most 500 questions")
+            scenes = [Scene(
+                id=f"scene-{uuid4().hex[:8]}", sceneType="question", layoutMode="native",
+                title=row["title"] or row["item"]["identifier"], assessmentItem=row["item"],
+                assessmentSettings=row.get("settings"),
+            ) for row in chosen]
+            if group:
+                groups = [candidate.model_copy(update={"questionSceneIds": [*candidate.questionSceneIds, *(scene.id for scene in scenes)]}) if candidate.id == group.id else candidate for candidate in groups]
+            board = project.storyboard.model_copy(update={"scenes": [*project.storyboard.scenes, *scenes], "assessments": groups})
+            path = project_path(project_id)
+            write_storyboard(path, board, expected)
+            write_project_metadata(path, {"updatedAt": now_iso()})
+            return read_project(project_id)
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.get("/api/projects/{project_id}/question-import/template.{format}")
+def get_question_template(project_id: str, format: Literal["csv", "xlsx"]) -> Response:
+    try:
+        read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    return Response(question_template(format), media_type="text/csv; charset=utf-8" if format == "csv" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="chimera-questions-template.{format}"'})
+
+
+@app.get("/api/projects/{project_id}/questions.{format}")
+def export_question_spreadsheet(project_id: str, format: Literal["csv", "xlsx"], assessment_id: str = "") -> Response:
+    try:
+        project = read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    scenes = project.storyboard.scenes
+    if assessment_id:
+        group = next((group for group in project.storyboard.assessments if group.id == assessment_id), None)
+        if group is None:
+            raise HTTPException(status_code=404, detail="Assessment not found")
+        by_id = {scene.id: scene for scene in scenes}
+        scenes = [by_id[scene_id] for scene_id in group.questionSceneIds]
+    return Response(question_spreadsheet(scenes, format), media_type="text/csv; charset=utf-8" if format == "csv" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{slugify(project.title)}-questions.{format}"'})
 
 
 def _save_assessment(project_id: str, data: AssessmentGroupWrite | None, assessment_id: str | None, if_match: str | None) -> ProjectDetail:

@@ -678,6 +678,9 @@ def update_scene(project_id: str, scene_id: str, data: SceneUpdate, expected_rev
     for index, scene in enumerate(scenes):
         if scene.id == scene_id:
             updated_scene = Scene.model_validate({**scene.model_dump(), **updates})
+            if updated_scene.assessmentItem and (scene.assessmentItem is None or updated_scene.assessmentItem.identifier != scene.assessmentItem.identifier):
+                if any(candidate.id != scene_id and candidate.assessmentItem and candidate.assessmentItem.identifier == updated_scene.assessmentItem.identifier for candidate in scenes):
+                    raise ValueError("This stable question identifier already exists in this project")
             if "visualLayout" not in updates and updated_scene.visualLayout and any(field in updates for field in ["extractedText", "title", "imageAssets"]):
                 from .models import SceneElement
                 layout = updated_scene.visualLayout.model_copy(deep=True)

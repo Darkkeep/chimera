@@ -1,6 +1,6 @@
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 
 
 SceneType = Annotated[
@@ -237,11 +237,35 @@ class AssessmentChoice(BaseModel):
     text: str = Field(min_length=1, max_length=1000)
 
 
+class QuestionMetadata(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    title: str = Field(default="", max_length=120)
+    description: str = Field(default="", max_length=2000)
+    tags: list[str] = Field(default_factory=list, max_length=50)
+    author: str = Field(default="", max_length=200)
+    source: str = Field(default="", max_length=1000)
+    language: str = Field(default="en", pattern=r"^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$", max_length=64)
+    difficulty: Literal["", "easy", "medium", "hard"] = ""
+    learningObjectiveRefs: list[str] = Field(default_factory=list, max_length=50)
+
+    @field_validator("tags", "learningObjectiveRefs")
+    @classmethod
+    def validate_references(cls, values: list[str]) -> list[str]:
+        cleaned = [value.strip() for value in values]
+        if any(not value or len(value) > 200 for value in cleaned):
+            raise ValueError("Tags and learning-objective references must be nonempty and at most 200 characters")
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("Tags and learning-objective references must be unique")
+        return cleaned
+
+
 class AssessmentBase(BaseModel):
     identifier: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,63}$")
     prompt: str = Field(min_length=1, max_length=5000)
     correctFeedback: str = Field(default="Correct.", max_length=2000)
     incorrectFeedback: str = Field(default="Review the material and try again.", max_length=2000)
+    metadata: QuestionMetadata = Field(default_factory=QuestionMetadata)
 
 
 class SingleChoiceAssessment(AssessmentBase):

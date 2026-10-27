@@ -48,7 +48,8 @@ type LayoutMode = "fidelity" | "hybrid" | "native" | "template";
 type SceneType = "content" | "title" | "question" | "media" | "interaction" | "summary";
 export type AssessmentChoice = { identifier: string; text: string };
 export type AssessmentPair = { sourceIdentifier: string; targetIdentifier: string };
-type AssessmentBase = { identifier: string; prompt: string; correctFeedback: string; incorrectFeedback: string };
+export type QuestionMetadata = { title: string; description: string; tags: string[]; author: string; source: string; language: string; difficulty: "" | "easy" | "medium" | "hard"; learningObjectiveRefs: string[] };
+type AssessmentBase = { identifier: string; prompt: string; correctFeedback: string; incorrectFeedback: string; metadata?: QuestionMetadata };
 export type AssessmentItem =
   | (AssessmentBase & { type: "single-choice"; choices: AssessmentChoice[]; correctResponse: string })
   | (AssessmentBase & { type: "multiple-response"; choices: AssessmentChoice[]; correctResponses: string[] })
@@ -1247,7 +1248,10 @@ export function App() {
     {showPythiaTransform && scene && <PythiaTransformView key={`${project.id}-${scene.id}`} projectId={project.id} scene={scene} scenes={scenes} onClose={() => setShowPythiaTransform(false)} />}
     {showPythiaAssessmentDesign && scene && <PythiaAssessmentDesignView key={`${project.id}-${scene.id}`} projectId={project.id} scene={scene} scenes={scenes} onClose={() => setShowPythiaAssessmentDesign(false)} />}
     {showPythiaCourseReview && <PythiaCourseReviewView project={project} onClose={() => setShowPythiaCourseReview(false)} onNavigateToObject={reference => openCourseReviewObject(reference.object_type, reference.object_id)} />}
-    {showAssessments && permissions.canEdit && <AssessmentsEditor key={project.id} project={project} canExport={permissions.canExport} onClose={() => setShowAssessments(false)} onProjectUpdated={applyProject} />}
+    {showAssessments && permissions.canEdit && <AssessmentsEditor key={project.id} project={project} canExport={permissions.canExport} onClose={() => setShowAssessments(false)} onProjectUpdated={applyProject} onEditQuestion={(sceneId, updatedProject) => {
+      const index = (updatedProject ?? project).storyboard.scenes.findIndex(candidate => candidate.id === sceneId);
+      if (index >= 0) { setSelectedScene(index); setShowAssessments(false); setShowAssessmentEditor(true); }
+    }} />}
     {showEnhancementReview && <EnhancementReviewView project={project} onClose={() => setShowEnhancementReview(false)} onProjectUpdated={applyProject} />}
     {showValidation && <ValidationView projectId={project.id} onClose={() => setShowValidation(false)} onOpenScene={(sceneId, issueCode) => { const index = scenes.findIndex((item) => item.id === sceneId); setShowValidation(false); if (index >= 0) setSelectedScene(index); if (issueCode === "missing-image-alt-text") setShowAccessibility(true); else if (issueCode === "missing-assessment-item") setShowAssessmentEditor(true); else setActiveView("storyboard"); }} />}
     {showAccessibility && <AccessibilityView projectId={project.id} revision={project.storyboard.revision} scenes={scenes} assets={project.storyboard.assets} onClose={() => setShowAccessibility(false)} onProjectUpdated={applyProject} />}

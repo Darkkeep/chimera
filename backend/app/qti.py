@@ -1,4 +1,6 @@
 from io import BytesIO
+import base64
+import json
 from xml.etree import ElementTree as ET
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -26,9 +28,10 @@ def assessment_item_xml(scene: Scene) -> bytes:
 
     root = ET.Element(qti_tag("assessmentItem"), {
         "identifier": item.identifier,
-        "title": scene.title,
+        "title": item.metadata.title or scene.title,
         "adaptive": "false",
         "timeDependent": "false",
+        "{http://www.w3.org/XML/1998/namespace}lang": item.metadata.language,
     })
 
     if isinstance(item, MultipleResponseAssessment):
@@ -55,10 +58,9 @@ def assessment_item_xml(scene: Scene) -> bytes:
         "cardinality": response_cardinality,
         "baseType": response_base_type,
     })
-    if not isinstance(item, ShortAnswerAssessment):
-        correct = ET.SubElement(response, qti_tag("correctResponse"))
-        for value in correct_responses:
-            ET.SubElement(correct, qti_tag("value")).text = value
+    correct = ET.SubElement(response, qti_tag("correctResponse"))
+    for value in correct_responses[:1] if isinstance(item, ShortAnswerAssessment) else correct_responses:
+        ET.SubElement(correct, qti_tag("value")).text = value
 
     score = ET.SubElement(root, qti_tag("outcomeDeclaration"), {
         "identifier": "SCORE",
@@ -132,8 +134,11 @@ def assessment_item_xml(scene: Scene) -> bytes:
                     "matchMax": "1",
                 }).text = choice.text
     elif isinstance(item, ShortAnswerAssessment):
-        ET.SubElement(body, qti_tag("p")).text = item.prompt
-        ET.SubElement(body, qti_tag("textEntryInteraction"), {
+        paragraph = ET.SubElement(body, qti_tag("p"))
+        prompt = ET.SubElement(paragraph, qti_tag("span"))
+        prompt.text = item.prompt
+        prompt.tail = " "
+        ET.SubElement(paragraph, qti_tag("textEntryInteraction"), {
             "responseIdentifier": "RESPONSE",
             "expectedLength": "40",
         })
@@ -144,7 +149,7 @@ def assessment_item_xml(scene: Scene) -> bytes:
     if isinstance(item, ShortAnswerAssessment):
         answer_match = ET.SubElement(response_if, qti_tag("or"))
         for answer in item.acceptedAnswers:
-            match = ET.SubElement(answer_match, qti_tag("match"), {"caseSensitive": str(item.caseSensitive).lower()})
+            match = ET.SubElement(answer_match, qti_tag("stringMatch"), {"caseSensitive": str(item.caseSensitive).lower()})
             ET.SubElement(match, qti_tag("variable"), {"identifier": "RESPONSE"})
             ET.SubElement(match, qti_tag("baseValue"), {"baseType": "string"}).text = answer
     else:
@@ -173,7 +178,17 @@ def assessment_item_xml(scene: Scene) -> bytes:
         "showHide": "show",
     }).text = item.incorrectFeedback
 
-    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+    extension = {
+        "metadata": item.metadata.model_dump(mode="json"),
+        "type": item.type,
+        "settings": scene.assessmentSettings.model_dump(mode="json") if scene.assessmentSettings else None,
+    }
+    if isinstance(item, DragDropAssessment):
+        extension["dragSources"] = [choice.identifier for choice in item.draggables]
+    encoded = base64.b64encode(json.dumps(extension, ensure_ascii=False).encode("utf-8"))
+    xml = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+    declaration, body_xml = xml.split(b"\n", 1)
+    return declaration + b"\n<?chimera " + encoded + b"?>\n" + body_xml
 
 
 def assessment_test_xml(scenes: list[Scene], title: str) -> bytes:

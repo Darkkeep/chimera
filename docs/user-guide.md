@@ -278,7 +278,40 @@ A green **Ready for production** check means the media loaded, its attribution i
 
 ## 5. Author assessments
 
+For an assessment-first workflow, open **Review tools > Assessments**. The **Question bank** lets you add a question directly or open an existing question and its metadata without creating a slide first. Create a named assessment, select its questions, arrange them, and download its QTI test package.
+
 Start each assessment task with a scene whose **Scene type** is **Assessment**. Set that type in Edit scene and save. Select **Create question** for a new question or **Edit question** for an existing one. The question editor supports seven types. Changing types replaces the type-specific question structure in the form; save only after checking the new content.
+
+### Import questions with review
+
+1. Open **Review tools > Assessments > Import questions**.
+2. Select a QTI 2.1 item XML, QTI ZIP package, or filled CSV/XLSX template. Download either template in the import panel; each contains examples of all seven types.
+3. Choose **Review import**. Nothing is saved at this stage. Inspect the question, answer key, feedback, metadata, errors, and warnings for each row.
+4. Select the valid questions to add. Existing stable identifiers and repeated identifiers in the upload are blocked, not renamed or overwritten. Correct duplicates in the source file and review it again.
+5. Optionally select a saved assessment to receive the new questions. Otherwise they enter the question bank only.
+6. Acknowledge any warnings, then choose **Import selected questions**. The selected questions and group membership are saved together. If another author changed the project, review the file again before importing.
+
+Uploads are limited to 10 MB and 500 questions. QTI import supports the representable text-only subset of the seven question types, not arbitrary LMS question formats, media, rich HTML, or custom response processing. Unsupported content is reported rather than silently discarded. Test-level navigation, selection, timing, and scoring policies are not imported as a test; choose and review Chimera's assessment rules separately.
+
+CSV/XLSX templates use one question per row and these columns:
+
+| Columns | Content |
+| --- | --- |
+| `identifier`, `type`, `title`, `prompt` | Stable question ID, one of the seven type names, authoring title, and learner prompt. |
+| `choices`, `secondaryChoices` | JSON arrays of `{"identifier":"A","text":"Answer"}` objects. For matching and drag-and-drop, use primary items in `choices` and targets/right items in `secondaryChoices`. |
+| `answers` | JSON array of correct choice IDs, ordered IDs, accepted answer strings, `"true"`/`"false"`, or `{"sourceIdentifier":"A","targetIdentifier":"B"}` pairs, depending on type. |
+| `correctFeedback`, `incorrectFeedback`, `caseSensitive` | Feedback and fill-in-the-blank case-matching behavior. |
+| `description`, `tags`, `author`, `source`, `language`, `difficulty`, `learningObjectiveRefs` | Question metadata. Tags and objective references are JSON string arrays. Difficulty is blank, `easy`, `medium`, or `hard`. Language uses a tag such as `en-US`. |
+
+Use the supplied examples rather than changing the headers. XLSX formulas are not evaluated or imported as question content. Spreadsheet imports do not carry assessment membership or course-specific rules. **Export questions CSV/XLSX** downloads authored questions and metadata in the same format.
+
+### Edit question metadata
+
+Open a question and expand **Tags and learning-objective references** at the bottom of the editor. This section starts collapsed; both fields use compact search/dropdowns. Focus the search field or choose **Select** to open its scrollable dropdown. Suggestions come from saved questions in the current project; search is case-insensitive and excludes values already selected. Select a suggestion to reuse its spelling, or choose **Create** (or press Enter) for a new value. Arrow keys navigate dropdown options; Enter selects and Escape closes the dropdown. Use **Remove** to remove a selected value, then **Save question** to persist your selections. Each field allows up to 50 values, each up to 200 characters. Expand **Question metadata** for its title, stable identifier, description, author, source, language, and difficulty. Tags and other metadata are authoring information and are not shown as learner-facing question content. References are identifiers or labels; adding them does not create or modify learning objectives.
+
+The stable identifier starts with a letter and contains up to 64 letters, digits, underscores, or hyphens. Keep it unchanged when maintaining a question's identity outside Chimera. Title defaults to the scene title when not specified. Tags and objective references accept up to 50 unique entries, at most 200 characters each.
+
+Metadata is retained in project data and spreadsheet exports. QTI uses the standard item title and XML language attributes; remaining Chimera metadata and supported item settings travel in a `chimera` XML processing instruction for round trips. Other QTI systems may ignore this extension. Course-specific remediation links cannot be carried into another project and are reported during import. QTI import/export still requires qualification against the target LMS; export availability is not a certification of LMS compatibility.
 
 ### Open or create an assessment question
 
@@ -317,6 +350,10 @@ Start each assessment task with a scene whose **Scene type** is **Assessment**. 
 
 ### Author a drag-and-drop question
 
+Type each draggable item and drop target into its text field. Use **Add draggable item** or **Add drop target** to extend either list, then assign the correct placements below the lists. Answer items currently support text only; images on the scene Stage are not draggable answer choices.
+
+In **Preview course** and exported SCORM courses, the targets form a vertical list below the answer tiles. Drag a tile to its matching label, or select a tile and then select its target using a mouse, touch, or keyboard. Correct tiles settle beside the label and leave the answer bank; incorrect tiles return home. Drops do not use attempts; only **Check answer** does. The question Stage expands to contain the targets and **Check answer**; scroll the preview for longer questions.
+
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | Choose **Drag and drop**, enter the prompt, draggable items, and drop targets, then choose each correct placement. Use distinct targets for the intended matches. | The question content and correct response are defined. | <a href="user-guide/images/question-drag-drop.png"><img src="user-guide/images/question-drag-drop.png" alt="question drag drop controls" width="240"></a> |
@@ -324,16 +361,22 @@ Start each assessment task with a scene whose **Scene type** is **Assessment**. 
 
 ### Author a matching question
 
+Type the items into the **Left column** and **Right column** text fields. Use **Add left item** or **Add right item** as needed, then assign the **Correct matches** below the lists. Matching answer items currently support text only, not image choices.
+
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | Choose **Matching**, enter the prompt and left/right items, then select each correct match. | The question content and correct response are defined. | <a href="user-guide/images/question-matching.png"><img src="user-guide/images/question-matching.png" alt="question matching controls" width="240"></a> |
 | 2 | Enter **Correct feedback** and **Incorrect feedback**, then click **Save question**. | The question is saved to the scene. | <a href="user-guide/images/question-matching.png"><img src="user-guide/images/question-matching.png" alt="question matching controls" width="240"></a><br><a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
-### Author a short-answer question
+### Author a fill-in-the-blank question
+
+**Fill-in-the-blank** replaces the former Short answer name. Learners enter one word or short phrase in a single blank after the prompt; this is automatically graded, not an essay or manually marked written response. Enter alternate accepted spellings or equivalent answers on separate lines. Matching ignores surrounding whitespace and, unless **Match letter case** is selected, capitalization.
+
+Existing questions and imported/exported CSV/XLSX templates retain the `short-answer` type identifier for compatibility; no conversion of saved answers is needed. QTI 2.1 exports use an inline `textEntryInteraction` inside a paragraph and a single primary correct-response value, with exact string comparisons retaining all accepted alternatives. This corrects the former block-level placement of the blank. Blackboard import compatibility still needs verification in the target Blackboard version; a QTI 2.1 package is not a Blackboard-native question pool.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Choose **Short answer**, enter the prompt, and enter one accepted answer per line. Select **Match letter case** only when capitalization must match. | The question content and correct response are defined. | <a href="user-guide/images/question-short-answer.png"><img src="user-guide/images/question-short-answer.png" alt="question short answer controls" width="240"></a> |
+| 1 | Choose **Fill-in-the-blank**, enter the prompt, and enter one accepted answer per line. Select **Match letter case** only when capitalization must match. | One blank and its accepted answers are defined. | <a href="user-guide/images/question-short-answer.png"><img src="user-guide/images/question-short-answer.png" alt="fill-in-the-blank controls (earlier Short answer label)" width="240"></a> |
 | 2 | Enter **Correct feedback** and **Incorrect feedback**, then click **Save question**. | The question is saved to the scene. | <a href="user-guide/images/question-short-answer.png"><img src="user-guide/images/question-short-answer.png" alt="question short answer controls" width="240"></a><br><a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
 ### Configure question scoring and remediation

@@ -33,7 +33,7 @@ const tasks: Task[] = [
     ['ordering', 'Ordering question', 'Enter items and use the arrows to put them in correct order.'],
     ['drag-drop', 'Drag-and-drop question', 'Enter draggable items and drop targets and specify correct placement.'],
     ['matching', 'Matching question', 'Enter both columns and specify each correct match.'],
-    ['short-answer', 'Short-answer question', 'Enter accepted answers, one per line, and choose whether letter case matters.'],
+    ['short-answer', 'Fill-in-the-blank question', 'Create one blank with accepted exact-match answers, one per line, and choose whether letter case matters.'],
   ].map(([type, title, copy]) => [`question-${type}`, title, 'assessment.editor', `Choose the corresponding Question type and enter a clear prompt. ${copy} Review feedback and assessment rules, then Save question.`, `question.saved.${type}`, assessment] as Task)),
   ['question-rules', 'Assessment attempts and remediation', 'assessment.editor', 'Review Maximum attempts, Passing score, Course score weight and Remediation scene. Save question. Test retry/remediation in learner preview afterwards.', 'question.saved', assessment],
   ['remove-question', 'Remove an assessment question', 'assessment.editor', 'Remove question clears the authored item after the application confirmation. Use expendable content or skip this step.', 'question.removed', assessment],

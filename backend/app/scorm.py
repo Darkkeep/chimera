@@ -145,8 +145,16 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
         let controls = "";
         if (item.type === "single-choice" || item.type === "true-false" || item.type === "multiple-response") controls = choiceList.map(choice => `<label><input type="${item.type === "multiple-response" ? "checkbox" : "radio"}" name="assessment-response" value="${escapeHtml(choice.identifier)}" ${result.response.includes(choice.identifier) ? "checked" : ""} ${disabled ? "disabled" : ""}> ${escapeHtml(choice.text)}</label>`).join("");
         if (item.type === "ordering") controls = choiceList.map((choice, index) => `<label>${index + 1}. <select data-order-index="${index}" ${disabled ? "disabled" : ""}><option value="">Choose</option>${choiceList.map(option => `<option value="${escapeHtml(option.identifier)}" ${result.response[index] === option.identifier ? "selected" : ""}>${escapeHtml(option.text)}</option>`).join("")}</select></label>`).join("");
-        if (item.type === "matching" || item.type === "drag-drop") { const sources = item.type === "matching" ? item.leftItems : item.draggables; const targets = item.type === "matching" ? item.rightItems : item.targets; controls = sources.map(source => `<label>${escapeHtml(source.text)} <select data-match-source="${escapeHtml(source.identifier)}" ${disabled ? "disabled" : ""}><option value="">Choose a match</option>${targets.map(target => `<option value="${escapeHtml(target.identifier)}" ${result.matches[source.identifier] === target.identifier ? "selected" : ""}>${escapeHtml(target.text)}</option>`).join("")}</select></label>`).join(""); }
-        if (item.type === "short-answer") controls = `<label>Your answer <input data-text-response maxlength="1000" value="${escapeHtml(result.textResponse)}" ${disabled ? "disabled" : ""}></label>`;
+        if (item.type === "matching") { controls = item.leftItems.map(source => `<label>${escapeHtml(source.text)} <select data-match-source="${escapeHtml(source.identifier)}" ${disabled ? "disabled" : ""}><option value="">Choose a match</option>${item.rightItems.map(target => `<option value="${escapeHtml(target.identifier)}" ${result.matches[source.identifier] === target.identifier ? "selected" : ""}>${escapeHtml(target.text)}</option>`).join("")}</select></label>`).join(""); }
+        if (item.type === "drag-drop") {
+            const bank = item.draggables.filter(source => !result.matches[source.identifier]).map(source => `<button type="button" class="course-preview-drag-chip" data-drag-source="${escapeHtml(source.identifier)}" draggable="${!disabled}" aria-pressed="false" ${disabled ? "disabled" : ""}>${escapeHtml(source.text)}</button>`).join("");
+            const targets = item.targets.map(target => {
+                const placed = item.draggables.find(source => result.matches[source.identifier] === target.identifier);
+                return `<div class="course-preview-drop-target" data-drop-target="${escapeHtml(target.identifier)}"><strong>${escapeHtml(target.text)}</strong><button type="button" class="course-preview-drop-slot${placed ? " course-preview-drag-chip" : ""}" data-target-slot aria-label="Place selected tile beside ${escapeHtml(target.text)}" aria-disabled="true" ${disabled ? "disabled" : ""}>${placed ? escapeHtml(placed.text) : "Drop a tile here"}</button></div>`;
+            }).join("");
+            controls = `<div class="course-preview-drag-question"><p class="course-preview-drag-instructions">Drag a tile beside its matching label, or select a tile and then a target. Incorrect tiles return home without using an attempt.</p><div class="course-preview-draggables" role="group" aria-label="Draggable answers">${bank || "<span>All tiles placed.</span>"}</div><div class="course-preview-drop-targets" role="group" aria-label="Drop targets">${targets}</div><p class="course-preview-drag-status" role="status" aria-live="polite"></p></div>`;
+        }
+        if (item.type === "short-answer") controls = `<label>Fill in the blank <input type="text" data-text-response maxlength="1000" autocomplete="off" value="${escapeHtml(result.textResponse)}" ${disabled ? "disabled" : ""}></label>`;
         const feedback = result.attempts && result.isCorrect !== null ? `<button type="button" data-view-feedback>View feedback</button>` : "";
         const hasResponse = result.response.length || Object.keys(result.matches).length || result.textResponse.trim().length;
         return `<section class="assessment"><h3>${escapeHtml(item.prompt)}</h3><form id="assessment-form">${controls}<button type="submit" ${disabled || !hasResponse ? "disabled" : ""}>${result.isCorrect === true ? "Passed" : result.attempts >= settings(scene).maxAttempts ? "Attempts used" : result.isCorrect === false ? "Try again" : "Check answer"}</button>${feedback}</form></section>`;
@@ -195,6 +203,55 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
         if (!form) return;
         const current = () => state.assessments[scene.id] || { response: [], matches: {}, textResponse: "", attempts: 0, isCorrect: null };
         const updateSubmit = () => { const result = current(); const button = form.querySelector('[type="submit"]'); button.textContent = "Check answer"; button.disabled = !(result.response.length || Object.keys(result.matches).length || result.textResponse.trim().length) || result.isCorrect === true || result.attempts >= settings(scene).maxAttempts; };
+        if (scene.assessmentItem.type === "drag-drop") {
+            const item = scene.assessmentItem;
+            const bank = form.querySelector(".course-preview-draggables");
+            const status = form.querySelector(".course-preview-drag-status");
+            let selected = null;
+            let rejected = false;
+            const locked = () => current().isCorrect === true || current().attempts >= settings(scene).maxAttempts;
+            const select = source => {
+                selected = source;
+                bank.querySelectorAll("[data-drag-source]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.dragSource === source)));
+                form.querySelectorAll("[data-drop-target]").forEach(target => target.querySelector("[data-target-slot]").setAttribute("aria-disabled", String(locked() || !source || Object.values(current().matches).includes(target.dataset.dropTarget))));
+            };
+            const place = (sourceId, targetNode) => {
+                if (locked()) return;
+                const source = item.draggables.find(choice => choice.identifier === sourceId);
+                const target = item.targets.find(choice => choice.identifier === targetNode.dataset.dropTarget);
+                if (!source || !target || current().matches[sourceId]) return;
+                select(null);
+                if (!item.correctMatches.some(pair => pair.sourceIdentifier === sourceId && pair.targetIdentifier === target.identifier)) {
+                    rejected = true;
+                    status.textContent = `${source.text} does not belong beside ${target.text}. It has returned home. Try again.`;
+                    return;
+                }
+                state.assessments[scene.id] = { ...current(), matches: { ...current().matches, [sourceId]: target.identifier }, isCorrect: null };
+                const slot = targetNode.querySelector("[data-target-slot]");
+                slot.textContent = source.text;
+                slot.classList.add("course-preview-drag-chip");
+                [...bank.querySelectorAll("[data-drag-source]")].find(button => button.dataset.dragSource === sourceId)?.remove();
+                if (!bank.querySelector("[data-drag-source]")) bank.textContent = "All tiles placed.";
+                status.textContent = `${source.text} placed beside ${target.text}.`;
+                updateSubmit();
+                save();
+            };
+            bank.querySelectorAll("[data-drag-source]").forEach(button => {
+                button.addEventListener("click", () => { if (!locked()) { select(selected === button.dataset.dragSource ? null : button.dataset.dragSource); status.textContent = ""; } });
+                button.addEventListener("dragstart", event => { rejected = false; event.dataTransfer.setData("text/plain", button.dataset.dragSource); event.dataTransfer.effectAllowed = "move"; });
+                button.addEventListener("dragend", event => {
+                    if (!rejected || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+                    rejected = false;
+                    const home = button.getBoundingClientRect();
+                    button.animate([{ transform: `translate(${event.clientX - home.x - home.width / 2}px, ${event.clientY - home.y - home.height / 2}px)` }, { transform: "translate(0, 0)" }], { duration: 350, easing: "ease-out" });
+                });
+            });
+            form.querySelectorAll("[data-drop-target]").forEach(target => {
+                target.addEventListener("dragover", event => { if (!locked()) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; } });
+                target.addEventListener("drop", event => { event.preventDefault(); place(event.dataTransfer.getData("text/plain"), target); });
+                target.querySelector("[data-target-slot]").addEventListener("click", () => { if (selected) place(selected, target); });
+            });
+        }
         form.querySelectorAll("[name=assessment-response]").forEach(input => input.addEventListener("change", () => { const response = [...form.querySelectorAll("[name=assessment-response]:checked")].map(entry => entry.value); state.assessments[scene.id] = { ...current(), response, isCorrect: null }; updateSubmit(); }));
         form.querySelectorAll("[data-order-index]").forEach(input => input.addEventListener("change", () => { const response = [...form.querySelectorAll("[data-order-index]")].sort((a, b) => Number(a.dataset.orderIndex) - Number(b.dataset.orderIndex)).map(entry => entry.value).filter(Boolean); state.assessments[scene.id] = { ...current(), response, isCorrect: null }; updateSubmit(); }));
         form.querySelectorAll("[data-match-source]").forEach(input => input.addEventListener("change", () => { const matches = { ...current().matches, [input.dataset.matchSource]: input.value }; state.assessments[scene.id] = { ...current(), matches, isCorrect: null }; updateSubmit(); }));
