@@ -64,6 +64,10 @@ export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { 
     return true;
   }
 
+  function reportProviderOutcome(action: "save" | "test" | "disconnect") {
+    reportOnboardingOutcome(`media.provider.${action === "test" ? "tested" : action === "disconnect" ? "disconnected" : "saved"}`, onboardingScope);
+  }
+
   async function requestAction(action: "save" | "test" | "disconnect") {
     if (!status || working || narrationWorking || !status.canManage) return;
     if (action === "disconnect" && !window.confirm("Disconnect the media provider for this installation? Running requests may finish.")) return;
@@ -79,7 +83,7 @@ export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { 
       if (!response.ok) throw new Error(result.detail || "The media provider action could not be completed.");
       if (action === "test") setMessage(result.message || "Connection verified.");
       else { applyStatus(result); setMessage(action === "save" ? "Media provider settings saved." : "Media provider disconnected."); window.dispatchEvent(new Event("chimera:ai-connection-updated")); }
-      reportOnboardingOutcome(`media.provider.${action === "test" ? "tested" : action === "disconnect" ? "disconnected" : "saved"}`, onboardingScope);
+      reportProviderOutcome(action);
     } catch (issue) { setError(issue instanceof Error ? issue.message : "Media provider action failed."); }
     finally { setApiKey(""); setWorking(false); }
   }
@@ -119,7 +123,7 @@ export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { 
     <p role="status" className="ai-connection-message">{working ? "Working..." : message}</p>
     </div>
     {providers.filter(provider => provider.id !== "openai").map(provider => <div key={provider.id} role="tabpanel" id={`provider-panel-${provider.id}`} aria-labelledby={`provider-tab-${provider.id}`} hidden={activeProvider !== provider.id} tabIndex={0}>
-      {activeProvider === provider.id && activeProvider !== "openai" && <NarrationConnections key={activeProvider} provider={activeProvider} onBusyChange={setNarrationWorking} onDirtyChange={setNarrationDirty} disabled={working} />}
+      {activeProvider === provider.id && activeProvider !== "openai" && <NarrationConnections key={activeProvider} provider={activeProvider} onBusyChange={setNarrationWorking} onDirtyChange={setNarrationDirty} onActionCompleted={reportProviderOutcome} disabled={working} />}
     </div>)}
   </EditorDialog>;
 }

@@ -284,7 +284,7 @@ export function AssessmentEditor({ projectId, projectTitle, revision, scene, sce
   }
 
   return <div className="assessment-editor-backdrop" onMouseDown={(event) => event.target === event.currentTarget && !busy && onClose()}>
-    <section data-onboarding="assessment.editor" className="assessment-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="assessment-editor-title">
+    <section data-onboarding="assessment.editor" data-onboarding-journey={`question-${item.type}`} className="assessment-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="assessment-editor-title">
       <header className="assessment-editor-header">
         <div><p className="eyebrow">VERSION-NEUTRAL ASSESSMENT</p><h2 id="assessment-editor-title">{scene.title}</h2></div>
         <button className="icon-button" onClick={onClose} disabled={busy} aria-label="Close question editor"><X size={18} /></button>

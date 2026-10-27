@@ -11,7 +11,7 @@ type Collection = { revision: string; canManage: boolean; storageAvailable: bool
 type Discovery = { message?: string; has_more?: boolean; voices: { id: string; name: string; language?: string }[]; models: { id: string; name: string }[] };
 const emptyForm = (provider: MediaConnectionProvider) => ({ name: "", provider, credentialSource: (provider === "google-cloud" ? "adc" : "secure-store") as CredentialSource, voice: "", model: provider === "elevenlabs" ? "eleven_multilingual_v2" : provider === "cartesia" ? "sonic-3.6" : "", language: "en-US", projectId: "", environment: "stage" as "stage" | "v1" });
 
-export function NarrationConnections({ provider = "elevenlabs", onBusyChange, onDirtyChange, disabled = false }: { provider?: MediaConnectionProvider; onBusyChange: (busy: boolean) => void; onDirtyChange?: (dirty: boolean) => void; disabled?: boolean }) {
+export function NarrationConnections({ provider = "elevenlabs", onBusyChange, onDirtyChange, onActionCompleted, disabled = false }: { provider?: MediaConnectionProvider; onBusyChange: (busy: boolean) => void; onDirtyChange?: (dirty: boolean) => void; onActionCompleted?: (action: "save" | "test" | "disconnect") => void; disabled?: boolean }) {
   const [collection, setCollection] = useState<Collection | null>(null);
   const [selectedId, setSelectedId] = useState("");
   const [form, setForm] = useState(() => emptyForm(provider));
@@ -78,6 +78,7 @@ export function NarrationConnections({ provider = "elevenlabs", onBusyChange, on
         setMessage(`${video ? "Video" : "Narration"} connection ${action === "save" ? "saved" : "disconnected"}.`);
         window.dispatchEvent(new Event("chimera:ai-connection-updated"));
       }
+      onActionCompleted?.(action);
     } catch { setError(failureMessage); }
     finally { setApiKey(""); setWorking(false); onBusyChange(false); }
   }

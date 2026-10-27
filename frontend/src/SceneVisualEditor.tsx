@@ -210,7 +210,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
     setTemplateId("");
     setPanel("canvas");
   }
-  return <EditorDialog className="visual-editor" labelledBy="visual-editor-title" busy={busy} onClose={onClose}>
+  return <EditorDialog className="visual-editor" labelledBy="visual-editor-title" busy={busy} onClose={onClose} onboardingTarget="scene.edit" onboardingJourney={panel === "canvas" ? "canvas" : "edit-scene"}>
     <header className="visual-editor-header"><div><p className="eyebrow">SCENE EDITOR</p><h2 id="visual-editor-title">{title || scene.title}</h2></div><button type="button" className="icon-button" aria-label="Close scene editor" disabled={busy} onClick={onClose}><X size={18} /></button></header>
     <div className="visual-editor-tabs" role="tablist" aria-label="Scene editor sections">
       <button type="button" role="tab" aria-selected={panel === "canvas"} onClick={() => setPanel("canvas")}>Stage</button>
@@ -256,7 +256,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
         {draftError && <p className="visual-editor-error" role="alert">{draftError}</p>}
       </section>}
       <div className="visual-scene-details-grid">
-        <label data-onboarding="scene.edit">Scene title<input value={title} maxLength={120} onChange={event => { setTitle(event.target.value); setSceneTextDirty(true); }} /></label>
+        <label>Scene title<input value={title} maxLength={120} onChange={event => { setTitle(event.target.value); setSceneTextDirty(true); }} /></label>
         <label>Scene type<select value={sceneType} onChange={event => setSceneType(event.target.value as Scene["sceneType"])}>{[["content", "Content"], ["title", "Title"], ["question", "Question"], ["media", "Media"], ["interaction", "Interaction"], ["summary", "Summary"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <label>Rendering mode<select aria-label="Rendering mode" value={layoutMode} onChange={event => { const value = event.target.value as Scene["layoutMode"]; setLayoutMode(value); if (value !== "template") setTemplateId(""); }}>{[["fidelity", "Fidelity"], ["hybrid", "Hybrid"], ["native", "Native"], ["template", "Template"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         {layoutMode === "template" && <label>Template<select value={templateId} onChange={event => setTemplateId(event.target.value)}><option value="">Choose a template</option>{templates.map(template => <option value={template.id} key={template.id}>{template.title}</option>)}</select>{templates.length === 0 && <span className="field-hint">Upload a PPTX template in Templates before assigning one.</span>}</label>}

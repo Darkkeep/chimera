@@ -2,6 +2,14 @@
 
 Updated 2026-10-27. The active development branch is `extract-onboarding-repository`.
 
+## October 27 contextual walkthrough correction
+
+An explicit **Dismiss walkthrough** control now puts the guide away without closing forms or deleting progress. The next help request follows the current workflow, including Stage versus Details, rather than preferring the dismissed task merely because both use the same editor. Pause/Escape retain their same-task resume behavior. Nine focused dismissal/keyboard/accessibility checks passed across Chromium, Firefox and WebKit.
+
+Walkthrough start/resume now resolves the current workflow instead of offering a globally paused first-scene task in unrelated dialogs. Supported forms offer Start walkthrough independently of earlier practice; Resume appears only for matching paused progress. AI connection settings and new-scene forms have distinct surface identities. Scene-editor targets remain visible in Stage and Details; new question workflows use the selected type. Starting help preserves open drafts and does not submit providers or save content. An AI-enabled first-project walkthrough hands off to scene creation rather than stacking the optional course-drafting dialog beneath it; ordinary unguided course drafting is unchanged. See [context-aware start and resume](onboarding-implementation.md#context-aware-start-and-resume).
+
+Verification: 57 focused browser checks passed across Chromium, Firefox and WebKit (14 context/provider scenarios and five original journey scenarios per browser). Coverage includes stale review isolation, current question type, Stage/Details targets, AI-enabled project handoff, failed saves, cancelled disconnect, draft preservation and no provider submission on navigation. TypeScript/Vite build and PDF verification passed; the existing bundle-size warning remains. The shared test helper waits for DOMContentLoaded and explicit application controls rather than unrelated page-load completion. This is targeted adapter verification, not full release qualification.
+
 ## October 27 media-provider connections and help
 
 **Settings > Pythia** is the current label for the learning-intelligence diagnostics panel; internal Engine routes and contracts are unchanged. **User guide**, immediately below Templates, opens the bundled PDF in a separate tab and is available without a selected project.

@@ -25,7 +25,7 @@ import restoreIcon from "./assets/cutout-56-a86a43163042.png";
 import "./audio-requirement.css";
 import "./assessment-editor.css";
 import { createChimeraOnboarding } from "./onboarding";
-import { chimeraJourneys, reportOnboardingOutcome } from "./onboarding-journeys";
+import { chimeraJourneys, reportOnboardingOutcome, surfaceWalkthroughs, walkthroughSurface } from "./onboarding-journeys";
 import type { Step } from "@guided-workflows/onboarding";
 import { useSession } from "./AuthGate";
 import { ProjectAccessPanel } from "./ProjectAccessPanel";
@@ -160,29 +160,47 @@ export function App() {
   });
   const [guides] = useState(() => Object.fromEntries(chimeraJourneys.map(journey => [journey.id, createChimeraOnboarding(() => guideContext.current, step => guideNavigate.current(step), journey)])));
   const onboarding = guides[guideId] || guides["first-scene"];
-  const pendingGuideStart = useRef(false);
-  const [guidePaused, setGuidePaused] = useState(false);
+  const pendingGuideStart = useRef<{ restart: boolean } | null>(null);
+  const [guideState, setGuideState] = useState(() => onboarding.controller.snapshot());
+  const [guideDismissed, setGuideDismissed] = useState(false);
+  const reviewGuideSurface = useRef<{ guideId: string; index: number; surface: string } | null>(null);
   const [resumeHost, setResumeHost] = useState<Element | null>(null);
-  guideContext.current = { ...guideContext.current, projectId: project.id, sceneCount: project.storyboard.scenes.length,
+  guideContext.current = { ...guideContext.current, projectId: isCreating && !createdCourseForDraft ? "" : project.id, sceneCount: project.storyboard.scenes.length,
     assetCount: project.storyboard.assets.length, templateCount: templates.length,
     selectedSceneId: project.storyboard.scenes[selectedScene]?.id,
     assessmentSceneId: project.storyboard.scenes[selectedScene]?.sceneType === "question" ? project.storyboard.scenes[selectedScene].id : project.storyboard.scenes.find(s => s.sceneType === "question")?.id,
     questionCount: project.storyboard.scenes.filter(s => s.assessmentItem).length,
     hasImages: project.storyboard.scenes.some(s => s.imageAssets.length > 0),
     hasAudio: Boolean(project.storyboard.scenes[selectedScene]?.audioAssets.length) };
-  const currentSurface = visualSceneId || sceneDraft ? "scene.edit" : isCreating ? "project.name" : templateDraft ? "templates.edit" :
+  const currentSurface = visualSceneId ? "scene.edit" : sceneDraft ? sceneDraft.id ? "scene.edit" : "scene.form" : isCreating ? "project.name" : templateDraft ? "templates.edit" :
     showExport ? "export.panel" : showPreview ? "preview.content" : showAssessmentEditor ? "assessment.editor" :
     showAssessments ? "review.assessments" : showCompletionSettings ? "review.completion" : showEnhancementReview ? "review.enhancement" :
     showPythiaCourseReview ? "review.course" : showPythiaAnalysis ? "pythia.analysis" : showPythiaTransform ? "pythia.transform" :
-    showPythiaAssessmentDesign ? "pythia.assessment" : showIntelligenceEngine ? "settings.engine" :
+    showPythiaAssessmentDesign ? "pythia.assessment" : showIntelligenceEngine ? "settings.engine" : showAIConnection ? "settings.media" :
+    showProjectBackground ? "storyboard.background" :
     showAccessibility ? "review.accessibility" : showValidation ? "review.validation" :
     showGoldenPath ? "catalog" : showManagement ? "workspace.management" : activeView;
   const hasOpenForm = Boolean(visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showProjectBackground || showAccessibility || showValidation);
+  const selectedJourney = chimeraJourneys.find(journey => journey.id === guideId) || chimeraJourneys[0];
+  const selectedGuideSurface = walkthroughSurface(guideState.step.target || selectedJourney.steps[0].target);
+  const guideMatchesSurface = !guideDismissed && selectedGuideSurface === currentSurface;
+  const guideVisible = ["active", "preparing", "blocked"].includes(guideState.status);
+  const canOfferWalkthrough = !guideVisible && (guideMatchesSurface || Boolean(surfaceWalkthroughs[currentSurface]));
+  const walkthroughLabel = guideMatchesSurface && guideState.status === "paused" ? "Resume walkthrough" : "Start walkthrough";
+  function contextualWalkthrough() {
+    if (currentSurface === "storyboard" && guideId === "first-scene" && ["complete", "finished"].includes(guideState.status) && project.storyboard.scenes.length > 0) return "edit-scene";
+    if (guideMatchesSurface) return guideId;
+    const markedJourney = document.querySelector('[role="dialog"][aria-modal="true"] [data-onboarding-journey], [role="dialog"][aria-modal="true"][data-onboarding-journey]')?.getAttribute("data-onboarding-journey");
+    if (markedJourney && guides[markedJourney]) return markedJourney;
+    if (guideDismissed && currentSurface === "storyboard") return project.storyboard.scenes.length ? "edit-scene" : project.id ? "import-deck" : "first-scene";
+    if (guideDismissed && currentSurface === "catalog") return "workspace";
+    return surfaceWalkthroughs[currentSurface] || (!hasOpenForm ? guideId : undefined);
+  }
   guideNavigate.current = (step) => {
     const target = step.target;
     if (!target) return;
-    if (step.id === "review") return;
-    if (step.id === "project") { beginProjectCreate(); return; }
+    if (step.id === "review") { setShowManagement(false); setActiveView("storyboard"); return; }
+    if (step.id === "project") { if (!isCreating) beginProjectCreate(); return; }
     if (step.id === "scene") { setShowManagement(false); setActiveView("storyboard"); if (!sceneDraft) beginSceneCreate(); return; }
     // Keep the same form mounted across steps/resume so application drafts survive.
     if (target === currentSurface || (target === "preview.comments" && showPreview)) return;
@@ -210,13 +228,14 @@ export function App() {
     else if (target === "workspace.appearance") setShowSettings(true);
     else if (target === "workspace.management") setShowManagement(true);
   };
-  useEffect(() => onboarding.controller.subscribe(state => setGuidePaused(state.status === "paused")), [onboarding]);
+  useEffect(() => onboarding.controller.subscribe(setGuideState), [onboarding]);
   useEffect(() => {
-    const unmount = onboarding.mount();
+    const unmount = onboarding.mount(() => setGuideDismissed(true));
     if (pendingGuideStart.current) {
-      pendingGuideStart.current = false;
+      const options = pendingGuideStart.current;
+      pendingGuideStart.current = null;
       onboarding.controller.setScope(project.id || "workspace");
-      onboarding.controller.start({ restart: ["complete", "finished"].includes(onboarding.controller.snapshot().status) });
+      onboarding.controller.start(options);
     }
     return unmount;
   }, [onboarding]);
@@ -235,22 +254,35 @@ export function App() {
     const state = onboarding.controller.snapshot();
     if (state.status !== "active") return;
     const target = state.step.target || "";
-    const expected = target === "project.name" ? "project.name" : target === "scene.form" ? "scene.edit" :
-      target.startsWith("storyboard.") || target === "scene.saved" || target === "scene.audio" ? "storyboard" :
-      target.startsWith("media.") ? "media" : target.startsWith("templates.") ? target === "templates.edit" ? target : "templates" :
-      target === "preview.comments" ? "preview.content" : target;
+    if (!target) {
+      const previous = reviewGuideSurface.current;
+      if (!previous || previous.guideId !== guideId || previous.index !== state.index) {
+        reviewGuideSurface.current = { guideId, index: state.index, surface: currentSurface };
+      } else if (previous.surface !== currentSurface) onboarding.controller.pause();
+      return;
+    }
+    const expected = walkthroughSurface(target);
     if (target && expected !== currentSurface && !target.startsWith("workspace.project") && !target.startsWith("workspace.appearance")) onboarding.controller.pause();
-  }, [currentSurface, onboarding]);
-  useEffect(() => { setResumeHost(guidePaused ? document.querySelector('[role="dialog"][aria-modal="true"]') : null); }, [guidePaused, currentSurface]);
-  function startOnboarding(id = guideId) {
+  }, [currentSurface, onboarding, guideId, guideState.index, guideState.status]);
+  useEffect(() => { setResumeHost(canOfferWalkthrough ? document.querySelector('[role="dialog"][aria-modal="true"]') : null); }, [canOfferWalkthrough, currentSurface]);
+  function startOnboarding(requestedId?: string) {
+    const id = requestedId || (!project.id && !hasOpenForm ? "first-scene" : contextualWalkthrough());
+    if (!id) { setFeedback("No walkthrough is available for this form yet. Your edits are preserved; use Guided review after closing it to choose another task."); return; }
     const requested = guides[id] || guides["first-scene"];
     const progress = requested.controller.snapshot();
-    const ownForm = id === guideId && progress.status === "paused" && (progress.step.target === currentSurface || (progress.step.id === "scene" && sceneDraft) || (progress.step.id === "project" && isCreating) || (progress.step.target === "preview.comments" && showPreview));
+    const journey = chimeraJourneys.find(item => item.id === id) || chimeraJourneys[0];
+    const ownForm = walkthroughSurface(progress.step.target || journey.steps[0].target) === currentSurface ||
+      id === "first-scene" && (currentSurface === "scene.form" || currentSurface === "project.name");
     if (busy || (hasOpenForm && !ownForm)) { setFeedback("Finish or close your current form before starting a walkthrough. Your edits are preserved."); return; }
+    reviewGuideSurface.current = null;
+    setGuideDismissed(false);
     setShowGoldenPath(false);
     try { localStorage.setItem("chimera.onboarding.selected", id); } catch { /* In-memory selection remains available. */ }
-    if (id !== guideId) { onboarding.controller.pause(); pendingGuideStart.current = true; setGuideId(id); }
-    else requested.controller.start({ restart: ["complete", "finished"].includes(progress.status) });
+    const restart = ["complete", "finished"].includes(progress.status) ||
+      !requestedId && id !== guideId && progress.index > 0 ||
+      id === "first-scene" && !guideMatchesSurface && hasOpenForm;
+    if (id !== guideId) { onboarding.controller.pause(); pendingGuideStart.current = { restart }; setGuideId(id); }
+    else requested.controller.start({ restart });
   }
 
   function applyProject(updatedProject: Project) {
@@ -418,8 +450,9 @@ export function App() {
       setActiveView("storyboard");
       setShowManagement(false);
       setCourseDesignFiles([]);
-      setCreatedCourseForDraft(Boolean(aiConfiguredForProject));
-      if (!aiConfiguredForProject) {
+      const keepCourseDesignOpen = Boolean(aiConfiguredForProject) && !(guideState.status === "active" && guideState.step.id === "project");
+      setCreatedCourseForDraft(keepCourseDesignOpen);
+      if (!keepCourseDesignOpen) {
         setIsCreating(false);
         setTitle("");
         setAiConfiguredForProject(null);
@@ -1264,7 +1297,7 @@ export function App() {
       onClose={() => setShowAssessmentEditor(false)}
       onProjectUpdated={applyProject}
     />}
-    {isCreating && <EditorDialog onResumeWalkthrough={guidePaused ? () => onboarding.controller.start() : undefined} labelledBy="create-project-title" onClose={() => { if (createdCourseForDraft) setTitle(""); setIsCreating(false); setCourseDesignFiles([]); setCourseResourceIds([]); setCreatedCourseForDraft(false); setCourseDraft(null); setCourseDraftError(""); setCoursePrompt(""); }} busy={busy}>
+    {isCreating && <EditorDialog onResumeWalkthrough={canOfferWalkthrough ? () => startOnboarding() : undefined} walkthroughLabel={walkthroughLabel} labelledBy="create-project-title" onClose={() => { if (createdCourseForDraft) setTitle(""); setIsCreating(false); setCourseDesignFiles([]); setCourseResourceIds([]); setCreatedCourseForDraft(false); setCourseDraft(null); setCourseDraftError(""); setCoursePrompt(""); }} busy={busy}>
       <div className="modal-head"><div><p className="eyebrow">{createdCourseForDraft ? "COURSE DRAFTING" : "NEW PROJECT"}</p><h2 id="create-project-title">{createdCourseForDraft ? "Draft course scenes" : "Name your course"}</h2></div><button className="icon-button" onClick={() => { if (createdCourseForDraft) setTitle(""); setIsCreating(false); setCourseDesignFiles([]); setCourseResourceIds([]); setCreatedCourseForDraft(false); setCourseDraft(null); setCourseDraftError(""); setCoursePrompt(""); }} disabled={busy} aria-label={createdCourseForDraft ? "Close course drafting" : "Close new project"}><X size={18} /></button></div>
       {!createdCourseForDraft ? <>
         {creatingParent && <p className="field-hint">Creating a subproject of <strong>{creatingParent.title}</strong>. Content, settings, permissions, and exports are independent.</p>}
@@ -1288,11 +1321,11 @@ export function App() {
         <div className="modal-actions"><button type="button" className="button button-outline" disabled={busy} onClick={() => { setIsCreating(false); setTitle(""); setCreatedCourseForDraft(false); setCourseResourceIds([]); setCourseDraftError(""); setCoursePrompt(""); setCourseDraft(null); }}>Done</button>{courseDraft && <button type="button" className="button button-accent" disabled={busy || !courseDraft.some(item => item.included)} onClick={() => void applyCourseContentDraft()}><Check size={15} /> Add selected scenes</button>}</div>
       </section>}
     </EditorDialog>}
-    {sceneDraft && <EditorDialog onResumeWalkthrough={guidePaused ? () => onboarding.controller.start() : undefined} className="scene-editor" labelledBy="scene-editor-title" onClose={() => setSceneDraft(null)} busy={busy}><div className="modal-head"><div><p className="eyebrow">SCENE SETTINGS</p><h2 id="scene-editor-title">{sceneDraft.id ? "Edit scene" : "New scene"}</h2></div><button className="icon-button" onClick={() => setSceneDraft(null)} disabled={busy} aria-label="Close scene editor"><X size={18} /></button></div><label data-onboarding={sceneDraft.id ? "scene.edit" : "scene.form"}>Scene title<input value={sceneDraft.title} maxLength={120} onChange={(event) => setSceneDraft({ ...sceneDraft, title: event.target.value })} /></label><label>Scene type<select value={sceneDraft.sceneType} onChange={(event) => setSceneDraft({ ...sceneDraft, sceneType: event.target.value as SceneType })}><option value="content">Content</option><option value="title">Title</option><option value="question">Question</option><option value="media">Media</option><option value="interaction">Interaction</option><option value="summary">Summary</option></select></label><label>Scene layout<select value={sceneDraft.layoutMode} onChange={(event) => setSceneDraft({ ...sceneDraft, layoutMode: event.target.value as LayoutMode, templateId: event.target.value === "template" ? sceneDraft.templateId : "" })}><option value="fidelity">Fidelity</option><option value="hybrid">Hybrid</option><option value="native">Native</option><option value="template">Template</option></select></label>{sceneDraft.layoutMode === "template" && <label>Template<select value={sceneDraft.templateId} onChange={(event) => setSceneDraft({ ...sceneDraft, templateId: event.target.value })}><option value="">Choose a template</option>{templates.map((template) => <option value={template.id} key={template.id}>{template.title}</option>)}</select>{templates.length === 0 && <span className="field-hint">Upload a PPTX template in the Templates section first.</span>}</label>}<label>On-screen text<textarea rows={5} value={sceneDraft.screenText} onChange={(event) => setSceneDraft({ ...sceneDraft, screenText: event.target.value })} /></label><label>Action description<textarea rows={3} maxLength={5000} value={sceneDraft.actionDescription} onChange={(event) => setSceneDraft({ ...sceneDraft, actionDescription: event.target.value })} placeholder="Describe movement, interaction, or timed actions shown in this scene" /></label><label>Speaker notes<textarea rows={4} value={sceneDraft.notes} onChange={(event) => setSceneDraft({ ...sceneDraft, notes: event.target.value })} /></label>
+    {sceneDraft && <EditorDialog onResumeWalkthrough={canOfferWalkthrough ? () => startOnboarding() : undefined} walkthroughLabel={walkthroughLabel} className="scene-editor" labelledBy="scene-editor-title" onClose={() => setSceneDraft(null)} busy={busy}><div className="modal-head"><div><p className="eyebrow">SCENE SETTINGS</p><h2 id="scene-editor-title">{sceneDraft.id ? "Edit scene" : "New scene"}</h2></div><button className="icon-button" onClick={() => setSceneDraft(null)} disabled={busy} aria-label="Close scene editor"><X size={18} /></button></div><label data-onboarding={sceneDraft.id ? "scene.edit" : "scene.form"}>Scene title<input value={sceneDraft.title} maxLength={120} onChange={(event) => setSceneDraft({ ...sceneDraft, title: event.target.value })} /></label><label>Scene type<select value={sceneDraft.sceneType} onChange={(event) => setSceneDraft({ ...sceneDraft, sceneType: event.target.value as SceneType })}><option value="content">Content</option><option value="title">Title</option><option value="question">Question</option><option value="media">Media</option><option value="interaction">Interaction</option><option value="summary">Summary</option></select></label><label>Scene layout<select value={sceneDraft.layoutMode} onChange={(event) => setSceneDraft({ ...sceneDraft, layoutMode: event.target.value as LayoutMode, templateId: event.target.value === "template" ? sceneDraft.templateId : "" })}><option value="fidelity">Fidelity</option><option value="hybrid">Hybrid</option><option value="native">Native</option><option value="template">Template</option></select></label>{sceneDraft.layoutMode === "template" && <label>Template<select value={sceneDraft.templateId} onChange={(event) => setSceneDraft({ ...sceneDraft, templateId: event.target.value })}><option value="">Choose a template</option>{templates.map((template) => <option value={template.id} key={template.id}>{template.title}</option>)}</select>{templates.length === 0 && <span className="field-hint">Upload a PPTX template in the Templates section first.</span>}</label>}<label>On-screen text<textarea rows={5} value={sceneDraft.screenText} onChange={(event) => setSceneDraft({ ...sceneDraft, screenText: event.target.value })} /></label><label>Action description<textarea rows={3} maxLength={5000} value={sceneDraft.actionDescription} onChange={(event) => setSceneDraft({ ...sceneDraft, actionDescription: event.target.value })} placeholder="Describe movement, interaction, or timed actions shown in this scene" /></label><label>Speaker notes<textarea rows={4} value={sceneDraft.notes} onChange={(event) => setSceneDraft({ ...sceneDraft, notes: event.target.value })} /></label>
       <label className="required-toggle"><input type="checkbox" checked={sceneDraft.required} onChange={(event) => setSceneDraft({ ...sceneDraft, required: event.target.checked })} /> Required scene</label>
       {error && <p className="export-error" role="alert">{error}</p>}<div className="modal-actions"><button className="button button-outline" onClick={() => setSceneDraft(null)} disabled={busy}>Cancel</button><button className="button button-accent" onClick={saveScene} disabled={busy || !sceneDraft.title.trim() || (sceneDraft.layoutMode === "template" && !sceneDraft.templateId)}>{sceneDraft.id ? "Save changes" : "Create scene"} <Check size={15} /></button></div></EditorDialog>}
       {templateDraft && <EditorDialog className="scene-editor" labelledBy="template-editor-title" onClose={() => setTemplateDraft(null)} busy={busy}><div data-onboarding="templates.edit" className="modal-head"><div><p className="eyebrow">TEMPLATE LIBRARY</p><h2 id="template-editor-title">Edit template</h2></div><button className="icon-button" onClick={() => setTemplateDraft(null)} disabled={busy} aria-label="Close template editor"><X size={18} /></button></div><label>Template name<input value={templateDraft.title} maxLength={120} onChange={(event) => setTemplateDraft({ ...templateDraft, title: event.target.value })} /></label><label>Description<textarea rows={4} value={templateDraft.description} maxLength={1000} onChange={(event) => setTemplateDraft({ ...templateDraft, description: event.target.value })} /></label>
       {error && <p className="export-error" role="alert">{error}</p>}<div className="modal-actions"><button className="button button-outline" onClick={() => setTemplateDraft(null)} disabled={busy}>Cancel</button><button className="button button-accent" onClick={saveTemplate} disabled={busy || !templateDraft.title.trim()}>Save template <Check size={15} /></button></div></EditorDialog>}
-    {guidePaused && resumeHost && !sceneDraft && !isCreating && createPortal(<button type="button" className="button button-outline" disabled={busy} onClick={() => onboarding.controller.start()}>Resume walkthrough</button>, resumeHost)}
+    {canOfferWalkthrough && resumeHost && !sceneDraft && !isCreating && createPortal(<button type="button" className="button button-outline" disabled={busy} onClick={() => startOnboarding()}>{walkthroughLabel}</button>, resumeHost)}
     </div>;
 }
