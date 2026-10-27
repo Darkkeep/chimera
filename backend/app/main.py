@@ -40,6 +40,7 @@ from .media_generation import media_provider_configured
 from .media_routes import router as media_router
 from .learning_intelligence import PythiaProvider, PythiaUnavailableError, validate_assessment_blueprint, validate_course_review, validate_storyboard_analysis, validate_storyboard_transformation
 from .ai_connection import ConnectionRevision, ConnectionUpdate, connection_status, disconnect_connection, save_connection, test_connection
+from .narration_connections import SPEECH_PROVIDERS, NarrationConnectionUpdate, disconnect_narration_connection, narration_status, save_narration_connection, test_narration_connection
 from .word_export import DOCX_MEDIA_TYPE, FULL_TEMPLATE_PATH, SME_TEMPLATE_PATH, TemplateArtworkError, build_full_storyboard_docx, build_sme_storyboard_docx, build_storyboard_docx
 from .deployment import cors_origins, installation_policy, public_origin
 from .password_auth import AccountStore, COOKIE, HostedAuthorizationPolicy, LoginRequest, ResetPasswordRequest, ReviewInvitationRequest, SESSION_SECONDS, require_origin
@@ -82,6 +83,8 @@ ROUTE_ACTIONS = {
     "get_enhancement_jobs": "project.view", "get_ai_connection": "identity.view",
     "get_intelligence_engine": "identity.view",
     "put_ai_connection": "admin.policy.manage", "post_ai_disconnect": "admin.policy.manage", "post_ai_test": "admin.policy.manage",
+    "get_narration_connections": "identity.view", "put_narration_connection": "admin.policy.manage",
+    "post_narration_disconnect": "admin.policy.manage", "post_narration_test": "admin.policy.manage",
     "get_media_generation_capability": "project.view", "get_media_generation_jobs": "project.view",
     "post_media_generation_job": "media.job.create", "get_media_generation_job": "project.view",
     "post_media_generation_job_cancel": "media.job.manage", "post_media_generation_job_retry": "media.job.manage",
@@ -141,7 +144,7 @@ def _hosted_request_action(request: Request) -> str:
         return "project.restore"
     if path == "/api/trash/projects":
         return "workspace.view"
-    if path.startswith("/api/ai-connection"):
+    if path.startswith(("/api/ai-connection", "/api/narration-connections")):
         return "identity.self" if request.method == "GET" else "admin.policy.manage"
     if "/shared-media" in path:
         return "media.manage"
@@ -286,7 +289,7 @@ app.include_router(media_router)
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(request: Request, error: RequestValidationError):
-    if request.url.path.startswith("/api/ai-connection"):
+    if request.url.path.startswith(("/api/ai-connection", "/api/narration-connections")):
         return JSONResponse({"detail": "Provide an approved provider, supported models, a valid key, and valid request limits."}, status_code=422, headers={"Cache-Control": "no-store"})
     if request.url.path in {"/api/auth/login", "/api/auth/reset-password"}:
         return JSONResponse({"detail": "Provide an email and a password of at most 1024 characters"}, status_code=422, headers={"Cache-Control": "no-store"})
@@ -1791,6 +1794,54 @@ def get_ai_connection() -> dict:
     return {**connection_status(ROOT), "canManage": get_authorization_policy().allows(get_actor_context(), "admin.policy.manage")}
 
 
+@app.get("/api/narration-connections")
+def get_narration_connections() -> dict:
+    return {**narration_status(ROOT), "canManage": get_authorization_policy().allows(get_actor_context(), "admin.policy.manage")}
+
+
+@app.put("/api/narration-connections")
+def put_narration_connection(request: Request, data: NarrationConnectionUpdate) -> dict:
+    _require_ai_origin(request)
+    from keyring.errors import KeyringError
+    try:
+        with storyboard_transaction():
+            save_narration_connection(ROOT, data)
+            _record_ai_event("narration.connection_saved")
+        return get_narration_connections()
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    except (RuntimeError, OSError, KeyringError):
+        raise HTTPException(503, "Provider settings could not be saved securely. Check the backend credential store and workspace permissions.") from None
+
+
+@app.post("/api/narration-connections/{connection_id}/disconnect")
+def post_narration_disconnect(connection_id: str, request: Request, data: ConnectionRevision) -> dict:
+    _require_ai_origin(request)
+    from keyring.errors import KeyringError
+    try:
+        with storyboard_transaction():
+            disconnect_narration_connection(ROOT, connection_id, data.expectedRevision)
+            _record_ai_event("narration.connection_disconnected")
+        return get_narration_connections()
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    except (RuntimeError, OSError, KeyringError):
+        raise HTTPException(503, "Provider disconnection could not finish. Check the backend credential store and workspace permissions.") from None
+
+
+@app.post("/api/narration-connections/{connection_id}/test")
+def post_narration_test(connection_id: str, request: Request, data: ConnectionRevision) -> dict:
+    _require_ai_origin(request)
+    try:
+        result = test_narration_connection(ROOT, connection_id, data.expectedRevision)
+        _record_ai_event("narration.connection_tested")
+        return result
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(503, str(error)) from error
+
+
 @app.get("/api/intelligence-engine", name="get_intelligence_engine")
 def get_intelligence_engine() -> dict[str, object]:
     provider = _pythia_provider()
@@ -1857,13 +1908,20 @@ def post_ai_test(request: Request, data: ConnectionRevision) -> dict:
 
 
 @app.get("/api/projects/{project_id}/media-generation-capability")
-def get_media_generation_capability(project_id: str) -> dict[str, bool]:
+def get_media_generation_capability(project_id: str) -> dict:
     try:
         read_project(project_id)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
+    image = connection_status(ROOT)
+    narration = narration_status(ROOT)
+    connections = [item for item in narration["connections"] if item["provider"] in SPEECH_PROVIDERS and item["configured"] and item["voice"]]
+    if image["configured"]:
+        connections.insert(0, {"id": "legacy-openai", "name": "Existing AI connection", "provider": image["provider"], "voice": "alloy", "model": image["audioModel"], "language": "en-US"})
     return {
-        "providerConfigured": media_provider_configured(),
+        "providerConfigured": image["configured"] or bool(connections),
+        "imageConfigured": image["configured"],
+        "narrationConnections": connections,
         "canGenerate": get_authorization_policy().allows(get_actor_context(), "media.job.create", project_id),
     }
 
@@ -1886,6 +1944,8 @@ def post_media_generation_job(project_id: str, data: MediaGenerationJobCreate) -
         raise HTTPException(status_code=404, detail="Project not found") from error
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @app.get("/api/projects/{project_id}/media-generation-jobs/{job_id}", response_model=MediaGenerationJob)
@@ -1914,6 +1974,8 @@ def post_media_generation_job_retry(project_id: str, job_id: str) -> MediaGenera
         raise HTTPException(status_code=404, detail="Media generation job not found") from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @app.get("/api/projects/{project_id}/generated-candidates", response_model=list[GeneratedAssetCandidate])
@@ -1960,6 +2022,8 @@ def post_generated_candidate_regeneration(project_id: str, candidate_id: str) ->
         raise HTTPException(status_code=404, detail="Generated candidate not found") from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @app.get("/api/projects/{project_id}/generated-candidates/{candidate_id}/asset")

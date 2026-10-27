@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, Save, Unplug, X } from "lucide-react";
 import { EditorDialog } from "./EditorDialog";
+import { NarrationConnections } from "./NarrationConnections";
+import type { MediaConnectionProvider } from "./NarrationConnections";
 import { reportOnboardingOutcome } from "./onboarding-journeys";
 import "./ai-connection.css";
 
@@ -10,6 +12,11 @@ type ConnectionStatus = {
   textModel: string; imageModel: string; audioModel: string; textModels: string[]; imageModels: string[]; audioModels: string[];
   maxRequestsPerDay: number; maxConcurrentRequests: number;
 };
+const providers: { id: "openai" | MediaConnectionProvider; name: string }[] = [
+  { id: "openai", name: "OpenAI" }, { id: "elevenlabs", name: "ElevenLabs" },
+  { id: "google-cloud", name: "Google Cloud" }, { id: "cartesia", name: "Cartesia" },
+  { id: "synthesia", name: "Synthesia" }, { id: "shotstack", name: "Shotstack" },
+];
 
 export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { onClose: () => void; onboardingScope?: string }) {
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
@@ -21,8 +28,11 @@ export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { 
   const [concurrentLimit, setConcurrentLimit] = useState(1);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [narrationWorking, setNarrationWorking] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [activeProvider, setActiveProvider] = useState<"openai" | MediaConnectionProvider>("openai");
+  const [narrationDirty, setNarrationDirty] = useState(false);
 
   function applyStatus(next: ConnectionStatus) {
     setStatus(next);
@@ -43,10 +53,19 @@ export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { 
   }, []);
 
   const dirty = Boolean(status && (apiKey || textModel !== status.textModel || imageModel !== status.imageModel || audioModel !== status.audioModel || dailyLimit !== status.maxRequestsPerDay || concurrentLimit !== status.maxConcurrentRequests));
-  const editable = Boolean(status?.canManage && status.storageAvailable);
+  const editable = Boolean(status?.canManage && status.storageAvailable && !narrationWorking);
+
+  function selectProvider(provider: typeof activeProvider) {
+    if (provider === activeProvider) return true;
+    if (working || narrationWorking) return false;
+    if ((activeProvider === "openai" ? dirty : narrationDirty) && !window.confirm("Discard unsaved connection changes and switch provider?")) return false;
+    if (activeProvider === "openai" && status) applyStatus(status);
+    setApiKey(""); setError(""); setMessage(""); setNarrationDirty(false); setActiveProvider(provider);
+    return true;
+  }
 
   async function requestAction(action: "save" | "test" | "disconnect") {
-    if (!status || working || !status.canManage) return;
+    if (!status || working || narrationWorking || !status.canManage) return;
     if (action === "disconnect" && !window.confirm("Disconnect the media provider for this installation? Running requests may finish.")) return;
     setWorking(true);
     setError("");
@@ -65,8 +84,19 @@ export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { 
     finally { setApiKey(""); setWorking(false); }
   }
 
-  return <EditorDialog onboardingTarget="settings.media" labelledBy="ai-connection-title" onClose={() => { setApiKey(""); onClose(); }} busy={working} className="ai-connection-dialog">
-    <header className="ai-connection-header"><h2 id="ai-connection-title">AI connection</h2><button type="button" className="icon-button" aria-label="Close media provider settings" title="Close media provider settings" disabled={working} onClick={onClose}><X size={18} /></button></header>
+  return <EditorDialog onboardingTarget="settings.media" labelledBy="ai-connection-title" onClose={() => { setApiKey(""); onClose(); }} busy={working || narrationWorking} className="ai-connection-dialog">
+    <header className="ai-connection-header"><h2 id="ai-connection-title">AI connection</h2><button type="button" className="icon-button" aria-label="Close media provider settings" title="Close media provider settings" disabled={working || narrationWorking} onClick={onClose}><X size={18} /></button></header>
+    <div role="tablist" aria-label="AI providers" className="ai-provider-tabs">
+      {providers.map((provider, index) => <button key={provider.id} type="button" role="tab" id={`provider-tab-${provider.id}`} aria-controls={`provider-panel-${provider.id}`} aria-selected={activeProvider === provider.id} tabIndex={activeProvider === provider.id ? 0 : -1} disabled={working || narrationWorking} onClick={() => selectProvider(provider.id)} onKeyDown={event => {
+        const nextIndex = event.key === "ArrowRight" ? (index + 1) % providers.length : event.key === "ArrowLeft" ? (index + providers.length - 1) % providers.length : event.key === "Home" ? 0 : event.key === "End" ? providers.length - 1 : -1;
+        if (nextIndex < 0) return;
+        event.preventDefault();
+        const next = providers[nextIndex].id;
+        if (selectProvider(next)) event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`#provider-tab-${next}`)?.focus();
+      }}>{provider.name}</button>)}
+    </div>
+    <div role="tabpanel" id="provider-panel-openai" aria-labelledby="provider-tab-openai" hidden={activeProvider !== "openai"} tabIndex={0}>
+    <h3>OpenAI image / legacy narration</h3>
     {loading ? <p role="status">Loading connection...</p> : status && <>
       <dl className="ai-connection-status"><div><dt>Media provider</dt><dd>{status.configured ? "Configured" : "Not configured"}</dd></div><div><dt>Source</dt><dd>{status.source === "environment" ? "Server environment" : status.source === "saved" ? "Saved connection" : "None"}</dd></div><div><dt>Credential</dt><dd>{status.keyConfigured ? "Configured" : "Credential not stored"}</dd></div></dl>
       {!status.canManage && <p className="ai-connection-notice">Only installation administrators can change media provider settings.</p>}
@@ -82,10 +112,14 @@ export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { 
           <label>Concurrent request limit<input type="number" min={1} max={4} value={concurrentLimit} onChange={event => setConcurrentLimit(Number(event.target.value))} /></label>
         </fieldset>
         <p className="ai-connection-notice">Media generation sends its prompt and selected scene context to the provider and may incur charges. Request limits are not spending limits.</p>
-        <footer className="ai-connection-actions"><button type="submit" className="button button-accent" disabled={!editable || working || (!apiKey.trim() && !status.keyConfigured) || !dirty}><Save size={15} />Save media settings</button><button type="button" className="button button-outline" disabled={working || !status.configured || dirty} onClick={() => void requestAction("test")}><Link size={15} />Test provider</button><button type="button" className="button button-outline" disabled={working || !status.configured} onClick={() => void requestAction("disconnect")}><Unplug size={15} />Disconnect</button></footer>
+        <footer className="ai-connection-actions"><button type="submit" className="button button-accent" disabled={!editable || working || (!apiKey.trim() && !status.keyConfigured) || !dirty}><Save size={15} />Save media settings</button><button type="button" className="button button-outline" disabled={working || narrationWorking || !status.configured || dirty} onClick={() => void requestAction("test")}><Link size={15} />Test provider</button><button type="button" className="button button-outline" disabled={working || narrationWorking || !status.configured} onClick={() => void requestAction("disconnect")}><Unplug size={15} />Disconnect</button></footer>
       </form> : <dl className="ai-connection-status"><div><dt>Image model</dt><dd>{status.imageModel}</dd></div><div><dt>Audio model</dt><dd>{status.audioModel}</dd></div></dl>}
     </>}
     {error && <p role="alert" className="ai-connection-error">{error}</p>}
     <p role="status" className="ai-connection-message">{working ? "Working..." : message}</p>
+    </div>
+    {providers.filter(provider => provider.id !== "openai").map(provider => <div key={provider.id} role="tabpanel" id={`provider-panel-${provider.id}`} aria-labelledby={`provider-tab-${provider.id}`} hidden={activeProvider !== provider.id} tabIndex={0}>
+      {activeProvider === provider.id && activeProvider !== "openai" && <NarrationConnections key={activeProvider} provider={activeProvider} onBusyChange={setNarrationWorking} onDirtyChange={setNarrationDirty} disabled={working} />}
+    </div>)}
   </EditorDialog>;
 }

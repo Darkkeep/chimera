@@ -4,6 +4,10 @@ Status: Release qualification in progress; the integrated authoring, enhancement
 
 Prepared: 2026-09-30
 
+## Current media-provider disposition - 2026-10-27
+
+The six-tab **Settings > AI connection** dialog separates OpenAI images/legacy narration; ElevenLabs, Google Cloud and Cartesia MP3 narration; and Synthesia/Shotstack setup/testing only. Video generation remains future work, distinct from existing uploaded-video authoring/playback. Media adapters use server credentials, explicit connection selection and candidate review; they do not configure Pythia's learning-intelligence providers. See [current work](current-work.md#october-27-media-provider-connections-and-help), [provider setup](ai-connection.md) and [media placement](media-placement-and-ocr.md#generated-media-and-provider-boundaries). Dated baseline tables below retain their original scope rather than overriding this disposition.
+
 ## Current disposition - 2026-10-15
 
 This document preserves the original delivery sequence. The executable status is now the [completion plan](completion-plan-2026-10-15.md) and [execution record](completion-update-2026-10-15.md). Authentication and fixed-revision review links are implemented; remaining hosted/Encarta qualification is deferred for this update. Narration is modeled and exported. New work adds project-pinned shared media, course-wide/scene placement, imported captioned video, local versioned OCR with author inspection, Word provenance/discussion, and resume budgets. Historical remaining-work table entries below must be read with this disposition; future UI/API breadth is not a missing baseline prerequisite.

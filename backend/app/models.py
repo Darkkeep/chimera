@@ -884,6 +884,7 @@ class ReviewCommentDecision(BaseModel):
 
 class MediaGenerationJobCreate(BaseModel):
     kind: Literal["image", "narration"]
+    narrationConnectionId: str | None = Field(default=None, pattern=r"^(?:legacy-openai|narration-[a-f0-9]{12})$")
     sceneId: str
     purpose: str = Field(min_length=1, max_length=2000)
     style: str = Field(default="", max_length=2000)
@@ -910,6 +911,7 @@ class MediaGenerationJob(BaseModel):
     projectId: str
     sourceRevision: int
     aiConnectionRevision: str | None = None
+    narrationConnectionId: str | None = None
     sceneId: str
     kind: Literal["image", "narration"]
     purpose: str
@@ -940,6 +942,7 @@ class GeneratedAssetCandidate(BaseModel):
     id: str
     projectId: str
     jobId: str
+    narrationConnectionId: str | None = None
     sourceRevision: int
     sceneId: str
     kind: Literal["image", "audio"]

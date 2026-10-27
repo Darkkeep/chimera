@@ -2,6 +2,27 @@
 
 Updated 2026-10-27. The active development branch is `extract-onboarding-repository`.
 
+## October 27 media-provider connections and help
+
+**Settings > Pythia** is the current label for the learning-intelligence diagnostics panel; internal Engine routes and contracts are unchanged. **User guide**, immediately below Templates, opens the bundled PDF in a separate tab and is available without a selected project.
+
+**Settings > AI connection** now has six keyboard-accessible provider tabs:
+
+| Provider | Implemented scope |
+| --- | --- |
+| OpenAI | Existing images and legacy narration; prior saved/environment configurations and old jobs remain compatible |
+| ElevenLabs | Named connections, voice/model discovery and MP3 narration candidates |
+| Google Cloud | Server ADC, voice discovery, optional quota project and MP3 narration candidates |
+| Cartesia | Named connections, voice discovery and versioned MP3 narration adapter; default `sonic-3.6` |
+| Synthesia | Secure connection setup and read-only video-list test only; video generation is not yet available |
+| Shotstack | Separate sandbox/production connection settings and read-only template-list test only; video generation is not yet available |
+
+Non-OpenAI keys use a supported OS credential store or fixed server environment variables; Google uses Application Default Credentials, never a pasted/uploaded private key. Shared installations require administrator permission for save/test/disconnect. Entered keys are write-only and cleared after actions or confirmed tab changes. Narration generation explicitly selects a saved connection with a voice, preserves its identity for regeneration, and fails rather than falling back when it is removed or changed. Video setup does not enable media generation. See [provider setup and limits](ai-connection.md).
+
+Latest targeted verification: the six-provider backend regression selection ran 123 tests (122 passed, one skipped); the final provider browser spec passed 36 checks across Chromium, Firefox and WebKit, including light/dark desktop/mobile accessibility. The preceding combined provider/OpenAI/media-library selection passed 69 checks. Frontend TypeScript/Vite build passed with the existing chunk-size warning. These are targeted implementation results, not a full release qualification. No real credentials or paid synthesis/render requests were used; live provider entitlement, speech quality, video generation and deployment-specific secret-store/ADC behavior remain operator verification gates.
+
+Documentation now includes current images of all six provider tabs and explicit narration selection, captured against an isolated demonstration project with inert connection-status/capability fixtures. The [capture manifest](user-guide/refresh-providers-2026-10-27.json) records provenance; rebuilding the guide does not qualify provider output or a release. Earlier dated release evidence below retains its original scope.
+
 ## October 27 authoring update
 
 The current interface has **Assessments** under **WORKSPACE** in the left rail and **Project background** above the scene list in **Storyboard**. Neither is under its former Review tools/Settings location. See the [current user guide](user-guide.md), [root overview](../README.md#questions-assessments-and-metadata), and [backend API notes](../backend/README.md#question-import-metadata-and-export).
@@ -18,7 +39,7 @@ Focused validation during implementation passed parser/API/QTI and export regres
 
 The October 16 candidate status and older next-action instructions below are retained as historical handoff context, not a new approval for the October 27 changes.
 
-Current next action: submit the reviewed 1.1.0 candidate and verify CI on its exact full SHA. See the [October 16 candidate review](candidate-review-2026-10-16.md) and [completion update](completion-update-2026-10-15.md). The older PR #5 instructions below are historical and superseded. Hosted deployment remains deferred.
+Release-candidate follow-up from October 16: submit the reviewed 1.1.0 candidate and verify CI on its exact full SHA. See the [October 16 candidate review](candidate-review-2026-10-16.md) and [completion update](completion-update-2026-10-15.md). The October 27 authoring/provider changes need their own reviewed revision and CI evidence; do not treat the older candidate's results as qualification of these additions. The older PR #5 instructions below are historical and superseded. Hosted deployment remains deferred.
 
 Release-gate status (2026-10-16 addendum): backend 252 passed/6 skipped, frontend build passes, and the full onboarding suite passes in Chromium, Firefox and WebKit after test-stability fixes (collapsed inspector sections expanded in tests, WebKit button focus, polled saves, longer seed waits, and a WebKit project-switcher overflow clip at 390px). The full suite is slow and shares a growing project list; CI runs one worker with one retry. Still human-owned: Writer/LibreOffice inspection of the SME Master and Full Storyboard exports, live Linux/Nginx inspection, and Encarta verification.
 

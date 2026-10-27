@@ -13,6 +13,7 @@ from threading import RLock, local
 from typing import Iterator, Literal
 from .models import AssessmentGroup, AssessmentGroupWrite, ProductionStageUpdate
 from .ai_connection import connection_status
+from .narration_connections import SPEECH_PROVIDERS, resolve_narration_connection
 from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalChange, EnhancementProposalChangeCreate, EnhancementProposalCreate, EnhancementProposalDecisionRecord, ExportSettings, ExtractedAsset, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, PythiaAnalysisProposal, PythiaAnalysisProposalCreate, PythiaAnalysisProposalDecisionRecord, PythiaCourseFindingDecision, PythiaCourseFindingDecisionRecord, PythiaCourseFindingReview, PythiaCourseReview, PythiaCourseReviewCreate, PythiaTransformProposal, PythiaTransformProposalCreate, PythiaTransformProposalDecisionRecord, ReferencePassage, ReferenceResource, ReferenceResourceVersion, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewCommentReply, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate, TrashedProject
 ROOT = Path(os.environ.get("CHIMERA_WORKSPACE", Path(__file__).resolve().parents[2] / "workspace"))
 from .platform import DurableEventSink, LOCAL_ACTOR, ActorContext, PlatformEvent, get_actor_context, get_correlation_id
@@ -1453,13 +1454,28 @@ def create_media_generation_job(project_id: str, data: MediaGenerationJobCreate)
         project = read_project(project_id)
         if not any(scene.id == data.sceneId for scene in project.storyboard.scenes):
             raise ValueError("Media generation must target a scene in this project")
+        connection_revision = connection_status(ROOT)["revision"]
+        values = data.model_dump()
+        if data.narrationConnectionId and data.kind != "narration":
+            raise ValueError("Narration connections cannot generate images.")
+        if data.kind == "narration" and data.narrationConnectionId not in {None, "legacy-openai"}:
+            connection = resolve_narration_connection(ROOT, data.narrationConnectionId)
+            if connection.settings["provider"] not in SPEECH_PROVIDERS:
+                raise ValueError("This connection supports setup only; video generation is not yet available.")
+            connection_revision = connection.revision
+            values["voice"] = data.voice or connection.settings["voice"]
+            values["language"] = data.language or connection.settings["language"]
+            if not values["voice"]:
+                raise ValueError("Save or select a voice for this narration connection before generating.")
+            if connection.settings["provider"] == "google-cloud" and len(data.script.encode("utf-8")) > 5000:
+                raise ValueError("Google Cloud narration is limited to 5,000 UTF-8 bytes per request.")
         timestamp = now_iso()
         job = MediaGenerationJob(
             id=f"media-generation-{uuid.uuid4().hex[:12]}",
             projectId=project_id,
             sourceRevision=project.storyboard.revision,
-            aiConnectionRevision=connection_status(ROOT)["revision"],
-            **data.model_dump(),
+            aiConnectionRevision=connection_revision,
+            **values,
             createdAt=timestamp,
             updatedAt=timestamp,
         )

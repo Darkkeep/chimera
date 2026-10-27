@@ -37,7 +37,7 @@ test('Pythia stays disabled while checking and reports a missing connection', as
   await expect(page.getByText('Checking Pythia connection...', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Edit scene', exact: true })).toBeEnabled();
   release();
-  await expect(toggle).toHaveAttribute('title', 'Pythia connection unavailable (503). Check Settings > Intelligence Engine.');
+  await expect(toggle).toHaveAttribute('title',   'Pythia connection unavailable (503). Check Settings > Pythia.');
   const tooltipTarget = page.locator('.pythia-scene-toggle');
   await expect(tooltipTarget).toHaveAttribute('title', await toggle.getAttribute('title'));
   await tooltipTarget.hover();
@@ -50,7 +50,7 @@ test('connection retry enables the group and loss of health closes it', async ({
   await page.clock.install();
   let status = { ...online, health: { status: 'unavailable' } };
   const toggle = await setup(page, route => route.fulfill({ json: status }));
-  await expect(toggle).toHaveAttribute('title', 'Pythia Engine is not healthy. Check Settings > Intelligence Engine.');
+  await expect(toggle).toHaveAttribute('title',   'Pythia Engine is not healthy. Check Settings > Pythia.');
   await expect(toggle).toBeDisabled();
   status = online;
   await page.getByRole('button', { name: 'Check Pythia connection', exact: true }).click();

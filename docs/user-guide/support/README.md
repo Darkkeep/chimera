@@ -1,5 +1,15 @@
 # Maintaining the illustrated user guide
 
+## October 27 provider-tabs refresh
+
+The [provider/narration manifest](../refresh-providers-2026-10-27.json) records seven refreshed screenshots: all six provider tabs plus explicit narration connection selection. It supersedes earlier captures of `ai-connection-current.png` and `media-narration-form.png`; assessment/navigation provenance remains in its separate manifest below. The backend/UI must include the provider changes, even when the manifest's base commit predates those uncommitted changes.
+
+Run `node docs\user-guide\support\capture-provider-tabs.cjs` from the repository root with the October 27 fixture and isolated services on 8017/5178. It verifies the fixture identity before interaction and refuses any other frontend port. It mocks safe connection status, credential-store availability and a documentation-only Cartesia narration capability in the browser. All forms are captured without a key; the narration example has a clearly named fixture connection/voice. Non-GET browser API requests and Pythia/external HTTPS requests are blocked. No provider settings are saved, tests/generation submitted, secrets accessed, user projects read or demonstration content mutated.
+
+For these isolated services, set `CHIMERA_WORKSPACE` to `workspace\user-guide-20261027\data`, `CHIMERA_PYTHIA_BASE_URL` to `http://127.0.0.1:1` and clear all provider variables (`CHIMERA_AI_*`, `ELEVENLABS_API_KEY`, `CARTESIA_API_KEY`, `SYNTHESIA_API_KEY`, `SHOTSTACK_SANDBOX_API_KEY`, `SHOTSTACK_PRODUCTION_API_KEY`). Do not enable a real provider for capture. The actual service account's credential-store/ADC availability is not certified by these inert status fixtures.
+
+Inspect the seven images, update the corresponding guide instructions, rebuild/verify the PDF using the commands below, and stop only the isolated services you started. Keep Synthesia/Shotstack explicitly labelled connection-only; screenshots and mock-based tests are not proof of video generation or paid provider access.
+
 ## October 27 documentation refresh
 
 The Markdown and PDF instructions now describe **WORKSPACE > Assessments**, **Storyboard > Project background**, reviewed QTI/CSV/XLSX question import/export, **Fill-in-the-blank**, and the collapsed bottom **Tags and learning-objective references** search/dropdowns. The [October 27 manifest](../refresh-manifest-2026-10-27.json) records 19 current assessment/navigation captures, including all seven question types, the question bank/import review, Storyboard background location, named assessments, and collapsed/expanded metadata with existing-value search. Older capture manifests still apply to images not replaced by this selective refresh. A PDF rebuild does not imply a full screenshot or release qualification.

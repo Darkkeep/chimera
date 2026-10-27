@@ -1159,7 +1159,7 @@ export function App() {
         <button className="nav-item settings-toggle" aria-expanded={showSettings} aria-controls="workspace-settings" onClick={() => setShowSettings((open) => !open)}><Settings2 size={18} /><span>Settings</span><ChevronDown size={15} className={showSettings ? "expanded" : ""} /></button>
         {showSettings && <div id="workspace-settings" className="workspace-settings">
           <AppearanceSelector />
-          <button type="button" className="nav-item" disabled={busy} onClick={() => setShowIntelligenceEngine(true)}><Sparkles size={16} />Intelligence Engine</button>
+          <button type="button" className="nav-item" disabled={busy} onClick={() => setShowIntelligenceEngine(true)}>          <Sparkles size={16} />Pythia</button>
           <button type="button" className="nav-item" disabled={busy} onClick={event => { event.currentTarget.focus(); setShowAIConnection(true); }}><Sparkles size={16} />AI connection</button>
           {session && permissions.canManageMembers && <button className="nav-item" disabled={!project.id} onClick={() => setShowProjectAccess(true)}>Project access</button>}
         </div>}

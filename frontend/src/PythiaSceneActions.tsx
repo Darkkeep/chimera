@@ -27,7 +27,7 @@ export function PythiaSceneActions({ projectId, disabled, onAnalyze, onTransform
   const toggle = useRef<HTMLButtonElement>(null);
   const connected = engine?.health.status === "ok";
   const enabled = connected && !checking && !disabled;
-  const tooltip = checking ? "Checking Pythia connection..." : error ? `${error} Check Settings > Intelligence Engine.` : "Pythia scene tools";
+  const tooltip = checking ? "Checking Pythia connection..." : error ?   `${error} Check Settings > Pythia.` : "Pythia scene tools";
 
   useEffect(() => {
     const controller = new AbortController();

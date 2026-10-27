@@ -8,6 +8,12 @@ Status: Direction agreed 2026-09-30
 
 Chimera is a team authoring and publishing platform for learning content. Learners consume published SCORM or other exported course content, but they are not Chimera platform users in the first team-platform release.
 
+### Current AI and media boundary (2026-10-27)
+
+Pythia owns learning-intelligence provider/model orchestration and proposal generation. Chimera exposes its diagnostics under **Settings > Pythia** and retains author review/acceptance. **Settings > AI connection** is a separate, installation-scoped media configuration surface, with one tab per provider: OpenAI images/legacy narration; ElevenLabs, Google Cloud and Cartesia narration; Synthesia and Shotstack connection setup/testing only. Video generation is not yet implemented for the latter two.
+
+Local operators or installation administrators manage connections, not individual project authors in a shared installation. Secrets remain server-side in the OS credential store, fixed environment injection or Google ADC; project backups and learner packages never carry them. Provider tests are explicit read-only checks, not generation or approval. Authors explicitly select a usable narration connection and approve generated candidates before use. A tab's existence or configured status does not establish account entitlement, provider quality, spending approval or release readiness. See [connection governance and limits](ai-connection.md).
+
 The platform must support these roles:
 
 | Role | Primary responsibilities |

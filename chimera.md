@@ -17,6 +17,8 @@ This document records the original product requirements and delivery sequence. I
 
 The current product follows the separate [Pythia + Chimera integrated build plan](Pythia_Chimera_Integrated_Build_Plan.md): Pythia provides learning-intelligence analysis and proposals; Chimera owns authoring, review and acceptance, preview, and package production. Pythia proposals must not silently mutate canonical project content.
 
+**October 27 media configuration:** **Settings > AI connection** now uses separate provider tabs. OpenAI images/legacy narration and ElevenLabs/Google Cloud/Cartesia MP3 narration are implemented. Synthesia and Shotstack support secure setup/read-only tests only; video generation, render polling/download and generated-video review remain future work. Keys use server OS storage or fixed environment injection; Google uses ADC. This is separate from **Settings > Pythia**, not a new text-reasoning registry. See the [current handoff](docs/current-work.md#october-27-media-provider-connections-and-help) and [connection guide](docs/ai-connection.md) for precise support and verification boundaries.
+
 | Original phase | Current status |
 |---|---|
 | 0 — Foundation | Delivered. |
