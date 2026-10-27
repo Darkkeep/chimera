@@ -1,6 +1,22 @@
 # Current work and handoff
 
-Updated 2026-10-16. The active development branch is `extract-onboarding-repository`.
+Updated 2026-10-27. The active development branch is `extract-onboarding-repository`.
+
+## October 27 authoring update
+
+The current interface has **Assessments** under **WORKSPACE** in the left rail and **Project background** above the scene list in **Storyboard**. Neither is under its former Review tools/Settings location. See the [current user guide](user-guide.md), [root overview](../README.md#questions-assessments-and-metadata), and [backend API notes](../backend/README.md#question-import-metadata-and-export).
+
+Completed question-authoring changes:
+
+- Ordering controls and paired text-entry layouts are readable; assessment stages expand to show targets and submission controls.
+- Drag tiles settle beside correct vertical targets or return home on incorrect drops. Drop retries are unlimited; Check answer consumes an attempt. Preview and both SCORM profiles share this behavior.
+- Reviewed QTI 2.1 XML/ZIP and CSV/XLSX question import, templates, question-bank authoring, spreadsheet export, duplicate protection, and revision-checked atomic imports.
+- Core metadata and unique stable-ID editing. Tags and learning-objective references use compact searchable dropdowns in a collapsed section at the bottom of the question editor, with reuse/create/remove actions from current-project question values.
+- Short Answer is now **Fill-in-the-blank**, preserving legacy `short-answer` data. QTI exports correct the inline placement and supply a primary correct-answer value while preserving alternate-answer grading.
+
+Focused validation during implementation passed parser/API/QTI and export regressions, frontend builds, and desktop/mobile Chromium/Firefox/WebKit checks for the changed interactions, contrast, tag/reference dropdowns, navigation, and backgrounds. These were targeted runs, not a new complete release-suite result. QTI/Blackboard question-bank acceptance, external LMS requalification of new SCORM packages, and human release approval remain separate gates.
+
+The October 16 candidate status and older next-action instructions below are retained as historical handoff context, not a new approval for the October 27 changes.
 
 Current next action: submit the reviewed 1.1.0 candidate and verify CI on its exact full SHA. See the [October 16 candidate review](candidate-review-2026-10-16.md) and [completion update](completion-update-2026-10-15.md). The older PR #5 instructions below are historical and superseded. Hosted deployment remains deferred.
 

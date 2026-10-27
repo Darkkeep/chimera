@@ -11,6 +11,23 @@ uvicorn app.main:app --reload --port 8000
 
 The API stores projects under `workspace/projects` by default. Set `CHIMERA_WORKSPACE` to use another location.
 
+## Question import, metadata, and export
+
+The authoring entry point is **WORKSPACE > Assessments**. Question metadata is part of each assessment item; legacy questions receive defaults. Stable identifiers remain unique per project. Tags and learning-objective references are lists of at most 50 unique strings, each at most 200 characters. Their searchable UI derives suggestions from saved questions in the current project; there is no cross-project tag registry or automatic learning-objective creation.
+
+| Route, relative to `/api/projects/{project_id}` | Behavior |
+| --- | --- |
+| `POST /question-import/preview` | Multipart `file`; returns revision, SHA-256 digest, and indexed review rows with parsed item, warnings, and errors. Does not write. |
+| `POST /question-import` | Multipart original `file`, `selected` JSON row indexes, `digest`, optional `assessment_id`, and `confirm_warnings`. Requires `If-Match`; reparses and verifies the upload before atomically adding selected questions and optional group membership. |
+| `GET /question-import/template.csv` or `.xlsx` | Downloads examples for all seven supported types. |
+| `GET /questions.csv` or `.xlsx` | Exports authored questions and metadata; optional `assessment_id` restricts the export to a named assessment. |
+
+Imports support a conservative text-only QTI 2.1 XML/ZIP subset and the supplied CSV/XLSX templates, with a 10 MB upload and 500-question limit. Duplicate IDs never replace existing questions. Stale reviews return 412; missing import-commit revisions return 428; invalid selections, changed uploads, and unacknowledged warnings return 422. Import requires `project.import`, templates require `project.view`, and spreadsheet downloads require `project.export`.
+
+**Fill-in-the-blank** retains the `short-answer` discriminator and accepted-answer/case-sensitivity fields. QTI export uses one inline `p > textEntryInteraction` with a single primary `correctResponse` value and exact string comparisons for accepted alternatives. The importer accepts both this layout and legacy Chimera exports. Title and language use standard QTI attributes; remaining metadata/settings use a `chimera` processing instruction. Other consumers may ignore that extension. Target Blackboard QTI import is not certified by local tests or prior SCORM acceptance.
+
+Use the [user guide](../docs/user-guide.md#5-author-assessments) for author procedures. After updating backend code or requirements, restart a server launched without `--reload`; a stale process can serve old routes and return Not Found for newly added features.
+
 ### Pythia Sprint 1 integration
 
 The Chimera repository pins [`Darkkeep/pythia-contracts`](https://github.com/Darkkeep/pythia-contracts) `v1.0.0` as the `vendor/pythia-contracts` Git submodule. Contract tests require this checkout and validate generated requests and returned drafts against its schemas. Initialize it with `git submodule update --init --recursive` after cloning. The Pythia Engine API base URL is configured on the Chimera backend with `CHIMERA_PYTHIA_BASE_URL` and defaults to `http://localhost:8000`. The adapter exposes health/capability discovery, task submission, polling/cancellation, and validated draft artifact retrieval. Its browser entry point never receives the Pythia URL or credential. If Pythia client authentication is enabled, configure `CHIMERA_PYTHIA_API_KEY` in the Chimera backend environment; the adapter sends it as a Bearer credential and in the legacy `X-Pythia-API-Key` header. Never place this secret in frontend source or browser storage. Run the contract tests with `python -m pytest backend/tests/test_learning_intelligence.py` from the repository root.
@@ -48,7 +65,7 @@ Project media uploads support JPG, PNG, GIF, WebP, MP3, M4A, AAC, WAV, and OGG f
 
 Each media asset has attribution text and a `draft` or `complete` status. Draft attribution is allowed during authoring. Production readiness is checked with `GET /api/projects/{project_id}/validation?target=production`; it fails until every media asset has non-empty attribution text and `complete` status. SCORM packages can be built for SCORM 2004 and 1.2. Local browser qualification covers both profiles; Blackboard verification is documented for SCORM 2004 only. See `docs/scorm-compatibility-checklist.md` for details.
 
-Project mutation requests from the authoring UI include `If-Match: "<revision>"`, using the storyboard revision returned in each project response. Stale writes return `412 Precondition Failed` and include the current revision in the `ETag` header. The header remains optional for legacy API clients.
+Project mutation requests from the authoring UI include `If-Match: "<revision>"`, using the storyboard revision returned in each project response. Stale writes return `412 Precondition Failed` and include the current revision in the `ETag` header. The header remains optional on legacy mutation routes; question-import commits and named-assessment writes require it and return 428 when it is missing.
 
 Scenes can be deleted with `DELETE /api/projects/{project_id}/scenes/{scene_id}`. Deletion archives the prior storyboard; remediation links targeting the removed scene are cleared in the same revision-checked save.
 

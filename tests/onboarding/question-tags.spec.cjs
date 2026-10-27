@@ -24,7 +24,6 @@ for (const theme of ['light', 'dark']) {
       await page.goto('/');
       const bank = page.getByRole('dialog', { name: 'Assessments', exact: true });
       async function openEditor() {
-        await page.getByRole('button', { name: 'Review tools', exact: true }).click();
         await page.getByRole('button', { name: 'Assessments', exact: true }).click();
         await bank.getByRole('button', { name: 'Edit question and metadata', exact: true }).nth(1).click();
         const editor = page.getByRole('dialog', { name: 'Question 2', exact: true });

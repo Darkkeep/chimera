@@ -27,7 +27,7 @@ Open **Review tools > Guided review > All functionality walkthroughs**. Search b
 | Scene authoring | PowerPoint import, text/notes/action/type/layout/required settings, dedicated saved canvas authoring, ordering, explicitly confirmed deletion |
 | Templates | PPTX upload, name/description save, source replacement, saved scene assignment |
 | Media | Image/audio upload, attach/detach, attribution save, required playback, alt text/decorative save |
-| Assessments | Separate save journeys for single-choice, multiple-answer, true/false, ordering, drag/drop, matching and short-answer; attempts/score/weight/remediation; confirmed removal; QTI item export |
+| Assessments | Separate save journeys for single-choice, multiple-answer, true/false, ordering, drag/drop, matching and Fill-in-the-blank (legacy `short-answer`); attempts/score/weight/remediation; confirmed removal; QTI item export |
 | Learner preview | Contents navigation, scene/media/question/retry/remediation/progress review, saved comments, replies, resolve/reopen, explicit enhancement from a comment |
 | Course review | Saved completion rules, successfully loaded validation followed by acknowledgment of authoring/production findings |
 | Enhancement | Reference upload, preview/explicit submission, cancel/retry jobs, edit/accept/reject/reverse suggestion decisions |
@@ -47,6 +47,8 @@ The Golden Path now includes Engine diagnostics and a recovery archive before tr
 The new catalog reuses the existing Guided review rows and controls. The reusable package and independent vanilla demo retain their framework-independent contract.
 
 ## Run verification
+
+Current navigation (2026-10-27): **Assessments** is directly under **WORKSPACE**, not Review tools. **Project background** is above the Storyboard scene list, not Settings. Question tags and learning-objective references use searchable reuse/create dropdowns in a collapsed bottom section. These newer import/metadata and navigation workflows have dedicated browser specs; their availability does not imply a separate guided walkthrough was added for every new control.
 
 Chimera now opens on My Work after launch and refresh. Authoring reload checks explicitly choose Resume authoring before resuming a guide; this does not reset task/project progress. The media file picker is Add media, while the existing upload outcome identifier remains unchanged. Candidate review remains available when creation is collapsed or AI is unavailable. **Settings > Intelligence Engine** provides diagnostics; **Settings > Media provider** opens the separate permission-aware media connection dialog. Neither starts a provider task when opened by a walkthrough.
 

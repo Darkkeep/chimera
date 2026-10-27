@@ -17,7 +17,6 @@ for (const width of [1440, 390]) {
     await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
     await page.route('**/api/projects', route => route.fulfill({ json: [project] }));
     await page.goto('/');
-    await page.getByRole('button', { name: 'Review tools', exact: true }).click();
     await page.getByRole('button', { name: 'Assessments', exact: true }).click();
     const bank = page.getByRole('dialog', { name: 'Assessments', exact: true });
     await expect(bank).toContainText('LEGACY_BLANK · Fill-in-the-blank');

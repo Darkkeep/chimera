@@ -521,7 +521,7 @@ assessment.design
 - Ordering
 - Matching
 - Drag and drop
-- Short answer
+- Fill-in-the-blank (legacy `short-answer` identifier; one automatically graded blank, not an essay)
 
 using Chimera's native assessment model.
 

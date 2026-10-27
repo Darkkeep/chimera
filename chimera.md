@@ -410,17 +410,21 @@ set-bookmark-marker
 
 ## 7.4 Assessment Authoring
 
-### Initial Question Types
+### Current Question Types (2026-10-27)
 
 ```text
 Multiple choice
 Multiple response
 True/false
 Matching
-Sequencing
+Ordering
+Drag-and-drop
 Fill-in-the-blank
-Short answer/self-assessment
 ```
+
+**Fill-in-the-blank** is one automatically graded blank with exact accepted alternatives and optional case sensitivity, not a manually graded essay. It retains the legacy `short-answer` data identifier. **WORKSPACE > Assessments** provides a direct question bank, reviewed QTI 2.1 XML/ZIP and CSV/XLSX imports, named ordered assessments, and spreadsheet exports. Import reports unsupported content, warnings, and duplicates without overwriting existing questions.
+
+Question metadata includes title, stable identifier, description, tags, author/source, language, difficulty, and learning-objective references. The bottom **Tags and learning-objective references** section starts collapsed; both fields use current-project searchable dropdowns with reuse/create/remove actions. References do not create learning objectives. **Project background** belongs in Storyboard above the scene list, not Settings. See the [user guide](docs/user-guide.md#5-author-assessments) for current controls and limits; QTI Blackboard acceptance remains unverified.
 
 ### Assessment Settings
 
@@ -664,11 +668,11 @@ Errors:
 
 ### Deliverables
 - [x] Single-choice assessment item authoring and QTI 2.1 item export.
-- [x] Multiple-response, true/false, ordering, drag-and-drop, matching, and short-answer authoring and QTI 2.1 item export.
+- [x] Multiple-response, true/false, ordering, drag-and-drop, matching, and fill-in-the-blank authoring and QTI 2.1 item export.
 - [x] QTI 2.1 assessment-test packaging with multi-item aggregate scoring.
 - [x] Assessment retry limit and passing threshold settings in local preview.
 - [x] Multiple choice with single and multiple correct answers.
-- [x] True/false, ordering, drag-and-drop, matching, and short-answer question formats.
+- [x] True/false, ordering, drag-and-drop, matching, and fill-in-the-blank question formats.
 - [x] Feedback and retry behavior for single-choice preview items.
 - [x] Course completion rule engine across required scene visits, required audio, and assessment resolution.
 - [x] Weighted course score and configurable passing threshold.

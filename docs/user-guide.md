@@ -1,6 +1,6 @@
 # Chimera user guide
 
-Process-based instructions for Chimera. Workflow text updated 2026-10-15, including Pythia analysis, transformation, assessment design, and course review. Screenshots last refreshed 2026-10-08 from commit `4ade811` plus then-uncommitted working-tree updates; they predate the current Pythia controls and Settings labels. Captures use the isolated user-guide demonstration workspace and made no live AI requests or use of credentials. Historical source/recovery context is documented in the [recovery record](export-enhancement-recovery.md).
+Process-based instructions for Chimera. Workflow text updated 2026-10-27 for current workspace navigation, reviewed question import/export, Fill-in-the-blank, and searchable question metadata. The [PDF edition](user-guide.pdf) is generated from this source. Workspace navigation, all seven question types, assessment management/import, and metadata controls were recaptured on 2026-10-27 using an isolated demonstration project. Other screenshots retain their earlier capture dates; provenance is recorded in [the maintenance guide](user-guide/support/README.md). Images may predate the current controls; use the current text instructions where labels differ. No user project or credentials are used for documentation captures. Historical source/recovery context is documented in the [recovery record](export-enhancement-recovery.md).
 
 ## How to use this guide
 
@@ -9,6 +9,10 @@ Tasks use numbered instructions or **Step / Action / Result / Control image** ta
 The source has changed since the original capability review: Word export, reference upload, enhancement submission, generated-media candidate review, comments, and Chimera storyboard archives now have interface controls. Their presence does not certify a configured AI provider or compatibility with every LMS. Example proposals, candidates, and job statuses in these images are documentation fixtures; no live AI request was made for this guide.
 
 **Prerequisite:** Start the backend and frontend using the [README setup instructions](../README.md#start-locally), then open `http://localhost:5173`. Keep both services running while authoring. LibreOffice is needed for rendered PowerPoint slide previews. Pythia workflows additionally need the Engine API; check **Settings > Intelligence Engine**. Image and narration generation use the separate **Settings > Media provider** connection or server environment settings. Shared-installation connection changes require an administrator; see [AI connection](ai-connection.md).
+
+**Help while authoring:** choose **User guide**, immediately below **Templates** in the left rail. The bundled PDF opens in a new tab without leaving your current workspace or discarding edits. It is available even before you select or create a project and does not require access to GitHub.
+
+**Navigation at a glance:** the left rail's **WORKSPACE** group contains My Work, Storyboard, Assessments, Media library, and Templates. **Assessments** opens the question bank and assessment manager directly. **Project background** is above the scene list in **Storyboard**. Review tools retains guided review, accessibility, validation, completion rules, and suggestion/Pythia review; Settings retains appearance and connection/access controls.
 
 My Work opens after normal launch/sign-in and refresh. It is first in the workspace menu. Select a project row to open its authoring workspace, choose New Project to create one, or Resume authoring to return to the remembered project. Direct authenticated review links retain their review destination.
 
@@ -150,8 +154,10 @@ Open **Edit scene**, then choose **Canvas**. The canvas editor saves an editable
 2. Double-click a text box, or focus it and press Enter, to edit its text directly. The **Text** field also edits the selected box. Drag boxes to move them, use resize handles, or enter exact position and size in the properties panel. Text resize handles preserve the box's current aspect ratio; image resize handles allow freeform sizing. Arrow keys move the focused element; Shift changes the step from one to ten slide-space units.
 3. Drag an **Attached images** thumbnail onto the canvas. Clicking the thumbnail adds it without dragging. The media-library selector can add other project images. Selecting an image exposes replacement and crop-reset controls.
 4. Use **Layers** to select overlapping or inherited content. Master and layout artwork starts locked; unlock it before editing. Toolbar controls add text, undo/redo, duplicate/delete elements, and change stacking order. Text properties include size, color, typeface, alignment, bold, and italic.
-5. Expand **Background** in the properties panel to choose a color and open the **Background image** thumbnail picker. Choose **Use project background**, a scene image, or **None** to explicitly opt out of the project image. Imported PowerPoint master backgrounds are labeled in the picker. Set the default under **Settings > Project background**; changing it affects only inheriting scenes, not scene-specific images or explicit None choices. Add images in Media library first. Backgrounds fill the stage and are decorative; check contrast and keep instructional information in accessible text. **Source slide**, when available, temporarily shows the original flattened rendering for comparison and is not changed by background settings.
+5. Expand **Background** in the properties panel to choose a color and open the **Background image** thumbnail picker. Choose **Use project background**, a scene image, or **None** to explicitly opt out of the project image. Imported PowerPoint master backgrounds are labeled in the picker. Set the default using **Storyboard > Project background**, above the scene list; changing it affects only inheriting scenes, not scene-specific images or explicit None choices. Add images in Media library first. Backgrounds fill the stage and are decorative; check contrast and keep instructional information in accessible text. **Source slide**, when available, temporarily shows the original flattened rendering for comparison and is not changed by background settings.
 6. Choose **Save scene**, then check **Preview course**. The saved canvas replaces the source preview in authoring, preview, and both SCORM profiles. **Cancel** discards unsaved canvas changes.
+
+![Project background settings opened from Storyboard](user-guide/images/project-background-current.png)
 
 New imports capture editable text, images, common PowerPoint shapes, line connectors, custom freeform geometry, rotation, cropping, slide dimensions, inherited graphics, and solid/picture backgrounds. Byte-identical images are shared as one Media library asset while every source placement stays separate on the canvas. Most extracted shapes can be moved, resized, rotated, layered, locked, or deleted like other canvas elements; text inside a shape remains separately editable. The original preview remains available for comparison. Less-common preset geometry, gradients, group rotation, mixed text formatting, bullets, and some inherited styles may be approximated and are listed under **Import limitations**; charts and SmartArt remain unsupported objects. This is not full PowerPoint-equivalent editing.
 
@@ -278,18 +284,22 @@ A green **Ready for production** check means the media loaded, its attribution i
 
 ## 5. Author assessments
 
-For an assessment-first workflow, open **Review tools > Assessments**. The **Question bank** lets you add a question directly or open an existing question and its metadata without creating a slide first. Create a named assessment, select its questions, arrange them, and download its QTI test package.
+For an assessment-first workflow, open **Assessments** under **WORKSPACE** in the left rail. The **Question bank** lets you add a question directly or open an existing question and its metadata without creating a slide first. Create a named assessment, select its questions, arrange them, and download its QTI test package.
+
+![Question bank and spreadsheet export controls](user-guide/images/question-bank-current.png)
 
 Start each assessment task with a scene whose **Scene type** is **Assessment**. Set that type in Edit scene and save. Select **Create question** for a new question or **Edit question** for an existing one. The question editor supports seven types. Changing types replaces the type-specific question structure in the form; save only after checking the new content.
 
 ### Import questions with review
 
-1. Open **Review tools > Assessments > Import questions**.
+1. Open **WORKSPACE > Assessments > Import questions**.
 2. Select a QTI 2.1 item XML, QTI ZIP package, or filled CSV/XLSX template. Download either template in the import panel; each contains examples of all seven types.
 3. Choose **Review import**. Nothing is saved at this stage. Inspect the question, answer key, feedback, metadata, errors, and warnings for each row.
 4. Select the valid questions to add. Existing stable identifiers and repeated identifiers in the upload are blocked, not renamed or overwritten. Correct duplicates in the source file and review it again.
 5. Optionally select a saved assessment to receive the new questions. Otherwise they enter the question bank only.
 6. Acknowledge any warnings, then choose **Import selected questions**. The selected questions and group membership are saved together. If another author changed the project, review the file again before importing.
+
+![Question import review before any questions are saved](user-guide/images/question-import-current.png)
 
 Uploads are limited to 10 MB and 500 questions. QTI import supports the representable text-only subset of the seven question types, not arbitrary LMS question formats, media, rich HTML, or custom response processing. Unsupported content is reported rather than silently discarded. Test-level navigation, selection, timing, and scoring policies are not imported as a test; choose and review Chimera's assessment rules separately.
 
@@ -307,7 +317,15 @@ Use the supplied examples rather than changing the headers. XLSX formulas are no
 
 ### Edit question metadata
 
+![Collapsed reference and metadata sections at the bottom of the question editor](user-guide/images/question-metadata-collapsed.png)
+
 Open a question and expand **Tags and learning-objective references** at the bottom of the editor. This section starts collapsed; both fields use compact search/dropdowns. Focus the search field or choose **Select** to open its scrollable dropdown. Suggestions come from saved questions in the current project; search is case-insensitive and excludes values already selected. Select a suggestion to reuse its spelling, or choose **Create** (or press Enter) for a new value. Arrow keys navigate dropdown options; Enter selects and Escape closes the dropdown. Use **Remove** to remove a selected value, then **Save question** to persist your selections. Each field allows up to 50 values, each up to 200 characters. Expand **Question metadata** for its title, stable identifier, description, author, source, language, and difficulty. Tags and other metadata are authoring information and are not shown as learner-facing question content. References are identifiers or labels; adding them does not create or modify learning objectives.
+
+| Search existing tags or create one | Search existing learning-objective references or create one |
+| --- | --- |
+| <a href="user-guide/images/question-tags-current.png"><img src="user-guide/images/question-tags-current.png" alt="Tag search with existing Safety value and inline creation" width="240"></a> | <a href="user-guide/images/question-objectives-current.png"><img src="user-guide/images/question-objectives-current.png" alt="Learning-objective reference search with existing OBJ-1 value and inline creation" width="240"></a> |
+
+![Expanded question metadata fields](user-guide/images/question-metadata-current.png)
 
 The stable identifier starts with a letter and contains up to 64 letters, digits, underscores, or hyphens. Keep it unchanged when maintaining a question's identity outside Chimera. Title defaults to the scene title when not specified. Tags and objective references accept up to 50 unique entries, at most 200 characters each.
 
@@ -324,14 +342,14 @@ Metadata is retained in project data and spreadsheet exports. QTI uses the stand
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Choose **Multiple choice ? one answer**, enter the **Question prompt** and answer text, and mark exactly one answer as correct. Use **Add answer choice** or the minus buttons as needed. | The question content and correct response are defined. | <a href="user-guide/images/question-single-choice.png"><img src="user-guide/images/question-single-choice.png" alt="question single choice controls" width="240"></a> |
+| 1 | Choose **Multiple choice · one answer**, enter the **Question prompt** and answer text, and mark exactly one answer as correct. Use **Add answer choice** or the minus buttons as needed. | The question content and correct response are defined. | <a href="user-guide/images/question-single-choice.png"><img src="user-guide/images/question-single-choice.png" alt="question single choice controls" width="240"></a> |
 | 2 | Enter **Correct feedback** and **Incorrect feedback**, then click **Save question**. | The question is saved to the scene. | <a href="user-guide/images/question-single-choice.png"><img src="user-guide/images/question-single-choice.png" alt="question single choice controls" width="240"></a><br><a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
 ### Author a multiple-correct question
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Choose **Multiple choice ? multiple answers**, enter the prompt and answer choices, and select the checkbox for every correct answer. | The question content and correct response are defined. | <a href="user-guide/images/question-multiple-response.png"><img src="user-guide/images/question-multiple-response.png" alt="question multiple response controls" width="240"></a> |
+| 1 | Choose **Multiple choice · multiple answers**, enter the prompt and answer choices, and select the checkbox for every correct answer. | The question content and correct response are defined. | <a href="user-guide/images/question-multiple-response.png"><img src="user-guide/images/question-multiple-response.png" alt="question multiple response controls" width="240"></a> |
 | 2 | Enter **Correct feedback** and **Incorrect feedback**, then click **Save question**. | The question is saved to the scene. | <a href="user-guide/images/question-multiple-response.png"><img src="user-guide/images/question-multiple-response.png" alt="question multiple response controls" width="240"></a><br><a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
 ### Author a true/false question
@@ -376,8 +394,8 @@ Existing questions and imported/exported CSV/XLSX templates retain the `short-an
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Choose **Fill-in-the-blank**, enter the prompt, and enter one accepted answer per line. Select **Match letter case** only when capitalization must match. | One blank and its accepted answers are defined. | <a href="user-guide/images/question-short-answer.png"><img src="user-guide/images/question-short-answer.png" alt="fill-in-the-blank controls (earlier Short answer label)" width="240"></a> |
-| 2 | Enter **Correct feedback** and **Incorrect feedback**, then click **Save question**. | The question is saved to the scene. | <a href="user-guide/images/question-short-answer.png"><img src="user-guide/images/question-short-answer.png" alt="question short answer controls" width="240"></a><br><a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
+| 1 | Choose **Fill-in-the-blank**, enter the prompt, and enter one accepted answer per line. Select **Match letter case** only when capitalization must match. | One blank and its accepted answers are defined. | <a href="user-guide/images/question-short-answer.png"><img src="user-guide/images/question-short-answer.png" alt="Fill-in-the-blank prompt and accepted-answer controls" width="240"></a> |
+| 2 | Enter **Correct feedback** and **Incorrect feedback**, then click **Save question**. | The question is saved to the scene. | <a href="user-guide/images/question-short-answer.png"><img src="user-guide/images/question-short-answer.png" alt="Fill-in-the-blank prompt and accepted-answer controls" width="240"></a><br><a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
 ### Configure question scoring and remediation
 
@@ -785,6 +803,9 @@ See the [implementation build plan](storyboard-export-enhancement-build-plan.md)
 | Symptom | What to do |
 | --- | --- |
 | Projects or libraries do not load | Confirm both local services are running and inspect the displayed error. |
+| Export questions CSV/XLSX returns Not Found | Restart the backend after installing updated code and dependencies, then refresh the frontend. A server started without reload may still serve an older route table. If it persists, check the project selection, permissions, and backend error. |
+| Tags or learning-objective references seem missing | Scroll to the bottom of the question editor and expand **Tags and learning-objective references**. Search or choose Select; Save question keeps changes. Existing suggestions come only from saved questions in this project. |
+| Drag-and-drop or matching has no answer items | Enter text in both lists and add items/targets as needed, then select the correct placements/matches. Answer images are not supported. In Preview, correct drag tiles settle beside the vertical targets; incorrect drops return home without using a Check answer attempt. |
 | A control is disabled | Select a project/scene, complete required fields, or wait for the current operation. Submit run and other Pythia tasks need authoring access and their Intelligence Engine capability; media generation needs its separate provider connection. See [Pythia prerequisites](#before-you-start-with-pythia). |
 | PowerPoint imports without a slide image | Check the render warning and LibreOffice availability. Inspect extracted text and media. |
 | Media upload is rejected | Check the supported image/audio extension, file validity, and 100 MB limit. |
@@ -796,6 +817,8 @@ See the [implementation build plan](storyboard-export-enhancement-build-plan.md)
 | AI generation does not yield a candidate | Check the visible error and ask the administrator to inspect provider/job configuration. The media form has no complete job monitor. |
 
 ## Screenshot and verification record
+
+The [2026-10-27 refresh manifest](user-guide/refresh-manifest-2026-10-27.json) records 19 updated captures: workspace rail/Storyboard background location, Review tools, question bank and import review, named assessment editing/list, all seven question types, and collapsed/expanded reference and metadata controls. The searchable dropdown captures verify existing values from another saved question in the same isolated project. No user course, provider credentials, paid generation, or external submission was used. Older images below retain their original scope; this selective refresh is not a full release or LMS qualification.
 
 Screenshots were captured from the actual local frontend and an isolated backend workspace on 2026-09-30, using a compatible headless Chromium browser, a 1500-pixel-wide viewport, and Light appearance. Images are stored in `docs/user-guide/images/` and contain demonstration data only. Proposal, generated-candidate, and enhancement-job examples were seeded locally to expose conditional controls. No paid generation or external submission was performed.
 

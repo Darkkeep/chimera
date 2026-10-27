@@ -290,7 +290,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
         <InspectorSection title="Background"><fieldset disabled={busy || sourceVisible}>
           <label>Background color<input type="color" value={layout.backgroundColor} onChange={event => commit({ ...layout, backgroundColor:event.target.value })} /></label>
           <BackgroundImagePicker project={project} label="Background image" allowInherit value={backgroundMode(layout) === "inherit" ? undefined : backgroundMode(layout) === "none" ? null : layout.backgroundAsset} onChange={setBackground} disabled={busy || sourceVisible} />
-          <p className="field-hint">Use the project default, choose a scene image, or select None. Set the project default in Settings &gt; Project background.</p>
+          <p className="field-hint">Use the project default, choose a scene image, or select None. Set the project default in Storyboard &gt; Project background.</p>
         </fieldset></InspectorSection>
         <InspectorSection title="Layers">
         <div className="visual-layers" aria-label="Layers, front to back">{[...layout.elements].reverse().map((element, index) => <button type="button" key={element.id} aria-pressed={selection === element.id} disabled={busy || sourceVisible} onClick={() => setSelection(element.id)}><small title="Z-axis position">{layout.elements.length - index}</small>{element.locked && <Lock size={12} />}<span>{element.kind === "text" ? element.text.slice(0, 40) || "Empty text" : element.kind === "shape" ? element.shapeName || "PowerPoint shape" : images.find(asset => asset.id === element.assetId)?.filename || "Image"}</span><small>{index === 0 ? "Front" : index === layout.elements.length - 1 ? "Back" : element.source}</small></button>)}</div>

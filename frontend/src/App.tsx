@@ -43,6 +43,7 @@ import { PythiaCourseReviewView } from "./PythiaCourseReviewView";
 import { PythiaSceneActions } from "./PythiaSceneActions";
 import { ProjectBackgroundPanel } from "./ProjectBackgroundPanel";
 import { effectiveBackgroundAsset } from "./background";
+import userGuideUrl from "../../docs/user-guide.pdf?url";
 
 type LayoutMode = "fidelity" | "hybrid" | "native" | "template";
 type SceneType = "content" | "title" | "question" | "media" | "interaction" | "summary";
@@ -1138,8 +1139,10 @@ export function App() {
       <nav aria-label="Workspace">
         <button ref={managementButtonRef} className={`nav-item management-nav-item ${showManagement ? "active" : ""}`} aria-current={showManagement ? "page" : undefined} onClick={() => setShowManagement(true)}><ClipboardList size={18} /><span>My Work</span></button>
         <button className={`nav-item ${!showManagement && activeView === "storyboard" ? "active" : ""}`} aria-current={!showManagement && activeView === "storyboard" ? "page" : undefined} onClick={() => { setShowManagement(false); setActiveView("storyboard"); }}><Layers3 size={18} /><span>Storyboard</span></button>
+        <button className={`nav-item ${showAssessments ? "active" : ""}`} onClick={() => setShowAssessments(true)} disabled={!project.id || busy || !permissions.canEdit}><ClipboardList size={18} /><span>Assessments</span></button>
         <button className={`nav-item ${!showManagement && activeView === "media" ? "active" : ""}`} aria-current={!showManagement && activeView === "media" ? "page" : undefined} onClick={() => { setShowManagement(false); setActiveView("media"); }}><FileUp size={18} /><span>Media library</span></button>
         <button className={`nav-item ${!showManagement && activeView === "templates" ? "active" : ""}`} aria-current={!showManagement && activeView === "templates" ? "page" : undefined} onClick={() => { setShowManagement(false); setActiveView("templates"); }}><BookOpen size={18} /><span>Templates</span></button>
+        <a className="nav-item" href={userGuideUrl} target="_blank" rel="noopener noreferrer" aria-label="User guide (PDF, opens in a new tab)"><FileText size={18} /><span>User guide</span></a>
       </nav>
       <div className="sidebar-review">
         <button className="nav-item review-toggle" aria-expanded={showReviewTools} aria-controls="review-tools" onClick={() => setShowReviewTools(!showReviewTools)}><ShieldCheck size={18} /><span>Review tools</span><ChevronDown size={15} className={showReviewTools ? "expanded" : ""} /></button>
@@ -1148,7 +1151,6 @@ export function App() {
           <button onClick={() => { setShowAccessibility(true); setShowReviewTools(false); }} disabled={!project.id || busy}><Accessibility size={16} /> Check image descriptions</button>
           <button onClick={() => { setShowValidation(true); setShowReviewTools(false); }} disabled={!project.id || busy}><ShieldCheck size={16} /> Validate storyboard</button>
           <button onClick={() => { setShowCompletionSettings(true); setShowReviewTools(false); }} disabled={!project.id || busy}><Settings2 size={16} /> Completion rules</button>
-          <button onClick={() => { setShowAssessments(true); setShowReviewTools(false); }} disabled={!project.id || busy || !permissions.canEdit}><ClipboardList size={16} /> Assessments</button>
           <button onClick={() => { setShowEnhancementReview(true); setShowReviewTools(false); }} disabled={!project.id || busy}><Sparkles size={16} /> Review suggestions</button>
           <button onClick={() => { setShowPythiaCourseReview(true); setShowReviewTools(false); }} disabled={!project.id || busy}><Sparkles size={16} /> Review course with Pythia</button>
         </div>}
@@ -1157,7 +1159,6 @@ export function App() {
         <button className="nav-item settings-toggle" aria-expanded={showSettings} aria-controls="workspace-settings" onClick={() => setShowSettings((open) => !open)}><Settings2 size={18} /><span>Settings</span><ChevronDown size={15} className={showSettings ? "expanded" : ""} /></button>
         {showSettings && <div id="workspace-settings" className="workspace-settings">
           <AppearanceSelector />
-          <button type="button" className="nav-item" disabled={busy || !project.id || !permissions.canEdit} onClick={() => setShowProjectBackground(true)}>Project background</button>
           <button type="button" className="nav-item" disabled={busy} onClick={() => setShowIntelligenceEngine(true)}><Sparkles size={16} />Intelligence Engine</button>
           <button type="button" className="nav-item" disabled={busy} onClick={event => { event.currentTarget.focus(); setShowAIConnection(true); }}><Sparkles size={16} />AI connection</button>
           {session && permissions.canManageMembers && <button className="nav-item" disabled={!project.id} onClick={() => setShowProjectAccess(true)}>Project access</button>}
@@ -1190,6 +1191,7 @@ export function App() {
         <section data-onboarding="storyboard.list" className="scene-list" aria-label="Scene sequence">
           <div className="scene-list-tools"><div className="scene-list-title"><h2>Scenes <span className="count">{scenes.length}</span></h2><button className="icon-button" title="Add scene" aria-label="Add scene" onClick={beginSceneCreate} disabled={!project.id || busy}><Plus size={19} /></button></div>
             <label data-onboarding="storyboard.import" className={`button button-outline upload-control ${!project.id || busy ? "disabled" : ""}`}><FileUp size={15} /> Import PowerPoint<input type="file" aria-label="Import PowerPoint" accept=".pptx" onChange={uploadDeck} disabled={!project.id || busy} /></label>
+            <button type="button" className="button button-outline" disabled={busy || !project.id || !permissions.canEdit} onClick={() => setShowProjectBackground(true)}>Project background</button>
           </div>
           <div className="scene-sequence">
             {scenes.length === 0 ? <div className="empty-list"><div className="empty-icon"><Layers3 size={22} /></div><strong>{project.id ? "A fresh start" : "No project selected"}</strong><p>{project.id ? "Your scenes will appear here. Drag to reorder, or use the arrow buttons." : "Create a project to start your storyboard."}</p></div> : scenes.map((item, index) => <div className={`scene-row-wrap ${selectedScene === index ? "is-selected" : ""} ${draggingSceneId === item.id ? "dragging" : ""}`} key={item.id} draggable={!busy} onDragStart={(event) => { setDraggingSceneId(item.id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", item.id); }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const draggedId = event.dataTransfer.getData("text/plain") || draggingSceneId; if (draggedId) void reorderScenes(draggedId, item.id); }} onDragEnd={() => setDraggingSceneId(null)}>

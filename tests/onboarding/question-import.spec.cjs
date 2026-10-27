@@ -18,7 +18,6 @@ for (const width of [1440, 390]) {
     }, { id: project.id, theme });
     await page.route('**/api/projects', route => route.fulfill({ json: [project] }));
     await page.goto('/');
-    await page.getByRole('button', { name: 'Review tools', exact: true }).click();
     await page.getByRole('button', { name: 'Assessments', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Assessments', exact: true });
     await dialog.getByRole('button', { name: 'Create assessment', exact: true }).click();
@@ -103,7 +102,6 @@ for (const width of [1440, 390]) {
       author: 'Training team', source: 'Local policy', language: 'en-US', difficulty: 'medium',
     });
     await editor.getByRole('button', { name: 'Close question editor', exact: true }).click();
-    await page.getByRole('button', { name: 'Review tools', exact: true }).click();
     await page.getByRole('button', { name: 'Assessments', exact: true }).click();
     await dialog.getByRole('button', { name: 'Edit question and metadata', exact: true }).first().click();
     await editor.getByText('Tags and learning-objective references', { exact: true }).click();
@@ -122,7 +120,6 @@ for (const width of [1440, 390]) {
     await expect(editor.getByRole('list', { name: 'Selected tags', exact: true })).toContainText('refresher');
     await page.screenshot({ path: test.info().outputPath('question-metadata.png') });
     await editor.getByRole('button', { name: 'Close question editor', exact: true }).click();
-    await page.getByRole('button', { name: 'Review tools', exact: true }).click();
     await page.getByRole('button', { name: 'Assessments', exact: true }).click();
     await dialog.getByLabel('New question title', { exact: true }).fill('Direct authoring');
     await dialog.getByRole('button', { name: 'Add question', exact: true }).click();

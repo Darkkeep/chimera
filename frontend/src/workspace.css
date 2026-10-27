@@ -45,6 +45,7 @@ button:disabled, .button.disabled { opacity: .48; cursor: not-allowed; }
 .nav-item { min-height: 44px; margin-bottom: 5px; padding: 12px; color: #d7e3f2; gap: 11px; font: 500 13px var(--font-inter); border-radius: 5px; }
 .nav-item.active { background: #2a507e; color: #fff; box-shadow: inset 3px 0 #86b8ff; }
 .nav-item:hover { background: #264666; color: white; }
+a.nav-item { text-decoration: none; }
 .sidebar-review { margin-top: 22px; padding-top: 18px; border-top: 1px solid #344a63; }
 .review-toggle { gap: 10px; }
 .review-toggle svg:last-child { margin-left: auto; transition: transform 120ms ease; }

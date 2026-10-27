@@ -25,8 +25,7 @@ for (const width of [1440, 390]) {
       localStorage.setItem('chimera.appearance', theme);
     }, { id, theme });
     await page.goto('/');
-    await page.getByRole('button', { name: 'Review tools', exact: true }).click();
-    await page.getByRole('button', { name: 'Assessments', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Workspace', exact: true }).getByRole('button', { name: 'Assessments', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Assessments', exact: true });
     const checkContrast = async () => {
       expect((await new AxeBuilder({ page }).include('.assessments-editor').withRules(['color-contrast']).analyze()).violations).toEqual([]);
@@ -73,7 +72,6 @@ for (const width of [1440, 390]) {
     await expect(summary).toContainText('Score 50%');
     await preview.getByRole('button', { name: 'Close course preview', exact: true }).click();
     await page.reload();
-    await page.getByRole('button', { name: 'Review tools', exact: true }).click();
     await page.getByRole('button', { name: 'Assessments', exact: true }).click();
     await expect(dialog.getByRole('button', { name: 'Edit Edited check', exact: true })).toBeVisible();
     page.once('dialog', prompt => prompt.accept());

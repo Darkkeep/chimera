@@ -64,7 +64,7 @@ for (const [theme, width] of [['light', 1440], ['dark', 390]]) {
     }, { id: project.id, theme });
     await page.goto('/');
     await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
-    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Scene sequence', exact: true }).getByRole('button', { name: 'Project background', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Project background', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Project background', exact: true });
     await dialog.getByRole('combobox', { name: 'Project background image' }).click();
@@ -109,7 +109,6 @@ for (const [theme, width] of [['light', 1440], ['dark', 390]]) {
       if (id) await preview.getByRole('button', { name: 'Next', exact: true }).click();
     }
     await preview.getByRole('button', { name: 'Close course preview', exact: true }).click();
-    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: 'Project background', exact: true }).click();
     await selectImage(page, 'Project background image', 'Scene image.png');
     await page.getByRole('button', { name: 'Save project background', exact: true }).click();
@@ -138,7 +137,7 @@ test('project background save reports stale revisions instead of overwriting', a
   const project = await seed(page, request);
   await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
   await page.goto('/');
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Storyboard', exact: true }).click();
   await page.getByRole('button', { name: 'Project background', exact: true }).click();
   await selectImage(page, 'Project background image', 'Project image.png');
   await request.patch(`/api/projects/${project.id}/background`, {

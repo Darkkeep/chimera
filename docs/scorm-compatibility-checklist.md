@@ -1,5 +1,11 @@
 # SCORM Compatibility Checklist
 
+## October 27 question changes: qualification scope
+
+Current question types include **Fill-in-the-blank** (legacy `short-answer`), not an essay/manual-grading question. Local checks cover one text blank, exact accepted alternatives, surrounding-whitespace handling, case sensitivity, retries, and saved responses in Preview and both SCORM profiles. Drag/drop uses correct-placement feedback, unlimited drop retries, and Check answer attempts. New packages still need target-LMS requalification.
+
+QTI item/test XML and CSV/XLSX question exports are separate from SCORM packages. The corrected inline QTI text-entry structure and metadata round trips have local regression coverage, but **Blackboard QTI question-bank acceptance is not verified**. The historical SCORM attestations below must not be interpreted as approval of QTI imports, new packages, or all question types. See the [assessment guide](user-guide.md#5-author-assessments).
+
 ## Replacement-package LMS acceptance: 2026-10-14
 
 The operator confirmed the retry fix worked, then explicitly confirmed Continue, Start over, and Gradebook score/completion with **“yes to all.”** The replacement SCORM 1.2 fixture passed the requested external LMS checks by operator attestation. Package SHA-256: `48a8c510e5a191946bac07842b03b48fbe56fe2a4698ba35d49e89d400fddb99`. See [live AI and LMS qualification](qualification/live-ai-and-lms-2026-10-14.md) for the package, sequence, earlier retry finding, and evidence limits. The prior failed/open results below describe earlier packages and are retained as history.
