@@ -112,9 +112,10 @@ async function freePort() {
   await text.click();
   await page.locator('.visual-inspector summary').filter({ hasText: /^Layout$/ }).click();
   const beforeX = Number(await page.getByLabel('Element x', { exact: true }).inputValue());
+  await text.scrollIntoViewIfNeeded();
   const box = await text.boundingBox();
   await page.mouse.move(box.x + 30, box.y + 20); await page.mouse.down(); await page.mouse.move(box.x + 85, box.y + 50, { steps: 8 }); await page.mouse.up();
-  assert(Number(await page.getByLabel('Element x', { exact: true }).inputValue()) > beforeX);
+  await expect.poll(async () => Number(await page.getByLabel('Element x', { exact: true }).inputValue())).toBeGreaterThan(beforeX);
   await page.getByLabel('Element width', { exact: true }).fill('560');
   const textRatio = Number(await page.getByLabel('Element width', { exact: true }).inputValue()) / Number(await page.getByLabel('Element height', { exact: true }).inputValue());
   const textResizeHandle = text.locator('xpath=..').locator('.visual-resize-handle-se');
@@ -145,7 +146,7 @@ async function freePort() {
   await expect(page.locator('.visual-editable .visual-image')).toHaveCount(beforeImages + 1);
   const addedImage = page.locator('.visual-editable .visual-image').last();
   await addedImage.click();
-  const imageResizeHandle = addedImage.locator('xpath=../..').locator('.visual-resize-handle-se');
+  const imageResizeHandle = addedImage.locator('xpath=ancestor::*[contains(@class,"react-draggable")][1]').locator('.visual-resize-handle-se');
   const imageSizeBefore = [Number(await page.getByLabel('Element width', { exact: true }).inputValue()), Number(await page.getByLabel('Element height', { exact: true }).inputValue())];
   await imageResizeHandle.scrollIntoViewIfNeeded();
   const imageHandleBox = await imageResizeHandle.boundingBox();
