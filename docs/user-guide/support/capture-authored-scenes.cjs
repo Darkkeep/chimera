@@ -1,0 +1,91 @@
+const { chromium, expect } = require('@playwright/test');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const { execFileSync } = require('node:child_process');
+
+(async () => {
+  const baseURL = process.env.GUIDE_URL || 'http://127.0.0.1:5178';
+  if (baseURL !== 'http://127.0.0.1:5178') throw Error('Capture requires the isolated guide frontend on 5178.');
+  const fixtureDir = process.env.CHIMERA_GUIDE_DIR || path.resolve('workspace/user-guide-authored-20261027');
+  const fixture = JSON.parse(await fs.readFile(path.join(fixtureDir, 'fixture.json'), 'utf8'));
+  const browser = await chromium.launch();
+  const captures = [];
+  try {
+    const page = await browser.newPage({ baseURL, viewport: { width: 1500, height: 1250 }, colorScheme: 'light' });
+    await page.route('**/api/**', route => {
+      const url = new URL(route.request().url());
+      if (/pythia-|generation-jobs|content-draft|\/ai-connection|\/narration-connections/.test(url.pathname)) {
+        if (route.request().method() !== 'GET') return route.abort();
+        return route.fulfill({ status: 503, json: { detail: 'Documentation capture; providers disabled.' } });
+      }
+      return route.continue();
+    });
+    await page.route('https://**/*', route => route.abort());
+    const projects = await (await page.request.get('/api/projects')).json();
+    if (projects.length !== 1 || projects[0].id !== fixture.projectId || projects[0].title !== 'Chimera Guide Demonstration') throw Error('Unexpected fixture; user projects must not be captured.');
+    await page.addInitScript(id => { localStorage.setItem('chimera.activeProjectId', id); localStorage.setItem('chimera.appearance', 'light'); }, fixture.projectId);
+    const shot = async (name, target) => {
+      const destination = path.resolve(`docs/user-guide/images/${name}.png`);
+      await target.screenshot({ path: destination, animations: 'disabled' });
+      const buffer = await fs.readFile(destination);
+      captures.push({ file: `images/${name}.png`, sha256: crypto.createHash('sha256').update(buffer).digest('hex') });
+    };
+    const button = name => page.getByRole('button', { name, exact: true });
+    await page.goto('/');
+    await button('Resume authoring').click();
+    await button('Project background').click();
+    const background = page.getByRole('dialog', { name: 'Project background', exact: true });
+    await expect(background.getByRole('button', { name: 'Import graphic', exact: true })).toBeVisible();
+    await shot('project-background-current', background);
+    await background.getByLabel('Import background graphic').setInputFiles(fixture.backgroundFile);
+    await expect(background.getByRole('combobox')).toContainText('project-backdrop.png');
+    await shot('project-background-import', background);
+    await background.getByRole('button', { name: 'Save project background', exact: true }).click();
+    await expect(background).toHaveCount(0);
+    await shot('storyboard-background-location', page.locator('.scene-list'));
+    await shot('scene-sequence', page.locator('.scene-list'));
+    await button('Edit scene').click();
+    const editor = page.getByRole('dialog', { name: 'Welcome and objectives', exact: true });
+    await editor.getByRole('tab', { name: 'Details', exact: true }).click();
+    await expect(editor.getByRole('combobox', { name: 'Rendering mode', exact: true })).toHaveCount(0);
+    await shot('scene-editor', editor);
+    const template = editor.getByRole('combobox', { name: 'Template', exact: true });
+    await template.selectOption({ index: 1 });
+    await shot('template-selection', editor);
+    await editor.getByRole('button', { name: 'Apply template', exact: true }).click();
+    await expect(editor.getByRole('tab', { name: 'Stage', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await shot('template-applied-stage', editor);
+    await editor.getByRole('button', { name: 'Undo', exact: true }).click();
+    await shot('scene-canvas-editor', editor);
+    await editor.getByRole('button', { name: 'Compare with original', exact: true }).click();
+    await expect(editor.locator('.visual-source')).toBeVisible();
+    await shot('scene-original-comparison', editor);
+    await editor.getByRole('button', { name: 'Return to scene', exact: true }).click();
+    await editor.locator('.visual-inspector-section > summary').filter({ hasText: /^Background$/ }).click();
+    await editor.getByRole('combobox', { name: 'Background image', exact: true }).click();
+    await expect(editor.getByRole('option', { name: /Use project default/ })).toBeVisible();
+    await shot('scene-background-default', editor);
+    await page.keyboard.press('Escape');
+    await editor.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await button('Add scene').first().click();
+    await shot('new-scene', page.getByRole('dialog', { name: 'New scene', exact: true }));
+    await page.getByRole('dialog', { name: 'New scene', exact: true }).getByRole('button', { name: 'Cancel', exact: true }).click();
+    await button('Preview course').click();
+    const preview = page.getByRole('dialog', { name: 'Chimera Guide Demonstration course preview', exact: true });
+    await expect(preview.locator('.visual-stage')).toBeVisible();
+    await shot('preview-header', preview.locator('.course-preview-header'));
+    await shot('preview-navigation', preview.locator('.course-preview-navigation'));
+    await shot('preview-authored-flow', preview.locator('.course-preview-content'));
+    await preview.getByText('Read slide text', { exact: true }).click();
+    await shot('slide-transcript', preview.locator('.course-preview-transcript'));
+    await shot('scene-discussion', preview.locator('.course-preview-review'));
+    await preview.getByRole('button', { name: 'Close course preview', exact: true }).click();
+    const sourceFiles = ['frontend/src/SceneVisualEditor.tsx', 'frontend/src/CoursePreview.tsx', 'frontend/src/ProjectBackgroundPanel.tsx', 'backend/app/authoring.py', 'backend/app/scene_print.py'];
+    const sourceHashes = {};
+    for (const file of sourceFiles) sourceHashes[file] = crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
+    const manifest = { date: '2026-10-27', sourceBaseCommit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceIncludesUncommittedImplementation: true, sourceHashes, fixture: path.relative(process.cwd(), fixtureDir), sourceReference: fixture.source, providerTraffic: 'blocked; no credentials or provider operations', captures };
+    await fs.writeFile('docs/user-guide/refresh-authored-scenes-2026-10-27.json', JSON.stringify(manifest, null, 2) + '\n');
+    console.log(`Captured ${captures.length} authored-scene guide images using isolated synthetic content.`);
+  } finally { await browser.close(); }
+})().catch(error => { console.error(error); process.exitCode = 1; });

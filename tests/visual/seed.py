@@ -71,6 +71,9 @@ def fixture() -> None:
     source = root / "original" / "source-deck.pptx"
     presentation.save(source)
     scenes, assets = extract_presentation(source, root)
+    # Synthetic source-reference image for comparison controls, not PPTX fidelity evidence.
+    (root / "renders" / "slide-001.png").write_bytes(background.getvalue())
+    scenes[0].previewImage = "renders/slide-001.png"
     for asset in assets:
         asset.attributionText = "Generated solid-color test artwork for qualification."
         asset.attributionStatus = "complete"

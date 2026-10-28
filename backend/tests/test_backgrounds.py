@@ -57,7 +57,7 @@ class BackgroundTests(unittest.TestCase):
         self.assertEqual([scene.backgroundAsset for scene in resolved.storyboard.scenes], [self.images[0], self.images[1], None])
         self.assertEqual(resolved.model_dump(), resolved_project(resolved).model_dump())
         self.assertEqual(self.project.model_dump(), original)
-        self.assertIsNone(self.project.storyboard.scenes[0].visualLayout)
+        self.assertEqual(self.project.storyboard.scenes[0].visualLayout.backgroundMode, "inherit")
         self.assertEqual(self.project.storyboard.scenes[2].visualLayout.backgroundMode, "none")
         self.save_default(self.images[1])
         self.assertEqual([effective_background_asset(self.project, scene) for scene in self.project.storyboard.scenes],
@@ -78,6 +78,39 @@ class BackgroundTests(unittest.TestCase):
             SceneUpdate(visualLayout=SceneLayout(backgroundMode="inherit")))
         self.assertIsNone(self.project.storyboard.scenes[0].backgroundAsset)
         self.assertEqual(effective_background_asset(self.project, self.project.storyboard.scenes[0]), self.images[0])
+
+    def test_one_project_save_prepares_legacy_source_slides_and_preserves_exceptions(self):
+        from pptx import Presentation
+        presentation = Presentation()
+        for title in ["Inherits", "Own image", "No image"]:
+            slide = presentation.slides.add_slide(presentation.slide_layouts[1])
+            slide.shapes.title.text = title
+            slide.placeholders[1].text = "Source content"
+        source = storage.project_path(self.id) / "original" / "source-deck.pptx"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        presentation.save(source)
+        scenes = [scene.model_copy(update={"sourceSlide": index + 1, "layoutMode": "fidelity"})
+                  for index, scene in enumerate(self.project.storyboard.scenes)]
+        scenes[1] = scenes[1].model_copy(update={"backgroundAsset": self.images[1]})
+        scenes[2] = scenes[2].model_copy(update={"visualLayout": SceneLayout(backgroundMode="none")})
+        storage.write_storyboard(storage.project_path(self.id), self.project.storyboard.model_copy(update={"scenes": scenes}), self.project.storyboard.revision)
+        self.project = storage.read_project(self.id)
+        before = self.project.storyboard.revision
+        self.save_default(self.images[0])
+        self.assertEqual(self.project.storyboard.revision, before + 1)
+        inherited, override, none = self.project.storyboard.scenes
+        self.assertEqual(inherited.visualLayout.backgroundMode, "inherit")
+        self.assertIsNone(inherited.visualLayout.backgroundAsset)
+        self.assertTrue(resolved_project(self.project).storyboard.scenes[0].visualLayout.enabled)
+        self.assertEqual(override.visualLayout.backgroundMode, "image")
+        self.assertEqual(override.backgroundAsset, self.images[1])
+        self.assertEqual(none.visualLayout.backgroundMode, "none")
+        original_layout = inherited.visualLayout.model_dump()
+        self.save_default(self.images[1])
+        self.assertEqual(self.project.storyboard.scenes[0].visualLayout.model_dump(), original_layout)
+        self.assertEqual(effective_background_asset(self.project, self.project.storyboard.scenes[0]), self.images[1])
+        self.save_default(None)
+        self.assertTrue(resolved_project(self.project).storyboard.scenes[0].visualLayout.enabled)
 
     def test_revision_invalid_assets_and_model_invariants(self):
         revision = self.project.storyboard.revision

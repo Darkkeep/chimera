@@ -104,6 +104,10 @@ def extract_presentation(source: Path, output_root: Path) -> tuple[list[Scene], 
             return asset.id
 
         visual_layout = extract_slide_layout(presentation, slide, register_image)
+        visual_layout.enabled = True
+        visual_layout.sourceBackgroundAsset = visual_layout.backgroundAsset
+        visual_layout.backgroundAsset = None
+        visual_layout.backgroundMode = "inherit"
         slide_xml = ElementTree.fromstring(slide._element.xml)
         timing = slide_xml.find(qn("p:timing"))
         transition = slide_xml.find(qn("p:transition"))

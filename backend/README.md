@@ -11,6 +11,18 @@ uvicorn app.main:app --reload --port 8000
 
 The API stores projects under `workspace/projects` by default. Set `CHIMERA_WORKSPACE` to use another location.
 
+## Authored scenes and document rendering
+
+Stage, storyboard, course preview, standalone, SCORM, and Word visuals use the authored composition. Original PowerPoint renders remain comparison references. Legacy `layoutMode` and `visualLayout.enabled` fields remain readable for older clients; the authoring UI no longer offers rendering modes. See [the workflow and migration contract](../docs/authored-scene-workflow.md).
+
+Routes below are relative to `/api/projects/{project_id}` and require `scene.manage`:
+
+- `POST /authoring/prepare` requires `If-Match`. It prepares missing compositions from retained PowerPoint/template sources or native scene content, preserving existing compositions and scene metadata. Preparation is one revision with history and is idempotent; missing revisions return 428, stale writes 412, and unavailable source layouts 422.
+- `POST /scenes/{scene_id}/template-draft` requires `If-Match` and a `SceneUpdate` body with the selected `templateId` and current title/text. It returns `{project, layout}` for draft preview. Reusable imported media can advance the project revision, but the saved scene remains unchanged until the ordinary scene PATCH saves the reviewed composition. Undo/Redo is editor-local.
+- `PATCH /background` changes the project default and prepares legacy scenes in the same revision. Explicit scene images and None overrides remain exceptions. `visualLayout.sourceBackgroundAsset` retains a source-deck baseline independently from the authored override.
+
+Word exports render static images through the same delivery player used for standalone/SCORM. Install the root production dependencies (`npm ci --omit=dev`) and Chromium (`npx playwright install chromium`) for the backend account. The renderer needs Node.js, local temporary storage, and the package's referenced assets. It blocks external browser requests, stops motion for static output, shows assessments in their initial unanswered state, and removes temporary packages afterward. Missing or failed rendering returns 503; obsolete source-preview images are not a fallback for authored compositions. Instructional text and the surrounding Word records remain editable. Original source previews are excluded from delivery packages when the scene has an authored composition.
+
 ## Question import, metadata, and export
 
 The authoring entry point is **WORKSPACE > Assessments**. Question metadata is part of each assessment item; legacy questions receive defaults. Stable identifiers remain unique per project. Tags and learning-objective references are lists of at most 50 unique strings, each at most 200 characters. Their searchable UI derives suggestions from saved questions in the current project; there is no cross-project tag registry or automatic learning-objective creation.
@@ -63,7 +75,7 @@ PowerPoint scene templates are stored under `workspace/templates` (or the config
 
 Project media uploads support JPG, PNG, GIF, WebP, MP3, M4A, AAC, WAV, and OGG files up to 100 MB. Media files are stored under each project's `assets` directory and scene references are stored in `storyboard.json`.
 
-Each media asset has attribution text and a `draft` or `complete` status. Draft attribution is allowed during authoring. Production readiness is checked with `GET /api/projects/{project_id}/validation?target=production`; it fails until every media asset has non-empty attribution text and `complete` status. SCORM packages can be built for SCORM 2004 and 1.2. Local browser qualification covers both profiles; Blackboard verification is documented for SCORM 2004 only. See `docs/scorm-compatibility-checklist.md` for details.
+Each media asset has attribution text and a `draft` or `complete` status. Draft attribution is allowed during authoring. Production readiness is checked with `GET /api/projects/{project_id}/validation?target=production`; missing or incomplete image credits produce an Attribution Pending warning, while missing or incomplete audio/video credits remain blocking errors. Verify all credits before release. SCORM packages can be built for SCORM 2004 and 1.2. Local browser qualification covers both profiles; Blackboard verification is documented for SCORM 2004 only. See `docs/scorm-compatibility-checklist.md` for details.
 
 Project mutation requests from the authoring UI include `If-Match: "<revision>"`, using the storyboard revision returned in each project response. Stale writes return `412 Precondition Failed` and include the current revision in the `ETag` header. The header remains optional on legacy mutation routes; question-import commits and named-assessment writes require it and return 428 when it is missing.
 

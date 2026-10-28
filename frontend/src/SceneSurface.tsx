@@ -13,7 +13,7 @@ export type ElementAnimations = { entrance: AnimationStep; presentation: Animati
 
 export type SceneElement = { id: string; kind: "text" | "image" | "shape"; x: number; y: number; width: number; height: number; rotation: number; text: string; assetId: string | null; fontSize: number; fontFamily: string; color: string; bold: boolean; italic: boolean; align: "left" | "center" | "right"; crop: number[]; shapeSvg: string | null; shapeName: string | null; source: "slide" | "layout" | "master" | "manual"; locked: boolean; animations?: ElementAnimations | null };
 export type AssessmentRegion = { x: number; y: number; width: number; height: number };
-export type SceneLayout = { version: 1; enabled: boolean; width: number; height: number; backgroundColor: string; backgroundAsset: string | null; backgroundMode?: "inherit" | "image" | "none" | null; elements: SceneElement[]; warnings: string[]; assessmentRegion?: AssessmentRegion | null };
+export type SceneLayout = { version: 1; enabled: boolean; width: number; height: number; backgroundColor: string; backgroundAsset: string | null; sourceBackgroundAsset?: string | null; backgroundMode?: "inherit" | "image" | "none" | null; elements: SceneElement[]; warnings: string[]; assessmentRegion?: AssessmentRegion | null };
 
 export function assessmentRegion(layout: SceneLayout, title?: string): AssessmentRegion {
   const heading = layout.elements.find(element => element.kind === "text" && element.text.trim() === title?.trim());
@@ -22,22 +22,27 @@ export function assessmentRegion(layout: SceneLayout, title?: string): Assessmen
   return layout.assessmentRegion || { x, y, width: Math.min(heading?.width ?? layout.width * 0.9, layout.width - x - layout.width * 0.05), height: Math.max(1, Math.min(layout.height * 0.7, layout.height - y - layout.height * 0.05)) };
 }
 
+export function visibleSceneElements(layout: SceneLayout, title: string, hasAssessment: boolean) {
+  return layout.elements.filter(element => !(hasAssessment && element.kind === "text" && element.text.trim() === title.trim()));
+}
+
 export function newElement(kind: "text" | "image", changes: Partial<SceneElement> = {}): SceneElement {
   return { id: crypto.randomUUID(), kind, x: 40, y: 40, width: kind === "text" ? 400 : 240, height: kind === "text" ? 100 : 180, rotation: 0, text: kind === "text" ? "New text" : "", assetId: null, fontSize: 28, fontFamily: "sans-serif", color: "#202020", bold: false, italic: false, align: "left", crop: [0, 0, 0, 0], shapeSvg: null, shapeName: null, source: "manual", locked: false, ...changes };
 }
 
 export function initialLayout(scene: Scene): SceneLayout {
-  return scene.visualLayout ? structuredClone(scene.visualLayout) : { version: 1, enabled: false, width: 1280, height: 720, backgroundColor: "#ffffff", backgroundAsset: scene.backgroundAsset ?? null, warnings: [], elements: [scene.title, ...scene.extractedText].filter(Boolean).map((text, index) => newElement("text", { text, x: 60, y: 40 + index * 110, width: 1160, height: 100, fontSize: index ? 28 : 40 })) };
+  const lines = [scene.title, ...scene.extractedText].filter(text => text.trim());
+  return scene.visualLayout ? structuredClone(scene.visualLayout) : { version: 1, enabled: true, width: 1280, height: Math.min(10000, Math.max(720, 170 + lines.length * 96)), backgroundColor: "#ffffff", backgroundAsset: scene.backgroundAsset ?? null, backgroundMode: scene.backgroundAsset ? "image" : "inherit", warnings: [], elements: lines.map((text, index) => newElement("text", { id: `native-text-${index}`, text, x: 72, y: 80 + index * 96, width: 1136, height: 80, fontSize: index ? 28 : 40, fontFamily: "Aptos" })) };
 }
 
 export function resolvedSceneBackground(project: Project, scene: Scene): Scene {
   const backgroundAsset = effectiveBackgroundAsset(project, scene);
-  const layout = scene.visualLayout || (backgroundAsset && (scene.layoutMode === "native" || scene.assessmentItem) ? initialLayout(scene) : null);
+  const layout = scene.visualLayout || ((!scene.sourceSlide && !scene.previewImage || scene.assessmentItem) ? initialLayout(scene) : null);
   const masterBackground = project.storyboard.assets.some(asset => asset.id === backgroundAsset && asset.role === "background");
   return { ...scene, backgroundAsset, visualLayout: layout ? {
     ...layout, backgroundAsset, backgroundMode: backgroundAsset ? "image" : "none",
     elements: masterBackground ? layout.elements.filter(element => element.source !== "master") : layout.elements,
-    enabled: layout.enabled || Boolean(backgroundAsset && scene.layoutMode === "native"),
+    enabled: true,
   } : null };
 }
 
@@ -73,6 +78,6 @@ export function SceneSurface({ project, scene, assessment, animate = false }: { 
   if (!layout) return null;
   const region = assessmentRegion(scene.visualLayout || layout, scene.title);
   const question = scene.assessmentItem ? <div className="assessment-stage-region" style={{ left: `${region.x / layout.width * 100}%`, marginTop: `${region.y / layout.width * 100}%`, width: `${region.width / layout.width * 100}%` }}>{assessment ?? <AssessmentStageContent item={scene.assessmentItem} />}</div> : undefined;
-  const elements = layout.elements.filter(element => !(scene.assessmentItem && element.kind === "text" && element.text.trim() === scene.title.trim()));
+  const elements = visibleSceneElements(layout, scene.title, Boolean(scene.assessmentItem));
   return <div ref={animationRoot}><ScaledStage layout={layout} projectId={project.id} assessment={question}>{() => elements.map(element => <div key={element.id} data-scene-element={element.id} className="visual-element" style={{ position: "absolute", left: element.x, top: element.y, width: element.width, height: element.height, transform: `rotate(${element.rotation}deg)` }}><ElementContent element={element} project={project} scene={scene} /></div>)}</ScaledStage></div>;
 }

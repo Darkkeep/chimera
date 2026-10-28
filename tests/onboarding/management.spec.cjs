@@ -1,13 +1,20 @@
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 
-function project(id, title) {
-  return { id, title, sceneCount: 0, updatedAt: '2026-10-07T10:00:00Z', hasSourceDeck: false, productionStage: 'draft',
-    storyboard: { revision: 1, scenes: [], assets: [], completionSettings: { passingScore: 80, includeOptionalAssessments: false }, exportSettings: { packageWarningThresholdMB: 200 } } };
+function scene(id, title) {
+  return { id, sourceSlide: null, title, sceneType: 'content', layoutMode: 'native', templateId: null, required: true,
+    audioRequired: false, assessmentItem: null, assessmentSettings: null, extractedText: ['Synthetic scene content'],
+    actionDescription: 'Review this source scene.', narration: '', imageAssets: [], imageAltText: {}, decorativeImages: [],
+    audioAssets: [], previewImage: null, renderWarning: null, sourceAnimationXml: null, sourceTransitionXml: null, notes: 'Synthetic notes' };
+}
+
+function project(id, title, scenes = []) {
+  return { id, title, sceneCount: scenes.length, updatedAt: '2026-10-07T10:00:00Z', hasSourceDeck: false, productionStage: 'draft',
+    storyboard: { revision: 1, scenes, assets: [], completionSettings: { passingScore: 80, includeOptionalAssessments: false }, exportSettings: { packageWarningThresholdMB: 200 } } };
 }
 
 async function mockWorkspace(page, options = {}) {
-  const projects = options.empty ? [] : [project('alpha', 'Alpha course'), project('beta', 'Beta course')];
+  const projects = options.empty ? [] : [project('alpha', 'Alpha course'), project('beta', 'Beta course', options.scenes || [])];
   while (projects.length < (options.projectCount || 0)) projects.push(project(`project-${projects.length + 1}`, `Project ${projects.length + 1}`));
   let stage = 'draft';
   let referenceUploads = 0;
@@ -324,4 +331,25 @@ test('moves a project to trash from My Work after title confirmation and restore
   await expect(trashedRow).toHaveCount(0);
   await expect(page.locator('.health-row').filter({ hasText: 'Alpha course' })).toBeVisible();
   await expect(page.getByLabel('Switch project').locator('option', { hasText: 'Alpha course' })).toHaveCount(1);
+});
+
+test('opens only an authorized deep-linked project and selects its scene', async ({ page }) => {
+  await mockWorkspace(page, { scenes: [scene('scene-beta-2', 'Linked source scene')] });
+  await page.goto('/?project_id=beta&object_id=scene-beta-2');
+  await expect(page.getByRole('heading', { name: 'Beta course', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Linked source scene', exact: true })).toBeVisible();
+  await expect(page.locator('.scene-row.selected')).toContainText('Linked source scene');
+  await expect(page.getByRole('navigation', { name: 'Workspace' }).getByRole('button', { name: 'Storyboard' })).toHaveAttribute('aria-current', 'page');
+});
+
+test('does not request a deep-linked project outside the authorized project list', async ({ page }) => {
+  const forbiddenRequests = [];
+  page.on('request', request => {
+    if (new URL(request.url()).pathname === '/api/projects/outside-workspace') forbiddenRequests.push(request.url());
+  });
+  await mockWorkspace(page);
+  await page.goto('/?project_id=outside-workspace&object_id=scene-1');
+  await expect(page.getByRole('alert')).toContainText('unavailable or not accessible');
+  await expect(page.getByRole('heading', { name: 'My Work', exact: true })).toBeVisible();
+  expect(forbiddenRequests).toEqual([]);
 });

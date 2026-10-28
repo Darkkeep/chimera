@@ -2,6 +2,15 @@
 
 Approved direction: **Mechanicus Trinity**, built from the lion + eagle + dragon identity.
 
+2026-10-24 refinement: the existing artwork now has a broader lion jaw, fuller
+faceted mane and layered wings in the same silver/copper treatment. Original
+sources are retained in `assets/source/`; editable additions are in
+`assets/marks/leonine-refinement.svg`. The composite `chimera-mark.svg` embeds
+the original raster and is not a fully vectorized redraw. Regenerate with
+`python scripts/refine-brand.py` from the repository root (Pillow and Inkscape
+required); validate with `--verify`. See [current identity](../../brand-identity.md).
+The historical PDF and reference boards are retained, not regenerated.
+
 This package turns the approved concept into implementation-ready web/UI assets and design tokens. It is intended for the CHIMERA product shell, marketing surfaces, prototypes, and developer handoff.
 
 ## Start here

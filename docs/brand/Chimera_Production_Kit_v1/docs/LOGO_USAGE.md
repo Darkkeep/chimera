@@ -1,5 +1,10 @@
 # Logo and Creature Usage
 
+2026-10-24: use the refreshed exported marks and icons, preserving the fuller
+central lion mane, broad feline jaw and layered metallic wings. Do not substitute
+the historical reference-board/PDF artwork. The composite SVG retains the
+original raster; the refinement overlay is editable, not an AI regeneration.
+
 ## Identity anatomy
 - Lion: strength, execution, build.
 - Eagle: vision, elevation, Air Force lineage.

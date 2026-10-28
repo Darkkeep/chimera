@@ -10,8 +10,10 @@ Use the [completion execution record](completion-update-2026-10-15.md) for this 
 
 - [ ] Python 3.11+ is installed.
 - [ ] Node.js and npm are installed.
+- [ ] Word storyboard visuals have the repository's root production dependencies (`npm ci --omit=dev`) and Playwright Chromium (`npx playwright install chromium`) installed for the backend service account. The browser renderer is separate from LibreOffice and uses temporary localhost-only delivery pages.
 - [ ] LibreOffice is installed if rendered slide previews are required.
 - [ ] The workspace directory is writable.
+- [ ] The backend account can write temporary document-rendering files. An unavailable renderer must produce an export error rather than silently substitute an old source-slide image.
 - [ ] No provider credentials are stored in frontend files or project exports.
 - [ ] Backend requirements include `keyring`; a supported, unlocked OS credential store is available to the API account if browser-based AI connection saves will be used. Otherwise use protected server environment configuration.
 - [ ] If Google narration is needed, its Text-to-Speech API/billing and server ADC are provisioned for the backend account. No Google private key is uploaded through Chimera.

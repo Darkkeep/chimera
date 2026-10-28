@@ -22,6 +22,7 @@ from .models import AssessmentItem, ExtractedAsset, ProjectDetail, Scene
 from .render import render_slides
 from .storage import project_path, list_reference_resources, list_enhancement_proposals, list_review_comments
 from .media import resolved_project
+from .scene_print import scene_image, with_scene_images
 
 
 DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -201,7 +202,6 @@ def _add_scene(document: DocumentType, project: ProjectDetail, scene: Scene, ind
         ("Scene ID", scene.id),
         ("Type", scene.sceneType),
         ("Required", "Yes" if scene.required else "No (optional)"),
-        ("Layout", scene.layoutMode),
     ]
     if scene.sourceSlide is not None:
         metadata_rows.append(("Source slide", str(scene.sourceSlide)))
@@ -219,10 +219,12 @@ def _add_scene(document: DocumentType, project: ProjectDetail, scene: Scene, ind
     else:
         document.add_paragraph("No learner-facing text recorded.")
 
-    if scene.previewImage:
-        preview = _asset_path(project, scene.previewImage, "renders")
-        if preview is None or not _add_image(document, preview, "Imported slide preview"):
-            document.add_paragraph(f"Slide preview reference: {scene.previewImage}")
+    if scene.visualLayout or scene.previewImage:
+        preview = scene_image(scene.id)
+        if preview is None and not scene.visualLayout and scene.previewImage:
+            preview = _asset_path(project, scene.previewImage, "renders")
+        if preview is None or not _add_image(document, preview, "Authored scene"):
+            raise RuntimeError(f"Authored scene visual is unavailable for '{scene.title}'.")
 
     assets_by_id = {asset.id: asset for asset in project.storyboard.assets}
     attached_images = [assets_by_id[asset_id] for asset_id in scene.imageAssets if asset_id in assets_by_id]
@@ -379,7 +381,9 @@ def _add_sme_scene(document: DocumentType, project: ProjectDetail, scene: Scene,
     visual_area_cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
     _set_cell_border(visual_area_cell, style.panel_border)
     _set_cell_fill(visual_area_cell, style.panel_fill)
-    preview = _asset_path(project, scene.previewImage, "renders") if scene.previewImage else None
+    preview = scene_image(scene.id)
+    if preview is None and not scene.visualLayout and scene.previewImage:
+        preview = _asset_path(project, scene.previewImage, "renders")
     if preview is not None:
         try:
             with Image.open(preview) as source:
@@ -646,6 +650,7 @@ def _add_authoring_appendix(document: DocumentType, project: ProjectDetail, incl
                 document.add_paragraph(str(_clean_xml_value(f"Reply — {reply.authorLabel}: {reply.body}")))
 
 
+@with_scene_images
 def build_sme_storyboard_docx(project: ProjectDetail, include_answer_key: bool = False, include_review_comments: bool = False) -> bytes:
     project = _normalized_project(project)
     dimensions = _template_slide_dimensions()
@@ -668,6 +673,7 @@ def build_sme_storyboard_docx(project: ProjectDetail, include_answer_key: bool =
         return output.getvalue()
 
 
+@with_scene_images
 def build_full_storyboard_docx(project: ProjectDetail, include_answer_key: bool = False, include_review_comments: bool = False) -> bytes:
     project = _normalized_project(project)
     if not FULL_TEMPLATE_PATH.is_file():
@@ -713,6 +719,7 @@ def build_full_storyboard_docx(project: ProjectDetail, include_answer_key: bool 
     return output.getvalue()
 
 
+@with_scene_images
 def build_storyboard_docx(project: ProjectDetail, include_answer_key: bool = False, include_review_comments: bool = False) -> bytes:
     project = _normalized_project(project)
     document = Document()

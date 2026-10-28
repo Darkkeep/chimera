@@ -117,6 +117,7 @@ class SceneLayout(BaseModel):
     height: float = Field(default=720, gt=0, le=10000, allow_inf_nan=False)
     backgroundColor: str = Field(default="#ffffff", pattern=r"^#[0-9a-fA-F]{6}$")
     backgroundAsset: str | None = None
+    sourceBackgroundAsset: str | None = None
     backgroundMode: Literal["inherit", "image", "none"] | None = None
     elements: list[SceneElement] = Field(default_factory=list, max_length=2000)
     warnings: list[str] = Field(default_factory=list)

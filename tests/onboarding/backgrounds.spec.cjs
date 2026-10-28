@@ -54,6 +54,114 @@ async function expectBackground(stage, id) {
   } else await expect(stage).toHaveCSS('background-image', 'none');
 }
 
+test('original comparison never changes the authored previews or survives reopening', async ({ page, request }) => {
+  let project = await seed(page, request);
+  let response = await request.post(`/api/projects/${project.id}/authoring/prepare`, { headers: { 'If-Match': `"${project.storyboard.revision}"` } });
+  expect(response.ok()).toBeTruthy(); project = await response.json();
+  response = await request.patch(`/api/projects/${project.id}/scenes/${project.storyboard.scenes[0].id}`, {
+    headers: { 'If-Match': `"${project.storyboard.revision}"` },
+    data: { visualLayout: { version: 1, enabled: true, width: 1280, height: 720, backgroundColor: '#123456', elements: [{ id: 'body', kind: 'text', x: 72, y: 176, width: 1136, height: 80, text: 'Readable learning content.' }] } },
+  });
+  expect(response.ok()).toBeTruthy(); project = await response.json();
+  project.storyboard.scenes[0].previewImage = 'source-preview.png';
+  await page.route(`**/api/projects/${project.id}`, route => route.fulfill({ json: project }));
+  await page.route('**/source-preview.png', route => route.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=', 'base64') }));
+  await page.addInitScript(({ id, sceneId }) => {
+    localStorage.setItem('chimera.activeProjectId', id);
+    localStorage.setItem(`chimera.previewView.${id}.${sceneId}`, 'source');
+  }, { id: project.id, sceneId: project.storyboard.scenes[0].id });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await expect(page.locator('.visual-authoring-surface .visual-stage')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Inherited scene', exact: true });
+  await expect(editor.locator('.visual-stage')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+  await editor.getByRole('tab', { name: 'Details', exact: true }).click();
+  await expect(editor.getByRole('combobox', { name: 'Rendering mode', exact: true })).toHaveCount(0);
+  await editor.getByRole('tab', { name: 'Stage', exact: true }).click();
+  await editor.getByRole('button', { name: 'Compare with original', exact: true }).click();
+  await expect(editor.locator('.visual-source')).toBeVisible();
+  await expect(editor.getByRole('status')).toContainText('Original slide reference');
+  await editor.getByRole('button', { name: 'Close scene editor', exact: true }).click();
+  await expect(page.locator('.visual-authoring-surface .visual-stage')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+  await page.getByRole('button', { name: 'Preview course', exact: true }).click();
+  const preview = page.getByRole('dialog', { name: `${project.title} course preview`, exact: true });
+  await expect(preview.locator('.visual-stage')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+  await expect(preview.locator('.course-preview-slide')).toHaveCount(0);
+  const navigation = await preview.locator('.course-preview-navigation').boundingBox();
+  const transcript = await preview.locator('.course-preview-transcript').boundingBox();
+  const discussion = await preview.locator('.course-preview-review').boundingBox();
+  expect(transcript.y).toBeGreaterThanOrEqual(navigation.y + navigation.height);
+  expect(discussion.y).toBeGreaterThan(transcript.y);
+  await preview.getByRole('button', { name: 'Close course preview', exact: true }).click();
+  await page.reload();
+  await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await expect(editor.getByRole('button', { name: 'Compare with original', exact: true })).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('imports a graphic inside project background and saves it across reload', async ({ page, request }) => {
+  const project = await seed(page, request);
+  await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await page.getByRole('button', { name: 'Project background', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Project background', exact: true });
+  const buffer = await page.evaluate(() => {
+    const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 18;
+    const context = canvas.getContext('2d'); context.fillStyle = '#123456'; context.fillRect(0, 0, 32, 18);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  await dialog.getByLabel('Import background graphic').setInputFiles({ name: 'Imported background.png', mimeType: 'image/png', buffer: Buffer.from(buffer, 'base64') });
+  await expect(dialog.getByRole('combobox')).toContainText('Imported background.png');
+  await dialog.getByRole('button', { name: 'Save project background', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  const saved = await (await request.get(`/api/projects/${project.id}`)).json();
+  const image = saved.storyboard.assets.find(asset => asset.filename === 'Imported background.png');
+  expect(saved.storyboard.backgroundAsset).toBe(image.id);
+  await page.reload();
+  await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await page.getByRole('button', { name: 'Project background', exact: true }).click();
+  await expect(dialog.getByRole('combobox')).toContainText('Imported background.png');
+});
+
+test('apply template previews the composition, supports undo, and preserves it on save', async ({ page, request }) => {
+  let project = await seed(page, request);
+  let response = await request.post(`/api/projects/${project.id}/authoring/prepare`, { headers: { 'If-Match': `"${project.storyboard.revision}"` } });
+  expect(response.ok()).toBeTruthy(); project = await response.json();
+  const buffer = execFileSync(python, ['-c', `import io,sys
+from pptx import Presentation
+from pptx.dml.color import RGBColor
+p=Presentation(); s=p.slides.add_slide(p.slide_layouts[1]); s.shapes.title.text='Template title'; s.placeholders[1].text='Template body'
+s.background.fill.solid(); s.background.fill.fore_color.rgb=RGBColor(18,52,86)
+b=io.BytesIO(); p.save(b); sys.stdout.buffer.write(b.getvalue())`]);
+  response = await request.post('/api/templates', { multipart: { file: { name: 'Authored template.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', buffer } } });
+  expect(response.ok()).toBeTruthy(); const template = await response.json();
+  await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Inherited scene', exact: true });
+  await editor.getByRole('tab', { name: 'Details', exact: true }).click();
+  await editor.getByRole('combobox', { name: 'Template', exact: true }).selectOption(template.id);
+  await editor.getByRole('button', { name: 'Apply template', exact: true }).click();
+  await expect(editor.locator('.visual-stage')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+  let saved = await (await request.get(`/api/projects/${project.id}`)).json();
+  expect(saved.storyboard.scenes[0].templateId).toBeNull();
+  await editor.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(editor.locator('.visual-stage')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await editor.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(editor.locator('.visual-stage')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+  await editor.getByRole('button', { name: 'Save scene', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  saved = await (await request.get(`/api/projects/${project.id}`)).json();
+  expect(saved.storyboard.scenes[0].templateId).toBe(template.id);
+  expect(saved.storyboard.scenes[0].title).toBe('Inherited scene');
+  await page.reload();
+  await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await expect(page.locator('.visual-authoring-surface .visual-stage')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+});
+
 for (const [theme, width] of [['light', 1440], ['dark', 390]]) {
   test(`project and scene thumbnail backgrounds persist and preview in ${theme} at ${width}px`, async ({ page, request }) => {
     const project = await seed(page, request);
@@ -86,9 +194,9 @@ for (const [theme, width] of [['light', 1440], ['dark', 390]]) {
       const editor = page.getByRole('dialog').last();
       await editor.locator('.visual-inspector summary').filter({ hasText: /^Background$/ }).click();
       const picker = editor.getByRole('combobox', { name: 'Background image', exact: true });
-      await expect(picker).toContainText('Use project background (Project image.png)');
+      await expect(picker).toContainText('Use project default (Project image.png)');
       await picker.click();
-      await expect(editor.getByRole('option', { name: 'Use project background (Project image.png)', exact: true }).locator('img')).toBeVisible();
+      await expect(editor.getByRole('option', { name: 'Use project default (Project image.png)', exact: true }).locator('img')).toBeVisible();
       await editor.getByRole('listbox').getByRole('option', { name: option, exact: true }).click();
       await expectBackground(editor.locator('.visual-stage'), index === 1 ? project.storyboard.assets[1].id : null);
       await editor.getByRole('button', { name: 'Save scene', exact: true }).click();
@@ -125,7 +233,7 @@ for (const [theme, width] of [['light', 1440], ['dark', 390]]) {
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Home');
     await page.keyboard.press('Enter');
-    await expect(picker).toContainText('Use project background');
+    await expect(picker).toContainText('Use project default');
     await page.getByRole('button', { name: 'Save scene', exact: true }).click();
     await expect.poll(async () => (await read()).storyboard.scenes[1].visualLayout.backgroundMode).toBe('inherit');
     saved = await read();

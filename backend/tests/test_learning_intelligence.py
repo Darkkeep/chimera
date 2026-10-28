@@ -460,6 +460,52 @@ class PythiaRouteTests(unittest.TestCase):
         assert_contract_schema(self, "task-request.schema.json", request)
         assert_contract_schema(self, "storyboard-analysis-input.schema.json", request["inputs"][0])
 
+    @unittest.skipUnless(
+        all(os.environ.get(name) for name in (
+            "CHIMERA_PYTHIA_BASE_URL",
+            "CHIMERA_PYTHIA_API_KEY",
+            "CHIMERA_MANTEION_API_KEY",
+            "CHIMERA_FOREIGN_API_KEY",
+        )),
+        "Set isolated qualification credentials to run the live Pythia interoperability check.",
+    )
+    def test_live_pythia_candidate_round_trip_and_cross_client_provenance(self):
+        base_url = os.environ["CHIMERA_PYTHIA_BASE_URL"]
+        provider = PythiaProvider(base_url)
+        self.assertEqual(provider.health().get("contract_version"), "1.1.0")
+
+        submitted = main.submit_pythia_analysis(self.project.id, self.scene.id)
+        self.assertEqual(submitted["consumer"], "chimera")
+        self.assertEqual(submitted["status"], "submitted")
+        task_id = submitted["task_id"]
+
+        task = provider.task_status(task_id)
+        for _ in range(100):
+            if task.get("status") == "awaiting_review":
+                break
+            self.assertNotEqual(task.get("status"), "failed", task)
+            time.sleep(0.025)
+            task = provider.task_status(task_id)
+        self.assertEqual(task.get("status"), "awaiting_review")
+        artifact_id = task["artifact_id"]
+        artifact = provider.artifact(artifact_id)
+        validate_storyboard_analysis(artifact, self.project.id, self.scene.id)
+        self.assertEqual(
+            artifact["sources"],
+            [f"chimera://{self.project.id}/scenes/{self.scene.id}"],
+        )
+
+        with patch.dict(os.environ, {"CHIMERA_PYTHIA_API_KEY": os.environ["CHIMERA_MANTEION_API_KEY"]}):
+            manteion = PythiaProvider(base_url)
+            self.assertEqual(manteion.task_status(task_id), task)
+            self.assertEqual(manteion.artifact(artifact_id), artifact)
+
+        with patch.dict(os.environ, {"CHIMERA_PYTHIA_API_KEY": os.environ["CHIMERA_FOREIGN_API_KEY"]}):
+            foreign = PythiaProvider(base_url)
+            with self.assertRaises(PythiaUnavailableError) as raised:
+                foreign.artifact(artifact_id)
+        self.assertEqual(raised.exception.status_code, 404)
+
     def test_transform_submit_preserves_selected_scene_order_and_content(self):
         self.project = storage.create_scene(self.project.id, SceneCreate(
             title="Second scene",

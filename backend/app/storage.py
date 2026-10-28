@@ -663,6 +663,8 @@ def validate_visual_assets(scene: Scene, assets: dict[str, ExtractedAsset]) -> N
         references.update(element.assetId for element in scene.visualLayout.elements if element.kind == "image")
         if scene.visualLayout.backgroundAsset:
             references.add(scene.visualLayout.backgroundAsset)
+        if scene.visualLayout.sourceBackgroundAsset:
+            references.add(scene.visualLayout.sourceBackgroundAsset)
     if any(reference not in assets or assets[reference].kind != "image" for reference in references):
         raise ValueError("Visual scene elements must reference image assets in this project")
 
@@ -679,6 +681,10 @@ def update_scene(project_id: str, scene_id: str, data: SceneUpdate, expected_rev
     for index, scene in enumerate(scenes):
         if scene.id == scene_id:
             updated_scene = Scene.model_validate({**scene.model_dump(), **updates})
+            if "backgroundAsset" in updates and "visualLayout" not in updates and updated_scene.visualLayout:
+                updated_scene = updated_scene.model_copy(update={"visualLayout": updated_scene.visualLayout.model_copy(update={
+                    "backgroundAsset": data.backgroundAsset, "backgroundMode": "image" if data.backgroundAsset else "none",
+                })})
             if updated_scene.assessmentItem and (scene.assessmentItem is None or updated_scene.assessmentItem.identifier != scene.assessmentItem.identifier):
                 if any(candidate.id != scene_id and candidate.assessmentItem and candidate.assessmentItem.identifier == updated_scene.assessmentItem.identifier for candidate in scenes):
                     raise ValueError("This stable question identifier already exists in this project")
@@ -686,10 +692,11 @@ def update_scene(project_id: str, scene_id: str, data: SceneUpdate, expected_rev
                 from .models import SceneElement
                 layout = updated_scene.visualLayout.model_copy(deep=True)
                 text_elements = [element for element in layout.elements if element.kind == "text" and (layout.enabled or element.source == "slide")]
-                if not layout.enabled and text_elements:
+                title_element = next((element for element in text_elements if element.text == scene.title), None)
+                if title_element:
                     if "title" in updates and updated_scene.title != scene.title:
-                        text_elements[0].text = updated_scene.title
-                    text_elements = text_elements[1:]
+                        title_element.text = updated_scene.title
+                    text_elements = [element for element in text_elements if element.id != title_element.id]
                 if "extractedText" in updates and updated_scene.extractedText != scene.extractedText:
                     texts = list(updated_scene.extractedText)
                     for element, text in zip(text_elements, texts):
@@ -829,13 +836,46 @@ def update_project_export_settings(project_id: str, settings: ExportSettings, ex
     return read_project(project_id)
 
 
+def prepare_authored_project(project_id: str, expected_revision: int | None = None) -> ProjectDetail:
+    from .authoring import prepared_project
+    from .media import validate_backgrounds
+    current = read_project(project_id)
+    expected = expected_revision or current.storyboard.revision
+    if expected != current.storyboard.revision:
+        raise StoryboardRevisionConflict(expected, current.storyboard.revision)
+    with prepared_project(current, project_path(project_id)) as (candidate, staging, assets):
+        if candidate.storyboard == current.storyboard:
+            return current
+        validate_backgrounds(candidate)
+        with storyboard_transaction():
+            actual = read_project(project_id).storyboard.revision
+            if actual != expected:
+                raise StoryboardRevisionConflict(expected, actual)
+            persist_imported_assets(project_id, staging, assets)
+            write_storyboard(project_path(project_id), candidate.storyboard, expected)
+        write_project_metadata(project_path(project_id), {"id": project_id, "title": current.title, "updatedAt": now_iso()})
+    return read_project(project_id)
+
+
 def update_project_background(project_id: str, background_asset: str | None, expected_revision: int | None = None) -> ProjectDetail:
+    from .authoring import prepared_project
     from .media import validate_backgrounds
     path = project_path(project_id)
     current = read_project(project_id)
-    storyboard = current.storyboard.model_copy(update={"backgroundAsset": background_asset})
-    validate_backgrounds(current.model_copy(update={"storyboard": storyboard}))
-    write_storyboard(path, storyboard, expected_revision or current.storyboard.revision)
+    expected = expected_revision or current.storyboard.revision
+    if expected != current.storyboard.revision:
+        raise StoryboardRevisionConflict(expected, current.storyboard.revision)
+    candidate = current.model_copy(update={"storyboard": current.storyboard.model_copy(update={"backgroundAsset": background_asset})})
+    validate_backgrounds(candidate)
+    # One project-level transaction prepares legacy slides and changes the default.
+    with prepared_project(candidate, path) as (candidate, staging, assets):
+        validate_backgrounds(candidate)
+        with storyboard_transaction():
+            actual = read_project(project_id).storyboard.revision
+            if actual != expected:
+                raise StoryboardRevisionConflict(expected, actual)
+            persist_imported_assets(project_id, staging, assets)
+            write_storyboard(path, candidate.storyboard, expected)
     write_project_metadata(path, {"id": project_id, "title": current.title, "updatedAt": now_iso()})
     return read_project(project_id)
 

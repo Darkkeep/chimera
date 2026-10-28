@@ -56,7 +56,7 @@ const tasks: Task[] = [
   ['upload-template', 'Upload a scene template', 'templates.library', 'Choose Upload PPTX template and a readable presentation. Wait for the reusable template to appear in the library.', 'template.uploaded', always],
   ['edit-template', 'Edit template details', 'templates.edit', 'Edit the template name and description, then Save template.', 'template.saved', c => Number(c.templateCount) > 0],
   ['replace-template', 'Replace a template source', 'templates.library', 'Use Replace PPTX on the intended template and select its replacement. Existing scene references keep the template ID.', 'template.replaced', c => Number(c.templateCount) > 0],
-  ['use-template', 'Assign a template to a scene', 'scene.edit', 'In Details, set Scene layout to Template and choose a template, then choose Save scene. The other layouts are Fidelity, Hybrid and Native.', 'scene.template-saved', c => scene(c) && Number(c.templateCount) > 0],
+  ['use-template', 'Assign a template to a scene', 'scene.edit', 'In Details, choose a template, apply it to the scene, review the Stage, then choose Save scene.', 'scene.template-saved', c => scene(c) && Number(c.templateCount) > 0],
   ...([
     ['single-choice', 'Single-choice question', 'Enter at least two choices and select the one correct answer.'],
     ['multiple-response', 'Multiple-answer question', 'Enter choices and select every correct answer.'],

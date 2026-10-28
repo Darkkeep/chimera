@@ -50,7 +50,7 @@ def effective_background_asset(project: ProjectDetail, scene: Scene) -> str | No
     if layout and layout.backgroundMode == "none":
         return None
     if layout and layout.backgroundMode == "inherit":
-        return project.storyboard.backgroundAsset
+        return project.storyboard.backgroundAsset or layout.sourceBackgroundAsset
     return (layout.backgroundAsset if layout else None) or scene.backgroundAsset or project.storyboard.backgroundAsset
 
 
@@ -72,15 +72,13 @@ def resolved_project(project: ProjectDetail, published: bool = False) -> Project
         background = effective_background_asset(project, scene)
         layout = scene.visualLayout
         if layout:
-            layout = layout.model_copy(update={"backgroundAsset": background, "backgroundMode": "image" if background else "none"})
+            layout = layout.model_copy(update={"backgroundAsset": background, "backgroundMode": "image" if background else "none",
+                "enabled": True})
             if background in assets and assets[background].role == "background":
                 layout = layout.model_copy(update={"elements": [element for element in layout.elements if element.source != "master"]})
-        elif background and (scene.layoutMode == "native" or scene.assessmentItem):
-            layout = SceneLayout(enabled=True, backgroundAsset=background, backgroundMode="image", elements=[
-                SceneElement(id=f"background-text-{index}", kind="text", x=60, y=40 + index * 110,
-                    width=1160, height=100, text=text, fontSize=28 if index else 40)
-                for index, text in enumerate([scene.title, *scene.extractedText]) if text
-            ])
+        elif not scene.sourceSlide and not scene.previewImage or scene.assessmentItem:
+            from .authoring import native_layout
+            layout = native_layout(scene).model_copy(update={"backgroundAsset": background, "backgroundMode": "image" if background else "none"})
         if layout and background and scene.layoutMode == "native":
             layout = layout.model_copy(update={"enabled": True})
         placements = effective_placements(project, scene)
@@ -93,8 +91,11 @@ def resolved_project(project: ProjectDetail, published: bool = False) -> Project
             used.add(background)
         if layout:
             used.update(e.assetId for e in layout.elements if e.assetId)
+            if layout.sourceBackgroundAsset:
+                used.add(layout.sourceBackgroundAsset)
         scenes.append(scene.model_copy(update={"imageAssets": by_kind["image"], "audioAssets": by_kind["audio"], "videoAssets": by_kind["video"],
             "visualLayout": layout, "backgroundAsset": background,
+            "previewImage": None if published and layout else scene.previewImage,
             "mediaPlacements": placements, "imageAltText": {p.assetId: p.altText for p in placements if p.altText},
             "decorativeImages": [p.assetId for p in placements if p.decorative]}))
     storyboard = project.storyboard.model_copy(update={"scenes": scenes,
@@ -172,7 +173,7 @@ def asset_usage(project: ProjectDetail, asset_id: str) -> dict:
     return {"courseWide": project.storyboard.backgroundAsset == asset_id or any(p.assetId == asset_id for p in project.storyboard.courseMedia),
             "scenes": [{"id": s.id, "title": s.title} for s in project.storyboard.scenes
                 if asset_id in {p.assetId for p in effective_placements(project, s)} or effective_background_asset(project, s) == asset_id or s.backgroundAsset == asset_id
-                or s.visualLayout and (s.visualLayout.backgroundAsset == asset_id or any(e.assetId == asset_id for e in s.visualLayout.elements))]}
+                or s.visualLayout and (s.visualLayout.backgroundAsset == asset_id or s.visualLayout.sourceBackgroundAsset == asset_id or any(e.assetId == asset_id for e in s.visualLayout.elements))]}
 
 
 def delete_asset(project_id: str, asset_id: str, revision: int) -> ProjectDetail:

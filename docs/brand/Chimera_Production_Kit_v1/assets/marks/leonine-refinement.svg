@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 305 206">
+  <title>Chimera metallic lion refinement</title>
+  <desc>Large swept metallic wings rise from behind the shoulders and all three heads. The dragon's ear, eagle, crown and eyes remain in the foreground, with a fuller copper and silver lion mane and broad feline jaw.</desc>
+  <defs>
+    <linearGradient id="silver" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F4F5F3"/>
+      <stop offset=".45" stop-color="#B1B7BE"/>
+      <stop offset="1" stop-color="#505A68"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FFE0A1"/>
+      <stop offset=".35" stop-color="#FF9A24"/>
+      <stop offset="1" stop-color="#CC3505"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#A6ADB5"/>
+      <stop offset="1" stop-color="#303943"/>
+    </linearGradient>
+  </defs>
+  <g id="wings" stroke="#161B20" stroke-width="1.1" stroke-linejoin="round">
+    <g id="left-wing">
+      <path fill="url(#steel)" d="M118 148L87 100L51 62L8 8L63 31L97 67L120 112Z"/>
+      <path fill="url(#silver)" d="M8 8L50 24L90 57L113 105L72 61Z"/>
+      <path fill="#697581" d="M8 8L72 61L113 105L86 65L48 30Z"/>
+      <path fill="url(#copper)" d="M13 26L61 46L101 88L113 119L66 76Z"/>
+      <path fill="#FFE1AF" stroke="none" d="M15 28L61 47L89 76L57 52Z"/>
+      <path fill="url(#silver)" d="M15 47L60 64L101 105L115 135L68 95Z"/>
+      <path fill="#647180" d="M15 47L68 95L115 135L90 101L55 72Z"/>
+      <path fill="url(#copper)" d="M24 70L65 84L104 124L118 149L73 115Z"/>
+      <path fill="url(#silver)" d="M37 92L76 107L105 139L118 158L79 132Z"/>
+    </g>
+    <use href="#left-wing" transform="translate(305 0) scale(-1 1)"/>
+  </g>
+  <g id="mane" stroke="#191D21" stroke-width="1.2" stroke-linejoin="round">
+    <path fill="url(#copper)" d="M127 82L116 95L120 114L128 109L123 135L136 127L132 150L147 164L140 128L138 102Z"/>
+    <path fill="url(#silver)" d="M126 95L120 114L128 109L123 135L136 127L140 115Z"/>
+    <path fill="#E96815" d="M123 135L136 127L132 150L140 142Z"/>
+    <path fill="#FFE0A1" stroke="none" d="M118 96L120 111L124 106L126 91Z"/>
+    <path fill="url(#steel)" d="M130 108L128 124L136 120L133 136L141 143L139 122Z"/>
+    <path fill="url(#copper)" d="M183 82L194 95L190 114L182 109L187 135L174 127L178 150L163 164L170 128L172 102Z"/>
+    <path fill="url(#silver)" d="M184 95L190 114L182 109L187 135L174 127L170 115Z"/>
+    <path fill="#E96815" d="M187 135L174 127L178 150L170 142Z"/>
+    <path fill="#FFE0A1" stroke="none" d="M192 96L190 111L186 106L184 91Z"/>
+    <path fill="url(#steel)" d="M180 108L182 124L174 120L177 136L169 143L171 122Z"/>
+  </g>
+  <g id="jaw" stroke="#20242A" stroke-width="1" stroke-linejoin="round">
+    <path fill="url(#steel)" d="M140 99L134 113L137 126L145 137L155 145L166 137L174 126L177 113L170 99L169 115L164 121L146 121L141 115Z"/>
+    <path fill="url(#silver)" d="M140 100L136 114L141 121L147 117L146 108Z"/>
+    <path fill="url(#silver)" d="M170 100L174 114L169 121L163 117L164 108Z"/>
+    <path fill="url(#silver)" d="M148 111L140 118L142 125L151 127L155 123L155 115Z"/>
+    <path fill="url(#silver)" d="M162 111L170 118L168 125L159 127L155 123L155 115Z"/>
+    <path fill="#2C3239" d="M149 111L161 111L159 116L155 119L151 116Z"/>
+    <path fill="#D6D8D7" d="M148 129L155 131L162 129L165 133L155 140L145 133Z"/>
+    <path fill="#75808B" stroke="none" d="M155 131L162 129L165 133L155 140Z"/>
+    <path fill="none" stroke="#13191E" d="M155 119V123M145 126L151 127L155 125L159 127L165 126"/>
+  </g>
+</svg>

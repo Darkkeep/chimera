@@ -8,6 +8,6 @@ export function backgroundMode(layout: SceneLayout): "inherit" | "image" | "none
 export function effectiveBackgroundAsset(project: Project, scene: Scene): string | null {
   const layout = scene.visualLayout;
   if (layout?.backgroundMode === "none") return null;
-  if (layout?.backgroundMode === "inherit") return project.storyboard.backgroundAsset ?? null;
+  if (layout?.backgroundMode === "inherit") return project.storyboard.backgroundAsset ?? layout.sourceBackgroundAsset ?? null;
   return layout?.backgroundAsset || scene.backgroundAsset || project.storyboard.backgroundAsset || null;
 }

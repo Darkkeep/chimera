@@ -1,5 +1,21 @@
 # Maintaining the illustrated user guide
 
+## October 27 authored-scene refresh
+
+The [authored-scene manifest](../refresh-authored-scenes-2026-10-27.json) records current Stage/Details, original comparison, direct template application, project background import/inheritance, new-scene, preview navigation, transcript, and discussion captures. It supersedes the older captures with matching filenames. The base Git commit alone does not identify uncommitted implementation; the manifest includes SHA-256 hashes of the relevant application source files.
+
+Use a dedicated fixture and the isolated services on 8017/5178 described below:
+
+```powershell
+$env:CHIMERA_GUIDE_DIR = Join-Path (Get-Location) 'workspace/user-guide-authored-20261027'
+.\backend\.venv\Scripts\python.exe docs/user-guide/support/seed-authored-scenes.py
+node docs/user-guide/support/capture-authored-scenes.cjs
+```
+
+The seed creates or verifies only the named guide fixture. It generates a synthetic PowerPoint reference using local LibreOffice, a synthetic authored composition, and a simple demonstration backdrop. No user course is copied. The capture verifies the single fixture project's identity before interaction, imports the backdrop through Project background, exercises Apply template and Undo without saving a scene change, and captures comparison and preview controls. Provider/engine browser requests are blocked; no credentials or paid generation are needed. Repeated runs reuse the isolated fixture and refresh the same images. The original source-reference demonstration is not a fidelity qualification for arbitrary PowerPoint files.
+
+Review refreshed images, then use the established PDF commands below. Update guide text, screenshot provenance, and PDF together. Preserve the date and evidence boundaries of historical captures and release records.
+
 ## October 27 provider-tabs refresh
 
 The [provider/narration manifest](../refresh-providers-2026-10-27.json) records seven refreshed screenshots: all six provider tabs plus explicit narration connection selection. It supersedes earlier captures of `ai-connection-current.png` and `media-narration-form.png`; assessment/navigation provenance remains in its separate manifest below. The backend/UI must include the provider changes, even when the manifest's base commit predates those uncommitted changes.
