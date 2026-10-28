@@ -1,5 +1,27 @@
 # Maintaining the illustrated user guide
 
+## October 27 provider-tabs refresh
+
+The [provider/narration manifest](../refresh-providers-2026-10-27.json) records seven refreshed screenshots: all six provider tabs plus explicit narration connection selection. It supersedes earlier captures of `ai-connection-current.png` and `media-narration-form.png`; assessment/navigation provenance remains in its separate manifest below. The backend/UI must include the provider changes, even when the manifest's base commit predates those uncommitted changes.
+
+Run `node docs\user-guide\support\capture-provider-tabs.cjs` from the repository root with the October 27 fixture and isolated services on 8017/5178. It verifies the fixture identity before interaction and refuses any other frontend port. It mocks safe connection status, credential-store availability and a documentation-only Cartesia narration capability in the browser. All forms are captured without a key; the narration example has a clearly named fixture connection/voice. Non-GET browser API requests and Pythia/external HTTPS requests are blocked. No provider settings are saved, tests/generation submitted, secrets accessed, user projects read or demonstration content mutated.
+
+For these isolated services, set `CHIMERA_WORKSPACE` to `workspace\user-guide-20261027\data`, `CHIMERA_PYTHIA_BASE_URL` to `http://127.0.0.1:1` and clear all provider variables (`CHIMERA_AI_*`, `ELEVENLABS_API_KEY`, `CARTESIA_API_KEY`, `SYNTHESIA_API_KEY`, `SHOTSTACK_SANDBOX_API_KEY`, `SHOTSTACK_PRODUCTION_API_KEY`). Do not enable a real provider for capture. The actual service account's credential-store/ADC availability is not certified by these inert status fixtures.
+
+Inspect the seven images, update the corresponding guide instructions, rebuild/verify the PDF using the commands below, and stop only the isolated services you started. Keep Synthesia/Shotstack explicitly labelled connection-only; screenshots and mock-based tests are not proof of video generation or paid provider access.
+
+## October 27 documentation refresh
+
+The Markdown and PDF instructions now describe **WORKSPACE > Assessments**, **Storyboard > Project background**, reviewed QTI/CSV/XLSX question import/export, **Fill-in-the-blank**, and the collapsed bottom **Tags and learning-objective references** search/dropdowns. The [October 27 manifest](../refresh-manifest-2026-10-27.json) records 19 current assessment/navigation captures, including all seven question types, the question bank/import review, Storyboard background location, named assessments, and collapsed/expanded metadata with existing-value search. Older capture manifests still apply to images not replaced by this selective refresh. A PDF rebuild does not imply a full screenshot or release qualification.
+
+### Reproduce the October 27 assessment captures
+
+Set `$env:CHIMERA_GUIDE_DIR = Join-Path (Get-Location) 'workspace\user-guide-20261027'`, then run `.\backend\.venv\Scripts\python.exe docs\user-guide\support\seed.py` once. The seed refuses to overwrite an existing fixture. Start the isolated services described below on 8017/5178, with `CHIMERA_WORKSPACE` pointing to this fixture's `data` directory and provider settings empty. Set `CHIMERA_PYTHIA_BASE_URL` to `http://127.0.0.1:1` to avoid connecting to a real Engine.
+
+Run `node docs\user-guide\support\capture-assessments.cjs` from the repository root. It verifies the single fixture project identity before interacting, reviews but does not commit a template import, creates or updates the demonstration named assessment, and saves accepted-answer/tag/reference demonstration data. It opens the other question's searchable dropdowns to show reuse. It blocks browser Pythia requests and uses no provider. Repeated runs reuse the isolated project and refresh the same images and manifest. Review the images, rebuild/verify the PDF, then stop only the isolated services.
+
+When recapturing these workflows, use only an isolated demonstration project. Capture the workspace rail/Storyboard background control, assessment question bank/import review, Fill-in-the-blank, and the bottom reference section both collapsed and expanded with a searchable dropdown. Verify reuse/create/remove and save/reopen for both fields. No provider connection, paid request, or user course is needed. Target-LMS acceptance must remain explicitly unverified rather than inferred from screenshots or local browser tests.
+
 The guide is [docs/user-guide.md](../../user-guide.md). PNG screenshots are stored in [images](../images/). [capture-manifest.json](../capture-manifest.json) records the original complete capture; [refresh-manifest-2026-10-14.json](../refresh-manifest-2026-10-14.json) records the refreshed controls.
 
 These helpers run against a separate demonstration workspace. They do not require changes to the application code or use real project content. The demonstration slide image is a repository graphic copied unchanged; it is not evidence of PowerPoint rendering fidelity. The sample suggestion is an author proposal seeded for documentation, not AI-generated output. The generated-media candidate also uses fixture data rather than paid generation.
@@ -87,11 +109,12 @@ Run `node docs/user-guide/support/capture-refresh.cjs` from the repository root.
 To produce the PDF from the current Markdown and images:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r docs/user-guide/support/requirements.txt
-.\.venv\Scripts\python.exe docs/user-guide/support/render-pdf.py
+.\backend\.venv\Scripts\python.exe docs/user-guide/support/render-pdf.py
 node docs/user-guide/support/render-pdf.cjs
-.\.venv\Scripts\python.exe docs/user-guide/support/finalize-pdf.py
-.\.venv\Scripts\python.exe docs/user-guide/support/verify-guide.py
+.\backend\.venv\Scripts\python.exe docs/user-guide/support/finalize-pdf.py
+.\backend\.venv\Scripts\python.exe docs/user-guide/support/verify-guide.py
 ```
+
+If a helper reports a missing Python dependency, install the declared documentation requirements into that environment with `.\backend\.venv\Scripts\python.exe -m pip install -r docs/user-guide/support/requirements.txt`, then retry. Update the footer date in `render-pdf.cjs` to match the guide's documented refresh date before rebuilding.
 
 The Python helper creates ignored print HTML under `workspace/`. Chromium embeds the images and creates `docs/user-guide.pdf` in A4 landscape, with page numbers and repeated table headers. Missing images fail the render. PDF links to repository documents/images use GitHub `main` paths so they do not depend on the maintainer's local filesystem. Markdown links remain relative. Inspect representative PDF pages and check all image/link targets before committing the source, screenshots, manifests, and PDF together.

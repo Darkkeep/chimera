@@ -1,0 +1,33 @@
+.pythia-scene-actions {
+  position: relative;
+  min-width: 0;
+}
+.pythia-scene-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pythia-scene-toggle {
+  display: inline-flex;
+}
+.pythia-scene-toggle > button:disabled {
+  pointer-events: none;
+}
+.pythia-scene-tools {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  display: grid;
+  gap: 6px;
+  width: max-content;
+  max-width: calc(100vw - 40px);
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--theme-panel);
+  box-shadow: 0 8px 24px #0003;
+}
+.pythia-scene-tools .button {
+  justify-content: flex-start;
+}

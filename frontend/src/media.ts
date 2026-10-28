@@ -1,7 +1,8 @@
 import type { Project, Scene } from "./App";
+import { resolvedSceneBackground } from "./SceneSurface";
 
-export type MediaPlacement = { assetId: string; role?: "supporting" | "narration" | "demonstration"; order: number; position: "before" | "after"; loop: boolean; muted: boolean; altText: string; decorative: boolean };
-export const placementFor = (assetId: string): MediaPlacement => ({ assetId, role: "supporting", order: 0, position: "after", loop: false, muted: false, altText: "", decorative: false });
+export type MediaPlacement = { assetId: string; role?: "supporting" | "narration" | "demonstration"; order: number; position: "before" | "after"; loop: boolean; muted: boolean; requiredViewing?: boolean; viewingThresholdPercent?: number; altText: string; decorative: boolean };
+export const placementFor = (assetId: string): MediaPlacement => ({ assetId, role: "supporting", order: 0, position: "after", loop: false, muted: false, requiredViewing: false, viewingThresholdPercent: 90, altText: "", decorative: false });
 
 export function scenePlacements(scene: Scene): MediaPlacement[] {
   const result = new Map<string, MediaPlacement>();
@@ -20,7 +21,7 @@ export function resolvedProject(project: Project): Project {
   const assets = new Map(project.storyboard.assets.map(asset => [asset.id, asset]));
   return { ...project, storyboard: { ...project.storyboard, scenes: project.storyboard.scenes.map(scene => {
     const placements = effectivePlacements(project, scene);
-    return { ...scene, mediaPlacements: placements,
+    return { ...resolvedSceneBackground(project, scene), mediaPlacements: placements,
       imageAssets: placements.filter(p => assets.get(p.assetId)?.kind === "image").map(p => p.assetId),
       audioAssets: placements.filter(p => assets.get(p.assetId)?.kind === "audio").map(p => p.assetId),
       videoAssets: placements.filter(p => assets.get(p.assetId)?.kind === "video").map(p => p.assetId),

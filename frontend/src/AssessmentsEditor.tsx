@@ -4,19 +4,23 @@ import type { Assessment, Project } from "./App";
 import { EditorDialog } from "./EditorDialog";
 import { revisionConflictMessage, storyboardWriteHeaders } from "./revision";
 import "./assessments.css";
+import { QuestionImportPanel } from "./QuestionImportPanel";
 
 type Draft = { id: string | null; title: string; questionSceneIds: string[]; revision: number };
 
-export function AssessmentsEditor({ project, canExport, onClose, onProjectUpdated }: {
+export function AssessmentsEditor({ project, canExport, onClose, onProjectUpdated, onEditQuestion }: {
   project: Project;
   canExport: boolean;
   onClose: () => void;
   onProjectUpdated: (project: Project) => void;
+  onEditQuestion: (sceneId: string, updatedProject?: Project) => void;
 }) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [stale, setStale] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
   const groups = project.storyboard.assessments ?? [];
   const questions = project.storyboard.scenes.filter(scene => scene.sceneType === "question");
   const questionById = new Map(questions.map(scene => [scene.id, scene]));
@@ -29,7 +33,35 @@ export function AssessmentsEditor({ project, canExport, onClose, onProjectUpdate
   }
 
   function close() {
-    if (!draft || window.confirm("Discard the unsaved assessment changes?")) onClose();
+    if ((!draft && !importing) || window.confirm("Discard the unsaved assessment or import review?")) onClose();
+  }
+
+  async function addQuestion() {
+    if (!newTitle.trim() || busy) return;
+    setBusy(true); setError("");
+    try {
+      const response = await fetch(`/api/projects/${project.id}/scenes`, {
+        method: "POST", headers: storyboardWriteHeaders(project.storyboard.revision),
+        body: JSON.stringify({ title: newTitle.trim(), sceneType: "question", layoutMode: "native" }),
+      });
+      if (!response.ok) await failure(response, "Question could not be created.");
+      const updated = await response.json() as Project;
+      onProjectUpdated(updated);
+      onEditQuestion(updated.storyboard.scenes[updated.storyboard.scenes.length - 1].id, updated);
+    } catch (issue) { setError(issue instanceof Error ? issue.message : "Question could not be created."); }
+    finally { setBusy(false); }
+  }
+
+  async function downloadSpreadsheet(format: "csv" | "xlsx") {
+    setBusy(true); setError("");
+    try {
+      const response = await fetch(`/api/projects/${project.id}/questions.${format}`);
+      if (!response.ok) await failure(response, "Questions could not be downloaded.");
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a"); link.href = url; link.download = `${project.id}-questions.${format}`; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (issue) { setError(issue instanceof Error ? issue.message : "Questions could not be downloaded."); }
+    finally { setBusy(false); }
   }
 
   async function failure(response: Response, fallback: string): Promise<never> {
@@ -130,14 +162,31 @@ export function AssessmentsEditor({ project, canExport, onClose, onProjectUpdate
     <div className="modal-head"><h2 id="assessments-title">Assessments</h2><button type="button" className="icon-button" title="Close assessments" aria-label="Close assessments" disabled={busy} onClick={close}><X size={18} /></button></div>
     {error && <p className="assessment-editor-error" role="alert">{error}</p>}
     {stale && <button type="button" className="button button-outline" disabled={busy} onClick={() => void reload()}><RefreshCw size={15} /> Reload latest, keep draft</button>}
-    <div className="assessments-heading"><h3>Saved assessments ({groups.length})</h3><button type="button" className="button button-outline" disabled={busy} onClick={() => edit()}><Plus size={15} /> Create assessment</button></div>
+    {!draft && !importing && <div className="assessments-actions">
+      <button type="button" className="button button-outline" disabled={busy} onClick={() => setImporting(true)}>Import questions</button>
+      <button type="button" className="button button-outline" disabled={busy || !canExport} onClick={() => void downloadSpreadsheet("csv")}>Export questions CSV</button>
+      <button type="button" className="button button-outline" disabled={busy || !canExport} onClick={() => void downloadSpreadsheet("xlsx")}>Export questions XLSX</button>
+    </div>}
+    {importing && <QuestionImportPanel project={project} onProjectUpdated={onProjectUpdated} onClose={() => setImporting(false)} onBusyChange={setBusy} />}
+    {!draft && !importing && <section className="assessment-question-bank" aria-label="Question bank">
+      <h3>Question bank ({questions.length})</h3>
+      <form className="question-bank-add" onSubmit={event => { event.preventDefault(); void addQuestion(); }}>
+        <label>New question title<input value={newTitle} maxLength={120} disabled={busy} onChange={event => setNewTitle(event.target.value)} /></label>
+        <button type="submit" className="button button-outline" disabled={busy || !newTitle.trim()}>Add question</button>
+      </form>
+      <ul className="assessments-list">{questions.map(question => <li key={question.id}>
+        <div className="assessments-description"><strong>{question.assessmentItem?.metadata?.title || question.title}</strong><span>{question.assessmentItem ? `${question.assessmentItem.identifier} · ${question.assessmentItem.type === "short-answer" ? "Fill-in-the-blank" : question.assessmentItem.type}` : "Not authored yet"}</span></div>
+        <button type="button" className="button button-outline" disabled={busy} onClick={() => onEditQuestion(question.id)}>Edit question and metadata</button>
+      </li>)}</ul>
+    </section>}
+    <div className="assessments-heading"><h3>Saved assessments ({groups.length})</h3><button type="button" className="button button-outline" disabled={busy || importing} onClick={() => edit()}><Plus size={15} /> Create assessment</button></div>
     <ul className="assessments-list" aria-label="Saved assessments">
       {groups.map(group => {
         const authored = group.questionSceneIds.filter(id => questionById.get(id)?.assessmentItem).length;
         return <li key={group.id}>
           <div className="assessments-description"><strong>{group.title}</strong><span>{group.questionSceneIds.length} questions · {authored} authored · {group.questionSceneIds.length - authored} unauthored</span></div>
           <div className="assessments-actions">
-            <button type="button" className="icon-button" disabled={busy} title={`Edit ${group.title}`} aria-label={`Edit ${group.title}`} onClick={() => edit(group)}><Pencil size={16} /></button>
+            <button type="button" className="icon-button" disabled={busy || importing} title={`Edit ${group.title}`} aria-label={`Edit ${group.title}`} onClick={() => edit(group)}><Pencil size={16} /></button>
             <button type="button" className="icon-button" disabled={busy} title={`Delete ${group.title}`} aria-label={`Delete ${group.title}`} onClick={() => void remove(group)}><Trash2 size={16} /></button>
             <span title={!canExport ? "Export permission required" : authored < 2 ? "Requires at least 2 authored questions" : `Download QTI test for ${group.title}`}><button type="button" className="button button-outline" disabled={busy || !canExport || authored < 2} aria-label={`Download QTI test for ${group.title}`} onClick={() => void download(group)}><Download size={15} /> Download QTI test</button></span>
           </div>

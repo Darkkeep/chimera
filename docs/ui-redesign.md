@@ -2,6 +2,8 @@
 
 Implemented September 30, 2026, using 12ui Design candidate A.
 
+**Current navigation addendum (2026-10-27):** Assessments is a direct **WORKSPACE** rail action, opening the question bank/import/assessment manager. Project background is in **Storyboard**, above the scene list. The question editor's tags and learning-objective references are collapsed at the bottom and use compact searchable dropdowns. The original implementation/design evidence below describes the September layout; use the [user guide](user-guide.md) for current operating instructions.
+
 The original interface placed approximately 395 pixels of headers and controls above the storyboard at 1440px width. The updated workspace starts at approximately 110px. Scene actions sit next to the selected content, with a persistent pencil button on every scene row. The sequence has its own scrolling area.
 
 Project selection, new-project creation, and libraries are in the navigation. Review tools expand in place. Preview and Export occupy one compact header. Export opens a keyboard-accessible dialog containing the existing SCORM, report, Chimera storyboard archive/restore, and conditional QTI test actions. Assessment and required-audio controls remain with their scene.

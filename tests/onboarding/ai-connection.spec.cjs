@@ -18,7 +18,7 @@ async function setup(page, options = {}) {
     }
     return route.fulfill({ json: status });
   });
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'AI connection', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'AI connection' })).toBeVisible();

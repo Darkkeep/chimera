@@ -23,8 +23,9 @@ for (const status of ['configured', 'unconfigured', 'unavailable', 'denied']) {
     await expect(page.getByRole('group', { name: 'Media candidate settings' })).toBeHidden();
     await creator.locator('summary').focus();
     await page.keyboard.press('Enter');
-    await expect(creator).toHaveAttribute('open', '');
     if (status === 'configured') {
+      await expect(creator.locator('summary')).toHaveAttribute('aria-disabled', 'false');
+      await expect(creator).toHaveAttribute('open', '');
       await expect(page.getByRole('textbox', { name: 'Purpose', exact: true })).toBeEnabled();
       await page.getByRole('textbox', { name: 'Purpose', exact: true }).fill('Learning illustration');
       await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill('An illustrative fixture');
@@ -34,8 +35,15 @@ for (const status of ['configured', 'unconfigured', 'unavailable', 'denied']) {
       await expect.poll(() => submissions).toBe(1);
     } else {
       await expect(creator).toHaveClass(/is-unavailable/);
-      await expect(page.getByRole('textbox', { name: 'Purpose', exact: true })).toBeDisabled();
-      await expect(page.getByRole('button', { name: 'Generate candidate', exact: true })).toBeDisabled();
+      await expect(creator.locator('summary')).toHaveAttribute('aria-disabled', 'true');
+      await expect(creator).not.toHaveAttribute('open');
+      await page.keyboard.press('Space');
+      await expect(creator).not.toHaveAttribute('open');
+      await creator.locator('summary').click();
+      await expect(creator).not.toHaveAttribute('open');
+      await expect(page.getByRole('group', { name: 'Media candidate settings' })).toBeHidden();
+      await expect(creator.getByLabel('Purpose', { exact: true })).toBeDisabled();
+      await expect(creator.locator('button').filter({ hasText: 'Generate candidate' })).toBeDisabled();
       await expect(creator.locator('.generation-availability')).toHaveText(status === 'unconfigured' ? 'AI not configured' : status === 'denied' ? 'Generation access unavailable' : 'AI status unavailable');
       expect(submissions).toBe(0);
     }
@@ -52,6 +60,52 @@ for (const status of ['configured', 'unconfigured', 'unavailable', 'denied']) {
     }
   });
 }
+test('candidate creation stays disabled while checking and closes when the AI connection is removed', async ({ page, request }) => {
+  const created = await request.post('/api/projects', { data: { title: `AI connection changes ${Date.now()}` } });
+  const project = await created.json();
+  await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
+  await page.route('**/api/projects', route => route.fulfill({ json: [project] }));
+  let pendingStatus;
+  let configured = true;
+  await page.route('**/media-generation-capability', async route => {
+    await new Promise(resolve => { pendingStatus = resolve; });
+    await route.fulfill({ json: { providerConfigured: configured, canGenerate: true } });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await page.getByRole('button', { name: 'Media library', exact: true }).click();
+  const creator = page.locator('.generation-creator');
+  const summary = creator.locator('summary');
+  await expect(summary).toHaveAttribute('aria-disabled', 'true');
+  await expect(creator.locator('.generation-availability')).toHaveText('Checking media provider...');
+  await summary.click();
+  await summary.press('Enter');
+  await expect(creator).not.toHaveAttribute('open');
+  await expect.poll(() => Boolean(pendingStatus)).toBe(true);
+  pendingStatus();
+  await expect(summary).toHaveAttribute('aria-disabled', 'false');
+  await summary.click();
+  await expect(creator).toHaveAttribute('open', '');
+  configured = false;
+  pendingStatus = undefined;
+  await page.evaluate(() => window.dispatchEvent(new Event('chimera:ai-connection-updated')));
+  await expect(summary).toHaveAttribute('aria-disabled', 'true');
+  await expect(creator).not.toHaveAttribute('open');
+  await expect.poll(() => Boolean(pendingStatus)).toBe(true);
+  pendingStatus();
+  await expect(creator.locator('.generation-availability')).toHaveText('AI not configured');
+  await summary.click();
+  await expect(creator).not.toHaveAttribute('open');
+  configured = true;
+  pendingStatus = undefined;
+  await page.evaluate(() => window.dispatchEvent(new Event('chimera:ai-connection-updated')));
+  await expect.poll(() => Boolean(pendingStatus)).toBe(true);
+  pendingStatus();
+  await expect(summary).toHaveAttribute('aria-disabled', 'false');
+  await expect(creator).not.toHaveAttribute('open');
+  await summary.press('Enter');
+  await expect(creator).toHaveAttribute('open', '');
+});
 const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAE0lEQVR4nGP8//8/AwMDEwMYAAAkBgMBXaJOiAAAAABJRU5ErkJggg==', 'base64');
 
 test('media project selector defaults to current project and keeps additions in the selected library', async ({ page, request }) => {

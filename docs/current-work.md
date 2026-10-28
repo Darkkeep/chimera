@@ -1,11 +1,57 @@
 # Current work and handoff
 
-Updated 2026-10-16. The active development branch is `extract-onboarding-repository`.
+Updated 2026-10-27. The active development branch is `extract-onboarding-repository`.
 
-Current next action: submit the reviewed 1.1.0 candidate and verify CI on its exact full SHA. See the [October 16 candidate review](candidate-review-2026-10-16.md) and [completion update](completion-update-2026-10-15.md). The older PR #5 instructions below are historical and superseded. Hosted deployment remains deferred.
+## October 27 contextual walkthrough correction
+
+An explicit **Dismiss walkthrough** control now puts the guide away without closing forms or deleting progress. The next help request follows the current workflow, including Stage versus Details, rather than preferring the dismissed task merely because both use the same editor. Pause/Escape retain their same-task resume behavior. Nine focused dismissal/keyboard/accessibility checks passed across Chromium, Firefox and WebKit.
+
+Walkthrough start/resume now resolves the current workflow instead of offering a globally paused first-scene task in unrelated dialogs. Supported forms offer Start walkthrough independently of earlier practice; Resume appears only for matching paused progress. AI connection settings and new-scene forms have distinct surface identities. Scene-editor targets remain visible in Stage and Details; new question workflows use the selected type. Starting help preserves open drafts and does not submit providers or save content. An AI-enabled first-project walkthrough hands off to scene creation rather than stacking the optional course-drafting dialog beneath it; ordinary unguided course drafting is unchanged. See [context-aware start and resume](onboarding-implementation.md#context-aware-start-and-resume).
+
+Verification: 57 focused browser checks passed across Chromium, Firefox and WebKit (14 context/provider scenarios and five original journey scenarios per browser). Coverage includes stale review isolation, current question type, Stage/Details targets, AI-enabled project handoff, failed saves, cancelled disconnect, draft preservation and no provider submission on navigation. TypeScript/Vite build and PDF verification passed; the existing bundle-size warning remains. The shared test helper waits for DOMContentLoaded and explicit application controls rather than unrelated page-load completion. This is targeted adapter verification, not full release qualification.
+
+## October 27 media-provider connections and help
+
+**Settings > Pythia** is the current label for the learning-intelligence diagnostics panel; internal Engine routes and contracts are unchanged. **User guide**, immediately below Templates, opens the bundled PDF in a separate tab and is available without a selected project.
+
+**Settings > AI connection** now has six keyboard-accessible provider tabs:
+
+| Provider | Implemented scope |
+| --- | --- |
+| OpenAI | Existing images and legacy narration; prior saved/environment configurations and old jobs remain compatible |
+| ElevenLabs | Named connections, voice/model discovery and MP3 narration candidates |
+| Google Cloud | Server ADC, voice discovery, optional quota project and MP3 narration candidates |
+| Cartesia | Named connections, voice discovery and versioned MP3 narration adapter; default `sonic-3.6` |
+| Synthesia | Secure connection setup and read-only video-list test only; video generation is not yet available |
+| Shotstack | Separate sandbox/production connection settings and read-only template-list test only; video generation is not yet available |
+
+Non-OpenAI keys use a supported OS credential store or fixed server environment variables; Google uses Application Default Credentials, never a pasted/uploaded private key. Shared installations require administrator permission for save/test/disconnect. Entered keys are write-only and cleared after actions or confirmed tab changes. Narration generation explicitly selects a saved connection with a voice, preserves its identity for regeneration, and fails rather than falling back when it is removed or changed. Video setup does not enable media generation. See [provider setup and limits](ai-connection.md).
+
+Latest targeted verification: the six-provider backend regression selection ran 123 tests (122 passed, one skipped); the final provider browser spec passed 36 checks across Chromium, Firefox and WebKit, including light/dark desktop/mobile accessibility. The preceding combined provider/OpenAI/media-library selection passed 69 checks. Frontend TypeScript/Vite build passed with the existing chunk-size warning. These are targeted implementation results, not a full release qualification. No real credentials or paid synthesis/render requests were used; live provider entitlement, speech quality, video generation and deployment-specific secret-store/ADC behavior remain operator verification gates.
+
+Documentation now includes current images of all six provider tabs and explicit narration selection, captured against an isolated demonstration project with inert connection-status/capability fixtures. The [capture manifest](user-guide/refresh-providers-2026-10-27.json) records provenance; rebuilding the guide does not qualify provider output or a release. Earlier dated release evidence below retains its original scope.
+
+## October 27 authoring update
+
+The current interface has **Assessments** under **WORKSPACE** in the left rail and **Project background** above the scene list in **Storyboard**. Neither is under its former Review tools/Settings location. See the [current user guide](user-guide.md), [root overview](../README.md#questions-assessments-and-metadata), and [backend API notes](../backend/README.md#question-import-metadata-and-export).
+
+Completed question-authoring changes:
+
+- Ordering controls and paired text-entry layouts are readable; assessment stages expand to show targets and submission controls.
+- Drag tiles settle beside correct vertical targets or return home on incorrect drops. Drop retries are unlimited; Check answer consumes an attempt. Preview and both SCORM profiles share this behavior.
+- Reviewed QTI 2.1 XML/ZIP and CSV/XLSX question import, templates, question-bank authoring, spreadsheet export, duplicate protection, and revision-checked atomic imports.
+- Core metadata and unique stable-ID editing. Tags and learning-objective references use compact searchable dropdowns in a collapsed section at the bottom of the question editor, with reuse/create/remove actions from current-project question values.
+- Short Answer is now **Fill-in-the-blank**, preserving legacy `short-answer` data. QTI exports correct the inline placement and supply a primary correct-answer value while preserving alternate-answer grading.
+
+Focused validation during implementation passed parser/API/QTI and export regressions, frontend builds, and desktop/mobile Chromium/Firefox/WebKit checks for the changed interactions, contrast, tag/reference dropdowns, navigation, and backgrounds. These were targeted runs, not a new complete release-suite result. QTI/Blackboard question-bank acceptance, external LMS requalification of new SCORM packages, and human release approval remain separate gates.
+
+The October 16 candidate status and older next-action instructions below are retained as historical handoff context, not a new approval for the October 27 changes.
+
+Release-candidate follow-up from October 16: submit the reviewed 1.1.0 candidate and verify CI on its exact full SHA. See the [October 16 candidate review](candidate-review-2026-10-16.md) and [completion update](completion-update-2026-10-15.md). The October 27 authoring/provider changes need their own reviewed revision and CI evidence; do not treat the older candidate's results as qualification of these additions. The older PR #5 instructions below are historical and superseded. Hosted deployment remains deferred.
+
+Release-gate status (2026-10-16 addendum): backend 252 passed/6 skipped, frontend build passes, and the full onboarding suite passes in Chromium, Firefox and WebKit after test-stability fixes (collapsed inspector sections expanded in tests, WebKit button focus, polled saves, longer seed waits, and a WebKit project-switcher overflow clip at 390px). The full suite is slow and shares a growing project list; CI runs one worker with one retry. Still human-owned: Writer/LibreOffice inspection of the SME Master and Full Storyboard exports, live Linux/Nginx inspection, and Encarta verification.
 
 ## Completed
-
 - Portable LibreOffice discovery and Word rendering/edit-save-reopen checks.
 - TestFrame revision 8 production validation and local qualification of both SCORM profiles. The user confirmed SCORM 1.2 passes their LMS; that LMS does not accept SCORM 2004.
 - Local, Encarta, and darkrogue.io authentication profiles. Local single-user operation is retained; Encarta remains denied until its real contract is supplied.

@@ -32,7 +32,13 @@ class MediaCapabilityTests(unittest.TestCase):
         policy.allows.return_value = False
         with patch.object(main, "read_project"), patch.object(main, "get_authorization_policy", return_value=policy), patch.object(main, "media_provider_configured", return_value=True):
             result = main.get_media_generation_capability("project")
-        self.assertEqual(result, {"providerConfigured": True, "canGenerate": False})
+        self.assertEqual(result, {
+            "providerConfigured": True, "imageConfigured": True, "canGenerate": False,
+            "narrationConnections": [{
+                "id": "legacy-openai", "name": "Existing AI connection", "provider": "openai",
+                "voice": "alloy", "language": "en-US", "model": "gpt-4o-mini-tts",
+            }],
+        })
         self.assertEqual(policy.allows.call_args.args[1:], ("media.job.create", "project"))
 
     def test_missing_project_returns_not_found(self) -> None:

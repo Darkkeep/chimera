@@ -31,8 +31,12 @@ def _layout_review_warnings(scene) -> list[str]:
 
 
 def validate_project(project: ProjectDetail, target: Literal["authoring", "production"] = "authoring") -> ValidationReport:
-    from .media import resolved_project, validate_captions, validate_placements
+    from .media import resolved_project, validate_backgrounds, validate_captions, validate_placements
     issues: list[ValidationIssue] = []
+    try:
+        validate_backgrounds(project)
+    except ValueError as error:
+        issues.append(ValidationIssue(severity="error", code="invalid-background-reference", message=str(error)))
     try:
         validate_placements(project)
         project = resolved_project(project)

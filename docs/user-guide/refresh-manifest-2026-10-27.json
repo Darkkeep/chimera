@@ -1,0 +1,66 @@
+{
+  "capturedAt": "2026-10-27T17:03:23.604Z",
+  "sourceCommit": "1a30ee1590cc4556481620f7ba71ea5a3e596744",
+  "workingTree": "Includes uncommitted navigation and documentation changes.",
+  "fixture": "user-guide-20261027",
+  "scope": "Assessment/navigation refresh only. Earlier screenshots retain their original provenance. No user data or provider requests.",
+  "captures": [
+    {
+      "file": "workspace.png"
+    },
+    {
+      "file": "scene-sequence.png"
+    },
+    {
+      "file": "project-background-current.png"
+    },
+    {
+      "file": "review-tools.png"
+    },
+    {
+      "file": "question-bank-current.png"
+    },
+    {
+      "file": "assessments-editor.png"
+    },
+    {
+      "file": "assessments-list.png"
+    },
+    {
+      "file": "question-import-current.png"
+    },
+    {
+      "file": "question-single-choice.png"
+    },
+    {
+      "file": "question-multiple-response.png"
+    },
+    {
+      "file": "question-true-false.png"
+    },
+    {
+      "file": "question-ordering.png"
+    },
+    {
+      "file": "question-drag-drop.png"
+    },
+    {
+      "file": "question-matching.png"
+    },
+    {
+      "file": "question-short-answer.png"
+    },
+    {
+      "file": "question-metadata-collapsed.png"
+    },
+    {
+      "file": "question-tags-current.png"
+    },
+    {
+      "file": "question-objectives-current.png"
+    },
+    {
+      "file": "question-metadata-current.png"
+    }
+  ]
+}

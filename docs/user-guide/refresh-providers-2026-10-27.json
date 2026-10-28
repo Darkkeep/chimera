@@ -1,0 +1,44 @@
+{
+  "capturedAt": "2026-10-27T19:11:15.948Z",
+  "sourceCommit": "24ba49b9d71cfd935bdcd6d9b99a1508ea7aafe1",
+  "workingTree": "Includes uncommitted provider tabs, adapters, and documentation updates.",
+  "fixture": "user-guide-20261027",
+  "scope": "Six provider tabs and explicit narration selection in the actual UI. Credential-store availability, connection status and narration capability are inert browser fixtures. No user data, secrets, provider calls, or generation.",
+  "captures": [
+    {
+      "file": "ai-connection-current.png",
+      "provider": "OpenAI",
+      "state": "Unconfigured; no credentials entered or actions submitted."
+    },
+    {
+      "file": "ai-provider-elevenlabs.png",
+      "provider": "ElevenLabs",
+      "state": "Unconfigured; no credentials entered or actions submitted."
+    },
+    {
+      "file": "ai-provider-google-cloud.png",
+      "provider": "Google Cloud",
+      "state": "Unconfigured; no credentials entered or actions submitted."
+    },
+    {
+      "file": "ai-provider-cartesia.png",
+      "provider": "Cartesia",
+      "state": "Unconfigured; no credentials entered or actions submitted."
+    },
+    {
+      "file": "ai-provider-synthesia.png",
+      "provider": "Synthesia",
+      "state": "Unconfigured; no credentials entered or actions submitted."
+    },
+    {
+      "file": "ai-provider-shotstack.png",
+      "provider": "Shotstack",
+      "state": "Unconfigured; no credentials entered or actions submitted."
+    },
+    {
+      "file": "media-narration-form.png",
+      "provider": "Cartesia",
+      "state": "Inert capability/voice fixture; generation not submitted."
+    }
+  ]
+}

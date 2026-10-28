@@ -33,10 +33,10 @@ export function IntelligenceEnginePanel({ onClose }: { onClose: () => void }) {
     let alive = true;
     setLoading(true);
     fetch("/api/intelligence-engine").then(async response => {
-      if (!response.ok) throw new Error("Intelligence Engine status is unavailable.");
+      if (!response.ok) throw new Error("Pythia status is unavailable.");
       return response.json() as Promise<EngineStatus>;
     }).then(next => { if (alive) { setStatus(next); setError(""); } })
-      .catch(issue => { if (alive) setError(issue instanceof Error ? issue.message : "Intelligence Engine status is unavailable."); })
+      .catch(issue => { if (alive) setError(issue instanceof Error ? issue.message :       "Pythia status is unavailable."); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [refreshKey]);
@@ -46,10 +46,10 @@ export function IntelligenceEnginePanel({ onClose }: { onClose: () => void }) {
 
   return <EditorDialog onboardingTarget="settings.engine" labelledBy="intelligence-engine-title" onClose={onClose} busy={loading} className="ai-connection-dialog">
     <header className="ai-connection-header">
-      <h2 id="intelligence-engine-title">Intelligence Engine</h2>
+      <h2 id="intelligence-engine-title">Pythia</h2>
       <div className="ai-connection-actions">
         <button type="button" className="icon-button" aria-label="Refresh engine status" title="Refresh engine status" disabled={loading} onClick={() => setRefreshKey(value => value + 1)}><RefreshCw size={16} /></button>
-        <button type="button" className="icon-button" aria-label="Close Intelligence Engine" title="Close Intelligence Engine" onClick={onClose}><X size={18} /></button>
+        <button type="button" className="icon-button"         aria-label="Close Pythia settings" title="Close Pythia settings" onClick={onClose}><X size={18} /></button>
       </div>
     </header>
     {loading && <p role="status">Checking Engine...</p>}

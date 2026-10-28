@@ -1,12 +1,14 @@
 # Visual scene authoring
 
+Current navigation (2026-10-27): set the project-wide default using **Storyboard > Project background**, above the scene list, not Settings. Scene-specific choices still live in **Edit scene > Stage > Background** and can inherit the project default, select a local image, or explicitly choose None. **Assessments** now opens directly from **WORKSPACE** in the left rail. For question imports, Fill-in-the-blank, and collapsed tag/objective-reference dropdowns, see the [assessment user guide](user-guide.md#5-author-assessments).
+
 ## Scene metaphor
 
 A **Scene** is one authored moment in a course. Its **Stage** is the required, bounded surface on which visual content appears. A **Layout** is the arrangement of content on that stage, not the choice of rendering strategy. **Layers** order content along the Z-axis; the highest numbered layer is frontmost. The **Background** is the backdrop behind all content, separate from the layer stack.
 
 The scene editor opens on Stage. Stage settings offer widescreen, standard, square, and custom dimensions (1-10000 units per axis). A valid default stage is supplied for scenes without a stored layout. Changing stage dimensions does not resize or reposition content. Layout controls align a selected content box to stage edges or centers; coordinates, dimensions, and rotation remain editable. Locked content cannot be aligned. Background color and image are edited separately, and Layers lists content from front to back. These changes participate in undo/redo and are persisted by Save scene.
 
-The metaphor is content-neutral, but the current spatial renderer supports text, images, and imported vector shapes only. Narration/audio, assessments, and completion behavior remain scene-level features outside the spatial layer stack. Video, arbitrary HTML, documents, and embedded applications are not yet stage content types; they require explicit rendering, accessibility, security, persistence, and export support before being offered in the editor.
+The metaphor is content-neutral. The spatial layer stack supports text, images, and imported vector shapes. Question scenes also have a movable, resizable assessment region on the Stage; its interaction and scoring remain scene-level data, not ordinary visual layers. Narration/audio and completion behavior remain outside the spatial layer stack. Video, arbitrary HTML, documents, and embedded applications are not yet stage content types; they require explicit rendering, accessibility, security, persistence, and export support before being offered in the editor.
 
 Details contains scene metadata, narration, notes, and **Rendering mode** (Fidelity, Hybrid, Native, or Template). Guided metadata/template workflows open Details directly. Existing `visualLayout` data remains the storage contract; no migration or removal of legacy source-slide rendering is required.
 
@@ -14,7 +16,7 @@ Details contains scene metadata, narration, notes, and **Rendering mode** (Fidel
 
 Scenes may have a nullable `visualLayout`. Legacy scenes remain valid. Version 1 stores an explicit slide-space width/height, background color/image, warnings, and independently identified text/image elements. Geometry is finite and bounded; image crop fractions must retain a visible region; element IDs are unique. Image references must resolve to project image assets. Element array order defines stacking and DOM reading order.
 
-Imported layouts have `enabled: false`. Saving in the visual editor activates the layout. Enabled layouts replace, rather than overlay, the flattened preview in the workspace, React player, and exported SCORM players. Attached media remains available to authors but images are not repeated below an enabled visual scene. Audio, questions, review comments, and completion logic remain outside the visual stage. Authored slide colors do not change with application appearance.
+Imported layouts have `enabled: false`. Saving in the visual editor activates the layout. Enabled layouts replace, rather than overlay, the flattened preview in the workspace, React player, and exported SCORM players. Attached media remains available to authors but images are not repeated below an enabled visual scene. Questions use their assessment region, with the player expanding the assessment area as needed to keep targets and submission controls visible. Audio, review comments, and completion logic remain outside the visual stage. Authored slide colors do not change with application appearance.
 
 ## PPTX extraction
 
@@ -43,7 +45,7 @@ The visual editor uses `react-rnd` for scaled pointer/touch move and resize inte
 From the repository root:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest backend/tests -q
+.\backend\.venv\Scripts\python.exe -m pytest backend\tests -q
 npm --prefix frontend run build
 npm run test:visual
 npm run test:auth

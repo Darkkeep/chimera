@@ -2,10 +2,11 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const input = JSON.parse(fs.readFileSync(0, 'utf8'));
-async function session(profile, stored, mode = 'popup', sceneCount = 2) {
+async function session(profile, stored, mode = 'popup', sceneCount = 2, videoTracking = false) {
   const nodes = new Map();
   const events = {};
   const calls = [];
+  const createdElements = [];
   let initialized = false;
   const legacy = profile === '12';
   const names = legacy ? ['LMSInitialize', 'LMSGetValue', 'LMSSetValue', 'LMSCommit', 'LMSFinish'] : ['Initialize', 'GetValue', 'SetValue', 'Commit', 'Terminate'];
@@ -27,13 +28,38 @@ async function session(profile, stored, mode = 'popup', sceneCount = 2) {
       if (!nodes.has(selector)) nodes.set(selector, { textContent: '', innerHTML: '', addEventListener() {}, appendChild() {} });
       return nodes.get(selector);
     },
-    createElement: () => ({ style: {}, addEventListener() {} }),
+    createElement: tag => {
+      const elementEvents = {};
+      const element = {
+        tagName: tag.toUpperCase(), style: {}, textContent: '', attributes: {},
+        addEventListener(name, handler) { elementEvents[name] = handler; },
+        setAttribute(name, value) { this.attributes[name] = value; },
+        appendChild() {},
+        dispatch(name) { elementEvents[name]?.(); },
+        events: elementEvents,
+      };
+      if (tag === 'video') {
+        element.duration = 10;
+        element.currentTime = 0;
+        element.readyState = 2;
+        element.seekable = { length: 1 };
+        element.played = { ranges: [], get length() { return this.ranges.length; }, start(index) { return this.ranges[index][0]; }, end(index) { return this.ranges[index][1]; } };
+      }
+      createdElements.push(element);
+      return element;
+    },
   };
-  const scenes = Array.from({ length: sceneCount }, (_, index) => ({ id: index === 0 ? 'first' : index === 1 ? 'second' : `scene-${index}`, title: index === 0 ? 'First' : index === 1 ? 'Second' : `Scene ${index}`, required: true, extractedText: [], imageAssets: [], audioAssets: [] }));
-  vm.runInNewContext(input[profile], { window, document, Set, Date, fetch: async () => ({ json: async () => ({ title: 'Course', scenes, assets: [] }) }) });
+  const scenes = Array.from({ length: sceneCount }, (_, index) => ({ id: index === 0 ? 'first' : index === 1 ? 'second' : `scene-${index}`, title: index === 0 ? 'First' : index === 1 ? 'Second' : `Scene ${index}`, required: true, extractedText: [], imageAssets: [], audioAssets: [], videoAssets: [], mediaPlacements: [] }));
+  if (videoTracking) {
+    scenes[0].videoAssets = ['clip'];
+    scenes[0].mediaPlacements = [{ assetId: 'clip', position: 'after', requiredViewing: true, viewingThresholdPercent: 90 }];
+    scenes[1].required = false;
+  }
+  const assets = videoTracking ? [{ id: 'clip', kind: 'video', filename: 'clip.mp4', path: 'assets/clip.mp4' }] : [];
+  vm.runInNewContext(input[profile], { window, document, Set, Date, fetch: async () => ({ json: async () => ({ title: 'Course', scenes, assets }) }) });
   await new Promise(resolve => setImmediate(resolve));
   assert(!nodes.get('#scene-body').textContent?.includes('could not be loaded'));
-  return { nodes, events, calls };
+  return { nodes, events, calls, createdElements };
 }
 (async () => {
   for (const profile of ['2004', '12']) {
@@ -104,6 +130,34 @@ async function session(profile, stored, mode = 'popup', sceneCount = 2) {
     assert.match(unreadable.nodes.get('#runtime-status').textContent, /could not be read/);
     assert.equal(corrupt['cmi.suspend_data'], '{truncated');
     assert(!unreadable.calls.some(call => call[0] === status), 'Do not overwrite unreadable progress with empty answers');
+
+    const videoStored = {};
+    const videoSession = await session(profile, videoStored, 'popup', 2, true);
+    const video = videoSession.createdElements.find(element => element.tagName === 'VIDEO');
+    assert(video, 'Required video is rendered');
+    video.duration = 10;
+    video.currentTime = 9;
+    video.played.ranges = [];
+    video.events.seeked();
+    assert.equal(videoStored[profile === '12' ? 'cmi.core.lesson_status' : 'cmi.completion_status'], 'incomplete', 'Seeking to the end does not satisfy required viewing');
+    assert.deepEqual(JSON.parse(videoStored['cmi.suspend_data']).videoProgress.clip.watchedRanges, []);
+    video.currentTime = 8.9;
+    video.played.ranges = [[0, 8.9]];
+    video.events.timeupdate();
+    video.events.pause();
+    assert.equal(videoSession.nodes.get('#runtime-status').textContent, 'Connected to LMS tracking.');
+    const savedVideoProgress = JSON.parse(videoStored['cmi.suspend_data']).videoProgress.clip;
+    assert.equal(Math.floor(savedVideoProgress.watchedRanges[0][1] / 10 * 100), 89);
+    assert.equal(videoStored[profile === '12' ? 'cmi.core.lesson_status' : 'cmi.completion_status'], 'incomplete');
+    video.currentTime = 9;
+    video.played.ranges = [[0, 9]];
+    video.events.timeupdate();
+    assert.equal(videoStored[profile === '12' ? 'cmi.core.lesson_status' : 'cmi.completion_status'], profile === '12' ? 'passed' : 'completed');
+    assert.equal(JSON.parse(videoStored['cmi.suspend_data']).videoProgress.clip.position, 9);
+    const resumedVideoSession = await session(profile, videoStored, 'popup', 2, true);
+    const resumedVideo = resumedVideoSession.createdElements.find(element => element.tagName === 'VIDEO');
+    resumedVideo.events.loadedmetadata();
+    assert.equal(resumedVideo.currentTime, 9, 'Required video resumes at its saved playback position');
   }
   console.log('Both profiles: popup discovery, suspend/resume, completion, rejection reporting, and termination passed.');
 })().catch(error => { console.error(error); process.exit(1); });

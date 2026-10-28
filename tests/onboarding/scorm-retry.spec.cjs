@@ -42,7 +42,10 @@ for (const profile of ['scorm-12', 'scorm-2004']) {
       await page.goto('http://retry.test/index.html');
       async function answer(correct) {
         if (type === 'single-choice') await page.getByLabel(correct ? 'Correct answer' : 'Wrong answer', { exact: true }).check();
-        if (type === 'short-answer') await page.getByLabel('Your answer', { exact: true }).fill(correct ? 'Correct' : 'Wrong');
+        if (type === 'short-answer') {
+          await expect(page.locator('#assessment-form input[type="text"]')).toHaveCount(1);
+          await page.getByLabel('Fill in the blank', { exact: true }).fill(correct ? '  correct  ' : 'Wrong');
+        }
         if (type === 'matching') {
           await page.getByRole('combobox', { name: 'First', exact: true }).selectOption(correct ? 'a' : 'b');
           await page.getByRole('combobox', { name: 'Second', exact: true }).selectOption(correct ? 'b' : 'a');

@@ -59,6 +59,7 @@ test('AI draft text is fitted before review and unresolved edits cannot be saved
   const before = await (await request.get(`/api/projects/${project.id}`)).json();
   expect(before.storyboard.scenes[0].title).toBe('Welcome');
   await editor.getByRole('button', { name: `${paragraph.slice(0, 50)} element`, exact: true }).click();
+  await editor.locator('.visual-inspector summary').filter({ hasText: /^Layout$/ }).click();
   await editor.getByRole('spinbutton', { name: 'Element height', exact: true }).fill('20');
   await editor.getByRole('button', { name: 'Save scene', exact: true }).click();
   await expect(editor.getByRole('alert')).toContainText('Text does not fit');

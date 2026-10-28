@@ -9,6 +9,7 @@
 .generation-availability { color:var(--muted); font-size: 12px; }
 .generation-creator.is-unavailable { background:var(--theme-raised, var(--theme-panel)); }
 .generation-creator.is-unavailable > summary, .generation-creator.is-unavailable > summary h2 { color:var(--muted); }
+.generation-creator.is-unavailable > summary { cursor: not-allowed; }
 .generation-creator .generated-media-form { border:0; padding: 0; margin: 16px 0 0; min-width: 0; }
 .generation-creator .generated-media-form:disabled { color:var(--muted); }
 .generation-creator .generated-media-form:disabled :is(input, textarea, select, button) { opacity: .55; cursor: not-allowed; }

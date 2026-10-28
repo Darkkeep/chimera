@@ -30,7 +30,6 @@ export function AnimationControls({ animations, onChange, disabled }: { animatio
     onChange(next);
   }
   return <section aria-label="Element animations">
-    <h3>Animation</h3>
     <fieldset disabled={disabled}>
       {(["entrance", "presentation", "exit"] as const).map(phase => <div key={phase}>
         <label>{phase === "entrance" ? "Entrance" : phase === "presentation" ? "Presentation" : "Exit"}<select aria-label={`${phase} effect`} value={value[phase].effect} onChange={event => change(phase, { effect: event.target.value })}>{effects[phase].map(([effect, label]) => <option key={effect} value={effect}>{label}</option>)}</select></label>

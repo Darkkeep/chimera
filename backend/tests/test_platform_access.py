@@ -62,7 +62,7 @@ class PlatformAccessTests(unittest.TestCase):
         headers = {'X-Test-Actor': 'reviewer'}
         before = len(self.audit())
         self.assertEqual(self.client.post(base + '/scenes', headers=headers, json={'title': 'Denied'}).status_code, 403)
-        for suffix in ('/storyboard.docx', '/storyboard-sme.docx', '/storyboard-full.docx', '/backup.zip', '/scorm-12.zip', '/storyboard/export', '/scenes/fake/assessment.qti.xml'):
+        for suffix in ('/storyboard.docx', '/storyboard-sme.docx', '/storyboard-full.docx', '/backup.zip', '/scorm-12.zip', '/storyboard/export', '/scenes/fake/assessment.qti.xml', '/questions.csv', '/questions.xlsx'):
             self.assertEqual(self.get(base + suffix, 'reviewer').status_code, 403)
         self.assertEqual(self.client.post(base + '/enhancement-proposals/fake/decision', headers=headers, json={'decision': 'accept'}).status_code, 403)
         self.assertEqual(len(self.audit()), before)
@@ -74,6 +74,14 @@ class PlatformAccessTests(unittest.TestCase):
         self.assertTrue(all(event['actorId'] == 'reviewer' for event in events))
         self.assertEqual(len({event['correlationId'] for event in events}), 1)
         self.assertTrue(all(event['actorDisplayName'] == 'Known reviewer' for event in events))
+
+    def test_question_import_requires_import_permission_and_project_access(self):
+        base = f'/api/projects/{self.project.id}'
+        for suffix in ('/question-import/preview', '/question-import'):
+            response = self.client.post(base + suffix, headers={'X-Test-Actor': 'reviewer'}, files={'file': ('questions.xml', b'<test/>')})
+            self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.get(f'/api/projects/{self.other.id}/question-import/template.csv').status_code, 403)
+        self.assertEqual(self.get(base + '/question-import/template.csv', 'reviewer').status_code, 200)
 
     def test_project_and_installation_isolation_filter_management_views(self):
         self.assertEqual(self.get(f'/api/projects/{self.other.id}').status_code, 403)

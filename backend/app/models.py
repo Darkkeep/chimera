@@ -1,6 +1,6 @@
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 
 
 SceneType = Annotated[
@@ -11,6 +11,21 @@ SceneType = Annotated[
 
 class ProjectCreate(BaseModel):
     title: str = Field(min_length=1, max_length=120)
+    parentProjectId: str | None = None
+
+
+class ProjectRelationshipUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    parentProjectId: str | None
+    siblingOrder: int = Field(ge=0, le=2147483647, strict=True)
+    metadataRevision: int = Field(ge=1, strict=True)
+
+
+class ProjectRestore(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    parentProjectId: str | None = None
 
 
 class EntranceAnimation(BaseModel):
@@ -102,12 +117,17 @@ class SceneLayout(BaseModel):
     height: float = Field(default=720, gt=0, le=10000, allow_inf_nan=False)
     backgroundColor: str = Field(default="#ffffff", pattern=r"^#[0-9a-fA-F]{6}$")
     backgroundAsset: str | None = None
+    backgroundMode: Literal["inherit", "image", "none"] | None = None
     elements: list[SceneElement] = Field(default_factory=list, max_length=2000)
     warnings: list[str] = Field(default_factory=list)
     assessmentRegion: AssessmentRegion | None = None
 
     @model_validator(mode="after")
     def validate_identifiers(self) -> "SceneLayout":
+        if self.backgroundMode == "image" and not self.backgroundAsset:
+            raise ValueError("Choose a scene background image")
+        if self.backgroundMode in {"inherit", "none"} and self.backgroundAsset is not None:
+            raise ValueError("Inherited or empty backgrounds cannot specify a scene image")
         if len({element.id for element in self.elements}) != len(self.elements):
             raise ValueError("Scene element identifiers must be unique")
         region = self.assessmentRegion
@@ -150,6 +170,8 @@ class MediaPlacement(BaseModel):
     position: Literal["before", "after"] = "after"
     loop: bool = False
     muted: bool = False
+    requiredViewing: bool = False
+    viewingThresholdPercent: int = Field(default=90, ge=1, le=100)
     altText: str = Field(default="", max_length=2000)
     decorative: bool = False
 
@@ -215,11 +237,35 @@ class AssessmentChoice(BaseModel):
     text: str = Field(min_length=1, max_length=1000)
 
 
+class QuestionMetadata(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    title: str = Field(default="", max_length=120)
+    description: str = Field(default="", max_length=2000)
+    tags: list[str] = Field(default_factory=list, max_length=50)
+    author: str = Field(default="", max_length=200)
+    source: str = Field(default="", max_length=1000)
+    language: str = Field(default="en", pattern=r"^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$", max_length=64)
+    difficulty: Literal["", "easy", "medium", "hard"] = ""
+    learningObjectiveRefs: list[str] = Field(default_factory=list, max_length=50)
+
+    @field_validator("tags", "learningObjectiveRefs")
+    @classmethod
+    def validate_references(cls, values: list[str]) -> list[str]:
+        cleaned = [value.strip() for value in values]
+        if any(not value or len(value) > 200 for value in cleaned):
+            raise ValueError("Tags and learning-objective references must be nonempty and at most 200 characters")
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("Tags and learning-objective references must be unique")
+        return cleaned
+
+
 class AssessmentBase(BaseModel):
     identifier: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,63}$")
     prompt: str = Field(min_length=1, max_length=5000)
     correctFeedback: str = Field(default="Correct.", max_length=2000)
     incorrectFeedback: str = Field(default="Review the material and try again.", max_length=2000)
+    metadata: QuestionMetadata = Field(default_factory=QuestionMetadata)
 
 
 class SingleChoiceAssessment(AssessmentBase):
@@ -838,6 +884,7 @@ class ReviewCommentDecision(BaseModel):
 
 class MediaGenerationJobCreate(BaseModel):
     kind: Literal["image", "narration"]
+    narrationConnectionId: str | None = Field(default=None, pattern=r"^(?:legacy-openai|narration-[a-f0-9]{12})$")
     sceneId: str
     purpose: str = Field(min_length=1, max_length=2000)
     style: str = Field(default="", max_length=2000)
@@ -864,6 +911,7 @@ class MediaGenerationJob(BaseModel):
     projectId: str
     sourceRevision: int
     aiConnectionRevision: str | None = None
+    narrationConnectionId: str | None = None
     sceneId: str
     kind: Literal["image", "narration"]
     purpose: str
@@ -894,6 +942,7 @@ class GeneratedAssetCandidate(BaseModel):
     id: str
     projectId: str
     jobId: str
+    narrationConnectionId: str | None = None
     sourceRevision: int
     sceneId: str
     kind: Literal["image", "audio"]
@@ -1030,6 +1079,7 @@ class Storyboard(BaseModel):
     projectId: str
     title: str
     description: str = ""
+    backgroundAsset: str | None = None
     completionSettings: CourseCompletionSettings = Field(default_factory=CourseCompletionSettings)
     exportSettings: ExportSettings = Field(default_factory=ExportSettings)
     scenes: list[Scene] = Field(default_factory=list)
@@ -1055,6 +1105,11 @@ class ProductionStageUpdate(BaseModel):
     productionStage: ProductionStage
 
 
+class ProjectBackgroundUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    backgroundAsset: str | None
+
+
 class ProjectSummary(BaseModel):
     id: str
     title: str
@@ -1064,6 +1119,9 @@ class ProjectSummary(BaseModel):
     installationId: str = "local-installation"
     ownerId: str = "local-user"
     productionStage: ProductionStage = "not-set"
+    metadataRevision: int = Field(default=1, ge=1)
+    parentProjectId: str | None = None
+    siblingOrder: int = 0
 
 
 class ProjectDetail(ProjectSummary):

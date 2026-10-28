@@ -1,6 +1,37 @@
 import type { Context, Journey } from '@guided-workflows/onboarding';
 import { firstSceneJourney } from './onboarding';
 
+export function walkthroughSurface(target = "") {
+  if (target.startsWith("storyboard.") || target === "scene.saved" || target === "scene.audio") return "storyboard";
+  if (target.startsWith("media.")) return "media";
+  if (target === "templates.library") return "templates";
+  if (target === "preview.comments") return "preview.content";
+  return target;
+}
+
+export const surfaceWalkthroughs: Record<string, string> = {
+  "project.name": "first-scene",
+  "scene.form": "first-scene",
+  "scene.edit": "edit-scene",
+  "media": "upload-media",
+  "templates": "upload-template",
+  "templates.edit": "edit-template",
+  "assessment.editor": "question-rules",
+  "preview.content": "preview",
+  "review.completion": "completion",
+  "review.enhancement": "suggestions",
+  "review.course": "pythia-course-review",
+  "pythia.analysis": "pythia-analysis",
+  "pythia.transform": "pythia-transform",
+  "pythia.assessment": "pythia-assessment",
+  "settings.engine": "engine-status",
+  "settings.media": "media-provider",
+  "review.accessibility": "accessibility",
+  "review.validation": "validation",
+  "export.panel": "export-backup",
+  "workspace.management": "management",
+};
+
 export function reportOnboardingOutcome(type: string, scope: string, entityId?: string) {
   window.dispatchEvent(new CustomEvent('chimera:onboarding-outcome', { detail: { type, scope, entityId } }));
 }
@@ -33,7 +64,7 @@ const tasks: Task[] = [
     ['ordering', 'Ordering question', 'Enter items and use the arrows to put them in correct order.'],
     ['drag-drop', 'Drag-and-drop question', 'Enter draggable items and drop targets and specify correct placement.'],
     ['matching', 'Matching question', 'Enter both columns and specify each correct match.'],
-    ['short-answer', 'Short-answer question', 'Enter accepted answers, one per line, and choose whether letter case matters.'],
+    ['short-answer', 'Fill-in-the-blank question', 'Create one blank with accepted exact-match answers, one per line, and choose whether letter case matters.'],
   ].map(([type, title, copy]) => [`question-${type}`, title, 'assessment.editor', `Choose the corresponding Question type and enter a clear prompt. ${copy} Review feedback and assessment rules, then Save question.`, `question.saved.${type}`, assessment] as Task)),
   ['question-rules', 'Assessment attempts and remediation', 'assessment.editor', 'Review Maximum attempts, Passing score, Course score weight and Remediation scene. Save question. Test retry/remediation in learner preview afterwards.', 'question.saved', assessment],
   ['remove-question', 'Remove an assessment question', 'assessment.editor', 'Remove question clears the authored item after the application confirmation. Use expendable content or skip this step.', 'question.removed', assessment],
@@ -78,10 +109,10 @@ const tasks: Task[] = [
   ['project-restore', 'Restore a project from Trash', 'workspace.management', 'Open Trash in My Work and inspect the project and recovery deadline. Restore returns its files and project to the active list before expiry; opening Trash removes expired entries. Choose Next after reviewing available entries. This is different from restoring a storyboard ZIP over a project.', undefined, always],
   ['project-access', 'Manage project members and review links', 'workspace.access', 'Authorized hosted users can Save member with a project role, Remove access after confirmation, and Create review link for an assigned account. Links require sign-in, expire after three days and refer to a storyboard revision; Revoke link removes access through that link. Do not grant permissions just to practice. Choose Next after reviewing existing access.', undefined, c => project(c) && Boolean(c.canManageAccess)],
   ['engine-status', 'Inspect the Pythia Intelligence Engine', 'settings.engine', 'Check Engine availability, capabilities and provider registry. Refresh engine status retries diagnostics. Pythia owns learning-intelligence provider/model selection; this is not a provider editor. Usage requires administrator access and resets on Engine restart. If unavailable, ask the administrator to check CHIMERA_PYTHIA_BASE_URL and the Engine service. Choose Next after review.', undefined, always],
-  ['media-provider', 'Configure the media provider', 'settings.media', 'This connection is separate from Pythia. Administrators enter approved credentials and limits, then Save media settings. Enter secrets only in the password field, never in course content. Request limits are not spending caps. Read-only users must ask an administrator. Choose Next after checking the configuration; no credential change is required.', undefined, always],
-  ['media-provider-save', 'Save media provider settings', 'settings.media', 'Only installation administrators with secure credential storage can save. Choose approved image/audio models and limits, enter a key only if needed, then explicitly Save media settings. Leave the key blank to retain a configured credential. This step waits for a successful save, not typing. Skip if no settings change is appropriate.', 'media.provider.saved', always],
-  ['media-provider-test', 'Test the media provider connection', 'settings.media', 'After saving, explicitly choose Test provider. This checks the credential without generating media or submitting course content. The guide waits for success. Administrator access and a configured connection are required; skip if unavailable.', 'media.provider.tested', always],
-  ['media-provider-disconnect', 'Disconnect the media provider', 'settings.media', 'Only disconnect when appropriate. Disconnect asks for confirmation, removes the saved credential and disables environment fallback. Running requests may finish. Cancelling confirmation does not complete this step. This does not disconnect the Pythia Engine. Skip if generation should remain enabled.', 'media.provider.disconnected', always],
+  ['media-provider', 'Configure the media provider', 'settings.media', 'These six provider tabs are separate from Pythia. OpenAI supports images/legacy narration; ElevenLabs, Google Cloud and Cartesia support narration. Synthesia and Shotstack support setup/testing only, not video generation. Use approved server credentials or Google ADC; never put secrets in course content. Request limits are not spending caps. Choose Next after checking configuration; no credential change is required.', undefined, always],
+  ['media-provider-save', 'Save media provider settings', 'settings.media', 'Installation administrators choose the provider tab, approved credential source and settings, then explicitly Save media settings, Save narration connection or Save video connection. Keys use server secure storage or fixed environment injection; Google uses ADC. Leave a key blank to retain a compatible stored credential. This step waits for a successful save, not typing. Skip if no change is appropriate.', 'media.provider.saved', always],
+  ['media-provider-test', 'Test the media provider connection', 'settings.media', 'After saving, explicitly choose Test provider, Test narration connection or Test video connection in the intended tab. This reads provider metadata without generating media or submitting course content. Success is not proof of generation entitlement or output quality. The guide waits for success. Administrator access and configured credentials are required; skip if unavailable.', 'media.provider.tested', always],
+  ['media-provider-disconnect', 'Disconnect the media provider', 'settings.media', 'Only disconnect when appropriate. Confirm Disconnect for OpenAI or Disconnect narration/video connection for the selected named connection. OpenAI disables its environment fallback; named connections remove their owned key but do not unset server environment variables or ADC identities. Running requests may finish. Cancelling does not complete this step. Pythia remains separate. Skip if the connection should remain enabled.', 'media.provider.disconnected', always],
 ];
 export const chimeraJourneys: Journey[] = [firstSceneJourney, ...tasks.map<Journey>(([id, title, target, instruction, event, prerequisite = project]) => ({
   id, title, version: 1, steps: [

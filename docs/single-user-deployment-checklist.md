@@ -14,6 +14,8 @@ Use the [completion execution record](completion-update-2026-10-15.md) for this 
 - [ ] The workspace directory is writable.
 - [ ] No provider credentials are stored in frontend files or project exports.
 - [ ] Backend requirements include `keyring`; a supported, unlocked OS credential store is available to the API account if browser-based AI connection saves will be used. Otherwise use protected server environment configuration.
+- [ ] If Google narration is needed, its Text-to-Speech API/billing and server ADC are provisioned for the backend account. No Google private key is uploaded through Chimera.
+- [ ] Provider environment secrets, if used, are injected into the backend only; Shotstack sandbox and production use different keys. See [provider setup](ai-connection.md#provider-tabs).
 
 ## Start
 
@@ -49,6 +51,11 @@ It verifies health, installation mode, project loading, production validation, b
 - [ ] Media Library defaults its project selector to the current course; switching projects retains the library view and Add media targets that project.
 - [ ] Create a media candidate starts collapsed and is greyed/disabled without configured AI or generation permission.
 - [ ] Settings > AI connection shows safe status. Save/test/disconnect use the local operator's permissions; credentials are never returned to the browser. Tests use inert credentials unless the operator explicitly approves a live-provider check.
+- [ ] All six provider tabs are reachable by mouse and keyboard and confirm before discarding unsaved changes. Pythia diagnostics remain separate under **Settings > Pythia**.
+- [ ] Only configured speech connections with a saved voice are offered for narration. Narration-only setup does not enable images; Synthesia/Shotstack setup does not enable generation of any media.
+- [ ] Synthesia/Shotstack tabs state that video generation is not yet available. Their tests read metadata without creating a video/render; successful testing is not a generation-quality or entitlement certification.
+- [ ] Narration generation requires explicit connection selection and candidate review/approval. Disconnecting/removing a connection does not silently route regeneration to another provider.
+- [ ] **User guide**, below Templates, opens the bundled PDF even with no selected project. Review the current [guide](user-guide.md#configure-media-connections) before a provider demonstration.
 - [ ] Provider-account spending controls and data-handling approval are in place before AI use; request caps are not currency budgets.
 - [ ] Preview opens and can navigate scenes without the backend learner runtime.
 - [ ] Review comments can be created, replied to, resolved, and reopened.

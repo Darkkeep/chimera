@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 
 from . import storage
-from .models import AssetMetadataUpdate, ExtractedAsset, MediaPlacement, MediaPlacementsUpdate, ProjectDetail, Scene
+from .models import AssetMetadataUpdate, ExtractedAsset, MediaPlacement, MediaPlacementsUpdate, ProjectDetail, Scene, SceneElement, SceneLayout
 
 
 def validate_captions(text: str) -> None:
@@ -45,33 +45,66 @@ def effective_placements(project: ProjectDetail, scene: Scene) -> list[MediaPlac
     return sorted(placements.values(), key=lambda item: (item.position != "before", item.order, item.assetId))
 
 
+def effective_background_asset(project: ProjectDetail, scene: Scene) -> str | None:
+    layout = scene.visualLayout
+    if layout and layout.backgroundMode == "none":
+        return None
+    if layout and layout.backgroundMode == "inherit":
+        return project.storyboard.backgroundAsset
+    return (layout.backgroundAsset if layout else None) or scene.backgroundAsset or project.storyboard.backgroundAsset
+
+
+def validate_backgrounds(project: ProjectDetail) -> None:
+    assets = {asset.id: asset for asset in project.storyboard.assets}
+    background = project.storyboard.backgroundAsset
+    if background is not None and (background not in assets or assets[background].kind != "image"):
+        raise ValueError("Project background must reference an image asset in this project")
+    for scene in project.storyboard.scenes:
+        storage.validate_visual_assets(scene, assets)
+
+
 def resolved_project(project: ProjectDetail, published: bool = False) -> ProjectDetail:
     """Resolve precedence once for Word/packages; never save this derived view."""
     assets = {asset.id: asset for asset in project.storyboard.assets}
     used = set()
     scenes = []
     for scene in project.storyboard.scenes:
+        background = effective_background_asset(project, scene)
+        layout = scene.visualLayout
+        if layout:
+            layout = layout.model_copy(update={"backgroundAsset": background, "backgroundMode": "image" if background else "none"})
+            if background in assets and assets[background].role == "background":
+                layout = layout.model_copy(update={"elements": [element for element in layout.elements if element.source != "master"]})
+        elif background and (scene.layoutMode == "native" or scene.assessmentItem):
+            layout = SceneLayout(enabled=True, backgroundAsset=background, backgroundMode="image", elements=[
+                SceneElement(id=f"background-text-{index}", kind="text", x=60, y=40 + index * 110,
+                    width=1160, height=100, text=text, fontSize=28 if index else 40)
+                for index, text in enumerate([scene.title, *scene.extractedText]) if text
+            ])
+        if layout and background and scene.layoutMode == "native":
+            layout = layout.model_copy(update={"enabled": True})
         placements = effective_placements(project, scene)
         for placement in placements:
             if placement.assetId not in assets:
                 raise ValueError("Media placement references an unavailable project asset")
         by_kind = {kind: [p.assetId for p in placements if assets[p.assetId].kind == kind] for kind in ("image", "audio", "video")}
         used.update(p.assetId for p in placements)
-        if scene.backgroundAsset:
-            used.add(scene.backgroundAsset)
-        if scene.visualLayout:
-            used.update(e.assetId for e in scene.visualLayout.elements if e.assetId)
-            if scene.visualLayout.backgroundAsset:
-                used.add(scene.visualLayout.backgroundAsset)
+        if background:
+            used.add(background)
+        if layout:
+            used.update(e.assetId for e in layout.elements if e.assetId)
         scenes.append(scene.model_copy(update={"imageAssets": by_kind["image"], "audioAssets": by_kind["audio"], "videoAssets": by_kind["video"],
+            "visualLayout": layout, "backgroundAsset": background,
             "mediaPlacements": placements, "imageAltText": {p.assetId: p.altText for p in placements if p.altText},
             "decorativeImages": [p.assetId for p in placements if p.decorative]}))
     storyboard = project.storyboard.model_copy(update={"scenes": scenes,
+        "backgroundAsset": project.storyboard.backgroundAsset if not published or project.storyboard.backgroundAsset in used else None,
         "assets": [asset for asset in assets.values() if not published or asset.id in used]})
     return project.model_copy(update={"storyboard": storyboard})
 
 
 def validate_placements(project: ProjectDetail) -> None:
+    validate_backgrounds(project)
     assets = {asset.id: asset for asset in project.storyboard.assets}
     scopes = [project.storyboard.courseMedia, *(s.mediaPlacements for s in project.storyboard.scenes)]
     for placements in scopes:
@@ -88,6 +121,10 @@ def validate_placements(project: ProjectDetail) -> None:
                 raise ValueError(f"{kind.title()} scene references must point to {kind} assets in this project")
         if scene.audioRequired and any(p.loop and assets[p.assetId].kind == "audio" for p in effective_placements(project, scene)):
             raise ValueError("Required audio cannot loop; learners must be able to reach its end")
+        if any(p.requiredViewing and assets[p.assetId].kind != "video" for p in effective_placements(project, scene)):
+            raise ValueError("Required viewing can only be configured for video")
+        if any(p.requiredViewing and p.loop for p in effective_placements(project, scene)):
+            raise ValueError("Required videos cannot loop")
 
 
 def write_placements(project_id: str, data: MediaPlacementsUpdate, revision: int, scene_id: str | None = None) -> ProjectDetail:
@@ -132,9 +169,9 @@ def update_metadata(project_id: str, asset_id: str, data: AssetMetadataUpdate, r
 
 
 def asset_usage(project: ProjectDetail, asset_id: str) -> dict:
-    return {"courseWide": any(p.assetId == asset_id for p in project.storyboard.courseMedia),
+    return {"courseWide": project.storyboard.backgroundAsset == asset_id or any(p.assetId == asset_id for p in project.storyboard.courseMedia),
             "scenes": [{"id": s.id, "title": s.title} for s in project.storyboard.scenes
-                if asset_id in {p.assetId for p in effective_placements(project, s)} or s.backgroundAsset == asset_id
+                if asset_id in {p.assetId for p in effective_placements(project, s)} or effective_background_asset(project, s) == asset_id or s.backgroundAsset == asset_id
                 or s.visualLayout and (s.visualLayout.backgroundAsset == asset_id or any(e.assetId == asset_id for e in s.visualLayout.elements))]}
 
 

@@ -13,13 +13,24 @@ The first implementation consists of a headless package, a shared DOM renderer a
 
 ## Try the walkthroughs
 
-Install root dependencies with `npm ci`, then frontend dependencies with `npm ci --prefix frontend`. Start Chimera normally using the root README. Choose **Start / resume walkthrough** in the sidebar or in **Review tools → Guided review**. Existing projects start at scene creation; an empty workspace starts with project creation. Saves create real authored content. Restarting the guide adds another practice scene rather than resetting the project.
+Install root dependencies with `npm ci`, then frontend dependencies with `npm ci --prefix frontend`. Start Chimera normally using the root README. Choose **Start / resume walkthrough** in the sidebar or in **Review tools → Guided review**. An empty workspace starts with project creation. In an open workflow, the control resumes a matching guide or starts the guide for that workflow, rather than reopening an unrelated first-scene task. Saves create real authored content. Restarting the first-scene guide adds another practice scene rather than resetting the project.
 
 The independent demo now lives in [Darkkeep/onboarding](https://github.com/Darkkeep/onboarding). In that repository, run `npm ci` and `npm run dev`, then open `http://127.0.0.1:5188`. It requires no Chimera checkout or API. Chimera installs the private `0.1.1` release tarball from `vendor/onboarding`; see its [provenance and update instructions](../vendor/onboarding/README.md).
 
 ## Walkthrough catalog
 
-Open **Review tools > Guided review > All functionality walkthroughs**. Search by task name (for example, Pythia, canvas, audio, questions, storyboard), then choose a walkthrough. The sidebar **Start / resume walkthrough** resumes the last selected task. The catalog now contains **68 walkthroughs**, including **9 Pythia workflows**, with independent browser-local progress for the selected project; **Practiced**, **Paused**, and **Ended with skips** describe practice history rather than project readiness.
+Open **Review tools > Guided review > All functionality walkthroughs**. Search by task name (for example, Pythia, canvas, audio, questions, storyboard), then choose a walkthrough. The sidebar **Start / resume walkthrough** uses the current workflow first. On Storyboard or the catalog, where several tasks are possible, it retains the last selected task. The catalog contains **68 walkthroughs**, including **9 Pythia workflows**, with independent browser-local progress for the selected project; **Practiced**, **Paused**, and **Ended with skips** describe practice history rather than project readiness.
+
+### Context-aware start and resume
+
+- **Dismiss walkthrough** hides the active guide without closing the form, discarding drafts, completing steps or deleting practice history. The next Start uses the workflow you are in, including Details versus Stage and the current question type, instead of treating the dismissed task as a resume destination. Help stays closed until you request it again. **Pause guide** and Escape retain the explicit resume behavior for the selected task.
+- Supported open dialogs offer **Start walkthrough** even if no guide was previously paused. **Resume walkthrough** appears only for a paused guide that belongs to the current workflow. Switching to a different workflow through Start re-enters its task instead of landing on an older result-review step. Neither action clears the open draft.
+- Media library, Templates, My Work, preview, export, validation, completion, accessibility, Pythia and AI connection settings each resolve to their own workflow. An unrelated first-scene review cannot resume inside them.
+- For a newly selected scene-editor workflow, Stage chooses canvas authoring and Details chooses scene editing. A newly selected question workflow uses the current Question type. An explicitly selected catalog task keeps its own instructions and success requirements.
+- A saved-scene walkthrough anchors to the editor itself, so moving between Stage and Details does not make its target disappear. A new scene and a saved scene are distinct contexts.
+- Opening Create project while another project is selected starts at naming the new course and preserves its draft; the selected project's existence does not satisfy the new-project step.
+- After completing first-scene practice, the Storyboard shortcut moves on to editing the saved scene instead of restarting creation. Use the catalog to explicitly restart first-scene practice.
+- Forms without a supported walkthrough do not receive an unrelated Resume button. Close the form and use the catalog to choose another task. Context detection is not automatic execution, a save or a provider submission.
 
 | Functionality | Walkthroughs and outcomes |
 | --- | --- |
@@ -27,7 +38,7 @@ Open **Review tools > Guided review > All functionality walkthroughs**. Search b
 | Scene authoring | PowerPoint import, text/notes/action/type/layout/required settings, dedicated saved canvas authoring, ordering, explicitly confirmed deletion |
 | Templates | PPTX upload, name/description save, source replacement, saved scene assignment |
 | Media | Image/audio upload, attach/detach, attribution save, required playback, alt text/decorative save |
-| Assessments | Separate save journeys for single-choice, multiple-answer, true/false, ordering, drag/drop, matching and short-answer; attempts/score/weight/remediation; confirmed removal; QTI item export |
+| Assessments | Separate save journeys for single-choice, multiple-answer, true/false, ordering, drag/drop, matching and Fill-in-the-blank (legacy `short-answer`); attempts/score/weight/remediation; confirmed removal; QTI item export |
 | Learner preview | Contents navigation, scene/media/question/retry/remediation/progress review, saved comments, replies, resolve/reopen, explicit enhancement from a comment |
 | Course review | Saved completion rules, successfully loaded validation followed by acknowledgment of authoring/production findings |
 | Enhancement | Reference upload, preview/explicit submission, cancel/retry jobs, edit/accept/reject/reverse suggestion decisions |
@@ -38,7 +49,7 @@ Open **Review tools > Guided review > All functionality walkthroughs**. Search b
 | Restore | JSON and Chimera storyboard ZIP restoration after the existing user confirmation and successful API response |
 | Management | My Work project health, saved production/release stage, identity/policy and audit activity review |
 
-Action steps wait for their handler's successful outcome, including the project scope and scene identity where applicable. Question-type journeys also require the matching saved type. Prerequisites block with Retry/Skip/Pause when required content is absent. Preparation opens existing views/forms; it never performs a save, accepts a destructive confirmation or starts a provider run. Review steps use Next for explicit acknowledgment. Escape pauses the guide; open dialogs offer Resume walkthrough without clearing drafts. Changing projects or tasks preserves separate progress.
+Action steps wait for their handler's successful outcome, including the project scope and scene identity where applicable. Question-type journeys also require the matching saved type. Prerequisites block with Retry/Skip/Pause when required content is absent. Preparation opens existing views/forms; it never performs a save, accepts a destructive confirmation or starts a provider run. Review steps use Next for explicit acknowledgment. Escape pauses the guide; supported open dialogs offer a matching Start/Resume action without clearing drafts. Changing projects or tasks preserves separate progress.
 
 Pythia draft steps advance only after the returned artifact has been persisted in Chimera, not after task submission or polling completion alone. Failed draft saves leave the task step active; **Retry polling** checks the existing task without submitting another one. Scene-based draft outcomes also match the selected scene. Decisions have separate outcome identifiers, so an unrelated enhancement decision cannot finish a Pythia review step. **Accept review** records analysis review without content changes; **Accept transformation** replaces selected scenes with no undo button; assessment **Accept change** uses the native proposal mechanism. Finding resolution requires a note and records a decision rather than fixing course content. Escape pauses the guide while keeping the form open; closing the form also pauses the guide but may discard unsaved form values.
 
@@ -47,6 +58,8 @@ The Golden Path now includes Engine diagnostics and a recovery archive before tr
 The new catalog reuses the existing Guided review rows and controls. The reusable package and independent vanilla demo retain their framework-independent contract.
 
 ## Run verification
+
+Current navigation (2026-10-27): **Assessments** is directly under **WORKSPACE**, not Review tools. **Project background** is above the Storyboard scene list, not Settings. Question tags and learning-objective references use searchable reuse/create dropdowns in a collapsed bottom section. These newer import/metadata and navigation workflows have dedicated browser specs; their availability does not imply a separate guided walkthrough was added for every new control.
 
 Chimera now opens on My Work after launch and refresh. Authoring reload checks explicitly choose Resume authoring before resuming a guide; this does not reset task/project progress. The media file picker is Add media, while the existing upload outcome identifier remains unchanged. Candidate review remains available when creation is collapsed or AI is unavailable. **Settings > Intelligence Engine** provides diagnostics; **Settings > Media provider** opens the separate permission-aware media connection dialog. Neither starts a provider task when opened by a walkthrough.
 

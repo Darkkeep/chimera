@@ -11,7 +11,7 @@ exports.startChimera = async page => {
     if (route.request().method() === 'GET') await route.fulfill({ json: [] });
     else await route.continue();
   });
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Start / resume walkthrough', exact: true }).click();
   await exports.expectStep(page, 'Name your course');
 };
