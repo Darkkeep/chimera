@@ -1,6 +1,8 @@
 # Chimera user guide
 
-Process-based instructions for Chimera. Workflow text updated 2026-10-27 for current workspace navigation, reviewed question import/export, Fill-in-the-blank, searchable question metadata, Pythia naming, six media-provider tabs and explicit narration selection. The [PDF edition](user-guide.pdf) is generated from this source. Workspace navigation, all seven question types, assessment management/import, metadata controls, all six provider forms and the narration connection selector were recaptured on 2026-10-27 using an isolated demonstration project. Provider images use inert status/capability fixtures, not configured accounts or generated output. Other screenshots retain their earlier capture dates; provenance is recorded in [the maintenance guide](user-guide/support/README.md). Images may predate the current controls; use the current text instructions where labels differ. No user project or credentials are used for documentation captures. Historical source/recovery context is documented in the [recovery record](export-enhancement-recovery.md).
+Process-based instructions for Chimera. Workflow text and the PDF edition were refreshed on 2026-10-27 for one authored scene across Stage, storyboard, preview, and delivery; temporary original comparison; direct template application with Undo/Redo; project background import and inheritance; and presentation-first preview navigation. The [authored-scene manifest](user-guide/refresh-authored-scenes-2026-10-27.json) records the current captures and implementation hashes. Earlier October 27 assessment/navigation and provider captures remain current where their controls are unchanged. Provider images use inert status/capability fixtures, not configured accounts or generated output. Other images retain their earlier provenance in the [maintenance guide](user-guide/support/README.md). No user course or credentials are used for captures. Historical source/recovery context remains in the [recovery record](export-enhancement-recovery.md).
+
+Chimera authors one scene. Edit its content and composition, inherit project defaults unless you deliberately create an exception, and choose a destination when exporting. The [authored-scene workflow](authored-scene-workflow.md) explains migration and output behavior; the steps below show the controls.
 
 ## How to use this guide
 
@@ -158,7 +160,7 @@ Importing another deck updates the project from that deck. Download a Chimera st
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | Click the **+** control labeled **Add scene**. | The New scene dialog opens. | <a href="user-guide/images/scene-sequence.png"><img src="user-guide/images/scene-sequence.png" alt="scene sequence controls" width="240"></a> |
-| 2 | Enter **Scene title**, select **Scene type** and **Scene layout**, and enter **On-screen text**. Set directions, notes, and **Required scene** as needed. | The new scene is prepared in the form. | <a href="user-guide/images/new-scene.png"><img src="user-guide/images/new-scene.png" alt="new scene controls" width="240"></a> |
+| 2 | Enter **Scene title**, select **Scene type** and optionally choose a **Template**, and enter **On-screen text**. Set directions, notes, and **Required scene** as needed. | The new scene is prepared in the form. | <a href="user-guide/images/new-scene.png"><img src="user-guide/images/new-scene.png" alt="new scene controls" width="240"></a> |
 | 3 | Click **Create scene**. | The scene is appended and saved. | <a href="user-guide/images/new-scene.png"><img src="user-guide/images/new-scene.png" alt="new scene controls" width="240"></a> |
 
 ### Edit scene content and settings
@@ -167,28 +169,47 @@ The **Edit scene** dialog combines scene details and canvas authoring. On-screen
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Select a scene, then click **Edit scene** or its pencil icon. | The unified scene editor opens on Details. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a><br><a href="user-guide/images/scene-sequence.png"><img src="user-guide/images/scene-sequence.png" alt="scene sequence controls" width="240"></a> |
-| 2 | In **Details**, update the title, type, layout, on-screen text, action description, speaker notes, or required status. Choose **Canvas** to edit the visual layout in the same dialog. | Both sections share one draft and one save action. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
+| 1 | Select a scene, then click **Edit scene** or its pencil icon. | The unified scene editor opens on Stage; choose Details for content and settings. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a><br><a href="user-guide/images/scene-sequence.png"><img src="user-guide/images/scene-sequence.png" alt="scene sequence controls" width="240"></a> |
+| 2 | In **Details**, update the title, type, on-screen text, action description, narration, speaker notes, or required status. Use **Apply template** to preview a selected design, or choose **Stage** for precise visual editing. | Both sections share one draft and one save action. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
 | 3 | Click **Save scene**; use **Cancel** to discard edits from either section. | Saved changes update the storyboard and its revision. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor Details controls" width="240"></a> |
 
 ### Edit text and images on the canvas
 
-Open **Edit scene**, then choose **Canvas**. The canvas editor saves an editable layout; it does not paint over the flattened PowerPoint preview. Canvas edits to an imported slide use Hybrid rendering so the edited layers, rather than an unchanged flattened image, are shown.
+Open **Edit scene**, then choose **Stage**. The authored composition is shared by the editor, storyboard, course preview, and delivery outputs. The original PowerPoint is retained for comparison; there is no Rendering mode decision.
 
-![Unified scene editor Canvas tab](user-guide/images/scene-canvas-editor.png)
+![Unified scene editor Stage tab](user-guide/images/scene-canvas-editor.png)
 
-1. For an older imported scene, choose **Extract source layout** to recover positions and inherited artwork from the retained PPTX. This preserves scene IDs, notes, questions, review threads, existing assets, and authored text. The extracted layout remains inactive until **Save scene**. Cancelling keeps the extracted data but does not change playback.
+1. Older projects prepare missing scene compositions automatically when an editor opens them. This preserves scene IDs, text, notes, questions, review threads, existing assets, and original source files. A missing retained source produces an error rather than a generic replacement slide. Review the listed import limitations before publishing.
 2. Double-click a text box, or focus it and press Enter, to edit its text directly. The **Text** field also edits the selected box. Drag boxes to move them, use resize handles, or enter exact position and size in the properties panel. Text resize handles preserve the box's current aspect ratio; image resize handles allow freeform sizing. Arrow keys move the focused element; Shift changes the step from one to ten slide-space units.
-3. Drag an **Attached images** thumbnail onto the canvas. Clicking the thumbnail adds it without dragging. The media-library selector can add other project images. Selecting an image exposes replacement and crop-reset controls.
+3. Drag a **Content** thumbnail onto the canvas. Clicking the thumbnail adds it without dragging. The media-library selector can add other project images. Selecting an image exposes replacement and crop-reset controls.
 4. Use **Layers** to select overlapping or inherited content. Master and layout artwork starts locked; unlock it before editing. Toolbar controls add text, undo/redo, duplicate/delete elements, and change stacking order. Text properties include size, color, typeface, alignment, bold, and italic.
-5. Expand **Background** in the properties panel to choose a color and open the **Background image** thumbnail picker. Choose **Use project background**, a scene image, or **None** to explicitly opt out of the project image. Imported PowerPoint master backgrounds are labeled in the picker. Set the default using **Storyboard > Project background**, above the scene list; changing it affects only inheriting scenes, not scene-specific images or explicit None choices. Add images in Media library first. Backgrounds fill the stage and are decorative; check contrast and keep instructional information in accessible text. **Source slide**, when available, temporarily shows the original flattened rendering for comparison and is not changed by background settings.
-6. Choose **Save scene**, then check **Preview course**. The saved canvas replaces the source preview in authoring, preview, and both SCORM profiles. **Cancel** discards unsaved canvas changes.
+5. Expand **Background** in the properties panel to choose a color and open the **Background image** thumbnail picker. Choose **Use project default**, a scene image, or **None** to explicitly opt out of the project image. Imported PowerPoint master backgrounds are labeled in the picker. Set the default using **Storyboard > Project background**, above the scene list; changing it affects only inheriting scenes, not scene-specific images or explicit None choices. Use **Import graphic** in Project background, or choose an existing Media library image. Backgrounds fill the stage and are decorative; check contrast and keep instructional information in accessible text. **Compare with original**, when available, temporarily shows the original flattened slide. **Return to scene** restores the authored composition. Comparison does not change previews or outputs.
+6. Choose **Save scene**, then check **Preview course**. The saved composition is shared by storyboard, course preview, Word visuals, standalone, and both SCORM profiles. **Cancel** discards unsaved canvas changes.
 
 ![Project background settings opened from Storyboard](user-guide/images/project-background-current.png)
 
 New imports capture editable text, images, common PowerPoint shapes, line connectors, custom freeform geometry, rotation, cropping, slide dimensions, inherited graphics, and solid/picture backgrounds. Byte-identical images are shared as one Media library asset while every source placement stays separate on the canvas. Most extracted shapes can be moved, resized, rotated, layered, locked, or deleted like other canvas elements; text inside a shape remains separately editable. The original preview remains available for comparison. Less-common preset geometry, gradients, group rotation, mixed text formatting, bullets, and some inherited styles may be approximated and are listed under **Import limitations**; charts and SmartArt remain unsupported objects. This is not full PowerPoint-equivalent editing.
 
-For a scene with an enabled visual layout, edits to **On-screen text** in the original metadata dialog also update the corresponding visual text boxes. The scene title remains the navigation label; use the canvas editor to change a title drawn on the slide.
+Saving content changes in Details updates the authored scene; use Stage for precise placement and text-box styling. Preview and export use the saved composition, not unsaved dialog edits.
+
+### Compare with the original slide
+
+1. On Stage, choose **Compare with original** when the scene has a retained PowerPoint rendering.
+2. Inspect the **Original slide reference**. Editing controls are disabled while you compare.
+3. Choose **Return to scene** to resume editing. Closing and reopening the editor also returns to the authored scene. Comparison never changes storyboard preview, course preview, or exported output.
+
+![Temporary original comparison with Return to scene](user-guide/images/scene-original-comparison.png)
+
+### Import and apply a project background
+
+1. Open **Storyboard > Project background** above the scene list.
+2. Choose **Import graphic** and select a PNG, JPEG, GIF, or WebP image. The upload selects the image and adds it to Media library.
+3. Choose **Save project background** once. All inheriting scenes update automatically, including imported slides; scene-specific images and explicit None choices remain exceptions. Cancel does not apply the background, but the imported image remains available in Media library.
+4. To remove a scene exception, open **Edit scene > Stage > Background**, choose **Use project default**, and save that scene. Subsequent project changes flow through automatically. Without a project background, an inheriting imported scene can retain its original source-background baseline.
+
+![Imported graphic selected in Project background](user-guide/images/project-background-import.png)
+
+![Restore inheritance or choose a scene background exception](user-guide/images/scene-background-default.png)
 
 ### Jump directly to another scene
 
@@ -237,23 +258,21 @@ Download a Chimera storyboard before deletion when you need an accessible recove
 
 ### Assign a template to a scene
 
-Scene layout chooses how the scene is rendered:
+A template supplies the first-slide design and master/layout artwork, replacing its sample text with the scene content. It shapes the authored composition; it is not a separate rendering mode. Project defaults and explicit scene background exceptions still apply.
 
-- **Fidelity** keeps the rendered source slide.
-- **Hybrid** uses the extracted slide background and editable slide layers.
-- **Native** uses a clean white canvas with the scene's learner-facing text.
-- **Template** uses the selected PPTX's first-slide design and master/layout artwork, replacing its sample text with the scene content.
-
-PowerPoint effects that Chimera cannot represent may be approximated or omitted; compare the result with the source slide before publishing.
+PowerPoint effects that Chimera cannot represent may be approximated or omitted. Use **Compare with original** and review import limitations before publishing.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Open the scene editor and set **Scene layout** to **Template**. | A Template selector appears. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="scene editor controls" width="240"></a> |
-| 2 | Choose a template, then click **Save scene** or **Create scene**. | The scene background and editable design layers update to the selected template. | <a href="user-guide/images/template-selection.png"><img src="user-guide/images/template-selection.png" alt="template selection controls" width="240"></a> |
+| 1 | Open **Edit scene > Details** and choose a **Template**. | The template is selected without changing the saved scene. | <a href="user-guide/images/scene-editor.png"><img src="user-guide/images/scene-editor.png" alt="Details with Template and Apply template controls" width="240"></a> |
+| 2 | Choose **Apply template**. | Stage opens with the draft composition. Undo/Redo restores or reapplies the design. | <a href="user-guide/images/template-selection.png"><img src="user-guide/images/template-selection.png" alt="Selected template ready to apply" width="240"></a> |
+| 3 | Review Stage and choose **Save scene**, or cancel. | Saving keeps the composition across previews and exports. Cancel leaves the saved scene unchanged. | <a href="user-guide/images/scene-canvas-editor.png"><img src="user-guide/images/scene-canvas-editor.png" alt="scene stage editing controls" width="240"></a> |
+
+![Applied template draft on Stage; Undo restores the previous composition](user-guide/images/template-applied-stage.png)
 
 ## 4. Manage imported media and accessibility
 
-The current upload interface accepts images and audio, up to 100 MB per file. Images: JPG, PNG, GIF, WebP. Audio: MP3, M4A, AAC, WAV, OGG. Video import, a shared media library across projects, and explicit course-wide placement are not exposed by these controls.
+Media uploads support JPG/PNG/GIF/WebP images, MP3/M4A/AAC/WAV/OGG audio, and MP4/WebM video, up to 100 MB per file. Placement, course-wide media, shared-media copies, captions, and OCR are described in [media placement and OCR](media-placement-and-ocr.md). These authoring controls do not imply that every configured provider can generate those formats.
 
 ### Add external media
 
@@ -519,7 +538,7 @@ A proposal can contain multiple related changes. Accept change applies that disp
 
 ## 8. Generate and approve media
 
-Select the target project and scene before opening Media library. Create a media candidate starts collapsed; expand its heading to access the form. Without AI configuration or generation permission, the section is greyed and generation/regeneration is disabled. Existing candidates remain reviewable. Approval attaches a candidate to its target scene; choose **Edit scene > Canvas** afterward to place supported image assets. A generation-cost preview and full media-job monitor are not provided.
+Select the target project and scene before opening Media library. Create a media candidate starts collapsed; expand its heading to access the form. Without AI configuration or generation permission, the section is greyed and generation/regeneration is disabled. Existing candidates remain reviewable. Approval attaches a candidate to its target scene; choose **Edit scene > Stage** afterward to place supported image assets. A generation-cost preview and full media-job monitor are not provided.
 
 ### Request an image candidate
 
@@ -554,7 +573,7 @@ Provider discovery sends no course text and is not an audio-quality check. Expli
 
 ## 9. Play and comment on the storyboard
 
-Preview progress is stored in this browser, separately from a learner's LMS session. In-app discussion is available. Hosted authenticated review links are documented in the [authentication deployment guide](authentication-deployments.md); local guest review and timestamp-entry controls are not available.
+Preview shows the saved authored scene. Previous/Next and scene dots stay directly with the presentation; slide text and scene discussion follow below. Original comparison in the editor does not switch preview to the source image. Preview progress is stored in this browser, separately from a learner's LMS session. In-app discussion is available. Hosted authenticated review links are documented in the [authentication deployment guide](authentication-deployments.md); local guest review and timestamp-entry controls are not available.
 
 ### Play the storyboard
 
@@ -562,7 +581,9 @@ Preview progress is stored in this browser, separately from a learner's LMS sess
 | --- | --- | --- | --- |
 | 1 | Click **Preview course** in the top bar. | The playable storyboard opens. | <a href="user-guide/images/top-actions.png"><img src="user-guide/images/top-actions.png" alt="top actions controls" width="240"></a> |
 | 2 | Use **Next**, **Previous**, or a scene navigation dot. Play attached audio with its player controls. | You review scene order, content, and media; required progress updates. | <a href="user-guide/images/preview-navigation.png"><img src="user-guide/images/preview-navigation.png" alt="preview navigation controls" width="240"></a><br><a href="user-guide/images/preview-audio.png"><img src="user-guide/images/preview-audio.png" alt="preview audio controls" width="240"></a> |
-| 3 | Use **Read slide text** when shown for a rendered imported slide. Click **Exit preview** to return to authoring. | You can inspect extracted text and resume editing. | <a href="user-guide/images/slide-transcript.png"><img src="user-guide/images/slide-transcript.png" alt="slide transcript controls" width="240"></a><br><a href="user-guide/images/preview-header.png"><img src="user-guide/images/preview-header.png" alt="preview header controls" width="240"></a> |
+| 3 | Expand **Read slide text** below navigation when the scene has saved on-screen text. Click **Exit preview** to return to authoring. | You can inspect extracted text and resume editing. | <a href="user-guide/images/slide-transcript.png"><img src="user-guide/images/slide-transcript.png" alt="slide transcript controls" width="240"></a><br><a href="user-guide/images/preview-header.png"><img src="user-guide/images/preview-header.png" alt="preview header controls" width="240"></a> |
+
+![Authored presentation followed by navigation, slide text, and scene discussion](user-guide/images/preview-authored-flow.png)
 
 ### Test an assessment in preview
 
@@ -625,6 +646,8 @@ Passing validation is not certification for every LMS. Pending suggestions and u
 | 2 | Resolve blocking errors, including missing assets, and inspect warnings such as **Attribution Pending** for images. Reopen the report after changes. | The report shows blocking production errors separately from pending image credits; export can proceed with that warning. | <a href="user-guide/images/production-validation.png"><img src="user-guide/images/production-validation.png" alt="production validation controls" width="240"></a> |
 
 ## 11. Export course deliverables
+
+Word storyboard visuals are static snapshots of the authored composition, rendered through the same player as delivery packages. Motion is stopped for print, and interactive assessments are shown in their initial unanswered state. Instructional text, narration, notes, and other Word records remain editable. If document visuals cannot be prepared, ask the operator to check the document renderer; an obsolete source-slide image is not substituted. Original comparison images are excluded from delivery packages when the scene has an authored layout.
 
 Open Export for the intended saved project. Export uses saved content, not unsaved dialog edits or pending proposals. SCORM 2004 has recorded Blackboard verification for a specific artifact; consult the [compatibility checklist](scorm-compatibility-checklist.md) for the scope of testing.
 
@@ -821,7 +844,7 @@ Resolving or dismissing a finding records a human decision only. It does not fix
 Do not follow the implementation build plan as if every planned control already exists. The following have no complete workflow in the interface captured here:
 
 - Unauthenticated guest review. Authenticated hosted review links have a separate documented deployment workflow.
-- Video upload, caption/transcript authoring, and course-wide/shared media-library controls. Supported image placement is available through **Edit scene > Canvas**.
+- Arbitrary video, HTML, and document elements inside the Stage layer stack. Video upload, captions/transcripts, and scene/course-wide media placement have a separate [Media library workflow](media-placement-and-ocr.md).
 - Full reference-resource classification, authority, version-management, and per-scene mapping editors.
 - Word reimport or automatic synchronization of external edits.
 - A general history browser and arbitrary revision restore.
@@ -859,3 +882,5 @@ UI navigation, proposal acceptance, commenting/resolution, and sample assessment
 The 2026-10-15 Pythia workflow text was checked against the current frontend controls and integration handoffs; no new screenshots or live provider requests were made for this update. The separate [Sprint 10 qualification record](pythia-sprint-10-golden-path-handoff.md) covers an API-level PowerPoint-to-SCORM regression using deterministic local Pythia providers. It is not a screenshot walkthrough, external-model qualification, human SME approval, or live LMS test.
 
 Capture details and refresh instructions: [manifest](user-guide/capture-manifest.json) and [maintainer instructions](user-guide/support/README.md).
+
+The authored-scene documentation refresh uses a separate synthetic lesson and a locally rendered synthetic PowerPoint source. Its [capture manifest](user-guide/refresh-authored-scenes-2026-10-27.json) records the refreshed controls and hashes of the uncommitted implementation used for capture. Template application/Undo, direct background import, temporary source comparison, preview navigation, slide text, and discussion were exercised without provider traffic. This refresh does not change the dates or scope of earlier release, provider, or LMS evidence.

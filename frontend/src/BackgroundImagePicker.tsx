@@ -10,18 +10,19 @@ type Props = {
   label: string;
   allowInherit?: boolean;
   disabled?: boolean;
+  fallbackAsset?: string | null;
 };
 
-export function BackgroundImagePicker({ project, value, onChange, label, allowInherit = false, disabled = false }: Props) {
+export function BackgroundImagePicker({ project, value, onChange, label, allowInherit = false, disabled = false, fallbackAsset }: Props) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const id = useId();
   const images = project.storyboard.assets.filter(asset => asset.kind === "image");
-  const projectImage = images.find(asset => asset.id === project.storyboard.backgroundAsset);
+  const projectImage = images.find(asset => asset.id === (project.storyboard.backgroundAsset || fallbackAsset));
   const choices = [
-    ...(allowInherit ? [{ value: undefined, label: `Use project background (${projectImage?.filename || "None"})`, image: projectImage }] : []),
+    ...(allowInherit ? [{ value: undefined, label: `Use project default (${projectImage?.filename || "None"})`, image: projectImage }] : []),
     { value: null, label: "None", image: undefined },
     ...[...images.filter(asset => asset.role === "background"), ...images.filter(asset => asset.role !== "background")]
       .map(image => ({ value: image.id, label: image.filename, image })),

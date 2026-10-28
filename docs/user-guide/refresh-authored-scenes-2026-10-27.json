@@ -1,0 +1,88 @@
+{
+  "date": "2026-10-27",
+  "sourceBaseCommit": "83edaa114be52e8ccd186a8b81e7623e76c7fb3e",
+  "sourceIncludesUncommittedImplementation": true,
+  "sourceHashes": {
+    "frontend/src/SceneVisualEditor.tsx": "49c933e0dd808f0921786806d60b97c145ea4ce3c3e6734ebe3776083756a52e",
+    "frontend/src/CoursePreview.tsx": "954d11bebb7f53c49fe544ece3ac6b75b82f32f74c46b637736b04cde63bbc36",
+    "frontend/src/ProjectBackgroundPanel.tsx": "e2bf02e0b76228a1828190188a30f782480afe6143efe80b787ba0638cdfb438",
+    "backend/app/authoring.py": "5f69409bf0ff9972ba8624ab0c4fdd3a79bddd4c83e9d673f52d464b2c666a5f",
+    "backend/app/scene_print.py": "d282aefa00c591b97a85880383f8929fe2bc95eb2fc13aa983ec6306bd30533a"
+  },
+  "fixture": "workspace\\user-guide-authored-20261027",
+  "sourceReference": "Synthetic PowerPoint rendered by local LibreOffice; no user course or provider.",
+  "providerTraffic": "blocked; no credentials or provider operations",
+  "captures": [
+    {
+      "file": "images/project-background-current.png",
+      "sha256": "e51a0479104fd678b025d0a246a66d4c87c5b8fb369c403d21b3d5554761681d"
+    },
+    {
+      "file": "images/project-background-import.png",
+      "sha256": "5ec71608bc03b0f3750e5e9ab7b63ffb797176c0bbc7d953e9385e433586629b"
+    },
+    {
+      "file": "images/storyboard-background-location.png",
+      "sha256": "54f271f88bf190f276bfe549f36a60b4ba0638499d27e4ab155a057b4776f3b4"
+    },
+    {
+      "file": "images/scene-sequence.png",
+      "sha256": "54f271f88bf190f276bfe549f36a60b4ba0638499d27e4ab155a057b4776f3b4"
+    },
+    {
+      "file": "images/scene-editor.png",
+      "sha256": "514c2a6d02a1c37a010695fdd539fb7d661d77ed5e4fdf20136d558a110555ab"
+    },
+    {
+      "file": "images/template-selection.png",
+      "sha256": "323be36ebb267697276811df0ba46a61dea523aa85fb7a103a4a6d0e94138368"
+    },
+    {
+      "file": "images/template-applied-stage.png",
+      "sha256": "391ca2437326db7ed10d0076477169f422ae836931662f2b08e5a804659f8eee"
+    },
+    {
+      "file": "images/scene-canvas-editor.png",
+      "sha256": "035c5f56814c4291ee25c0be68f40da34d5727f401baa4ee584c1e59630200cd"
+    },
+    {
+      "file": "images/scene-original-comparison.png",
+      "sha256": "2f339c05b6cabc5673aacbe5088208551449b899b053e5881c10f34485cb1c6b"
+    },
+    {
+      "file": "images/scene-background-default.png",
+      "sha256": "154213bb14a46450c98ae6bd114da0dc0f8d6f6bf3f118acf1f4cf337687e4fc"
+    },
+    {
+      "file": "images/new-scene.png",
+      "sha256": "4a2f8f08809a7c926e59a23fa817a42f1aa21ce67f63c9942c4dd1a30eaa8dc5"
+    },
+    {
+      "file": "images/preview-header.png",
+      "sha256": "ba7b4c9099444a554214b5f51734f6e9b79314c9e9ac5dcf429ac4507122688e"
+    },
+    {
+      "file": "images/preview-navigation.png",
+      "sha256": "bb4adacf3597191208fffcc60a98e0d54278a7de2585d349de8c670c9822f518"
+    },
+    {
+      "file": "images/preview-authored-flow.png",
+      "sha256": "2543dd88e7ec2523d4c7eefd6fb7d005c6f4605a08402a63d2b0b6c755f2eb99"
+    },
+    {
+      "file": "images/slide-transcript.png",
+      "sha256": "d4663acb5595273e95549f0320c62dff3ff53850559637cc0a128000d1b40825"
+    },
+    {
+      "file": "images/scene-discussion.png",
+      "sha256": "006f89d17ab48df1e4beb22a0479ed7f396d14267bb5bf3d6eaeca1604ce5cba"
+    }
+  ],
+  "pdf": {
+    "file": "../user-guide.pdf",
+    "pages": 83,
+    "internalNavigationLinks": 33,
+    "sha256": "bb5b8cdc50c30848bee5c3e4411e2a13858ae3d679b50872dc8c4681688227a7",
+    "markdownSha256": "88badb5d82161f3518526ed3a722bec92827446c4abfb630af8af75ff0c5a151"
+  }
+}

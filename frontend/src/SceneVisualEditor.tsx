@@ -5,7 +5,7 @@ import { AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignHorizonta
 import type { Project, Scene } from "./App";
 import { EditorDialog } from "./EditorDialog";
 import { AssessmentDraftPreview } from "./AssessmentDraftPreview";
-import { assessmentRegion, ElementContent, initialLayout, newElement, resolvedSceneBackground, ScaledStage, SceneSurface } from "./SceneSurface";
+import { assessmentRegion, ElementContent, initialLayout, newElement, resolvedSceneBackground, ScaledStage, SceneSurface, visibleSceneElements } from "./SceneSurface";
 import { alignExitTiming, AnimationControls, defaultAnimations } from "./AnimationControls";
 import { fitLayoutText, textFitMessage } from "./text-fit";
 import { AssessmentStageContent } from "./AssessmentStageContent";
@@ -66,11 +66,11 @@ function syncSceneText(layout: SceneLayout, scene: Scene, title: string, screenT
   return next;
 }
 
-export function SceneVisualEditor({ project, scene, templates, onClose, onSave, onExtract, onGenerate, canGenerate, initialPanel = "canvas" }: { project: Project; scene: Scene; templates: { id: string; title: string }[]; onClose: () => void; onSave: (layout: SceneLayout, settings: SceneEditSettings) => Promise<void>; onExtract: () => Promise<SceneLayout>; onGenerate: (prompt: string, currentScene: Partial<Scene>) => Promise<GeneratedSceneDraft>; canGenerate: boolean; initialPanel?: "canvas" | "details" }) {
+export function SceneVisualEditor({ project, scene, templates, onClose, onSave, onExtract, onApplyTemplate, onGenerate, canGenerate, initialPanel = "canvas" }: { project: Project; scene: Scene; templates: { id: string; title: string }[]; onClose: () => void; onSave: (layout: SceneLayout, settings: SceneEditSettings) => Promise<void>; onExtract: () => Promise<SceneLayout>; onApplyTemplate: (templateId: string, title: string, extractedText: string[]) => Promise<SceneLayout>; onGenerate: (prompt: string, currentScene: Partial<Scene>) => Promise<GeneratedSceneDraft>; canGenerate: boolean; initialPanel?: "canvas" | "details" }) {
   const [history, setHistory] = useState<SceneLayout[]>(() => [initialLayout(scene)]);
   const [cursor, setCursor] = useState(0);
   const [selection, setSelection] = useState<string | null>(null);
-  const [sourceVisible, setSourceVisible] = useState(false);
+  const [sourceVisible, setSourceVisible] = useState(Boolean((scene.sourceSlide || scene.previewImage) && !scene.visualLayout));
   const [motionPreview, setMotionPreview] = useState(0);
   const [editingText, setEditingText] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -83,6 +83,8 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
   const [sceneType, setSceneType] = useState<Scene["sceneType"]>(scene.sceneType);
   const [layoutMode, setLayoutMode] = useState<Scene["layoutMode"]>(scene.layoutMode);
   const [templateId, setTemplateId] = useState(scene.templateId || "");
+  const [pendingTemplateId, setPendingTemplateId] = useState(scene.templateId || "");
+  const templateHistory = useRef([scene.templateId || ""]);
   const [screenText, setScreenText] = useState(scene.extractedText.join("\n"));
   const [actionDescription, setActionDescription] = useState(scene.actionDescription);
   const [narration, setNarration] = useState(scene.narration);
@@ -101,7 +103,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
   const selected = layout.elements.find(element => element.id === selection);
   const images = project.storyboard.assets.filter(asset => asset.kind === "image");
   const [imageId, setImageId] = useState("");
-  function commit(next: SceneLayout) {
+  function commit(next: SceneLayout, appliedTemplate = templateId, previousLayout?: SceneLayout) {
     setMotionPreview(0);
     if (next.assessmentRegion) {
       const region = next.assessmentRegion;
@@ -110,7 +112,10 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
       next = { ...next, assessmentRegion: { width, height, x: Math.max(0, Math.min(region.x, next.width - width)), y: Math.max(0, Math.min(region.y, next.height - height)) } };
     }
     setCanvasEdited(true);
-    const nextHistory = [...history.slice(0, cursor + 1), next].slice(-100);
+    const previousHistory = history.slice(0, cursor + 1);
+    if (previousLayout) previousHistory[cursor] = previousLayout;
+    const nextHistory = [...previousHistory, next].slice(-100);
+    templateHistory.current = [...templateHistory.current.slice(0, cursor + 1), appliedTemplate].slice(-100);
     setHistory(nextHistory); setCursor(nextHistory.length - 1);
   }
   function update(changes: Partial<SceneElement>) {
@@ -142,16 +147,16 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
   }
   async function extract() {
     setBusy(true); setError("");
-    try { const next = await onExtract(); setHistory([next]); setCursor(0); setSelection(null); }
+    try { const next = await onExtract(); setHistory([next]); setCursor(0); setSelection(null); setSourceVisible(false); }
     catch (issue) { setError(issue instanceof Error ? issue.message : "Source extraction failed."); }
     finally { setBusy(false); }
   }
   async function save() {
     setBusy(true); setError("");
     try {
-      const savedMode = layoutMode === "fidelity" && canvasEdited ? "hybrid" : layoutMode;
+      const savedMode = layoutMode === "template" ? "template" : scene.sourceSlide ? "hybrid" : "native";
       const updatedLayout = sceneTextDirty ? syncSceneText(layout, scene, title.trim(), screenText, generatedLayoutApplied) : structuredClone(layout);
-      updatedLayout.enabled = savedMode !== "fidelity";
+      updatedLayout.enabled = true;
       if (updatedLayout.enabled) {
         const checked = await fitLayoutText(updatedLayout);
         if (checked.issues.length) throw new Error(textFitMessage(checked.issues));
@@ -192,6 +197,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
     const generatedLayout = structuredClone(draft.visualLayout);
     generatedLayout.enabled = true;
     setHistory([generatedLayout]);
+    templateHistory.current = [""];
     setCursor(0);
     setSelection(null);
     setCanvasEdited(true);
@@ -208,6 +214,8 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
     setSceneTextDirty(true);
     setLayoutMode("native");
     setTemplateId("");
+    setPendingTemplateId("");
+    setSourceVisible(false);
     setPanel("canvas");
   }
   return <EditorDialog className="visual-editor" labelledBy="visual-editor-title" busy={busy} onClose={onClose} onboardingTarget="scene.edit" onboardingJourney={panel === "canvas" ? "canvas" : "edit-scene"}>
@@ -239,12 +247,13 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
         }) });
       }}><Sparkles size={18} /></button>
       <button type="button" className="icon-button" title="Add text" aria-label="Add text" disabled={busy || sourceVisible} onClick={() => { const element = newElement("text"); commit({ ...layout, elements: [...layout.elements, element] }); setSelection(element.id); }}><Plus size={18} /></button>
-      <button type="button" className="icon-button" title="Undo" aria-label="Undo" disabled={busy || cursor === 0} onClick={() => setCursor(cursor - 1)}><Undo2 size={18} /></button>
-      <button type="button" className="icon-button" title="Redo" aria-label="Redo" disabled={busy || cursor === history.length - 1} onClick={() => setCursor(cursor + 1)}><Redo2 size={18} /></button>
+      <button type="button" className="icon-button" title="Undo" aria-label="Undo" disabled={busy || cursor === 0} onClick={() => { setCursor(cursor - 1); const id = templateHistory.current[cursor - 1] || ""; setTemplateId(id); setPendingTemplateId(id); setLayoutMode(id ? "template" : scene.sourceSlide ? "hybrid" : "native"); }}><Undo2 size={18} /></button>
+      <button type="button" className="icon-button" title="Redo" aria-label="Redo" disabled={busy || cursor === history.length - 1} onClick={() => { setCursor(cursor + 1); const id = templateHistory.current[cursor + 1] || ""; setTemplateId(id); setPendingTemplateId(id); setLayoutMode(id ? "template" : scene.sourceSlide ? "hybrid" : "native"); }}><Redo2 size={18} /></button>
       <span className="visual-editor-dimensions">{Math.round(layout.width)} x {Math.round(layout.height)}</span>
-      {scene.previewImage && <button type="button" className="button button-outline" aria-pressed={sourceVisible} onClick={() => setSourceVisible(!sourceVisible)}>Source slide</button>}
-      {!scene.visualLayout && scene.sourceSlide && project.hasSourceDeck && <button type="button" className="button button-outline" disabled={busy} onClick={() => void extract()}>Extract source layout</button>}
+      {scene.previewImage && scene.visualLayout && <button type="button" className="button button-outline" disabled={busy} aria-pressed={sourceVisible} onClick={() => { setMotionPreview(0); setSourceVisible(!sourceVisible); }}>{sourceVisible ? "Return to scene" : "Compare with original"}</button>}
+      {!scene.visualLayout && scene.sourceSlide && project.hasSourceDeck && <button type="button" className="button button-outline" disabled={busy} onClick={() => void extract()}>Prepare editable scene</button>}
     </div>}
+    {panel === "canvas" && sourceVisible && <p className="field-hint" role="status">Original slide reference. Comparing does not change your scene, preview, or exports.</p>}
     {generatedLayoutApplied && panel === "canvas" && <p className="scene-draft-unsaved" role="status">Generated scene layout · not saved</p>}
     {error && <p className="visual-editor-error" role="alert">{error}</p>}
     {panel === "canvas" && layout.warnings.length > 0 && <details className="visual-editor-warnings"><summary>{layout.warnings.length} import limitations</summary><ul>{layout.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></details>}
@@ -258,8 +267,16 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
       <div className="visual-scene-details-grid">
         <label>Scene title<input value={title} maxLength={120} onChange={event => { setTitle(event.target.value); setSceneTextDirty(true); }} /></label>
         <label>Scene type<select value={sceneType} onChange={event => setSceneType(event.target.value as Scene["sceneType"])}>{[["content", "Content"], ["title", "Title"], ["question", "Question"], ["media", "Media"], ["interaction", "Interaction"], ["summary", "Summary"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <label>Rendering mode<select aria-label="Rendering mode" value={layoutMode} onChange={event => { const value = event.target.value as Scene["layoutMode"]; setLayoutMode(value); if (value !== "template") setTemplateId(""); }}>{[["fidelity", "Fidelity"], ["hybrid", "Hybrid"], ["native", "Native"], ["template", "Template"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        {layoutMode === "template" && <label>Template<select value={templateId} onChange={event => setTemplateId(event.target.value)}><option value="">Choose a template</option>{templates.map(template => <option value={template.id} key={template.id}>{template.title}</option>)}</select>{templates.length === 0 && <span className="field-hint">Upload a PPTX template in Templates before assigning one.</span>}</label>}
+        <div className="visual-scene-details-wide"><label>Template<select value={pendingTemplateId} onChange={event => setPendingTemplateId(event.target.value)}><option value="">Choose a template</option>{templates.map(template => <option value={template.id} key={template.id}>{template.title}</option>)}</select></label><button type="button" className="button button-outline" disabled={busy || !pendingTemplateId} onClick={async () => {
+          setBusy(true); setError("");
+          try {
+            const next = await onApplyTemplate(pendingTemplateId, title.trim(), screenText.split(/\r?\n/).map(text => text.trim()).filter(Boolean));
+            const previous = sceneTextDirty ? syncSceneText(layout, scene, title.trim(), screenText, generatedLayoutApplied) : layout;
+            commit(next, pendingTemplateId, previous); setTemplateId(pendingTemplateId); setLayoutMode("template");
+            setSceneTextDirty(false); setSourceVisible(false); setPanel("canvas");
+          } catch (issue) { setError(issue instanceof Error ? issue.message : "Template could not be applied."); }
+          finally { setBusy(false); }
+        }}>Apply template</button><span className="field-hint">{templates.length ? "Review the result on Stage. Undo restores the previous composition; Save scene keeps the change." : "Upload a PPTX template in Templates to use it here."}</span></div>
         <label className="visual-scene-details-wide">On-screen text<textarea rows={5} maxLength={50000} value={screenText} onChange={event => { setScreenText(event.target.value); setSceneTextDirty(true); }} /></label>
         <label className="visual-scene-details-wide">Action description<textarea rows={3} maxLength={5000} value={actionDescription} onChange={event => setActionDescription(event.target.value)} placeholder="Describe movement, interaction, or timed actions shown in this scene" /></label>
         <label className="visual-scene-details-wide">Narration<textarea rows={3} maxLength={10000} value={narration} onChange={event => setNarration(event.target.value)} /></label>
@@ -269,7 +286,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
       </div>
     </div> : <div className="visual-editor-workspace">
       <div className="visual-editor-canvas" onDragOver={event => { if (event.dataTransfer.types.includes("application/x-chimera-image")) event.preventDefault(); }} onDrop={event => { event.preventDefault(); if (sourceVisible || busy) return; const frame = event.currentTarget.querySelector(".visual-stage-frame")?.getBoundingClientRect(); if (frame) addImage(event.dataTransfer.getData("application/x-chimera-image"), (event.clientX - frame.left) * layout.width / frame.width, (event.clientY - frame.top) * layout.height / frame.height); }}>
-        {motionPreview > 0 ? <SceneSurface key={motionPreview} project={project} scene={{ ...scene, title, sceneType, assessmentItem, visualLayout: { ...(sceneTextDirty ? syncSceneText(layout, scene, title.trim(), screenText, generatedLayoutApplied) : layout), enabled: true } }} animate /> : sourceVisible ? <img className="visual-source" src={`/api/projects/${project.id}/${scene.previewImage}`} alt={`Source slide ${scene.sourceSlide}`} /> : <ScaledStage layout={stageLayout} projectId={project.id}>{scale => <>{stageLayout.elements.map((element, index) => <Rnd key={element.id} scale={scale} position={{ x: element.x, y: element.y }} size={{ width: element.width, height: element.height }} lockAspectRatio={element.kind === "text"} resizeHandleClasses={{ bottomRight: "visual-resize-handle-se" }} disableDragging={busy || element.locked || editingText === element.id} enableResizing={!busy && !element.locked && editingText !== element.id} minWidth={20} minHeight={20} style={{ zIndex: index }} onDragStart={() => setSelection(element.id)} onDragStop={(_, data) => commit({ ...layout, elements: layout.elements.map(item => item.id === element.id ? { ...item, x: data.x, y: data.y } : item) })} onResizeStart={() => setSelection(element.id)} onResizeStop={(_, __, reference, ___, position) => commit({ ...layout, elements: layout.elements.map(item => item.id === element.id ? { ...item, ...position, width: parseFloat(reference.style.width), height: parseFloat(reference.style.height) } : item) })}>
+        {motionPreview > 0 ? <SceneSurface key={motionPreview} project={project} scene={{ ...scene, title, sceneType, assessmentItem, visualLayout: { ...(sceneTextDirty ? syncSceneText(layout, scene, title.trim(), screenText, generatedLayoutApplied) : layout), enabled: true } }} animate /> : sourceVisible ? scene.previewImage ? <img className="visual-source" src={`/api/projects/${project.id}/${scene.previewImage}`} alt={`Source slide ${scene.sourceSlide}`} /> : <p role="status">The original slide image is unavailable. Restore the retained source to prepare this scene.</p> : <ScaledStage layout={stageLayout} projectId={project.id}>{scale => <>{visibleSceneElements(stageLayout, title, Boolean(sceneType === "question" && assessmentItem)).map((element, index) => <Rnd key={element.id} scale={scale} position={{ x: element.x, y: element.y }} size={{ width: element.width, height: element.height }} lockAspectRatio={element.kind === "text"} resizeHandleClasses={{ bottomRight: "visual-resize-handle-se" }} disableDragging={busy || element.locked || editingText === element.id} enableResizing={!busy && !element.locked && editingText !== element.id} minWidth={20} minHeight={20} style={{ zIndex: index }} onDragStart={() => setSelection(element.id)} onDragStop={(_, data) => commit({ ...layout, elements: layout.elements.map(item => item.id === element.id ? { ...item, x: data.x, y: data.y } : item) })} onResizeStart={() => setSelection(element.id)} onResizeStop={(_, __, reference, ___, position) => commit({ ...layout, elements: layout.elements.map(item => item.id === element.id ? { ...item, ...position, width: parseFloat(reference.style.width), height: parseFloat(reference.style.height) } : item) })}>
           <div role={editingText === element.id ? undefined : "button"} tabIndex={editingText === element.id ? undefined : 0} aria-label={`${element.kind === "text" ? element.text.slice(0, 50) || "Empty text" : "Image"} element`} aria-pressed={editingText === element.id ? undefined : selection === element.id} className={`visual-element visual-editable ${selection === element.id ? "is-selected" : ""}`} style={{ transform: `rotate(${element.rotation}deg)` }} onClick={() => setSelection(element.id)} onDoubleClick={() => { setSelection(element.id); if (element.kind === "text" && !element.locked && !busy) setEditingText(element.id); }} onKeyDown={event => { if (event.target instanceof HTMLTextAreaElement) return; setSelection(element.id); if (element.locked || busy) return; if (event.key === "Enter" && element.kind === "text") { event.preventDefault(); setEditingText(element.id); return; } const step = event.shiftKey ? 10 : 1; const moves: Record<string, {x:number;y:number}> = {ArrowLeft:{x:-step,y:0},ArrowRight:{x:step,y:0},ArrowUp:{x:0,y:-step},ArrowDown:{x:0,y:step}}; if (moves[event.key]) { event.preventDefault(); commit({ ...layout, elements: layout.elements.map(item => item.id === element.id ? { ...item, x:item.x+moves[event.key].x, y:item.y+moves[event.key].y } : item) }); } }}>{editingText === element.id ? <textarea autoFocus aria-label="Edit canvas text" className="visual-inline-text" value={element.text} maxLength={50000} style={{fontSize:element.fontSize,fontFamily:element.fontFamily,color:"#202020",backgroundColor:"#fff"}} onChange={event => commit({...layout,elements:layout.elements.map(item => item.id === element.id ? {...item,text:event.target.value} : item)})} onBlur={() => setEditingText(null)} onKeyDown={event => { if(event.key === "Escape") { event.stopPropagation(); setEditingText(null); } }} /> : <ElementContent element={element} project={project} scene={scene} />}</div>
         </Rnd>)}{sceneType === "question" && assessmentItem && <Rnd scale={scale} bounds="parent" position={{ x: questionRegion.x, y: questionRegion.y }} size={{ width: questionRegion.width, height: questionRegion.height }} minWidth={120} minHeight={80} disableDragging={busy} enableResizing={!busy} style={{ zIndex: 2001 }} onDragStop={(_, data) => commit({ ...layout, assessmentRegion: { ...questionRegion, x: data.x, y: data.y } })} onResizeStop={(_, __, reference, ___, position) => commit({ ...layout, assessmentRegion: { ...position, width: parseFloat(reference.style.width), height: parseFloat(reference.style.height) } })}>
           <div className="assessment-stage-region" aria-label="Assessment component" style={{ inset: 0, width: "100%", height: "100%" }}><AssessmentStageContent item={assessmentItem} /></div>
@@ -289,7 +306,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
         </fieldset></InspectorSection>
         <InspectorSection title="Background"><fieldset disabled={busy || sourceVisible}>
           <label>Background color<input type="color" value={layout.backgroundColor} onChange={event => commit({ ...layout, backgroundColor:event.target.value })} /></label>
-          <BackgroundImagePicker project={project} label="Background image" allowInherit value={backgroundMode(layout) === "inherit" ? undefined : backgroundMode(layout) === "none" ? null : layout.backgroundAsset} onChange={setBackground} disabled={busy || sourceVisible} />
+          <BackgroundImagePicker project={project} label="Background image" allowInherit fallbackAsset={layout.sourceBackgroundAsset} value={backgroundMode(layout) === "inherit" ? undefined : backgroundMode(layout) === "none" ? null : layout.backgroundAsset} onChange={setBackground} disabled={busy || sourceVisible} />
           <p className="field-hint">Use the project default, choose a scene image, or select None. Set the project default in Storyboard &gt; Project background.</p>
         </fieldset></InspectorSection>
         <InspectorSection title="Layers">
@@ -306,6 +323,6 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
           </fieldset></InspectorSection>}
       </aside>
     </div>}
-    <footer className="modal-actions"><button type="button" className="button button-outline" disabled={busy} onClick={onClose}>Cancel</button><button type="button" className="button button-accent" disabled={busy || !title.trim() || layoutMode === "template" && !templateId} onClick={() => void save()}><Check size={16} />{busy ? "Saving" : "Save scene"}</button></footer>
+    <footer className="modal-actions"><button type="button" className="button button-outline" disabled={busy} onClick={onClose}>Cancel</button><button type="button" className="button button-accent" disabled={busy || !title.trim() || Boolean((scene.sourceSlide || scene.previewImage) && !scene.visualLayout && !canvasEdited) || layoutMode === "template" && !templateId} onClick={() => void save()}><Check size={16} />{busy ? "Saving" : "Save scene"}</button></footer>
   </EditorDialog>;
 }

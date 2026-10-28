@@ -26,6 +26,10 @@ The other root guides own their respective implementation status:
 These local links reflect the sibling checkout layout. Elsewhere open each named
 repository's root `DELIVERY_GUIDE.md`; do not assume unpushed guides are published.
 
+## Current authoring workflow
+
+The [authored-scene workflow](docs/authored-scene-workflow.md) and [illustrated user guide](docs/user-guide.md) describe the current local scene editor, original comparison, project defaults, templates, previews, and output visuals. Older Rendering mode or inactive-layout descriptions in dated handoffs are historical. This authoring/documentation update does not change the shared G3 status or grant release, deployment, provider, or LMS acceptance.
+
 ## Product Gate And Required Formats
 
 > Did Pythia provide an answer I can explain to someone else, including why it

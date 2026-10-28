@@ -310,8 +310,8 @@ class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn("notes", snapshot["scenes"][0])
                 self.assertFalse(snapshot["scenes"][1]["required"])
                 self.assertEqual(snapshot["scenes"][1]["assessmentItem"]["identifier"], "ITEM_INSPECTION")
-                self.assertEqual(snapshot["scenes"][0]["previewImage"], "renders/slide-1.png")
-                self.assertIn("renders/slide-1.png", package.namelist())
+                self.assertIsNone(snapshot["scenes"][0]["previewImage"])
+                self.assertNotIn("renders/slide-1.png", package.namelist())
                 self.assertTrue(any(name.endswith(".png") for name in package.namelist()))
                 self.assertTrue(any(name.endswith(".mp3") for name in package.namelist()))
                 player = package.read("player.js").decode("utf-8")
@@ -342,10 +342,10 @@ const document = {
     if (!nodes.has(selector)) nodes.set(selector, { textContent: "", innerHTML: "", disabled: false, addEventListener: () => {}, appendChild: () => {} });
     return nodes.get(selector);
   },
-  createElement: () => ({ addEventListener: () => {}, style: {}, remove: () => {} })
+  createElement: () => ({ addEventListener: () => {}, appendChild: () => {}, setAttribute: () => {}, style: {}, remove: () => {} })
 };
 const fetch = async () => ({ json: async () => JSON.parse(process.env.CHIMERA_STORYBOARD) });
-vm.runInNewContext(process.env.CHIMERA_PLAYER, { window, document, fetch });
+vm.runInNewContext(process.env.CHIMERA_PLAYER, { window, document, fetch, ResizeObserver: class { observe() {} disconnect() {} } });
 setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
 
         responses = [main.export_scorm_2004(project.id), main.export_scorm_12(project.id)]
@@ -1244,8 +1244,9 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
         self.assertEqual(sum(column.width for column in media_table.columns), available_width)
         image_row = next(row for row in media_table.rows[1:] if "inspection.png" in row.cells[2].text)
         self.assertTrue(image_row.cells[1]._tc.xpath(".//w:drawing"))
-        self.assertLessEqual(document.inline_shapes[0].width, Inches(0.55))
-        self.assertLessEqual(document.inline_shapes[0].height, Inches(0.42))
+        extent = image_row.cells[1]._tc.xpath(".//wp:extent")[0]
+        self.assertLessEqual(int(extent.get("cx")), Inches(0.55))
+        self.assertLessEqual(int(extent.get("cy")), Inches(0.42))
         with ZipFile(io.BytesIO(response.body)) as package:
             self.assertTrue(any(name.startswith("word/media/") for name in package.namelist()))
 
@@ -1278,9 +1279,10 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
         self.assertEqual(visual_cell._tc.xpath("./w:tcPr/w:shd/@w:fill"), ["FFFFFF"])
         self.assertEqual(visual_cell._tc.xpath("./w:tcPr/w:tcBorders/w:top/@w:color"), ["CCD4DD"])
         sme_drawings = sme_document._element.body.xpath(".//w:drawing")
-        self.assertEqual(len(sme_drawings), 1)
-        self.assertLessEqual(sme_document.inline_shapes[0].width, Inches(0.55))
-        self.assertLessEqual(sme_document.inline_shapes[0].height, Inches(0.42))
+        self.assertEqual(len(sme_drawings), 2)
+        self.assertEqual(len(visual_cell._tc.xpath(".//w:drawing")), 1)
+        self.assertLessEqual(sme_document.inline_shapes[-1].width, Inches(0.55))
+        self.assertLessEqual(sme_document.inline_shapes[-1].height, Inches(0.42))
 
         background_path = Path(self.temp_dir.name) / "master-background.png"
         Image.new("RGB", (48, 30), color=(255, 255, 255)).save(background_path)

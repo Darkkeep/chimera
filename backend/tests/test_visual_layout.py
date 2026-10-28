@@ -208,8 +208,9 @@ class VisualLayoutTests(unittest.TestCase):
             source = Path(folder) / "deck.pptx"
             deck.save(source)
             scenes, assets = extract_presentation(source, Path(folder))
-        self.assertIsNotNone(scenes[0].backgroundAsset)
-        self.assertEqual(scenes[0].backgroundAsset, assets[0].id)
+        self.assertIsNone(scenes[0].backgroundAsset)
+        self.assertEqual(scenes[0].visualLayout.sourceBackgroundAsset, assets[0].id)
+        self.assertEqual(scenes[0].visualLayout.backgroundMode, "inherit")
         self.assertIsNone(scenes[1].backgroundAsset)
         self.assertEqual(scenes[1].visualLayout.backgroundColor, "#010203")
 
@@ -243,7 +244,7 @@ class VisualLayoutTests(unittest.TestCase):
         text = next(element for element in layout.elements if element.kind == "text")
         self.assertAlmostEqual(text.x, 128)
         self.assertEqual(text.text, "Editable text")
-        self.assertFalse(layout.enabled)
+        self.assertTrue(layout.enabled)
 
     def test_identical_image_assets_are_shared_across_extracted_slides(self):
         deck = Presentation()
@@ -285,7 +286,7 @@ class VisualLayoutTests(unittest.TestCase):
             self.assertEqual(scene.notes, "Keep notes")
             self.assertEqual(scene.extractedText, ["Edited body"])
             self.assertIn("Edited body", scene.visualLayout.elements[0].text)
-            self.assertFalse(scene.visualLayout.enabled)
+            self.assertTrue(scene.visualLayout.enabled)
             again = main.extract_scene_layout(project.id, "retained", str(updated.storyboard.revision))
             self.assertEqual(again.storyboard.revision, updated.storyboard.revision)
             invalid = SceneLayout(elements=[SceneElement(id="bad", kind="image", assetId="missing", x=0, y=0, width=20, height=20)])

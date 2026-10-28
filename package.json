@@ -28,8 +28,11 @@
   "homepage": "https://github.com/Darkkeep/chimera#readme",
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
+    "@guided-workflows/onboarding": "file:vendor/onboarding/guided-workflows-onboarding-0.1.1.tgz",
     "@playwright/test": "1.59.1",
-    "@types/node": "^26.6.4",
-    "@guided-workflows/onboarding": "file:vendor/onboarding/guided-workflows-onboarding-0.1.1.tgz"
+    "@types/node": "^26.6.4"
+  },
+  "dependencies": {
+    "playwright": "1.59.1"
   }
 }

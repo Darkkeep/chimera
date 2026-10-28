@@ -120,6 +120,8 @@ ROUTE_ACTIONS = {
     "import_storyboard": "project.import", "post_project_asset": "media.manage",
     "get_project_asset": "project.view", "get_slide_render": "project.view", "post_scene": "scene.manage",
     "patch_scene": "scene.manage", "delete_project_scene": "scene.manage", "extract_scene_layout": "scene.manage",
+    "prepare_project_authoring": "scene.manage",
+    "preview_scene_template": "scene.manage",
     "put_scene_order": "scene.manage", "upload_source": "project.import",
 }
 
@@ -242,6 +244,8 @@ def _hosted_request_action(request: Request) -> str:
     if "/completion-settings" in path or "/export-settings" in path or path.endswith(("/production-stage", "/background", "/relationship")):
         return "project.settings.update"
     if "/scenes" in path:
+        return "scene.manage"
+    if path.endswith("/authoring/prepare"):
         return "scene.manage"
     if path.endswith("/source"):
         return "project.import"
@@ -1434,6 +1438,22 @@ def patch_project_background(project_id: str, settings: ProjectBackgroundUpdate,
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
+@app.post("/api/projects/{project_id}/authoring/prepare", response_model=ProjectDetail)
+def prepare_project_authoring(project_id: str, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
+    from .storage import prepare_authored_project
+    expected = _expected_revision(if_match)
+    if expected is None:
+        raise HTTPException(status_code=428, detail="An If-Match storyboard revision is required")
+    try:
+        return prepare_authored_project(project_id, expected)
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
 @app.get("/api/projects/{project_id}/assessments", response_model=list[AssessmentGroup])
 def get_assessments(project_id: str) -> list[AssessmentGroup]:
     try:
@@ -2233,6 +2253,8 @@ def export_storyboard_docx(project_id: str, include_answer_key: bool = False) ->
             content = build_storyboard_docx(project, include_answer_key)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
     filename = f"{slugify(project.title)}-storyboard.docx"
     return Response(
         content=content,
@@ -2252,7 +2274,7 @@ def _export_template_storyboard(project_id: str, include_answer_key: bool, full:
             content = builder(project, include_answer_key)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
-    except TemplateArtworkError as error:
+    except RuntimeError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     label = "full-storyboard" if full else "sme-master"
     filename = f"{slugify(project.title)}-{label}.docx"
@@ -2435,7 +2457,7 @@ def _native_scene_layout(scene: Scene) -> SceneLayout:
     return SceneLayout(enabled=True, width=1280, height=height, backgroundColor="#ffffff", elements=elements)
 
 
-def _apply_template_scene_layout(project_id: str, scene_id: str, data: SceneUpdate, expected_revision: int | None) -> ProjectDetail:
+def _apply_template_scene_layout(project_id: str, scene_id: str, data: SceneUpdate, expected_revision: int | None, draft: bool = False):
     current = read_project(project_id)
     _check_expected_revision(expected_revision, current.storyboard.revision)
     original_scene = next((item for item in current.storyboard.scenes if item.id == scene_id), None)
@@ -2455,32 +2477,16 @@ def _apply_template_scene_layout(project_id: str, scene_id: str, data: SceneUpda
         if template_scene is None or template_scene.visualLayout is None:
             raise ValueError("The selected template has no usable first slide.")
         layout = template_scene.visualLayout.model_copy(deep=True)
-        template_text = [element for element in layout.elements if element.kind == "text" and element.source == "slide"]
-        scene_text = [candidate.title, *candidate.extractedText]
-        for index, element in enumerate(template_text):
-            if index < len(scene_text):
-                element.text = scene_text[index]
-            else:
-                layout.elements.remove(element)
-        for index, text in enumerate(scene_text[len(template_text):], start=len(template_text)):
-            layout.elements.append(SceneElement(
-                id=f"template-text-{index}",
-                kind="text",
-                source="manual",
-                text=text,
-                x=64,
-                y=64 + index * 96,
-                width=layout.width - 128,
-                height=80,
-                fontSize=38 if index == 0 else 26,
-                fontFamily="Aptos",
-                color="#202020",
-            ))
+        from .authoring import apply_template_text, preserve_background_override
+        apply_template_text(layout, candidate)
+        preserve_background_override(layout, original_scene)
         layout.enabled = True
         candidate = candidate.model_copy(update={"visualLayout": layout, "backgroundAsset": layout.backgroundAsset})
         needed_asset_ids = {element.assetId for element in layout.elements if element.kind == "image" and element.assetId}
         if layout.backgroundAsset:
             needed_asset_ids.add(layout.backgroundAsset)
+        if layout.sourceBackgroundAsset:
+            needed_asset_ids.add(layout.sourceBackgroundAsset)
         imported_assets = [asset for asset in extracted_assets if asset.id in needed_asset_ids]
         combined_assets = {asset.id: asset for asset in current.storyboard.assets}
         combined_assets.update({asset.id: asset for asset in imported_assets})
@@ -2492,9 +2498,29 @@ def _apply_template_scene_layout(project_id: str, scene_id: str, data: SceneUpda
             _check_expected_revision(expected_revision, latest.storyboard.revision)
             if imported_assets:
                 persist_imported_assets(project_id, staging, imported_assets)
+            if draft:
+                # Retain reusable media, but leave the scene and its composition untouched.
+                if any(asset.id not in {item.id for item in current.storyboard.assets} for asset in imported_assets):
+                    write_storyboard(project_root, current.storyboard.model_copy(update={"assets": list(combined_assets.values())}), expected_revision or latest.storyboard.revision)
+                return {"project": read_project(project_id), "layout": layout}
             write_storyboard(project_root, storyboard, expected_revision or latest.storyboard.revision)
             write_project_metadata(project_root, {"id": project_id, "title": latest.title, "updatedAt": now_iso()})
         return read_project(project_id)
+
+
+@app.post("/api/projects/{project_id}/scenes/{scene_id}/template-draft")
+def preview_scene_template(project_id: str, scene_id: str, data: SceneUpdate, if_match: Annotated[str | None, Header()] = None):
+    expected = _expected_revision(if_match)
+    if expected is None:
+        raise HTTPException(status_code=428, detail="An If-Match storyboard revision is required")
+    try:
+        return _apply_template_scene_layout(project_id, scene_id, data, expected, draft=True)
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except (FileNotFoundError, KeyError) as error:
+        raise HTTPException(status_code=404, detail="Project, scene, or template not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.patch("/api/projects/{project_id}/scenes/{scene_id}", response_model=ProjectDetail)
@@ -2509,7 +2535,7 @@ def patch_scene(project_id: str, scene_id: str, data: SceneUpdate, if_match: Ann
         requested_template = data.templateId if "templateId" in data.model_fields_set else scene.templateId
         mode_changed = requested_mode != scene.layoutMode
         template_changed = requested_template != scene.templateId
-        if requested_mode == "template" and (mode_changed or template_changed or scene.visualLayout is None):
+        if requested_mode == "template" and data.visualLayout is None and (mode_changed or template_changed or scene.visualLayout is None):
             return _apply_template_scene_layout(project_id, scene_id, data, expected)
         if data.visualLayout is None and ((mode_changed and requested_mode == "native") or (requested_mode == "native" and scene.visualLayout is None)):
             native_scene = scene.model_copy(update={
@@ -2589,21 +2615,16 @@ def extract_scene_layout(project_id: str, scene_id: str, if_match: Annotated[str
             if source_scene is None or source_scene.visualLayout is None:
                 raise HTTPException(status_code=422, detail="Source slide is not available")
             layout = source_scene.visualLayout.model_copy(deep=True)
-            slide_text = [element for element in layout.elements if element.kind == "text" and element.source == "slide"]
-            current_text = [scene.title, *scene.extractedText]
-            if len(slide_text) == len(current_text):
-                for element, text in zip(slide_text, current_text):
-                    element.text = text
-            elif current_text != [source_scene.title, *source_scene.extractedText]:
-                layout.elements = [element for element in layout.elements if element.kind != "text" or element.source != "slide"]
-                from .models import SceneElement
-                layout.elements.append(SceneElement(id="preserved-text", kind="text", x=40, y=40, width=layout.width - 80, height=max(40, layout.height - 80), text="\n".join(current_text)))
-                layout.warnings.append("Existing text edits were preserved in a combined text box.")
+            from .authoring import preserve_scene_text, preserve_background_override
+            preserve_scene_text(layout, scene, source_scene)
+            preserve_background_override(layout, scene)
             updated_scene = scene.model_copy(update={"visualLayout": layout, "backgroundAsset": layout.backgroundAsset, "imageAssets": list(dict.fromkeys([*scene.imageAssets, *source_scene.imageAssets]))})
             needed = {element.assetId for element in layout.elements if element.kind == "image"}
             needed.update(source_scene.imageAssets)
             if layout.backgroundAsset:
                 needed.add(layout.backgroundAsset)
+            if layout.sourceBackgroundAsset:
+                needed.add(layout.sourceBackgroundAsset)
             imported_assets = [asset for asset in assets if asset.id in needed]
             merged_assets = {asset.id: asset for asset in imported_assets}
             merged_assets.update({asset.id: asset for asset in current.storyboard.assets})

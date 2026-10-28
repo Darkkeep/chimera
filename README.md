@@ -1,5 +1,8 @@
 # Chimera
 
+Start with the [living delivery guide](DELIVERY_GUIDE.md) for current priorities,
+verified progress, cross-repository responsibilities, and the developer update procedure.
+
 Chimera is a local authoring tool for turning PowerPoint decks into editable storyboards and portable SCORM packages.
 
 **Distinct parts. Deliberate design. Powerful learning.** The integrated Chimera mark brings a wing, body, and tail into one identity. See the [brand guide](docs/brand-identity.md) for assets and usage.
@@ -29,7 +32,9 @@ See [Author assessments](docs/user-guide.md#5-author-assessments) for the full i
 
 In the scene editor's right-hand properties panel, each section starts collapsed. Select a section heading or focus it and press Enter or Space to expand it; its chevron turns down when open. Stage, Background, and Layers are always available, while Question, Animation, and Layout appear when applicable. Sections expand independently and reset when the editor is reopened.
 
-Set a course-wide default under **Storyboard > Project background**, above the scene list. In **Edit scene > Stage > Background**, the thumbnail picker offers **Use project background**, a scene-specific image, or explicit **None**. Changing the project default updates inheriting scenes without replacing local overrides. Both pickers use images already in the project's Media library, including imported PowerPoint master backgrounds. Backgrounds fill the editable stage and are decorative; check text contrast and keep instructional details in accessible scene content. Saved choices are honored in Preview, SCORM 1.2/2004, and standalone exports, and retained in JSON and full backups. Original flattened source-slide previews remain unchanged; edit and save the Stage to use backgrounds on imported Fidelity scenes.
+Chimera authors one scene composition. **Stage**, storyboard, course preview, and delivery outputs use that composition; there is no Rendering mode selector. **Compare with original** is a temporary PowerPoint reference, not an output preference. In Details, **Apply template** previews a design on Stage with Undo/Redo; **Save scene** keeps it. Older projects prepare missing compositions once from retained sources, preserving scene content, original files, and storyboard history. See [One authored scene](docs/authored-scene-workflow.md).
+
+Set a course-wide default under **Storyboard > Project background**, above the scene list. **Import graphic** accepts PNG, JPEG, GIF, or WebP directly; save once to apply it to all inheriting scenes. **Edit scene > Stage > Background** offers **Use project default**, a scene-specific image, or explicit **None**. Changing the project default preserves those exceptions. Backgrounds fill the stage and are decorative; check contrast and keep instructional details in accessible content. Word visuals, Preview, SCORM 1.2/2004, and standalone exports use the resolved authored composition; JSON and full backups retain the source data and inheritance settings.
 
 The **Pythia** group beside **Edit scene** contains scene analysis, transformation, and assessment design. It activates only after a healthy Pythia Engine connection is verified; individual actions also require their advertised capability and author permissions. Connection status refreshes every 30 seconds and appears in the Pythia button's tooltip, including when disabled. When unavailable, use **Check Pythia connection** to retry and inspect **Settings > Pythia**. Media provider settings do not enable Pythia.
 
@@ -76,6 +81,10 @@ cd frontend
 npm install
 npm run dev
 ```
+
+### Word scene visuals
+
+From the repository root, run `npm ci --omit=dev` and `npx playwright install chromium` for the backend service account. Word exports use this local browser renderer to capture the authored scene through the delivery player. Motion is stopped and assessments show their initial unanswered state for print; surrounding instructional text and notes remain editable. A missing renderer produces an export error instead of an obsolete source image. LibreOffice still serves source-slide comparison and existing document/PDF conversion tasks.
 
 ### Portable LibreOffice (Windows, no administrator installation)
 

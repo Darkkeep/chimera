@@ -1,6 +1,14 @@
 # Current work and handoff
 
-Updated 2026-10-27. The active development branch is `extract-onboarding-repository`.
+Updated 2026-10-27. The active development branch is `feature/manteion-pythia-interoperability`.
+
+## October 27 authored-scene workflow and guide refresh
+
+The [authored-scene workflow](authored-scene-workflow.md) supersedes earlier descriptions of Rendering mode, disabled imported layouts, and source/extracted preview selection. Stage, storyboard, course preview, standalone/SCORM, and Word visuals use one authored composition. Compare with original is temporary; templates apply to a draft with Undo/Redo; project backgrounds import directly and propagate through inheritance while explicit scene exceptions remain.
+
+Legacy preparation is revision-guarded, idempotent, and recorded in storyboard history. Both local Test Flight projects were backed up and prepared after copy-based checks preserved all 16 scenes and original source bytes. Local checks recorded 114 targeted backend tests, 30 cross-browser checks, final preview-order checks, and all-scene editor/storyboard/course-preview parity. These are local engineering checks, not a new full release, live-provider, hosted, or target-LMS qualification.
+
+The user guide and active developer/deployment docs now cover the authored-scene contract and Word renderer requirements. Sixteen refreshed screenshots use an isolated synthetic lesson, a real locally rendered synthetic PPTX reference, and blocked provider/engine browser traffic. The [capture manifest](user-guide/refresh-authored-scenes-2026-10-27.json) records source-file hashes, image hashes, and final Markdown/PDF hashes; earlier provenance remains for unchanged images. The rebuilt PDF has 83 pages and 33 portable internal navigation links. Changed sections were rendered and visually checked; nine maintained Markdown documents passed 537 local-reference checks, the PDF has no blank pages, local-filesystem links, or out-of-page text, four desktop/mobile Light/Dark guide-access checks passed, and the production bundle's PDF matches the source bytes. This documentation verification remains separate from application acceptance.
 
 ## October 27 contextual walkthrough correction
 
