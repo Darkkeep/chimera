@@ -1,5 +1,7 @@
 # Plan: interactive onboarding for Chimera
 
+Historical design: onboarding is implemented and its reusable runtime has been extracted. See [current onboarding behavior](onboarding-implementation.md), the [migration record](onboarding-repository-migration.md), and [creator pre-alpha readiness](pre-alpha-readiness.md). The original future-tense plan below is not an implementation-status checklist.
+
 Prepared 2026-10-05. Planning only; no onboarding runtime or dependency changes are included.
 
 ## Intended outcome

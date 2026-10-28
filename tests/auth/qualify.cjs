@@ -86,14 +86,15 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Project access',exact:true}).click();
   await page.getByRole('heading',{name:/Project access/}).waitFor();await page.locator('table').getByText('Test Reviewer').waitFor();
   await page.screenshot({path:path.join(output,'project-access.png'),fullPage:true});
-  const reviewerContext=await browser.newContext({ignoreHTTPSErrors:true});const reviewerPage=await reviewerContext.newPage();
+  const reviewerContext=await browser.newContext({ignoreHTTPSErrors:true});const reviewerPage=await reviewerContext.newPage();currentPage=reviewerPage;
   await reviewerPage.goto(fixture.reviewUrl);await reviewerPage.getByLabel('Email',{exact:true}).fill('reviewer@example.test');await reviewerPage.getByLabel('Password',{exact:true}).fill(password);await reviewerPage.getByRole('button',{name:'Sign in',exact:true}).click();
-  await reviewerPage.getByRole('heading',{name:'Review the learning objective',exact:true}).waitFor();
+  await reviewerPage.locator('.course-preview-shell [data-scene-element]').filter({hasText:'Review the learning objective'}).waitFor();
+  assert.equal(await reviewerPage.locator('#course-preview-scene-title').textContent(),'Review the learning objective');
   assert.equal(await reviewerPage.getByRole('button',{name:'Enhance',exact:true}).count(),0);
   const denied=await reviewerContext.request.get(`${origin}/api/projects/${fixture.otherProjectId}`);assert.equal(denied.status(),403);
   await reviewerPage.getByLabel('Comment',{exact:true}).fill('HTTPS reviewer feedback');await reviewerPage.getByRole('button',{name:'Add comment'}).click();await reviewerPage.getByText('HTTPS reviewer feedback',{exact:true}).waitFor();
   await reviewerPage.screenshot({path:path.join(output,'authenticated-review.png'),fullPage:true});
-  await reviewerContext.close();
+  await reviewerContext.close();currentPage=page;
   await page.goto(origin+'/#reset='+fixture.resetToken);await page.getByRole('heading',{name:'Reset your password'}).waitFor();
   await page.getByLabel('New password',{exact:true}).fill(replacement);await page.getByLabel('Confirm password',{exact:true}).fill(replacement+'mismatch');await page.getByRole('button',{name:'Save password'}).click();await page.getByRole('alert').filter({hasText:'Passwords do not match'}).waitFor();
   await page.getByLabel('Confirm password',{exact:true}).fill(replacement);await page.screenshot({path:path.join(output,'reset-password.png'),fullPage:true});await page.getByRole('button',{name:'Save password'}).click();await page.getByRole('status').filter({hasText:'Password saved'}).waitFor();
@@ -104,7 +105,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   assert.deepEqual(errors,[]);
   const results={https:true,invalidPassword:true,login:true,secureCookie:true,recoveryGuidance:true,passwordReset:true,projectMembers:true,authenticatedReview:true,reviewerIsolation:true,comment:true,sessionExpiry:true,logout:true,mobileOverflow,axeViolations:accessibility.violations.length,javascriptErrors:errors,scope:'Isolated HTTPS proxy, disposable workspace and accounts; not live darkrogue.io'};
   fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(results,null,2));console.log(JSON.stringify(results,null,2));
-} )().catch(async error=>{if(currentPage)await currentPage.screenshot({path:path.join(output,'failure.png'),fullPage:true}).catch(()=>{});console.error(error.message);process.exitCode=1;}).finally(async()=>{
+} )().catch(async error=>{if(currentPage)await currentPage.screenshot({path:path.join(output,'failure.png'),fullPage:true}).catch(()=>{});if(currentPage)fs.writeFileSync(path.join(output,'failure-page.txt'),await currentPage.locator('body').innerText().catch(()=>''));console.error(error.message);process.exitCode=1;}).finally(async()=>{
   if(browser)await browser.close();
   if(backend&&backend.exitCode===null){backend.kill();await Promise.race([new Promise(resolve=>backend.once('exit',resolve)),pause(5000)]);}
   if(server)await new Promise(resolve=>server.close(resolve));

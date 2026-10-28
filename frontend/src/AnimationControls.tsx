@@ -25,7 +25,7 @@ export function AnimationControls({ animations, onChange, disabled }: { animatio
   };
   function change(phase: keyof ElementAnimations, changes: Partial<ElementAnimations["entrance"]>) {
     const next = alignExitTiming({ ...value, [phase]: { ...value[phase], ...changes } });
-    if (next.exit.delayMs > 60000) { setError("The exit must start within 60 seconds. Shorten the earlier effects first."); return; }
+    if (next.exit.delayMs > 3600000) { setError("The exit must start within one hour. Shorten the earlier effects first."); return; }
     setError("");
     onChange(next);
   }
@@ -34,9 +34,9 @@ export function AnimationControls({ animations, onChange, disabled }: { animatio
       {(["entrance", "presentation", "exit"] as const).map(phase => <div key={phase}>
         <label>{phase === "entrance" ? "Entrance" : phase === "presentation" ? "Presentation" : "Exit"}<select aria-label={`${phase} effect`} value={value[phase].effect} onChange={event => change(phase, { effect: event.target.value })}>{effects[phase].map(([effect, label]) => <option key={effect} value={effect}>{label}</option>)}</select></label>
         {value[phase].effect !== "none" && <div className="visual-numbers">
-          <label>Duration (ms)<input aria-label={`${phase} duration (ms)`} type="number" min={100} max={5000} step={50} value={value[phase].durationMs} onChange={event => { const durationMs = event.target.valueAsNumber; if (Number.isInteger(durationMs) && durationMs >= 100 && durationMs <= 5000) change(phase, { durationMs }); }} /></label>
-          <label>{phase === "exit" ? "Scene time (ms)" : "Delay (ms)"}<input aria-label={`${phase} delay (ms)`} type="number" min={0} max={60000} step={50} value={value[phase].delayMs} onChange={event => { const delayMs = event.target.valueAsNumber; if (Number.isInteger(delayMs) && delayMs >= 0 && delayMs <= 60000) change(phase, { delayMs }); }} /></label>
-          {phase === "presentation" && <label>Repeats<input aria-label="Presentation repeats" type="number" min={1} max={5} value={value.presentation.iterations || 1} onChange={event => { const iterations = event.target.valueAsNumber; if (Number.isInteger(iterations) && iterations >= 1 && iterations <= 5) { setError(""); const next = alignExitTiming({ ...value, presentation: { ...value.presentation, iterations } }); if (next.exit.delayMs <= 60000) onChange(next); else setError("Shorten the presentation before adding repeats."); } }} /></label>}
+          <label>Duration (ms)<input aria-label={`${phase} duration (ms)`} type="number" min={100} max={60000} step={50} value={value[phase].durationMs} onChange={event => { const durationMs = event.target.valueAsNumber; if (Number.isInteger(durationMs) && durationMs >= 100 && durationMs <= 60000) change(phase, { durationMs }); }} /></label>
+          <label>{phase === "exit" ? "Scene time (ms)" : "Delay (ms)"}<input aria-label={`${phase} delay (ms)`} type="number" min={0} max={3600000} step={50} value={value[phase].delayMs} onChange={event => { const delayMs = event.target.valueAsNumber; if (Number.isInteger(delayMs) && delayMs >= 0 && delayMs <= 3600000) change(phase, { delayMs }); }} /></label>
+          {phase === "presentation" && <label>Repeats<input aria-label="Presentation repeats" type="number" min={1} max={5} value={value.presentation.iterations || 1} onChange={event => { const iterations = event.target.valueAsNumber; if (Number.isInteger(iterations) && iterations >= 1 && iterations <= 5) { setError(""); const next = alignExitTiming({ ...value, presentation: { ...value.presentation, iterations } }); if (next.exit.delayMs <= 3600000) onChange(next); else setError("Shorten the presentation before adding repeats."); } }} /></label>}
         </div>}
       </div>)}
     </fieldset>

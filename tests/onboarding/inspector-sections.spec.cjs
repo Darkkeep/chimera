@@ -26,16 +26,16 @@ for (const theme of ['light', 'dark']) {
       await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
       const editor = page.getByRole('dialog').last();
       const inspector = editor.getByRole('complementary', { name: 'Element properties' });
-      const section = title => inspector.locator('details').filter({ has: page.locator('summary').filter({ hasText: new RegExp(`^${title}$`) }) });
-      await expect(inspector.locator('details')).toHaveCount(4);
-      await expect(inspector.locator('details[open]')).toHaveCount(0);
-      await section('Layers').locator('summary').click();
+      const section = title => inspector.locator('details.visual-inspector-section').filter({ has: page.locator(':scope > summary').filter({ hasText: new RegExp(`^${title}$`) }) });
+      await expect(inspector.locator('details.visual-inspector-section')).toHaveCount(4);
+      await expect(inspector.locator('details.visual-inspector-section[open]')).toHaveCount(0);
+      await section('Layers').locator(':scope > summary').click();
       await inspector.locator('.visual-layers button').filter({ hasText: 'Inspector question' }).click();
-      await section('Layers').locator('summary').click();
-      await expect(inspector.locator('details')).toHaveCount(6);
-      await expect(inspector.locator('details[open]')).toHaveCount(0);
-      for (const title of ['Animation', 'Question', 'Stage', 'Background', 'Layers', 'Layout']) {
-        const summary = section(title).locator('summary');
+      await section('Layers').locator(':scope > summary').click();
+      await expect(inspector.locator('details.visual-inspector-section')).toHaveCount(7);
+      await expect(inspector.locator('details.visual-inspector-section[open]')).toHaveCount(0);
+      for (const title of ['Appearance', 'Animation', 'Question', 'Stage', 'Background', 'Layers', 'Layout']) {
+        const summary = section(title).locator(':scope > summary');
         await expect(summary.locator('svg')).toBeVisible();
         await summary.focus();
         await page.keyboard.press('Enter');
@@ -45,12 +45,12 @@ for (const theme of ['light', 'dark']) {
       await expect(inspector.getByRole('spinbutton', { name: 'Question width', exact: true })).toBeVisible();
       await expect(inspector.getByRole('textbox', { name: 'Element text', exact: true })).toBeVisible();
       await inspector.getByRole('spinbutton', { name: 'Stage width', exact: true }).fill('1400');
-      await section('Stage').locator('summary').focus();
+      await section('Stage').locator(':scope > summary').focus();
       await page.keyboard.press('Space');
       await expect(section('Stage')).not.toHaveAttribute('open');
       await expect(inspector.getByRole('spinbutton', { name: 'Stage width', exact: true })).toBeHidden();
       await expect(section('Background')).toHaveAttribute('open', '');
-      await section('Stage').locator('summary').click();
+      await section('Stage').locator(':scope > summary').click();
       await expect(inspector.getByRole('spinbutton', { name: 'Stage width', exact: true })).toHaveValue('1400');
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       expect((await new AxeBuilder({ page }).include('.visual-inspector').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations).toEqual([]);
@@ -60,8 +60,8 @@ for (const theme of ['light', 'dark']) {
       const saved = await (await request.get(`/api/projects/${project.id}`)).json();
       expect(saved.storyboard.scenes[0].visualLayout.width).toBe(1400);
       await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
-      await expect(page.locator('.visual-inspector details')).toHaveCount(4);
-      await expect(page.locator('.visual-inspector details[open]')).toHaveCount(0);
+      await expect(page.locator('.visual-inspector > details')).toHaveCount(4);
+      await expect(page.locator('.visual-inspector > details[open]')).toHaveCount(0);
     });
   }
 }

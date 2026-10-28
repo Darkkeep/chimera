@@ -2,7 +2,11 @@
 
 Use this checklist for a repeatable local demonstration. Built-in hosted accounts are implemented separately; Encarta remains fail-closed until its integration contract is supplied.
 
-## Current qualification - 2026-10-15
+## Current readiness - 2026-10-28
+
+Use [current work](current-work.md) for delivered features and [creator pre-alpha readiness](pre-alpha-readiness.md) for outstanding candidate, clean-install, recovery, and participant-support tasks. The October 28 timeline/effects update has local engineering evidence but no new release or target-LMS acceptance. The evaluation installer still omits root npm/Chromium setup for Word visuals; follow the manual Word-renderer setup below and in the evaluation start guide until that helper is repaired. All dated records below remain historical.
+
+## Historical qualification - 2026-10-15
 
 Use the [completion execution record](completion-update-2026-10-15.md) for this update. Earlier records below remain historical: representative SCORM 1.2 LMS acceptance is complete by operator attestation, including the October 14 retry replacement; ordinary interactive Writer acceptance remains distinct. Video/shared media/OCR and resume budgets are described in [media placement and OCR](media-placement-and-ocr.md) and [resume policy](resume-data-policy.md). Hosted deployment is deferred by owner instruction for this update.
 
@@ -63,6 +67,9 @@ It verifies health, installation mode, project loading, production validation, b
 - [ ] Review comments can be created, replied to, resolved, and reopened.
 - [ ] JSON export and Chimera storyboard archive can be created and restored into a clean workspace.
 - [ ] Word export downloads an editable document.
+- [ ] Native shapes, appearance settings, groups/layers, and timeline clips survive save/reopen and archive restore in a clean installation.
+- [ ] Timed audio/video and animations share pause/seek/restart; seeking does not complete required clips; captions and source trimming match the authored interval.
+- [ ] Both Word formats use the chosen timeline snapshot time, retain written timing records, and support ordinary edit/save/reopen in the intended Word/Writer version.
 - [ ] SCORM 2004 and 1.2 exports succeed only after production validation passes.
 - [ ] Export reports and known LMS limitations are recorded.
 

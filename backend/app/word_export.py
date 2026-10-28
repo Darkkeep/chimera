@@ -193,6 +193,17 @@ def _add_assessment(document: DocumentType, scene: Scene, include_answer_key: bo
         paragraph.add_run(_answer_key(item))
 
 
+def _timeline_description(scene: Scene) -> str:
+    timeline = scene.visualLayout.timeline
+    lines = [f"Scene duration: {timeline.durationMs / 1000:g} s; visual snapshot: {timeline.printTimeMs / 1000:g} s."]
+    for clip in timeline.clips:
+        end = clip.startMs + clip.sourceOutMs - clip.sourceInMs
+        lines.append(f"{clip.name or clip.assetId}: {clip.kind}, scene {clip.startMs / 1000:g} to {end / 1000:g} s; source {clip.sourceInMs / 1000:g} to {clip.sourceOutMs / 1000:g} s; volume {clip.volume * 100:g}%" + ("; required" if clip.required else ""))
+    for cue in timeline.cues:
+        lines.append(f"Cue {cue.name}: {cue.timeMs / 1000:g} s")
+    return "\n".join(lines)
+
+
 def _add_scene(document: DocumentType, project: ProjectDetail, scene: Scene, index: int, include_answer_key: bool) -> None:
     document.add_page_break()
     document.add_heading(f"Scene {index}: {scene.title or 'Untitled scene'}", level=1)
@@ -271,6 +282,9 @@ def _add_scene(document: DocumentType, project: ProjectDetail, scene: Scene, ind
             if asset.captionsVtt:
                 document.add_paragraph(f"Captions ({asset.language}) — {asset.filename}:\n{asset.captionsVtt}")
 
+    if scene.visualLayout and scene.visualLayout.timeline:
+        document.add_heading("Scene timeline (authoring material)", level=2)
+        document.add_paragraph(_timeline_description(scene))
     if scene.actionDescription:
         document.add_heading("Production directions (authoring material)", level=2)
         document.add_paragraph(scene.actionDescription)
@@ -416,6 +430,8 @@ def _add_sme_scene(document: DocumentType, project: ProjectDetail, scene: Scene,
             content.add_paragraph(f"{identifier}. {choice_text}")
     else:
         content.add_paragraph("Learner action is not separately recorded.")
+    if scene.visualLayout and scene.visualLayout.timeline:
+        content.add_paragraph(_timeline_description(scene))
     if scene.actionDescription:
         content.add_paragraph(f"Production notes: {scene.actionDescription}")
     _paragraph_label(content.add_paragraph(), "What happens next", style)

@@ -175,6 +175,7 @@ test('provider tabs filter saved connections and keep non-admins read-only', asy
 
 for (const theme of ['light', 'dark']) {
   test(`all provider tabs fit desktop/mobile in ${theme} and remain accessible`, async ({ page }) => {
+    test.setTimeout(90000); // Twelve full Axe scans across provider tabs and viewport sizes.
     await page.addInitScript(value => localStorage.setItem('chimera.appearance', value), theme);
     await openConnections(page);
     const dialog = page.getByRole('dialog', { name: 'AI connection', exact: true });

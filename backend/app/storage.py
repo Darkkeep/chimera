@@ -665,6 +665,10 @@ def validate_visual_assets(scene: Scene, assets: dict[str, ExtractedAsset]) -> N
             references.add(scene.visualLayout.backgroundAsset)
         if scene.visualLayout.sourceBackgroundAsset:
             references.add(scene.visualLayout.sourceBackgroundAsset)
+    if scene.visualLayout and scene.visualLayout.timeline:
+        for clip in scene.visualLayout.timeline.clips:
+            if clip.assetId not in assets or assets[clip.assetId].kind != clip.kind:
+                raise ValueError("Timeline clips must reference matching media assets in this project")
     if any(reference not in assets or assets[reference].kind != "image" for reference in references):
         raise ValueError("Visual scene elements must reference image assets in this project")
 

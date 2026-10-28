@@ -1,6 +1,22 @@
 # Current work and handoff
 
-Updated 2026-10-27. The active development branch is `feature/manteion-pythia-interoperability`.
+## October 28 CI follow-up for PR #9
+
+The first [PR #9 workflow](https://github.com/Darkkeep/chimera/actions/runs/40707489276) passed backend/build/artifact checks but hit the 60-minute job limit during the serial 576-check browser matrix. Logs also showed repeated inspector and standalone assertions against older UI structure; no successful full-matrix qualification is claimed for that run. Browser integration now uses nine isolated runner jobs (three shards for each browser, one worker per runner), with separate backend/build/visual/auth qualification. Each browser shard has 64 checks and its own report/artifacts. Inspector tests distinguish top-level sections from nested effect details; standalone checks use the authored stage and await animation pause readiness; the twelve-scan provider accessibility scenario has an explicit timeout. Fresh CI must qualify the updated PR head before merge.
+
+The first sharded run exposed a walkthrough card intercepting Accept change, a reviewer fixture invalidated by later automatic scene preparation, stale visual-harness ancestor assumptions after appearance wrappers, and a too-short video fixture whose seek position rounded to zero. The suggestion-review card now sits away from decision controls; the auth fixture prepares its authored layout before issuing the revision-bound link; visual pointer targets are scrolled into view and located through their draggable ancestor; resume tests use the deterministic three-second video. Local visual and HTTPS-auth qualification passed, along with six focused walkthrough/media checks across all three browsers. These corrections preserve revision-bound authorization and played-range completion behavior; fresh hosted results remain separate.
+
+Every browser shard installs Chromium as well as its selected browser because Word exports invoke the Chromium document renderer even during Firefox/WebKit tests. The workflow cancels superseded runs on the same ref once they participate in its concurrency group.
+
+## October 28 scene timeline, layers, shapes, and effects
+
+The [scene timeline implementation](scene-timeline-implementation.md) delivers native shape insertion and appearance, text/shape effects, grouping/layer arrangement, and an optional shared animation/media timeline following the [plan](scene-timeline-layers-plan.md). Clips support source trimming, overlaps, volume/fades, audition controls, video geometry/stacking, local waveforms, and cues. Preview and exports share timing and consumption rules; seeking does not earn completion. Word snapshots use an authored timestamp and include written timeline records. Bevel/emboss are browser lighting approximations. Existing scenes remain unscheduled until explicitly enabled.
+
+Local verification: the backend discovery run passed 403 tests with 71 skipped; all 27 focused timeline/grouping/legacy-animation browser checks passed across Chromium, Firefox, and WebKit. Seven timeline model/print tests were rerun after final adjustments. TypeScript/Vite build passed with the existing large-bundle warning. The reconciled guide has 88 pages, 450 local references, and 35 internal PDF links; its verifier reports no errors. Two current editor/timeline captures use isolated synthetic courses. These checks do not replace manual screen-reader, representative-media, Word-editing, or target-LMS acceptance.
+
+Updated 2026-10-28. The timeline implementation and reconciled documentation are delivered together in this source revision on `main`. Commit identity is available from `git log`; no release tag, distribution, or exact-head CI acceptance is asserted. See [creator pre-alpha readiness](pre-alpha-readiness.md) for the current open checklist. Historical entries below retain their original dates and evidence scope; their old feature gaps and next actions are not the current backlog.
+
+Documentation reconciliation verified 607 local file/section references without errors and exercised the eight-section human acceptance form without JavaScript errors or duplicate IDs. Timeline and clean-install/recovery observations are now explicit. Evaluation instructions supply the manual root npm/Chromium prerequisite and package-root guide paths; repair of the automatic installer remains open. Cross-repository shared-journey records are identified as upstream locators rather than broken links into absent sibling checkouts.
 
 ## October 27 authored-scene workflow and guide refresh
 

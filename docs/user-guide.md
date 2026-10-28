@@ -1,6 +1,6 @@
 # Chimera user guide
 
-Process-based instructions for Chimera. Workflow text and the PDF edition were refreshed on 2026-10-27 for one authored scene across Stage, storyboard, preview, and delivery; temporary original comparison; direct template application with Undo/Redo; project background import and inheritance; and presentation-first preview navigation. The [authored-scene manifest](user-guide/refresh-authored-scenes-2026-10-27.json) records the current captures and implementation hashes. Earlier October 27 assessment/navigation and provider captures remain current where their controls are unchanged. Provider images use inert status/capability fixtures, not configured accounts or generated output. Other images retain their earlier provenance in the [maintenance guide](user-guide/support/README.md). No user course or credentials are used for captures. Historical source/recovery context remains in the [recovery record](export-enhancement-recovery.md).
+Process-based instructions for Chimera. Shape/appearance/layer and timeline instructions and the PDF edition were refreshed on 2026-10-28; the [timeline capture manifest](user-guide/refresh-timeline-2026-10-28.json) records the synthetic fixtures and source/image/PDF hashes. Earlier workflow text and the PDF edition were refreshed on 2026-10-27 for one authored scene across Stage, storyboard, preview, and delivery; temporary original comparison; direct template application with Undo/Redo; project background import and inheritance; and presentation-first preview navigation. The [authored-scene manifest](user-guide/refresh-authored-scenes-2026-10-27.json) records the current captures and implementation hashes. Earlier October 27 assessment/navigation and provider captures remain current where their controls are unchanged. Provider images use inert status/capability fixtures, not configured accounts or generated output. Other images retain their earlier provenance in the [maintenance guide](user-guide/support/README.md). No user course or credentials are used for captures. Historical source/recovery context remains in the [recovery record](export-enhancement-recovery.md).
 
 Chimera authors one scene. Edit its content and composition, inherit project defaults unless you deliberately create an exception, and choose a destination when exporting. The [authored-scene workflow](authored-scene-workflow.md) explains migration and output behavior; the steps below show the controls.
 
@@ -191,6 +191,40 @@ Open **Edit scene**, then choose **Stage**. The authored composition is shared b
 New imports capture editable text, images, common PowerPoint shapes, line connectors, custom freeform geometry, rotation, cropping, slide dimensions, inherited graphics, and solid/picture backgrounds. Byte-identical images are shared as one Media library asset while every source placement stays separate on the canvas. Most extracted shapes can be moved, resized, rotated, layered, locked, or deleted like other canvas elements; text inside a shape remains separately editable. The original preview remains available for comparison. Less-common preset geometry, gradients, group rotation, mixed text formatting, bullets, and some inherited styles may be approximated and are listed under **Import limitations**; charts and SmartArt remain unsupported objects. This is not full PowerPoint-equivalent editing.
 
 Saving content changes in Details updates the authored scene; use Stage for precise placement and text-box styling. Preview and export use the saved composition, not unsaved dialog edits.
+
+### Insert shapes and style layers
+
+On **Edit scene > Stage**, use **Insert shape** for rectangles, rounded rectangles, ellipses, lines, arrows, triangles, and diamonds. Select the object and expand **Appearance**. Give it a layer name, set whole-object opacity, and choose fill/outline colors, their individual opacity, and outline width. Rounded rectangles also have a corner-radius control. Zero fill opacity gives an unfilled shape. **Lock aspect ratio** controls resizing; **Layout** retains exact position, size, rotation, and alignment controls.
+
+Text also has whole-object and text-color opacity. Expand **Drop shadow**, **Bevel**, or **Emboss**, enable the effect, and adjust color, opacity, size, blur, and light angle. Each effect has its own reset. Bevel/emboss use browser silhouette-lighting approximations; they do not reproduce all PowerPoint surface treatments. Existing imported SVG shapes retain their original fills and geometry; native shape fill/outline controls apply to newly inserted native shapes.
+
+In **Layers**, select overlapping objects, drag rows to change stacking, or use Bring forward/Send backward. Check related layers, enter a group name, and choose **Group checked layers**; moving one grouped object moves its unlocked partners. **Ungroup** removes the relationship. Three or more checked layers can be distributed horizontally or vertically. Lock, duplicate, and delete retain their existing behavior. **Hide in delivery** is a saved publishing choice; select the hidden layer in Layers to show it again. Undo/Redo applies to these draft edits.
+
+![Shape appearance and named layer in the scene editor](user-guide/images/timeline-shape-editor.png)
+
+### Schedule scene objects, audio, and video
+
+Below the stage, expand **Timeline and layers** and choose **Enable scene timeline**. Existing scenes stay unchanged until you enable it; enabling the clock does not automatically schedule every attachment. Scenes support up to one hour. Scene playback starts through an explicit Play action and does not automatically advance to the next scene.
+
+| Task | Procedure |
+| --- | --- |
+| Set scene length | Enter **Scene duration (s)**. Objects, clips, animations, cue markers, and the Word snapshot time must fit. Adding or extending content can extend the duration. |
+| Place an object in time | Select its named timeline row. Set **Object start/end (s)**, or drag its block; drag the right edge to adjust its end. The stage and row share selection. |
+| Time native animations | Choose the entrance/presentation/exit effects in Animation. Use their blocks or timeline fields to set scene start and duration in seconds. The presentation start is displayed on the scene clock; Chimera handles its relative delay internally. |
+| Add audio or video | Choose a project asset in **Timeline media**, position the playhead, then choose **Add clip at playhead**. Select the clip row to edit it. The same asset can appear in multiple clips. |
+| Trim media | Set **Source in/out (s)** to select the source interval, and **Clip start (s)** to place it in the scene. Trimming preserves the original bytes. A clip starting at scene second 12 with source-in 3 starts at source second 3. |
+| Arrange video | Set its X/Y/width/height and layer order. Visual objects occupy odd-numbered layer positions starting at 1; video order 0 is behind all of them and 4001 is in front. |
+| Adjust sound | Set volume and fade-in/out durations. **Mute preview** and **Solo preview** are temporary audition controls; saved clip volume controls learner playback. |
+| Inspect a waveform | Choose **Generate local waveform**. Sources are limited to 25 MB; decoding stays in this browser. PCM WAV has a fallback decoder; other formats require browser Web Audio support. |
+| Add a cue | Choose **Add cue at playhead**. Cue buttons seek to their time; the adjacent × deletes a marker. Snapping uses 0.1-second steps and nearby cues. |
+| Check timing | Use Play/Pause, Restart, the playhead slider/field, and zoom. **Return to editing** restores stage manipulation. The panel can collapse and resize vertically. |
+| Choose a Word visual | Set **Word snapshot time (s)**. The document contains a still at that time and written clip/cue timing information, rather than a moving sequence. |
+
+![Timeline, named layers, seconds-based controls, and object lifetimes](user-guide/images/timeline-controls.png)
+
+Scheduling an already attached asset replaces its independent player in that scene's learner view. Unscheduled attachments retain their existing controls. **Require viewing/listening** sets required clip coverage; existing required-audio/video rules also apply when their asset is scheduled. Seeking does not count as consumption. Every required clip has independent coverage over its trimmed interval; changing its source interval invalidates that clip's previous coverage. Avoid overlapping required narration that learners cannot follow simultaneously.
+
+Learner preview and SCORM retain the shared scene position and earned media coverage. Standalone progress still lasts only while the page is open. Buffering or browser playback restrictions can pause the clock and show a retry message. Captions follow source time, transcripts remain available, and reduced motion suppresses movement while keeping timed visibility. Always verify the exported course and its completion rules before publishing.
 
 ### Compare with the original slide
 
@@ -844,7 +878,8 @@ Resolving or dismissing a finding records a human decision only. It does not fix
 Do not follow the implementation build plan as if every planned control already exists. The following have no complete workflow in the interface captured here:
 
 - Unauthenticated guest review. Authenticated hosted review links have a separate documented deployment workflow.
-- Arbitrary video, HTML, and document elements inside the Stage layer stack. Video upload, captions/transcripts, and scene/course-wide media placement have a separate [Media library workflow](media-placement-and-ocr.md).
+- Arbitrary HTML, document, and embedded-application objects inside the Stage layer stack. Uploaded video can be positioned and scheduled through the [scene timeline](#schedule-scene-objects-audio-and-video); imported media, captions/transcripts, and scene/course-wide placement also have a [Media library workflow](media-placement-and-ocr.md).
+- Cue markers that trigger interactions or scene events, arbitrary effect keyframes, and motion paths. Current timeline cues support seeking and snapping.
 - Full reference-resource classification, authority, version-management, and per-scene mapping editors.
 - Word reimport or automatic synchronization of external edits.
 - A general history browser and arbitrary revision restore.

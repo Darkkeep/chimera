@@ -1,0 +1,3 @@
+export type ClipProgress = { position: number; duration: number; watchedRanges: [number,number][] };
+export type SceneTransport = { play():void; pause():void; seek(value:number):void; setAudition(value:{muted:string[];solo:string|null}):void; readonly currentTime:number; readonly playing:boolean; media:{node:HTMLMediaElement;clip:any;asset:any}[];dispose():void };
+export function createSceneTransport(options: {root:HTMLElement;stage:HTMLElement;layout:any;resolveAsset:(id:string)=>any;onUpdate?:(time:number,playing:boolean)=>void;onProgress?:(id:string,progress:ClipProgress)=>void;onError?:(message:string)=>void;progress?:Record<string,ClipProgress>;initialTimeMs?:number}):SceneTransport;

@@ -29,7 +29,7 @@ test('course-wide video, scene exclusions, captions, shared copies and revision 
     expect(response.ok(), await response.text()).toBe(true); project = await response.json();
   };
   await change('scenes', { title: 'Opening lesson' }); await change('scenes', { title: 'Second lesson' });
-  const upload = await request.post(`/api/projects/${project.id}/assets`, { multipart: { file: { name: 'qualification.mp4', mimeType: 'video/mp4', buffer: fs.readFileSync(path.resolve('tests/fixtures/media-qualification.mp4')) } }, headers: { 'If-Match': `"${project.storyboard.revision}"` } });
+  const upload = await request.post(`/api/projects/${project.id}/assets`, { multipart: { file: { name: 'qualification.mp4', mimeType: 'video/mp4', buffer: fs.readFileSync(path.resolve('tests/fixtures/timeline-qualification.mp4')) } }, headers: { 'If-Match': `"${project.storyboard.revision}"` } });
   expect(upload.ok(), await upload.text()).toBe(true); project = await upload.json();
   const video = project.storyboard.assets[0];
   await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);

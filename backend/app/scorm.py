@@ -33,7 +33,12 @@ ASSESSMENT_SURFACE_CSS = (Path(__file__).parent / "static" / "assessment-surface
 
 CAPTION_RUNTIME = (Path(__file__).parent / "static" / "captions.js").read_text(encoding="utf-8").replace("export function installCaptionTrack", "function installCaptionTrack")
 
-PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
+APPEARANCE_RUNTIME = (Path(__file__).parent / "static" / "scene-appearance.js").read_text(encoding="utf-8").replace("export function ", "function ")
+
+TRANSPORT_RUNTIME = (Path(__file__).parent / "static" / "scene-transport.js").read_text(encoding="utf-8").replace("export function ", "function ")
+TIMELINE_POLICY = (Path(__file__).parent / "static" / "timeline-policy.js").read_text(encoding="utf-8").replace("export function ", "function ")
+
+PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
 (() => {
     const suspendDataLimit = 64000;
     const state = { scenes: [], completionSettings: { passingScore: 80, includeOptionalAssessments: false }, current: 0, visited: new Set(), completedAudio: new Set(), videoProgress: {}, assessments: {}, remediation: null, startedAt: Date.now() };
@@ -114,13 +119,14 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
       function requiredVideos() {
           const videos = new Map();
           state.scenes.forEach(scene => (scene.mediaPlacements || [])
-              .filter(placement => placement.requiredViewing && (scene.videoAssets || []).includes(placement.assetId) && window.__CHIMERA_ASSETS[placement.assetId]?.kind === "video")
+              .filter(placement => !scheduledAssets(scene).has(placement.assetId) && placement.requiredViewing && (scene.videoAssets || []).includes(placement.assetId) && window.__CHIMERA_ASSETS[placement.assetId]?.kind === "video")
               .forEach(placement => {
                   const current = videos.get(placement.assetId);
                   if (!current || (placement.viewingThresholdPercent || 90) > current.threshold) {
                       videos.set(placement.assetId, { scene, placement, key: placement.assetId, threshold: placement.viewingThresholdPercent || 90 });
                   }
               }));
+          for (const scene of state.scenes) for (const clip of requiredTimelineClips(scene)) videos.set(clipProgressKey(scene.id,clip),{scene,key:clipProgressKey(scene.id,clip),threshold:clip.thresholdPercent});
           return [...videos.values()];
       }
       function normalizeVideoProgress(value) {
@@ -180,7 +186,7 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
     function finish() {
         if (!save()) return;
         const required = state.scenes.filter(scene => scene.required);
-        const complete = state.scenes.length > 0 && required.every(scene => { if (!state.visited.has(scene.id)) return false; if (!scene.assessmentItem) return true; const result = state.assessments[scene.id]; const config = settings(scene); return result && result.attempts > 0 && (result.isCorrect === true || result.attempts >= config.maxAttempts); }) && state.scenes.filter(scene => scene.audioRequired).every(scene => scene.audioAssets.length > 0 && scene.audioAssets.every(id => state.completedAudio.has(`${scene.id}:${id}`))) && requiredVideos().every(({ key, threshold }) => videoCoverage(state.videoProgress[key]) >= threshold);
+        const complete = state.scenes.length > 0 && required.every(scene => { if (!state.visited.has(scene.id)) return false; if (!scene.assessmentItem) return true; const result = state.assessments[scene.id]; const config = settings(scene); return result && result.attempts > 0 && (result.isCorrect === true || result.attempts >= config.maxAttempts); }) && state.scenes.filter(scene => scene.audioRequired).every(scene => (scene.audioAssets.length > 0 || scene.visualLayout?.timeline?.clips.some(c=>c.kind==="audio")) && scene.audioAssets.filter(id=>!scheduledAssets(scene).has(id)).every(id => state.completedAudio.has(`${scene.id}:${id}`))) && requiredVideos().every(({ key, threshold }) => videoCoverage(state.videoProgress[key]) >= threshold);
         const scored = state.scenes.filter(scene => scene.assessmentItem && (scene.required || (state.completionSettings.includeOptionalAssessments && (state.assessments[scene.id]?.attempts || 0) > 0)));
         const totalWeight = scored.reduce((sum, scene) => sum + settings(scene).scoreWeight, 0);
         const score = totalWeight ? Math.round(scored.reduce((sum, scene) => sum + (state.assessments[scene.id]?.isCorrect === true ? 100 : 0) * settings(scene).scoreWeight, 0) / totalWeight) : null;
@@ -268,27 +274,35 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
     let animationSceneId = null;
     let sceneEnteredAt = 0;
     let motionEnabled = true;
+    let sceneTransport = null;
     function renderVisualScene(scene, body) {
         const layout = scene.visualLayout;
         const frame = document.createElement("div");
         frame.className = "visual-stage-frame";
         frame.style.cssText = `position:relative;width:100%;overflow:hidden;aspect-ratio:${layout.width}/${layout.height}`;
         const stage = document.createElement("div");
+        stage.className = "visual-stage";
         stage.style.cssText = `position:absolute;left:0;top:0;transform-origin:top left;width:${layout.width}px;height:${layout.height}px`;
         stage.style.backgroundColor = layout.backgroundColor;
         const background = window.__CHIMERA_ASSETS[layout.backgroundAsset];
         if (background) { stage.style.backgroundImage = `url("${background.path}")`; stage.style.backgroundSize = "100% 100%"; }
         layout.elements.forEach(element => {
+            if (element.hidden) return;
             if (scene.assessmentItem && element.kind === "text" && element.text.trim() === scene.title.trim()) return;
             const node = document.createElement("div");
             node.className = "visual-element";
             node.setAttribute("data-scene-element", element.id);
-            node.style.cssText = `position:absolute;left:${element.x}px;top:${element.y}px;width:${element.width}px;height:${element.height}px;transform:rotate(${element.rotation}deg);overflow:hidden`;
+            if(layout.timeline && element.timing && element.kind==="text"){node.setAttribute("aria-hidden","true");const accessible=document.createElement("p");accessible.className="sr-only";accessible.textContent=element.text;body.appendChild(accessible);}
+            node.style.cssText = `position:absolute;left:${element.x}px;top:${element.y}px;width:${element.width}px;height:${element.height}px;transform:rotate(${element.rotation}deg);overflow:visible`;
+            const contentNode = document.createElement("div");
+            contentNode.style.cssText = "width:100%;height:100%";
+            Object.assign(contentNode.style, appearanceStyle(element));
+            node.appendChild(contentNode);
             if (element.kind === "text") {
-                node.textContent = element.text;
+                contentNode.textContent = element.text;
                 node.style.fontSize = `${element.fontSize}px`;
                 node.style.fontFamily = element.fontFamily;
-                node.style.color = element.color;
+                node.style.color = element.appearance ? `${element.color}${Math.round(element.appearance.fillOpacity*255).toString(16).padStart(2,"0")}` : element.color;
                 node.style.fontWeight = element.bold ? "700" : "400";
                 node.style.fontStyle = element.italic ? "italic" : "normal";
                 node.style.textAlign = element.align;
@@ -298,12 +312,12 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
             } else if (element.kind === "shape") {
                 const shape = document.createElement("img");
                 shape.className = "visual-shape";
-                shape.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(element.shapeSvg || "")}`;
+                shape.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(element.nativeShape ? shapeMarkup(element) : element.shapeSvg || "")}`;
                 shape.alt = "";
                 shape.setAttribute("role", "presentation");
                 shape.style.cssText = "display:block;width:100%;height:100%;overflow:visible";
                 node.style.overflow = "visible";
-                node.appendChild(shape);
+                contentNode.appendChild(shape);
             } else {
                 const asset = window.__CHIMERA_ASSETS[element.assetId];
                 if (!asset) return;
@@ -312,8 +326,9 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
                 image.alt = (scene.decorativeImages || []).includes(element.assetId) ? "" : (scene.imageAltText || {})[element.assetId] || asset.filename;
                 const [left, top, right, bottom] = element.crop || [0,0,0,0];
                 image.style.cssText = `position:absolute;max-width:none;width:${100/(1-left-right)}%;height:${100/(1-top-bottom)}%;left:${-left*100/(1-left-right)}%;top:${-top*100/(1-top-bottom)}%;object-fit:fill`;
-                node.appendChild(image);
+                contentNode.appendChild(image);
             }
+            node.style.zIndex=String(layout.elements.indexOf(element)*2+1);
             stage.appendChild(node);
         });
         frame.appendChild(stage); body.appendChild(frame);
@@ -332,11 +347,12 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
         }
         visualObserver = new ResizeObserver(() => { stage.style.transform = `scale(${frame.clientWidth/layout.width})`; });
         visualObserver.observe(frame);
-        if (motionEnabled && layout.elements.some(element => element.animations)) stopStageAnimations = playStageAnimations(frame, layout.elements, Date.now() - sceneEnteredAt);
+        if (!layout.timeline && motionEnabled && layout.elements.some(element => element.animations)) stopStageAnimations = playStageAnimations(frame, layout.elements, Date.now() - sceneEnteredAt);
     }
     function render() {
     let scene = state.scenes[state.current];
     if (!scene) return;
+    if (sceneTransport) { sceneTransport.dispose(); sceneTransport = null; }
     if (stopStageAnimations) { stopStageAnimations(); stopStageAnimations = null; }
     if (animationSceneId !== scene.id) { animationSceneId = scene.id; sceneEnteredAt = Date.now(); }
     if (scene.assessmentItem && !scene.visualLayout?.enabled) {
@@ -376,7 +392,7 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
     const placements = scene.mediaPlacements?.length ? scene.mediaPlacements : [...(scene.imageAssets || []), ...(scene.audioAssets || []), ...(scene.videoAssets || [])].map(assetId => ({ assetId, position: "after" }));
     placements.forEach(placement => {
         const id = placement.assetId, asset = window.__CHIMERA_ASSETS[id];
-        if (!asset || asset.kind === "image" && embeddedImages.has(id)) return;
+        if (!asset || scheduledAssets(scene).has(id) || asset.kind === "image" && embeddedImages.has(id)) return;
         const container = placement.position === "before" ? before : media;
         const node = document.createElement(asset.kind === "image" ? "img" : asset.kind === "video" ? "video" : "audio");
         node.src = asset.path;
@@ -441,11 +457,37 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
         if (asset.captionsVtt && asset.kind !== "image") installCaptionTrack(node, asset.captionsVtt, asset.language || "en");
         if (asset.transcript && asset.kind !== "image") { const details = document.createElement("details"), summary = document.createElement("summary"), transcript = document.createElement("p"); summary.textContent = `Transcript: ${asset.filename}`; transcript.textContent = asset.transcript; details.appendChild(summary); details.appendChild(transcript); container.appendChild(details); }
     });
+    if (scene.visualLayout?.timeline && visual) {
+      const layout = scene.visualLayout, timeline = layout.timeline;
+      const stage = body.querySelector('.visual-stage');
+      stopStageAnimations = playStageAnimations(body,layout.elements);
+      const controls = document.createElement('section'); controls.setAttribute('aria-label','Scene playback');
+      controls.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 0';
+      const play = document.createElement('button');play.type='button';play.textContent='Play scene';
+      const restart = document.createElement('button');restart.type='button';restart.textContent='Restart';
+      const seek = document.createElement('input');seek.type='range';seek.min='0';seek.max=String(timeline.durationMs);seek.step='50';seek.setAttribute('aria-label','Scene playback time');
+      const output=document.createElement('output');
+      controls.append(play,restart,seek,output);body.appendChild(controls);
+      let lastSaved = 0;
+      const controller=createSceneTransport({root:body,stage,layout,resolveAsset:id=>window.__CHIMERA_ASSETS[id],initialTimeMs:(state.videoProgress[`clock:${scene.id}`]?.position||0)*1000,
+        progress:Object.fromEntries(timeline.clips.map(c=>[c.id,state.videoProgress[clipProgressKey(scene.id,c)]]).filter(([,v])=>v)),
+        onUpdate:(time,playing)=>{seek.value=String(time);output.textContent=`${(time/1000).toFixed(1)} / ${(timeline.durationMs/1000).toFixed(1)} s`;play.textContent=playing?'Pause scene':'Play scene';state.videoProgress[`clock:${scene.id}`]={position:time/1000,duration:timeline.durationMs/1000,watchedRanges:[]};if(!playing||time-lastSaved>5000){lastSaved=time;save();}},
+        onProgress:(id,value)=>{const clip=timeline.clips.find(c=>c.id===id);if(clip){state.videoProgress[clipProgressKey(scene.id,clip)]=value;finish();}},onError:runtimeStatus});
+      sceneTransport=controller;
+      // A deterministic snapshot hook is also used by Word scene rendering.
+      window.__CHIMERA_SCENE_TRANSPORT = controller;
+      play.onclick=()=>controller.playing?controller.pause():controller.play();
+      restart.onclick=()=>controller.seek(0);seek.oninput=()=>controller.seek(Number(seek.value));
+      for(const {node,asset,clip} of controller.media){
+        if(asset?.captionsVtt)installCaptionTrack(node,asset.captionsVtt,asset.language||'en');
+        if(asset?.transcript){const details=document.createElement('details'),summary=document.createElement('summary'),text=document.createElement('p');summary.textContent=`Transcript: ${clip.name||asset.filename}`;text.textContent=asset.transcript;details.append(summary,text);body.appendChild(details);}
+      }
+    } else window.__CHIMERA_SCENE_TRANSPORT = null;
     const status = document.querySelector("#scene-status"); status.textContent = `${state.current + 1} / ${state.scenes.length}`;
     document.querySelector("#previous").disabled = state.current === 0;
     document.querySelector("#next").disabled = state.current === state.scenes.length - 1;
     document.querySelector("#contents").value = String(state.current);
-    document.querySelector("#motion").hidden = !scene.visualLayout?.elements.some(element => element.animations && Object.values(element.animations).some(phase => phase.effect !== "none"));
+    document.querySelector("#motion").hidden = Boolean(scene.visualLayout?.timeline) || !scene.visualLayout?.elements.some(element => element.animations && Object.values(element.animations).some(phase => phase.effect !== "none"));
     document.querySelector("#motion").textContent = motionEnabled ? "Stop motion" : "Play motion";
     finish();
   }
@@ -455,6 +497,7 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
         const storyboard = localCourse || await (await fetch("storyboard.json")).json(); state.scenes = storyboard.scenes || []; state.completionSettings = storyboard.completionSettings || state.completionSettings;
     window.__CHIMERA_ASSETS = Object.fromEntries((storyboard.assets || []).map(asset => [asset.id, { ...asset, path: asset.path }]));
     const requiredVideoKeys = new Set(requiredVideos().map(item => item.key));
+    for(const scene of state.scenes){if(scene.visualLayout?.timeline)requiredVideoKeys.add(`clock:${scene.id}`);for(const clip of scene.visualLayout?.timeline?.clips||[])requiredVideoKeys.add(clipProgressKey(scene.id,clip));}
     state.videoProgress = Object.fromEntries(Object.entries(state.videoProgress).flatMap(([key, value]) => {
         const progress = requiredVideoKeys.has(key) ? normalizeVideoProgress(value) : null;
         return progress ? [[key, progress]] : [];
@@ -657,6 +700,19 @@ def _resume_budget_report(project: ProjectDetail, profile: str) -> dict[str, obj
         for placement in scene.mediaPlacements
         if placement.requiredViewing and placement.assetId in scene.videoAssets
     }
+    timeline_clips = 0
+    timeline_clocks = 0
+    for scene in scenes:
+        timeline = scene.visualLayout.timeline if scene.visualLayout else None
+        if not timeline:
+            continue
+        timeline_clocks += 1
+        video_progress[f"clock:{scene.id}"] = {"position": timeline.durationMs / 1000, "duration": timeline.durationMs / 1000, "watchedRanges": []}
+        for clip in timeline.clips:
+            timeline_clips += 1
+            key = f"clip:{scene.id}:{clip.id}:{clip.assetId}:{clip.sourceInMs}:{clip.sourceOutMs}"
+            duration = (clip.sourceOutMs - clip.sourceInMs) / 1000
+            video_progress[key] = {"position": duration, "duration": duration, "watchedRanges": [[0, duration]]}
     snapshot = {"current": max(0, len(scenes) - 1), "visited": [scene.id for scene in scenes],
                 "completedAudio": [f"{scene.id}:{asset}" for scene in scenes if scene.audioRequired for asset in scene.audioAssets],
                 "videoProgress": video_progress,
@@ -666,7 +722,8 @@ def _resume_budget_report(project: ProjectDetail, profile: str) -> dict[str, obj
     return {"budgetBytes": 4096 if profile == "SCORM 1.2" else 64000,
             "estimatedMaximumBytes": size, "encoding": "JSON UTF-8", "overflowPolicy": "warn-and-retain-previous-save",
             "requiredVideoCount": len(video_progress),
-            "videoRangeFragmentationNote": "Estimate includes one range per required video; repeated seeking can increase actual suspend-data size, which the player checks before every save."}
+            "timelineClipCount": timeline_clips, "timelineClockCount": timeline_clocks,
+            "videoRangeFragmentationNote": "Estimate includes one range per tracked media clip and scene clocks; repeated seeking can increase actual suspend-data size, which the player checks before every save."}
 
 
 def _manifest(project: ProjectDetail) -> bytes:

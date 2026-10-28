@@ -35,3 +35,7 @@
 .visual-editor > .onboarding-card {
   inset: auto auto 20px 20px;
 }
+
+.enhancement-review-dialog > .onboarding-card {
+  inset: auto auto 20px 20px;
+}

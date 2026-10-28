@@ -1,3 +1,4 @@
+import { scheduledAssets } from "../../backend/app/static/timeline-policy.js";
 import { useEffect, useRef } from "react";
 import type { Project, Scene } from "./App";
 import { effectivePlacements } from "./media";
@@ -135,7 +136,7 @@ export function PublishedMedia({ project, scene, position, completedAudioKeys, o
   onVideoProgress?: (key: string, progress: VideoProgress) => void;
 }) {
   const embedded = new Set(scene.visualLayout?.enabled ? scene.visualLayout.elements.filter(e => e.kind === "image").map(e => e.assetId) : []);
-  return <div className="published-media">{effectivePlacements(project, scene).filter(p => p.position === position && !embedded.has(p.assetId)).map(placement => {
+  return <div className="published-media">{effectivePlacements(project, scene).filter(p => p.position === position && !embedded.has(p.assetId) && !scheduledAssets(scene).has(p.assetId)).map(placement => {
     const asset = project.storyboard.assets.find(a => a.id === placement.assetId);
     if (!asset) return null;
     const source = `/api/projects/${project.id}/assets/${asset.id}`;

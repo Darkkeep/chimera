@@ -13,6 +13,8 @@ Chimera will use a **filesystem-backed project model** and a **canonical storybo
 
 ## 1.1 Current Status and Roadmap Authority
 
+**October 28 editor update:** native shape insertion, fill/outline/object opacity, text/shape shadow and bevel/emboss approximations, grouping/arrangement, and a shared animation/audio/video timeline are implemented. Timed clips support source trimming, coverage, captions, fades, cue markers, and timestamped Word visuals. Cue-triggered events, arbitrary keyframes/motion paths, and full PowerPoint effect fidelity remain outside this delivery. See the [implementation record](docs/scene-timeline-implementation.md) and [creator pre-alpha readiness](docs/pre-alpha-readiness.md).
+
 This document records the original product requirements and delivery sequence. It is not the authoritative implementation-status record: completed capabilities and their evidence are tracked in [current work and handoff](docs/current-work.md), the [1.1.0 completion update](docs/completion-update-2026-10-15.md), and the [SCORM compatibility checklist](docs/scorm-compatibility-checklist.md).
 
 The current product follows the separate [Pythia + Chimera integrated build plan](Pythia_Chimera_Integrated_Build_Plan.md): Pythia provides learning-intelligence analysis and proposals; Chimera owns authoring, review and acceptance, preview, and package production. Pythia proposals must not silently mutate canonical project content.
@@ -24,7 +26,7 @@ The current product follows the separate [Pythia + Chimera integrated build plan
 | 0 — Foundation | Delivered. |
 | 1 — PPTX import and rendering | Delivered. |
 | 2 — Storyboard editor | Delivered for the documented authoring workflows; see the current-work handoff for supported editing behavior and limits. |
-| 3 — Audio/video authoring | Core media authoring, captions, transcripts, and packaging are delivered. Advanced cue-point workflows and video-watch completion requirements remain open unless separately verified. |
+| 3 — Audio/video authoring | Core placement, captions/transcripts, required-media coverage, and scheduled/trimmed timeline clips are delivered with local checks. Cue-triggered actions and target-LMS acceptance of new timed packages remain open. |
 | 4 — Assessments and completion | Delivered for the documented assessment formats, scoring, completion rules, and remediation workflows. |
 | 5 — SCORM 2004 export | Export and local qualification are delivered. External acceptance is target-LMS- and package-specific. |
 | 6 — SCORM 1.2 export | Export and local qualification are delivered. Human acceptance evidence applies only to the packages and checks recorded in the compatibility checklist. |

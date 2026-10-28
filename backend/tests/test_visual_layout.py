@@ -304,7 +304,7 @@ class VisualLayoutTests(unittest.TestCase):
         for runtime in [PLAYER_JS, _scorm_12_player()]:
             self.assertIn("if (visual) renderVisualScene(scene, body)", runtime)
             self.assertIn("if (!visual && scene.previewImage)", runtime)
-            self.assertIn("node.textContent = element.text", runtime)
+            self.assertIn("contentNode.textContent = element.text", runtime)
             self.assertIn("element.crop", runtime)
             self.assertIn('element.kind === "shape"', runtime)
             self.assertIn("element.shapeSvg", runtime)

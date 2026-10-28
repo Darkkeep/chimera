@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-28",
+  "baseCommit": "f176d0f7571f56ba6541b41780eb5ff4a0b67968",
+  "scope": "Working implementation captured before its delivery commit; isolated synthetic courses from scene-timeline.spec.cjs, Chromium screenshots. No user course copied or paid generation requested. Existing screenshots retain earlier provenance. Final capture blocks unrelated Google font downloads for deterministic local font fitting; Light/Dark and 320/768/1024/1440px checks passed in all three browser engines.",
+  "hashAlgorithm": "SHA-256",
+  "files": {
+    "frontend/src/SceneVisualEditor.tsx": "45dff222dd13bfd05a255df7460155e5fba18666c3a083b0983fae8562f064f2",
+    "frontend/src/SceneSurface.tsx": "49bbc311e00cf32210eef932016b0b640d705473995abf0e1bbeed8c8e660342",
+    "frontend/src/SceneTimeline.tsx": "2a0c34d8bcbd0e876544f56ae4f4691652bbbee85b1213017ed54b856d38f27f",
+    "frontend/src/ElementAppearanceControls.tsx": "817e9609a55c333de045bf2b14e67db695145163cdd8528b625687111ef8826f",
+    "frontend/src/TimelinePlayback.tsx": "88b1b9bcc08868ab07bb5a735240e3e1d3d5450c67d502f65f4185a1a07954c6",
+    "frontend/src/waveform.ts": "d87326b0457dc65d7dd0a52d7902c1046b26af188eff7c432c1c99956687dfa1",
+    "frontend/src/scene-timeline.ts": "02bda02308f9e9783cea5108e3641550a035c1506284fc9dcaaae01ddb509db1",
+    "backend/app/models.py": "84a657b2285befdf3a1c8ad918e301730b1928bae7cb995f645c248ec78f7002",
+    "backend/app/scorm.py": "4d72649111806b4a2bdb720ee0da83ad690fb7c152b7a848a7d214f3fb36e743",
+    "backend/app/static/scene-appearance.js": "459ea7d11c1c9c5c5f4305e441aea44e993e037bcff394bcc7337a9035d604c6",
+    "backend/app/static/scene-transport.js": "dda875ea38812a15b7211d690754dbd5a72ed55c0d3b006afd1ea8001e9f197f",
+    "backend/app/static/timeline-policy.js": "053300ac2dc6b5c5d4dc3a00aff5a5f8c840a301a907cb8c11a938b3f8320a3f",
+    "tests/onboarding/scene-timeline.spec.cjs": "b15adaf520fc37f9201acdfef5389535b88aecdcfb5388e6a42089e60b256dee",
+    "tests/fixtures/timeline-qualification.mp4": "7eefcd53e1b3a78b5c0ed2a0a4b61f70dfa17607471a62ade6f0b04ecde6bf38",
+    "docs/user-guide/images/timeline-shape-editor.png": "bd3e293dd74f0e52a010f414c84a0bdd69b4918d0401da773773f156a83095bd",
+    "docs/user-guide/images/timeline-controls.png": "47d9e31d64535398027ccb55f2dc6c13f2daab90a98c0a7f62afe981072ea9bb",
+    "docs/user-guide.md": "f7c19e6a2ec16190777c3f46909f080318306bd461ff265de0af320013cd71d5",
+    "frontend/src/completion.ts": "0b52497bd6a00115a31b425f6a2ce2b769affd7213305b457e1f9beb19782822",
+    "frontend/src/PublishedMedia.tsx": "36abafa2baacec88a409ed94224935de9aa9a16a52364e7050b33d8402077934",
+    "frontend/src/CoursePreview.tsx": "b670db38a1d1e7522c677ca56caf986d9a6e591d303c5c9638dd48daff9e6184",
+    "backend/app/media.py": "75e90c14fba00be18a8d94a4236699bc746220ea606c0f051758873c1a581436",
+    "backend/app/storage.py": "99b390916b34fa21fa03928da6ec86baad7f31e3e3a525780944e7d87e1942d0",
+    "backend/app/validation.py": "e47d8fb51fa7045277a61f383ef6fc045091d2a904d7dbbdff75dd24c1217697",
+    "backend/app/word_export.py": "5360507c2b77b924b68820e080d5229835c835ee5c276932a4421f598ccd63e0",
+    "scripts/render-authored-scenes.cjs": "6dad73551907d7bb1c3c282e974b6cf10501b548790aba3a2722451f0fde1354",
+    "docs/user-guide.pdf": "b0ab5e47b7bfa580d6c564e8f57ae0d0bbb6be1ef1be3a9d339c4e916b940cd2"
+  },
+  "pdf": {
+    "pages": 88,
+    "internalLinks": 35,
+    "textOutsidePage": []
+  }
+}

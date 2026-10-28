@@ -24,7 +24,9 @@ PowerPoint conversion still has representational limits. Stage lists import limi
 
 SCORM 1.2, SCORM 2004, and standalone delivery resolve the authored composition and background inheritance. Original source-preview images are not included when a scene has an authored layout.
 
-Word storyboard exports embed static snapshots produced by the delivery player, accompanied by editable instructional text, notes, media information, and optional answer keys. Motion is stopped for print; interactive assessments are shown in their initial unanswered state. Original source screenshots are not substituted for unavailable authored snapshots.
+Word storyboard exports embed static snapshots produced by the delivery player, accompanied by editable instructional text, notes, media information, and optional answer keys. Legacy scenes stop motion for print. Timed scenes use their authored **Word snapshot time**, with written clip/cue timing in storyboard records; interactive assessments are shown in their initial unanswered state. Original source screenshots are not substituted for unavailable authored snapshots.
+
+Native shape appearance and the shared scene clock are described in the [timeline procedures](user-guide.md#schedule-scene-objects-audio-and-video). Media clips retain source bytes, use separate source-in/out and scene-start times, and share pause/seek/restart with native animations. Existing attachments are not silently converted. Bevel/emboss are browser lighting approximations, not a guarantee of PowerPoint effect fidelity.
 
 The document renderer needs Node.js, the root production dependencies (`npm ci --omit=dev`), and Chromium (`npx playwright install chromium`). Playwright is pinned as a production dependency. Rendering uses a temporary localhost-only package, blocks external network requests, and removes temporary output afterward. A failed renderer returns an actionable export error.
 

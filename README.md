@@ -11,6 +11,8 @@ See the [illustrated user guide](docs/user-guide.md) and [PDF edition](docs/user
 
 See [current work and handoff](docs/current-work.md) for completed milestones, remaining deployment checks, and continuing on another workstation.
 
+For the proposed supported creator pilot, see [pre-alpha readiness](docs/pre-alpha-readiness.md). It separates delivered capabilities from candidate packaging/CI, clean-install/recovery, human acceptance, and participant-support work. No release approval is implied by the feature list or local test results.
+
 In the app, **User guide** sits immediately below **Templates** in the WORKSPACE rail. It opens the bundled PDF in a new tab, works without a selected project, and needs no GitHub connection.
 
 The authoring workspace keeps scenes beside the canvas. Use a scene's pencil button to edit it directly, or **Edit scene** above the preview. Project selection and libraries live in the sidebar; **Review tools** groups validation, accessibility, completion rules, and guided review. **Export** opens SCORM packages, build reports, JSON backup/restore, and available QTI test export. Editing dialogs support Tab, Shift+Tab, and Escape.
@@ -57,6 +59,8 @@ Onboarding's reusable engine and standalone demo live in the private [Darkkeep/o
 New media controls support explicit scene/course-wide placement, project copies of shared assets, captioned MP4/WebM video and local PDF OCR with author inspection. Word exports can include accepted source citations and optional review discussion. See [media placement and OCR](docs/media-placement-and-ocr.md), [resume-data limits](docs/resume-data-policy.md), and [release policy](docs/release-policy.md).
 
 ## Start locally
+
+The scene editor now includes native shape insertion, opacity/fill/outline controls, text/shape shadow and bevel/emboss approximations, layer grouping/arrangement, and an optional shared timeline for animations and trimmed audio/video clips. Open **Edit scene > Stage**, then **Appearance** or **Timeline and layers**. See the [timeline procedures](docs/user-guide.md#schedule-scene-objects-audio-and-video) and [implementation plan](docs/scene-timeline-layers-plan.md). Existing scenes retain their playback until a timeline is explicitly enabled.
 
 For local, Encarta, and networked authentication preparation, see the [deployment authentication guide](docs/authentication-deployments.md). Local single-user operation remains the default; hosted profiles use separate workspaces.
 
@@ -113,5 +117,7 @@ Editable Word storyboard export is available from **Export**. Choose **SME Maste
 Chimera is licensed under the [MIT License](LICENSE). Third-party components retain their own licenses; for example, the vendored `@guided-workflows/onboarding` package is ISC-licensed, with its license included in the package tarball.
 
 ## Verify changes
+
+GitHub's **Chimera checks** workflow runs browser integration in nine isolated jobs: Chromium/Firefox/WebKit, each split into three shards with one worker. Backend, production build, visual/export qualification, and HTTPS auth run separately. The historical `test:onboarding` command and `tests/onboarding` directory contain the full browser integration suite, not only walkthrough tests. Each shard retains its own report and failure artifacts.
 
 From the repository root, run the backend suite with `python -m unittest discover -s backend/tests`, build with `npm --prefix frontend run build`, and run Chromium workflows with `npm run test:onboarding -- --project chromium`. `npm run test:management` targets My Work. The browser suites use temporary workspaces and inert AI responses, not real provider credentials. Hosted HTTPS verification remains `npm run test:auth` after the frontend build.

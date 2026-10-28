@@ -32,16 +32,16 @@ class EntranceAnimation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     effect: Literal["none", "fade", "slide-up", "slide-left", "zoom", "bounce"] = "none"
-    durationMs: int = Field(default=600, ge=100, le=5000)
-    delayMs: int = Field(default=0, ge=0, le=60000)
+    durationMs: int = Field(default=600, ge=100, le=60000)
+    delayMs: int = Field(default=0, ge=0, le=3600000)
 
 
 class PresentationAnimation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     effect: Literal["none", "pulse", "sway", "highlight"] = "none"
-    durationMs: int = Field(default=800, ge=100, le=5000)
-    delayMs: int = Field(default=0, ge=0, le=60000)
+    durationMs: int = Field(default=800, ge=100, le=60000)
+    delayMs: int = Field(default=0, ge=0, le=3600000)
     iterations: int = Field(default=1, ge=1, le=5)
 
 
@@ -49,8 +49,8 @@ class ExitAnimation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     effect: Literal["none", "fade", "slide-up", "slide-left", "zoom"] = "none"
-    durationMs: int = Field(default=400, ge=100, le=5000)
-    delayMs: int = Field(default=3000, ge=0, le=60000)
+    durationMs: int = Field(default=400, ge=100, le=60000)
+    delayMs: int = Field(default=3000, ge=0, le=3600000)
 
 
 class ElementAnimations(BaseModel):
@@ -66,6 +66,101 @@ class ElementAnimations(BaseModel):
         presentation_end = entrance_end + self.presentation.delayMs + self.presentation.durationMs * self.presentation.iterations if self.presentation.effect != "none" else entrance_end
         if self.exit.effect != "none" and self.exit.delayMs < presentation_end:
             raise ValueError("Exit must start after entrance and presentation animations finish")
+        return self
+
+
+class SurfaceEffect(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    color: str = Field(default="#000000", pattern=r"^#[0-9a-fA-F]{6}$")
+    opacity: float = Field(default=0.35, ge=0, le=1, allow_inf_nan=False)
+    size: float = Field(default=4, ge=0, le=64, allow_inf_nan=False)
+    blur: float = Field(default=4, ge=0, le=64, allow_inf_nan=False)
+    angle: float = Field(default=135, ge=-360, le=360, allow_inf_nan=False)
+
+
+class ElementAppearance(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    opacity: float = Field(default=1, ge=0, le=1, allow_inf_nan=False)
+    fill: str = Field(default="#168da8", pattern=r"^#[0-9a-fA-F]{6}$")
+    fillOpacity: float = Field(default=1, ge=0, le=1, allow_inf_nan=False)
+    stroke: str = Field(default="#202020", pattern=r"^#[0-9a-fA-F]{6}$")
+    strokeOpacity: float = Field(default=1, ge=0, le=1, allow_inf_nan=False)
+    strokeWidth: float = Field(default=0, ge=0, le=50, allow_inf_nan=False)
+    cornerRadius: float = Field(default=12, ge=0, le=500, allow_inf_nan=False)
+    shadow: SurfaceEffect = Field(default_factory=SurfaceEffect)
+    bevel: SurfaceEffect = Field(default_factory=SurfaceEffect)
+    emboss: SurfaceEffect = Field(default_factory=SurfaceEffect)
+
+
+class ElementTiming(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    startMs: int = Field(default=0, ge=0, le=3600000)
+    endMs: int = Field(gt=0, le=3600000)
+
+    @model_validator(mode="after")
+    def ordered(self):
+        if self.endMs <= self.startMs:
+            raise ValueError("An object's end must follow its start")
+        return self
+
+
+class TimelineClip(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(min_length=1, max_length=120)
+    assetId: str = Field(min_length=1, max_length=120)
+    name: str = Field(default="", max_length=200)
+    kind: Literal["audio", "video"]
+    startMs: int = Field(default=0, ge=0, le=3600000)
+    sourceInMs: int = Field(default=0, ge=0, le=3600000)
+    sourceOutMs: int = Field(gt=0, le=3600000)
+    sourceDurationMs: int | None = Field(default=None, gt=0, le=3600000)
+    volume: float = Field(default=1, ge=0, le=1, allow_inf_nan=False)
+    required: bool = False
+    thresholdPercent: int = Field(default=90, ge=1, le=100)
+    x: float = Field(default=40, ge=-10000, le=10000, allow_inf_nan=False)
+    y: float = Field(default=40, ge=-10000, le=10000, allow_inf_nan=False)
+    width: float = Field(default=480, gt=0, le=10000, allow_inf_nan=False)
+    height: float = Field(default=270, gt=0, le=10000, allow_inf_nan=False)
+    layerOrder: int = Field(default=4001, ge=0, le=4001)
+    fadeInMs: int = Field(default=0, ge=0, le=60000)
+    fadeOutMs: int = Field(default=0, ge=0, le=60000)
+
+    @model_validator(mode="after")
+    def ordered(self):
+        if self.sourceOutMs <= self.sourceInMs:
+            raise ValueError("Source out must follow source in")
+        if self.sourceDurationMs is not None and self.sourceOutMs > self.sourceDurationMs:
+            raise ValueError("Source out must fit within the source media")
+        if self.fadeInMs + self.fadeOutMs > self.sourceOutMs - self.sourceInMs:
+            raise ValueError("Fades must fit within the clip")
+        return self
+
+
+class TimelineCue(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=200)
+    timeMs: int = Field(ge=0, le=3600000)
+
+
+class SceneTimeline(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    version: Literal[1] = 1
+    durationMs: int = Field(default=30000, gt=0, le=3600000)
+    printTimeMs: int = Field(default=0, ge=0, le=3600000)
+    clips: list[TimelineClip] = Field(default_factory=list, max_length=200)
+    cues: list[TimelineCue] = Field(default_factory=list, max_length=200)
+
+    @model_validator(mode="after")
+    def validate_clips(self):
+        if len({clip.id for clip in self.clips}) != len(self.clips):
+            raise ValueError("Timeline clip identifiers must be unique")
+        if self.printTimeMs > self.durationMs:
+            raise ValueError("Print time must fit within the scene")
+        if any(cue.timeMs > self.durationMs for cue in self.cues):
+            raise ValueError("Cue markers must fit within the scene")
+        if any(clip.startMs + clip.sourceOutMs - clip.sourceInMs > self.durationMs for clip in self.clips):
+            raise ValueError("Extend the scene duration to contain every clip")
         return self
 
 
@@ -91,12 +186,19 @@ class SceneElement(BaseModel):
     source: Literal["slide", "layout", "master", "manual"] = "manual"
     locked: bool = False
     animations: ElementAnimations | None = None
+    name: str = Field(default="", max_length=200)
+    nativeShape: Literal["rectangle", "rounded-rectangle", "ellipse", "line", "arrow", "triangle", "diamond"] | None = None
+    appearance: ElementAppearance | None = None
+    timing: ElementTiming | None = None
+    groupId: str | None = Field(default=None, max_length=120)
+    hidden: bool = False
+    aspectLocked: bool | None = None
 
     @model_validator(mode="after")
     def validate_element(self) -> "SceneElement":
         if self.kind == "image" and not self.assetId:
             raise ValueError("Image elements require an asset reference")
-        if self.kind == "shape" and not self.shapeSvg:
+        if self.kind == "shape" and not self.shapeSvg and not self.nativeShape:
             raise ValueError("Shape elements require vector geometry")
         if any(not 0 <= value < 1 for value in self.crop) or self.crop[0] + self.crop[2] >= 1 or self.crop[1] + self.crop[3] >= 1:
             raise ValueError("Image crop must leave a visible image")
@@ -122,6 +224,7 @@ class SceneLayout(BaseModel):
     elements: list[SceneElement] = Field(default_factory=list, max_length=2000)
     warnings: list[str] = Field(default_factory=list)
     assessmentRegion: AssessmentRegion | None = None
+    timeline: SceneTimeline | None = None
 
     @model_validator(mode="after")
     def validate_identifiers(self) -> "SceneLayout":
@@ -131,6 +234,18 @@ class SceneLayout(BaseModel):
             raise ValueError("Inherited or empty backgrounds cannot specify a scene image")
         if len({element.id for element in self.elements}) != len(self.elements):
             raise ValueError("Scene element identifiers must be unique")
+        if self.timeline and any(element.timing and element.timing.endMs > self.timeline.durationMs for element in self.elements):
+            raise ValueError("Extend the scene duration to contain every object")
+        if self.timeline:
+            for element in self.elements:
+                a = element.animations
+                if not a:
+                    continue
+                entrance_end = a.entrance.delayMs + a.entrance.durationMs if a.entrance.effect != "none" else 0
+                presentation_end = entrance_end + a.presentation.delayMs + a.presentation.durationMs * a.presentation.iterations if a.presentation.effect != "none" else entrance_end
+                exit_end = a.exit.delayMs + a.exit.durationMs if a.exit.effect != "none" else 0
+                if max(entrance_end, presentation_end, exit_end) > self.timeline.durationMs:
+                    raise ValueError("Extend the scene duration to contain every animation")
         region = self.assessmentRegion
         if region and (region.x + region.width > self.width or region.y + region.height > self.height):
             raise ValueError("Assessment region must fit within the stage")
