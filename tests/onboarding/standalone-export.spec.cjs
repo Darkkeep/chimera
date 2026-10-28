@@ -94,9 +94,11 @@ test('standalone export runs directly from an extracted local folder without net
     await expect(localPage.getByText('Inspect equipment before operation.', { exact: true })).toBeVisible();
     const animatedHeading = localPage.locator('[data-scene-element="heading"]');
     await expect.poll(() => animatedHeading.evaluate(node => node.getAnimations().length)).toBe(3);
-    const motion = await animatedHeading.evaluate(node => {
+    const motion = await animatedHeading.evaluate(async node => {
       const animations = node.getAnimations();
-      animations.forEach(animation => { animation.pause(); animation.currentTime = 0; });
+      animations.forEach(animation => animation.pause());
+      await Promise.all(animations.map(animation => animation.ready));
+      animations.forEach(animation => { animation.currentTime = 0; });
       const entering = getComputedStyle(node).opacity;
       animations.forEach(animation => { animation.currentTime = 11000; });
       const exited = getComputedStyle(node).opacity;
@@ -143,8 +145,8 @@ test('standalone export runs directly from an extracted local folder without net
     await expect(localPage.getByRole('heading', { name: 'Knowledge check', exact: true })).toBeVisible();
     await localPage.screenshot({ path: testInfo.outputPath('local-player-mobile.png') });
     await localPage.getByRole('button', { name: 'Next', exact: true }).click();
-    const nativeSlide = localPage.getByRole('region', { name: 'Scene content', exact: true });
-    await expect(nativeSlide.getByRole('heading', { name: nativeTitle, exact: true })).toBeVisible();
+    const nativeSlide = localPage.locator('#scene-body .visual-stage-frame');
+    await expect(nativeSlide.locator('[data-scene-element]').filter({ hasText: nativeTitle })).toHaveText(nativeTitle);
     await expect(nativeSlide).toContainText('less than five simple steps.');
     expect(await localPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await localPage.screenshot({ path: testInfo.outputPath('native-slide-mobile.png') });

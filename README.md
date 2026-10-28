@@ -118,4 +118,6 @@ Chimera is licensed under the [MIT License](LICENSE). Third-party components ret
 
 ## Verify changes
 
+GitHub's **Chimera checks** workflow runs browser integration in nine isolated jobs: Chromium/Firefox/WebKit, each split into three shards with one worker. Backend, production build, visual/export qualification, and HTTPS auth run separately. The historical `test:onboarding` command and `tests/onboarding` directory contain the full browser integration suite, not only walkthrough tests. Each shard retains its own report and failure artifacts.
+
 From the repository root, run the backend suite with `python -m unittest discover -s backend/tests`, build with `npm --prefix frontend run build`, and run Chromium workflows with `npm run test:onboarding -- --project chromium`. `npm run test:management` targets My Work. The browser suites use temporary workspaces and inert AI responses, not real provider credentials. Hosted HTTPS verification remains `npm run test:auth` after the frontend build.

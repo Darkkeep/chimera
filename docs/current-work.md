@@ -1,5 +1,9 @@
 # Current work and handoff
 
+## October 28 CI follow-up for PR #9
+
+The first [PR #9 workflow](https://github.com/Darkkeep/chimera/actions/runs/40707489276) passed backend/build/artifact checks but hit the 60-minute job limit during the serial 576-check browser matrix. Logs also showed repeated inspector and standalone assertions against older UI structure; no successful full-matrix qualification is claimed for that run. Browser integration now uses nine isolated runner jobs (three shards for each browser, one worker per runner), with separate backend/build/visual/auth qualification. Each browser shard has 64 checks and its own report/artifacts. Inspector tests distinguish top-level sections from nested effect details; standalone checks use the authored stage and await animation pause readiness; the twelve-scan provider accessibility scenario has an explicit timeout. Fresh CI must qualify the updated PR head before merge.
+
 ## October 28 scene timeline, layers, shapes, and effects
 
 The [scene timeline implementation](scene-timeline-implementation.md) delivers native shape insertion and appearance, text/shape effects, grouping/layer arrangement, and an optional shared animation/media timeline following the [plan](scene-timeline-layers-plan.md). Clips support source trimming, overlaps, volume/fades, audition controls, video geometry/stacking, local waveforms, and cues. Preview and exports share timing and consumption rules; seeking does not earn completion. Word snapshots use an authored timestamp and include written timeline records. Bevel/emboss are browser lighting approximations. Existing scenes remain unscheduled until explicitly enabled.
