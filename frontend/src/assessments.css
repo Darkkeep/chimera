@@ -1,4 +1,20 @@
 .assessments-editor { width: min(760px, calc(100vw - 32px)); }
+.assessments-editor { max-height: 92dvh; overflow: auto; }
+.assessment-question-bank { margin-block: 20px; }
+.question-bank-add { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.question-bank-add label { flex: 1 1 200px; }
+.question-import { padding-block: 16px; }
+.question-import p { font-size: 13px; line-height: 1.5; }
+.question-import-rows { list-style: none; padding: 0; max-height: 450px; overflow: auto; }
+.question-import-rows > li { padding: 14px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.question-import .question-import-select { display: flex; flex-direction: row; align-items: start; gap: 10px; margin-block: 12px; }
+.assessments-editor input[type="checkbox"] { width: 18px; height: 18px; flex: 0 0 18px; padding: 0; margin: 0; }
+.question-import-select small { display: block; font-size: 12px; }
+.question-import-warning { color: var(--ui-warning); }
+.question-import details { color: var(--ink); margin-block: 10px; }
+.question-import summary { cursor: pointer; font-size: 13px; }
+.question-import dd { margin-left: 12px; }
+.question-import .button { margin-block: 8px; }
 .assessments-heading, .assessments-list > li, .assessments-questions > li { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .assessments-heading { flex-wrap: wrap; margin: 12px 0; }
 .assessments-heading h3, .assessments-draft h3 { margin: 0; font-size: 16px; }
@@ -6,14 +22,14 @@
 .assessments-list > li, .assessments-questions > li { padding: 12px 0; border-bottom:1px solid var(--border, var(--line)); }
 .assessments-list > li { flex-wrap: wrap; }
 .assessments-description { display: grid; gap: 4px; min-width: 0; flex: 1 1 180px; overflow-wrap: anywhere; }
-.assessments-description span, .assessments-question small { font-size: 12px; color:var(--text-muted, var(--muted)); }
+.assessments-description span, .assessments-question small { font-size: 12px; color:var(--muted); }
 .assessments-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; flex-shrink: 0; }
 .assessments-draft { margin-top: 20px; padding-top: 18px; border-top:1px solid var(--border, var(--line)); }
 .assessments-draft fieldset { border:0; padding: 12px 0 0; margin: 0; min-width: 0; }
 .assessments-questions { max-height: 340px; overflow: auto; }
+.assessments-questions > li { margin-block: 4px; padding: 12px; border: 1px solid var(--line); border-radius: var(--chimera-radius-sm); background: var(--theme-raised); color: var(--ink); }
 .assessments-questions .assessments-question { display: flex; flex-direction: row; align-items: center; gap: 10px; min-width: 0; margin: 0; flex: 1; }
-.assessments-question input { width: 18px; height: 18px; flex-shrink: 0; margin: 0; }
-.assessments-question span { overflow-wrap: anywhere; min-width: 0; }
+.assessments-question span { flex: 1; overflow-wrap: anywhere; min-width: 0; }
 .assessments-question small { display: block; margin-top: 3px; }
 .course-preview-assessments { margin: 20px 0; padding: 16px 0; border-block:1px solid var(--border, var(--line)); }
 .course-preview-assessments h2 { font-size: 16px; margin: 0 0 8px; }

@@ -36,7 +36,7 @@ CAPTION_RUNTIME = (Path(__file__).parent / "static" / "captions.js").read_text(e
 PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
 (() => {
     const suspendDataLimit = 64000;
-    const state = { scenes: [], completionSettings: { passingScore: 80, includeOptionalAssessments: false }, current: 0, visited: new Set(), completedAudio: new Set(), assessments: {}, remediation: null, startedAt: Date.now() };
+    const state = { scenes: [], completionSettings: { passingScore: 80, includeOptionalAssessments: false }, current: 0, visited: new Set(), completedAudio: new Set(), videoProgress: {}, assessments: {}, remediation: null, startedAt: Date.now() };
   let api = null;
         let resumeChoicePending = false;
     let lmsWarningShown = false;
@@ -59,7 +59,9 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
         function call(name, value) { if (!api) return ""; try { const result = api[name](...value); if (result === false || result === "false") { lmsWarningShown = true; runtimeStatus(`LMS rejected ${name}; progress or grades may not be saved. Check the LMS launch and grading settings.`); } return result; } catch (_) { if (!lmsWarningShown) { lmsWarningShown = true; runtimeStatus("LMS tracking is unavailable; progress will not be reported."); } return ""; } }
     function accepted(result) { return result === true || result === "true"; }
     function suspendSnapshot() {
-        return JSON.stringify({ current: state.current, visited: [...state.visited], completedAudio: [...state.completedAudio], assessments: state.assessments, remediation: state.remediation });
+        const snapshot = { current: state.current, visited: [...state.visited], completedAudio: [...state.completedAudio], assessments: state.assessments, remediation: state.remediation };
+        if (Object.keys(state.videoProgress).length) snapshot.videoProgress = state.videoProgress;
+        return JSON.stringify(snapshot);
     }
     function utf8Size(text) {
         let bytes = 0;
@@ -88,6 +90,44 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
         return committed;
   }
     function settings(scene) { return scene.assessmentSettings || { maxAttempts: 2, passingScore: 100, scoreWeight: 1, remediationSceneId: null }; }
+      function mergePlayedRanges(existing, played, duration) {
+          const ranges = Array.isArray(existing) ? existing.filter(range => Array.isArray(range) && range.length === 2 && Number.isFinite(range[0]) && Number.isFinite(range[1]) && range[1] > range[0]).map(range => [Math.max(0, range[0]), Math.min(duration, range[1])]).filter(range => range[1] > range[0]) : [];
+          for (let index = 0; index < played.length; index++) {
+              const start = Math.max(0, played.start(index));
+              const end = Math.min(duration, played.end(index));
+              if (end > start) ranges.push([start, end]);
+          }
+          ranges.sort((left, right) => left[0] - right[0]);
+          const merged = [];
+          ranges.forEach(([start, end]) => {
+              const previous = merged[merged.length - 1];
+              if (previous && start <= previous[1] + 0.2) previous[1] = Math.max(previous[1], end);
+              else merged.push([start, end]);
+          });
+          return merged.map(([start, end]) => [Math.round(start * 10) / 10, Math.round(end * 10) / 10]);
+      }
+      function videoCoverage(progress) {
+          if (!progress || !Number.isFinite(progress.duration) || progress.duration <= 0) return 0;
+          const watched = progress.watchedRanges.reduce((total, [start, end]) => total + Math.max(0, end - start), 0);
+          return Math.min(100, Math.floor(watched / progress.duration * 100));
+      }
+      function requiredVideos() {
+          const videos = new Map();
+          state.scenes.forEach(scene => (scene.mediaPlacements || [])
+              .filter(placement => placement.requiredViewing && (scene.videoAssets || []).includes(placement.assetId) && window.__CHIMERA_ASSETS[placement.assetId]?.kind === "video")
+              .forEach(placement => {
+                  const current = videos.get(placement.assetId);
+                  if (!current || (placement.viewingThresholdPercent || 90) > current.threshold) {
+                      videos.set(placement.assetId, { scene, placement, key: placement.assetId, threshold: placement.viewingThresholdPercent || 90 });
+                  }
+              }));
+          return [...videos.values()];
+      }
+      function normalizeVideoProgress(value) {
+          if (!value || typeof value !== "object" || !Number.isFinite(value.duration) || value.duration <= 0 || !Array.isArray(value.watchedRanges)) return null;
+          const ranges = mergePlayedRanges(value.watchedRanges, { length: 0 }, value.duration);
+          return { position: Number.isFinite(value.position) ? Math.max(0, Math.min(value.position, value.duration)) : 0, duration: value.duration, watchedRanges: ranges };
+      }
     function assessmentCorrect(item, result) {
         if (item.type === "single-choice" || item.type === "true-false") return result.response.length === 1 && result.response[0] === item.correctResponse;
         if (item.type === "multiple-response") return [...result.response].sort().join("|") === [...item.correctResponses].sort().join("|");
@@ -105,8 +145,16 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
         let controls = "";
         if (item.type === "single-choice" || item.type === "true-false" || item.type === "multiple-response") controls = choiceList.map(choice => `<label><input type="${item.type === "multiple-response" ? "checkbox" : "radio"}" name="assessment-response" value="${escapeHtml(choice.identifier)}" ${result.response.includes(choice.identifier) ? "checked" : ""} ${disabled ? "disabled" : ""}> ${escapeHtml(choice.text)}</label>`).join("");
         if (item.type === "ordering") controls = choiceList.map((choice, index) => `<label>${index + 1}. <select data-order-index="${index}" ${disabled ? "disabled" : ""}><option value="">Choose</option>${choiceList.map(option => `<option value="${escapeHtml(option.identifier)}" ${result.response[index] === option.identifier ? "selected" : ""}>${escapeHtml(option.text)}</option>`).join("")}</select></label>`).join("");
-        if (item.type === "matching" || item.type === "drag-drop") { const sources = item.type === "matching" ? item.leftItems : item.draggables; const targets = item.type === "matching" ? item.rightItems : item.targets; controls = sources.map(source => `<label>${escapeHtml(source.text)} <select data-match-source="${escapeHtml(source.identifier)}" ${disabled ? "disabled" : ""}><option value="">Choose a match</option>${targets.map(target => `<option value="${escapeHtml(target.identifier)}" ${result.matches[source.identifier] === target.identifier ? "selected" : ""}>${escapeHtml(target.text)}</option>`).join("")}</select></label>`).join(""); }
-        if (item.type === "short-answer") controls = `<label>Your answer <input data-text-response maxlength="1000" value="${escapeHtml(result.textResponse)}" ${disabled ? "disabled" : ""}></label>`;
+        if (item.type === "matching") { controls = item.leftItems.map(source => `<label>${escapeHtml(source.text)} <select data-match-source="${escapeHtml(source.identifier)}" ${disabled ? "disabled" : ""}><option value="">Choose a match</option>${item.rightItems.map(target => `<option value="${escapeHtml(target.identifier)}" ${result.matches[source.identifier] === target.identifier ? "selected" : ""}>${escapeHtml(target.text)}</option>`).join("")}</select></label>`).join(""); }
+        if (item.type === "drag-drop") {
+            const bank = item.draggables.filter(source => !result.matches[source.identifier]).map(source => `<button type="button" class="course-preview-drag-chip" data-drag-source="${escapeHtml(source.identifier)}" draggable="${!disabled}" aria-pressed="false" ${disabled ? "disabled" : ""}>${escapeHtml(source.text)}</button>`).join("");
+            const targets = item.targets.map(target => {
+                const placed = item.draggables.find(source => result.matches[source.identifier] === target.identifier);
+                return `<div class="course-preview-drop-target" data-drop-target="${escapeHtml(target.identifier)}"><strong>${escapeHtml(target.text)}</strong><button type="button" class="course-preview-drop-slot${placed ? " course-preview-drag-chip" : ""}" data-target-slot aria-label="Place selected tile beside ${escapeHtml(target.text)}" aria-disabled="true" ${disabled ? "disabled" : ""}>${placed ? escapeHtml(placed.text) : "Drop a tile here"}</button></div>`;
+            }).join("");
+            controls = `<div class="course-preview-drag-question"><p class="course-preview-drag-instructions">Drag a tile beside its matching label, or select a tile and then a target. Incorrect tiles return home without using an attempt.</p><div class="course-preview-draggables" role="group" aria-label="Draggable answers">${bank || "<span>All tiles placed.</span>"}</div><div class="course-preview-drop-targets" role="group" aria-label="Drop targets">${targets}</div><p class="course-preview-drag-status" role="status" aria-live="polite"></p></div>`;
+        }
+        if (item.type === "short-answer") controls = `<label>Fill in the blank <input type="text" data-text-response maxlength="1000" autocomplete="off" value="${escapeHtml(result.textResponse)}" ${disabled ? "disabled" : ""}></label>`;
         const feedback = result.attempts && result.isCorrect !== null ? `<button type="button" data-view-feedback>View feedback</button>` : "";
         const hasResponse = result.response.length || Object.keys(result.matches).length || result.textResponse.trim().length;
         return `<section class="assessment"><h3>${escapeHtml(item.prompt)}</h3><form id="assessment-form">${controls}<button type="submit" ${disabled || !hasResponse ? "disabled" : ""}>${result.isCorrect === true ? "Passed" : result.attempts >= settings(scene).maxAttempts ? "Attempts used" : result.isCorrect === false ? "Try again" : "Check answer"}</button>${feedback}</form></section>`;
@@ -132,7 +180,7 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
     function finish() {
         if (!save()) return;
         const required = state.scenes.filter(scene => scene.required);
-        const complete = state.scenes.length > 0 && required.every(scene => { if (!state.visited.has(scene.id)) return false; if (!scene.assessmentItem) return true; const result = state.assessments[scene.id]; const config = settings(scene); return result && result.attempts > 0 && (result.isCorrect === true || result.attempts >= config.maxAttempts); }) && state.scenes.filter(scene => scene.audioRequired).every(scene => scene.audioAssets.length > 0 && scene.audioAssets.every(id => state.completedAudio.has(`${scene.id}:${id}`)));
+        const complete = state.scenes.length > 0 && required.every(scene => { if (!state.visited.has(scene.id)) return false; if (!scene.assessmentItem) return true; const result = state.assessments[scene.id]; const config = settings(scene); return result && result.attempts > 0 && (result.isCorrect === true || result.attempts >= config.maxAttempts); }) && state.scenes.filter(scene => scene.audioRequired).every(scene => scene.audioAssets.length > 0 && scene.audioAssets.every(id => state.completedAudio.has(`${scene.id}:${id}`))) && requiredVideos().every(({ key, threshold }) => videoCoverage(state.videoProgress[key]) >= threshold);
         const scored = state.scenes.filter(scene => scene.assessmentItem && (scene.required || (state.completionSettings.includeOptionalAssessments && (state.assessments[scene.id]?.attempts || 0) > 0)));
         const totalWeight = scored.reduce((sum, scene) => sum + settings(scene).scoreWeight, 0);
         const score = totalWeight ? Math.round(scored.reduce((sum, scene) => sum + (state.assessments[scene.id]?.isCorrect === true ? 100 : 0) * settings(scene).scoreWeight, 0) / totalWeight) : null;
@@ -155,6 +203,55 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
         if (!form) return;
         const current = () => state.assessments[scene.id] || { response: [], matches: {}, textResponse: "", attempts: 0, isCorrect: null };
         const updateSubmit = () => { const result = current(); const button = form.querySelector('[type="submit"]'); button.textContent = "Check answer"; button.disabled = !(result.response.length || Object.keys(result.matches).length || result.textResponse.trim().length) || result.isCorrect === true || result.attempts >= settings(scene).maxAttempts; };
+        if (scene.assessmentItem.type === "drag-drop") {
+            const item = scene.assessmentItem;
+            const bank = form.querySelector(".course-preview-draggables");
+            const status = form.querySelector(".course-preview-drag-status");
+            let selected = null;
+            let rejected = false;
+            const locked = () => current().isCorrect === true || current().attempts >= settings(scene).maxAttempts;
+            const select = source => {
+                selected = source;
+                bank.querySelectorAll("[data-drag-source]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.dragSource === source)));
+                form.querySelectorAll("[data-drop-target]").forEach(target => target.querySelector("[data-target-slot]").setAttribute("aria-disabled", String(locked() || !source || Object.values(current().matches).includes(target.dataset.dropTarget))));
+            };
+            const place = (sourceId, targetNode) => {
+                if (locked()) return;
+                const source = item.draggables.find(choice => choice.identifier === sourceId);
+                const target = item.targets.find(choice => choice.identifier === targetNode.dataset.dropTarget);
+                if (!source || !target || current().matches[sourceId]) return;
+                select(null);
+                if (!item.correctMatches.some(pair => pair.sourceIdentifier === sourceId && pair.targetIdentifier === target.identifier)) {
+                    rejected = true;
+                    status.textContent = `${source.text} does not belong beside ${target.text}. It has returned home. Try again.`;
+                    return;
+                }
+                state.assessments[scene.id] = { ...current(), matches: { ...current().matches, [sourceId]: target.identifier }, isCorrect: null };
+                const slot = targetNode.querySelector("[data-target-slot]");
+                slot.textContent = source.text;
+                slot.classList.add("course-preview-drag-chip");
+                [...bank.querySelectorAll("[data-drag-source]")].find(button => button.dataset.dragSource === sourceId)?.remove();
+                if (!bank.querySelector("[data-drag-source]")) bank.textContent = "All tiles placed.";
+                status.textContent = `${source.text} placed beside ${target.text}.`;
+                updateSubmit();
+                save();
+            };
+            bank.querySelectorAll("[data-drag-source]").forEach(button => {
+                button.addEventListener("click", () => { if (!locked()) { select(selected === button.dataset.dragSource ? null : button.dataset.dragSource); status.textContent = ""; } });
+                button.addEventListener("dragstart", event => { rejected = false; event.dataTransfer.setData("text/plain", button.dataset.dragSource); event.dataTransfer.effectAllowed = "move"; });
+                button.addEventListener("dragend", event => {
+                    if (!rejected || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+                    rejected = false;
+                    const home = button.getBoundingClientRect();
+                    button.animate([{ transform: `translate(${event.clientX - home.x - home.width / 2}px, ${event.clientY - home.y - home.height / 2}px)` }, { transform: "translate(0, 0)" }], { duration: 350, easing: "ease-out" });
+                });
+            });
+            form.querySelectorAll("[data-drop-target]").forEach(target => {
+                target.addEventListener("dragover", event => { if (!locked()) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; } });
+                target.addEventListener("drop", event => { event.preventDefault(); place(event.dataTransfer.getData("text/plain"), target); });
+                target.querySelector("[data-target-slot]").addEventListener("click", () => { if (selected) place(selected, target); });
+            });
+        }
         form.querySelectorAll("[name=assessment-response]").forEach(input => input.addEventListener("change", () => { const response = [...form.querySelectorAll("[name=assessment-response]:checked")].map(entry => entry.value); state.assessments[scene.id] = { ...current(), response, isCorrect: null }; updateSubmit(); }));
         form.querySelectorAll("[data-order-index]").forEach(input => input.addEventListener("change", () => { const response = [...form.querySelectorAll("[data-order-index]")].sort((a, b) => Number(a.dataset.orderIndex) - Number(b.dataset.orderIndex)).map(entry => entry.value).filter(Boolean); state.assessments[scene.id] = { ...current(), response, isCorrect: null }; updateSubmit(); }));
         form.querySelectorAll("[data-match-source]").forEach(input => input.addEventListener("change", () => { const matches = { ...current().matches, [input.dataset.matchSource]: input.value }; state.assessments[scene.id] = { ...current(), matches, isCorrect: null }; updateSubmit(); }));
@@ -290,7 +387,54 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
         } else {
             node.controls = true; node.preload = "metadata"; node.loop = Boolean(placement.loop); node.muted = Boolean(placement.muted);
             node.setAttribute("aria-label", `${asset.kind === "video" ? "Video" : "Audio"}: ${asset.filename}`);
-            if (asset.kind === "video") node.playsInline = true;
+            if (asset.kind === "video") {
+                node.playsInline = true;
+                if (placement.requiredViewing) {
+                    const key = id;
+                    const threshold = placement.viewingThresholdPercent || 90;
+                    const status = document.createElement("p");
+                    status.setAttribute("role", "status");
+                    const updateStatus = () => { status.textContent = videoCoverage(state.videoProgress[key]) >= threshold ? "Required viewing complete." : `Required viewing: ${videoCoverage(state.videoProgress[key])}% of ${threshold}% watched.`; };
+                    const updateProgress = (forceSave = false) => {
+                        if (!Number.isFinite(node.duration) || node.duration <= 0) return;
+                        const previous = state.videoProgress[key];
+                        const wasComplete = videoCoverage(previous) >= threshold;
+                        state.videoProgress[key] = {
+                            position: Math.max(0, Math.min(node.currentTime, node.duration)),
+                            duration: node.duration,
+                            watchedRanges: mergePlayedRanges(previous?.watchedRanges, node.played, node.duration),
+                        };
+                        updateStatus();
+                        if (!wasComplete && videoCoverage(state.videoProgress[key]) >= threshold) finish();
+                        else if (forceSave || Date.now() - (node.__chimeraLastSave || 0) >= 5000) {
+                            node.__chimeraLastSave = Date.now();
+                            save();
+                        }
+                    };
+                    let videoPositionRestored = false;
+                    const resume = () => {
+                        if (videoPositionRestored) return;
+                        const saved = state.videoProgress[key];
+                        const seekable = node.seekable;
+                        if (saved && saved.position > 0 && saved.position < node.duration
+                            && node.readyState >= 2 && (!seekable || seekable.length > 0 || node.readyState >= 3)) {
+                            node.currentTime = saved.position;
+                            videoPositionRestored = true;
+                        }
+                        updateStatus();
+                    };
+                    node.addEventListener("loadedmetadata", resume);
+                    node.addEventListener("loadeddata", resume);
+                    node.addEventListener("canplay", resume);
+                    node.addEventListener("progress", resume);
+                    node.addEventListener("timeupdate", () => updateProgress());
+                    node.addEventListener("pause", () => updateProgress(true));
+                    node.addEventListener("seeked", () => updateProgress(true));
+                    node.addEventListener("ended", () => updateProgress(true));
+                    status.textContent = "Required viewing: 0% of " + threshold + "% watched.";
+                    container.appendChild(status);
+                }
+            }
             if (asset.kind === "audio" && scene.audioRequired) node.addEventListener("ended", () => { state.completedAudio.add(`${scene.id}:${id}`); finish(); });
         }
         container.appendChild(node);
@@ -307,9 +451,14 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
   }
   async function start() {
                 const localCourse = window.__CHIMERA_STORYBOARD;
-                api = localCourse ? null : findApi(); if (!api) runtimeStatus(localCourse ? "Local course: progress is kept only while this page is open." : "Preview mode: no LMS tracking connection detected."); if (api) { const initialized = call("Initialize", [""]); if (initialized !== true && initialized !== "true") { runtimeStatus("LMS initialization failed; progress and grades will not be saved."); api = null; } else { runtimeStatus("Connected to LMS tracking."); const location = Number(call("GetValue", ["cmi.location"])); if (Number.isInteger(location) && location >= 0) state.current = location; try { const saved = JSON.parse(call("GetValue", ["cmi.suspend_data"]) || "{}"); (saved.visited || []).forEach(id => state.visited.add(id)); (saved.completedAudio || []).forEach(key => state.completedAudio.add(key)); state.assessments = saved.assessments || {}; state.remediation = saved.remediation || null; } catch (_) { savedProgressUnreadable = true; runtimeStatus("Saved progress could not be read. Close this course and contact the administrator; existing progress will not be overwritten."); } } }
+                api = localCourse ? null : findApi(); if (!api) runtimeStatus(localCourse ? "Local course: progress is kept only while this page is open." : "Preview mode: no LMS tracking connection detected."); if (api) { const initialized = call("Initialize", [""]); if (initialized !== true && initialized !== "true") { runtimeStatus("LMS initialization failed; progress and grades will not be saved."); api = null; } else { runtimeStatus("Connected to LMS tracking."); const location = Number(call("GetValue", ["cmi.location"])); if (Number.isInteger(location) && location >= 0) state.current = location; try { const saved = JSON.parse(call("GetValue", ["cmi.suspend_data"]) || "{}"); (saved.visited || []).forEach(id => state.visited.add(id)); (saved.completedAudio || []).forEach(key => state.completedAudio.add(key)); state.videoProgress = saved.videoProgress || {}; state.assessments = saved.assessments || {}; state.remediation = saved.remediation || null; } catch (_) { savedProgressUnreadable = true; runtimeStatus("Saved progress could not be read. Close this course and contact the administrator; existing progress will not be overwritten."); } } }
         const storyboard = localCourse || await (await fetch("storyboard.json")).json(); state.scenes = storyboard.scenes || []; state.completionSettings = storyboard.completionSettings || state.completionSettings;
     window.__CHIMERA_ASSETS = Object.fromEntries((storyboard.assets || []).map(asset => [asset.id, { ...asset, path: asset.path }]));
+    const requiredVideoKeys = new Set(requiredVideos().map(item => item.key));
+    state.videoProgress = Object.fromEntries(Object.entries(state.videoProgress).flatMap(([key, value]) => {
+        const progress = requiredVideoKeys.has(key) ? normalizeVideoProgress(value) : null;
+        return progress ? [[key, progress]] : [];
+    }));
     if (!Number.isInteger(state.current) || state.current < 0 || state.current >= state.scenes.length) state.current = 0;
     const contents = document.querySelector("#contents");
     state.scenes.forEach((scene, index) => { const option = document.createElement("option"); option.value = String(index); option.textContent = `${index + 1}. ${scene.title}`; contents.appendChild(option); });
@@ -318,7 +467,7 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
     document.querySelector("#next").onclick = () => { state.current += 1; save(); render(); };
     document.querySelector("#motion").onclick = () => { motionEnabled = !motionEnabled; sceneEnteredAt = Date.now(); render(); };
     document.querySelector("#course-title").textContent = storyboard.title || "Chimera course";
-    const hasSavedProgress = state.current > 0 || state.visited.size > 0 || state.completedAudio.size > 0 || Object.keys(state.assessments).length > 0 || state.remediation;
+    const hasSavedProgress = state.current > 0 || state.visited.size > 0 || state.completedAudio.size > 0 || Object.keys(state.videoProgress).length > 0 || Object.keys(state.assessments).length > 0 || state.remediation;
     if (api && hasSavedProgress) {
         const resumeDialog = document.createElement("dialog");
         if (typeof resumeDialog.showModal === "function") {
@@ -335,6 +484,7 @@ PLAYER_JS = ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
                     state.current = 0;
                     state.visited.clear();
                     state.completedAudio.clear();
+                    state.videoProgress = {};
                     state.assessments = {};
                     state.remediation = null;
                     resolve();
@@ -501,13 +651,22 @@ def _resume_budget_report(project: ProjectDetail, profile: str) -> dict[str, obj
         assessments[scene.id] = {"response": response, "matches": matches, "textResponse": text,
                                  "attempts": (scene.assessmentSettings.maxAttempts if scene.assessmentSettings else 2), "isCorrect": False}
     longest_scene = max((scene.id for scene in scenes), key=lambda value: len(value.encode("utf-8")), default="")
+    video_progress = {
+        placement.assetId: {"position": 0, "duration": 1, "watchedRanges": [[0, 1]]}
+        for scene in scenes
+        for placement in scene.mediaPlacements
+        if placement.requiredViewing and placement.assetId in scene.videoAssets
+    }
     snapshot = {"current": max(0, len(scenes) - 1), "visited": [scene.id for scene in scenes],
                 "completedAudio": [f"{scene.id}:{asset}" for scene in scenes if scene.audioRequired for asset in scene.audioAssets],
+                "videoProgress": video_progress,
                 "assessments": assessments,
                 "remediation": {"assessmentSceneId": longest_scene, "remediationSceneId": longest_scene}}
     size = len(json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
     return {"budgetBytes": 4096 if profile == "SCORM 1.2" else 64000,
-            "estimatedMaximumBytes": size, "encoding": "JSON UTF-8", "overflowPolicy": "warn-and-retain-previous-save"}
+            "estimatedMaximumBytes": size, "encoding": "JSON UTF-8", "overflowPolicy": "warn-and-retain-previous-save",
+            "requiredVideoCount": len(video_progress),
+            "videoRangeFragmentationNote": "Estimate includes one range per required video; repeated seeking can increase actual suspend-data size, which the player checks before every save."}
 
 
 def _manifest(project: ProjectDetail) -> bytes:

@@ -49,6 +49,11 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     const editor = page.getByRole('dialog').last();
     await editor.getByRole('tab', { name: 'Stage', exact: true }).click();
     await expect(editor.getByLabel('Assessment component', { exact: true })).toContainText('Inspect equipment before use.');
+    const expandSections = async dialog => {
+      const closed = dialog.locator('.visual-inspector details:not([open]) > summary');
+      while (await closed.count()) await closed.first().click();
+    };
+    await expandSections(editor);
     await editor.getByRole('spinbutton', { name: 'Question x', exact: true }).fill('80');
     await editor.getByRole('spinbutton', { name: 'Question y', exact: true }).fill('160');
     await editor.getByRole('spinbutton', { name: 'Question width', exact: true }).fill('1000');
@@ -61,6 +66,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     expect(saved.storyboard.scenes[0].assessmentItem.prompt).toBe('Inspect equipment before use.');
     await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
     const reopened = page.getByRole('dialog').last();
+    await expandSections(reopened);
     await expect(reopened.getByRole('spinbutton', { name: 'Question x', exact: true })).toHaveValue('80');
     await page.screenshot({ path: testInfo.outputPath('assessment-on-stage.png') });
     await reopened.getByRole('button', { name: 'Cancel', exact: true }).click();

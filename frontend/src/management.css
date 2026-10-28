@@ -46,6 +46,18 @@
 .health-project-link svg { flex-shrink: 0; margin-top: 2px; }
 .health-project-link:hover { text-decoration: underline; }
 .project-trash-action { display: inline-flex; align-items: center; gap: 5px; margin-top: 9px; padding: 5px 8px; font-size: 11px; }
+.project-expand { display: flex; align-items: center; gap: 4px; border: 0; background: none; color: var(--ink); padding: 3px 0; margin-bottom: 6px; font: inherit; cursor: pointer; text-align: left; }
+.project-expand[aria-expanded="true"] svg { transform: rotate(90deg); }
+.subproject-row td:first-child { padding-left: 28px; border-left: 3px solid var(--line); }
+.project-hierarchy-actions { margin-top: 8px; }
+.project-hierarchy-actions summary { cursor: pointer; color: var(--ink); }
+.project-hierarchy-actions .button { margin-top: 6px; padding: 5px 8px; font-size: 11px; white-space: normal; }
+.project-relationship-dialog { width: min(520px, calc(100vw - 32px)); }
+.project-relationship-dialog > p { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.project-relationship-dialog > label { display: grid; gap: 6px; margin-top: 14px; font-size: 13px; }
+.project-relationship-dialog :is(select, input) { width: 100%; min-width: 0; padding: 9px; border: 1px solid var(--line); background: var(--theme-input, var(--theme-panel)); color: var(--ink); font: inherit; }
+.project-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.project-breadcrumb button { border: 0; background: none; padding: 0; color: var(--ink); text-decoration: underline; font: inherit; cursor: pointer; }
 .trash-table th:nth-child(1) { width: 40%; }
 .trash-table th:nth-child(2), .trash-table th:nth-child(3) { width: 22%; }
 .trash-table th:nth-child(4) { width: 16%; }

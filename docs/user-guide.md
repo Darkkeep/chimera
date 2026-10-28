@@ -1,6 +1,6 @@
 # Chimera user guide
 
-Process-based instructions for Chimera. Workflow text updated 2026-10-15, including Pythia analysis, transformation, assessment design, and course review. Screenshots last refreshed 2026-10-08 from commit `4ade811` plus then-uncommitted working-tree updates; they predate the current Pythia controls and Settings labels. Captures use the isolated user-guide demonstration workspace and made no live AI requests or use of credentials. Historical source/recovery context is documented in the [recovery record](export-enhancement-recovery.md).
+Process-based instructions for Chimera. Workflow text updated 2026-10-27 for current workspace navigation, reviewed question import/export, Fill-in-the-blank, searchable question metadata, Pythia naming, six media-provider tabs and explicit narration selection. The [PDF edition](user-guide.pdf) is generated from this source. Workspace navigation, all seven question types, assessment management/import, metadata controls, all six provider forms and the narration connection selector were recaptured on 2026-10-27 using an isolated demonstration project. Provider images use inert status/capability fixtures, not configured accounts or generated output. Other screenshots retain their earlier capture dates; provenance is recorded in [the maintenance guide](user-guide/support/README.md). Images may predate the current controls; use the current text instructions where labels differ. No user project or credentials are used for documentation captures. Historical source/recovery context is documented in the [recovery record](export-enhancement-recovery.md).
 
 ## How to use this guide
 
@@ -8,15 +8,21 @@ Tasks use numbered instructions or **Step / Action / Result / Control image** ta
 
 The source has changed since the original capability review: Word export, reference upload, enhancement submission, generated-media candidate review, comments, and Chimera storyboard archives now have interface controls. Their presence does not certify a configured AI provider or compatibility with every LMS. Example proposals, candidates, and job statuses in these images are documentation fixtures; no live AI request was made for this guide.
 
-**Prerequisite:** Start the backend and frontend using the [README setup instructions](../README.md#start-locally), then open `http://localhost:5173`. Keep both services running while authoring. LibreOffice is needed for rendered PowerPoint slide previews. Pythia workflows additionally need the Engine API; check **Settings > Intelligence Engine**. Image and narration generation use the separate **Settings > Media provider** connection or server environment settings. Shared-installation connection changes require an administrator; see [AI connection](ai-connection.md).
+**Prerequisite:** Start the backend and frontend using the [README setup instructions](../README.md#start-locally), then open `http://localhost:5173`. Keep both services running while authoring. LibreOffice is needed for rendered PowerPoint slide previews. Pythia workflows additionally need the Engine API; check **Settings > Pythia**. Image and narration generation use the separate **Settings > AI connection** dialog. Shared-installation connection changes require an administrator; see [AI connection](ai-connection.md).
+
+**Help while authoring:** choose **User guide**, immediately below **Templates** in the left rail. The bundled PDF opens in a new tab without leaving your current workspace or discarding edits. It is available even before you select or create a project and does not require access to GitHub.
+
+**Navigation at a glance:** the left rail's **WORKSPACE** group contains My Work, Storyboard, Assessments, Media library, and Templates. **Assessments** opens the question bank and assessment manager directly. **Project background** is above the scene list in **Storyboard**. Review tools retains guided review, accessibility, validation, completion rules, and suggestion/Pythia review; Settings retains appearance and connection/access controls.
 
 My Work opens after normal launch/sign-in and refresh. It is first in the workspace menu. Select a project row to open its authoring workspace, choose New Project to create one, or Resume authoring to return to the remembered project. Direct authenticated review links retain their review destination.
 
 **Working convention:** Select the intended project and scene before editing. Use the task's Save/Create/Accept control and wait for completion. Merely typing into a form does not save it. If a revision-conflict message appears, reload the project, inspect the latest values, and reapply the intended change. Do not assume unsaved form text will survive a reload.
 
-Optional interactive help is available under **Review tools > Guided review > All functionality walkthroughs**. Search the 68-task catalog, including nine Pythia workflows, and start the task you want to practice. The sidebar resumes your last selected walkthrough. Action steps wait for confirmed saves/downloads; Pythia draft steps wait until the draft is saved in Chimera, and review steps use Next. Escape pauses without clearing an open draft. Progress is browser-local and separate for each task/project; completing a walkthrough does not certify readiness. Restore/deletion confirmations and provider submissions remain your decisions. See the [walkthrough catalog and behavior](onboarding-implementation.md#walkthrough-catalog).
+Optional interactive help is available under **Review tools > Guided review > All functionality walkthroughs**. Search the 68-task catalog, including nine Pythia workflows, and start the task you want to practice. **Start / resume walkthrough** uses your current workflow when one is identifiable; Storyboard and the catalog retain the last selected task. Supported dialogs offer **Start walkthrough** for their current task, or **Resume walkthrough** only when the paused guide matches that workflow. They do not resume an unrelated first-scene guide. In a newly guided scene editor, Stage selects canvas authoring and Details selects scene editing; the question editor uses the current Question type. An explicitly selected catalog task retains its own instructions. Action steps wait for confirmed saves/downloads; Pythia draft steps wait until the draft is saved in Chimera, and review steps use Next. Escape pauses without clearing an open draft. Progress is browser-local and separate for each task/project; completing a walkthrough does not certify readiness. Restore/deletion confirmations and provider submissions remain your decisions. See [context-aware start and resume](onboarding-implementation.md#context-aware-start-and-resume) for limits.
 
 ## Processes
+
+To put help away while you work, choose **Dismiss walkthrough** on the guide. Your form and unsaved draft stay open, and practice history is retained. Move to another task, then use **Start walkthrough** or the sidebar's **Start / resume walkthrough** to get help for that current workflow, not the dismissed task. Help does not reopen automatically. Use **Pause guide** or Escape instead when you intend to resume the same selected task.
 
 1. [Manage projects and workspace](#1-manage-projects-and-workspace)
 2. [Import and author scenes](#2-import-and-author-scenes)
@@ -53,9 +59,25 @@ For the PowerPoint-to-SCORM path, start with [Work with Pythia](#14-work-with-py
 | 1 | Open the **PROJECT** selector and choose the desired course. | The selected storyboard and project media load. | <a href="user-guide/images/project-controls.png"><img src="user-guide/images/project-controls.png" alt="Project selector and Create project button" width="240"></a> |
 | 2 | Check the course title above the workspace before continuing. | Subsequent edits apply to the intended project. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a> |
 
+### Organize subprojects
+
+Subprojects are full projects attached to a top-level project. Only two levels are supported; a subproject cannot have its own children. Attachment organizes work without combining content or granting access.
+
+1. In **My Work**, open a top-level project's **Project actions**.
+2. Choose **Create subproject** to name and create an empty child, or **Attach existing project** to attach a standalone project. A project that already has children cannot become a subproject.
+3. Expand **visible subprojects** to see children you can access. Each retains its own production stage, blockers, and approval workflow. The parent summary counts only visible children and does not change the parent's stage.
+4. Open a child's **Project actions > Manage subproject** to select a different **Parent project**, choose **None (detach to top level)**, or change **Display order**. Lower numbers appear first; ties use a stable project-ID order.
+5. Use the grouped **PROJECT** or Media library selector to navigate. In child authoring, the parent breadcrumb opens the parent. Close or save current forms before switching projects.
+
+Scenes, media, background defaults, review records, permissions, completion rules, and exports remain independent. A child's scenes inherit only that child's project background, not the parent's background. Viewing a parent does not grant access to its children. Managing relationships requires settings access on the child and the affected parents; creating a subproject also requires permission to create projects. Unavailable parents are labeled without exposing their titles.
+
+Exports and project archives include only the selected project's content, not its parent or children. Archive restore preserves the current live attachment rather than applying an old relationship from the archive.
+
 ### Move a project to Trash and restore it
 
 Project owners can move a project to Trash from its row in **My Work**. Projects remain recoverable for 30 days; opening Trash removes expired entries. Projects with queued or running generation jobs must wait until those jobs finish. In shared installations, administrators can also manage project trash.
+
+A parent with active subprojects cannot be trashed: first move, detach, or individually trash its children. Trashing a child affects only that child. In Trash, a child's **Restore parent** defaults to its original parent, provided that parent remains available and authorized. If it is unavailable, explicitly select another permitted top-level parent or **None (restore to top level)** before restoring. No content is silently reassigned.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
@@ -70,18 +92,43 @@ Project owners can move a project to Trash from its row in **My Work**. Projects
 | 1 | Open **Settings** at the bottom of the sidebar. | Appearance options become available. | <a href="user-guide/images/workspace.png"><img src="user-guide/images/workspace.png" alt="workspace controls" width="240"></a> |
 | 2 | Choose **Light**, **Dark**, or **System**. | The preference is applied and remembered in this browser. | <a href="user-guide/images/appearance.png"><img src="user-guide/images/appearance.png" alt="appearance controls" width="240"></a> |
 
-### Configure the media provider
+### Configure media connections
 
-This connection serves image and narration generation, not storyboard enhancement or Pythia's learning-intelligence providers. Check **Settings > Intelligence Engine** for analysis, transformation, assessment, course review, and enhancement status; see [Pythia prerequisites](#before-you-start-with-pythia). Older screenshots call the media connection **AI connection**.
+These connections serve media providers, not storyboard enhancement or Pythia's learning-intelligence providers. Check **Settings > Pythia** for analysis, transformation, assessment, course review, and enhancement status; see [Pythia prerequisites](#before-you-start-with-pythia). The dialog has six tabs: **OpenAI**, **ElevenLabs**, **Google Cloud**, **Cartesia**, **Synthesia**, and **Shotstack**. The current screenshots below show unconfigured forms with inert status fixtures, not real provider credentials.
+
+Select a tab to view that provider's connections and capabilities. Arrow keys move between tabs; Home/End select the first/last tab. Switching away from unsaved changes asks for confirmation; confirming discards those edits and clears the entered key. Provider tabs organise settings, not the generation destination: choose the narration connection explicitly in Media library.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Open **Settings > Media provider**. | Media generation connection status appears; shared-installation non-admins see a read-only view. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Older AI connection settings screenshot" width="240"></a> |
-| 2 | Choose approved image/audio models, enter the API key, and set request limits. Click **Save media settings**. | The key is stored in the server's OS credential store and cleared from the form. Saving fails closed when secure storage is unavailable. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Older models, write-only API key and request limits screenshot" width="240"></a> |
-| 3 | Click **Test provider** after saving. | A models-list request checks the credential without sending course content or generating media. Model access and costs still depend on the provider account. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Older save, test and disconnect controls screenshot" width="240"></a> |
-| 4 | To disable AI, click **Disconnect** and confirm. | The saved key is deleted and environment fallback is disabled. Running requests may finish; queued jobs against changed settings require resubmission. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Disconnect AI connection" width="240"></a> |
+| 1 | Open **Settings > AI connection**, then the **OpenAI** tab. | OpenAI image/legacy narration settings appear; shared-installation non-admins see a read-only view. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Current provider tabs and OpenAI connection form" width="240"></a> |
+| 2 | Choose approved image/audio models, enter the API key, and set request limits. Click **Save media settings**. | The key is stored in the server's OS credential store and cleared from the form. Saving fails closed when secure storage is unavailable. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="OpenAI models, write-only API key and request limits" width="240"></a> |
+| 3 | Click **Test provider** after saving. | A models-list request checks the credential without sending course content or generating media. Model access and costs still depend on the provider account. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="OpenAI save, test and disconnect controls" width="240"></a> |
+| 4 | To disable the OpenAI connection, click **Disconnect** and confirm. | Its saved key is deleted and environment fallback is disabled, without disconnecting other narration providers. Running requests may finish; queued jobs against changed settings require resubmission. | <a href="user-guide/images/ai-connection-current.png"><img src="user-guide/images/ai-connection-current.png" alt="Disconnect AI connection" width="240"></a> |
 
-Request limits are not spending limits. Set a provider-account budget and confirm organisational data-use approval before enabling generation. See [AI connection](ai-connection.md) for credential-store provisioning and operational requirements.
+For **ElevenLabs**, add a named narration connection using a write-only key in the server's secure credential store or the fixed server-side `ELEVENLABS_API_KEY` environment variable. For **Google Cloud**, use server Application Default Credentials (ADC) and an optional quota project; enable the Cloud Text-to-Speech API and billing first. Google credentials/private keys cannot be pasted or uploaded through the dialog. An administrator provisions service credentials; never place secrets in Vite environment variables or course assets.
+
+For **Cartesia**, use a write-only key in the server's secure credential store or server `CARTESIA_API_KEY`. The default model is `sonic-3.6`; the adapter uses Cartesia API version `2026-08-14`. The selected language/locale is sent with the transcript.
+
+| Speech-provider tab | Setup and discovery | Current form |
+| --- | --- | --- |
+| ElevenLabs | Name the connection, choose secure store or server environment, save credentials, then test for voices/models. | <a href="user-guide/images/ai-provider-elevenlabs.png"><img src="user-guide/images/ai-provider-elevenlabs.png" alt="ElevenLabs named narration connection and credential source" width="240"></a> |
+| Google Cloud | Name the connection, use server ADC and optional quota project, save, then test for voices. No Google private-key field is offered. | <a href="user-guide/images/ai-provider-google-cloud.png"><img src="user-guide/images/ai-provider-google-cloud.png" alt="Google Cloud ADC, voice, language and optional quota project" width="240"></a> |
+| Cartesia | Name the connection, choose secure store or server environment, retain or set a supported model, save, then test for voices. Model access is not tested. | <a href="user-guide/images/ai-provider-cartesia.png"><img src="user-guide/images/ai-provider-cartesia.png" alt="Cartesia narration connection, model, voice and language" width="240"></a> |
+
+Save credentials before discovering voices; Voice can initially be blank. Test the saved narration connection, select a discovered voice (and an ElevenLabs speech model), then save again. Google uses the selected voice and language locale; ElevenLabs detects speech language through its model, with the saved language used as metadata. Tests only discover voices/models, not generate a paid audio sample or certify synthesis access. ElevenLabs and Cartesia list up to 100 voices per test; Cartesia's test does not discover models or verify model access.
+
+In **Media library**, choose **Narration** and explicitly select a saved connection with a voice, or **Existing AI connection** for legacy OpenAI. Review its voice and language, then **Generate candidate**. Generation can incur charges; listen to the candidate before **Approve asset**, which approves and attaches it to the target scene. Disconnecting a connection removes only that connection and its owned key, not environment variables or ADC identities. Google input is limited to 5,000 UTF-8 bytes; all three separate narration adapters produce MP3.
+
+**Synthesia** and **Shotstack** currently support secure connection setup and read-only testing only. Their tabs explicitly state that **video generation is not yet available in Chimera**. They never enable image/narration generation. Synthesia uses an API-enabled account key in the OS store or server `SYNTHESIA_API_KEY`; its test checks video-list metadata and discards it. Shotstack has separate **Sandbox (stage)** and **Production (v1)** settings and matching keys. Use the OS store or server `SHOTSTACK_SANDBOX_API_KEY` / `SHOTSTACK_PRODUCTION_API_KEY`; switching environments in secure-store mode requires the matching new key. Its test lists saved templates without submitting a render or generating AI assets. Save, Test and Disconnect are independent for each named connection.
+
+| Video-provider tab | Available actions, not generation | Current form |
+| --- | --- | --- |
+| Synthesia | Name the connection, choose secure store or server environment, **Save video connection**, then **Test video connection**. A successful read-only check does not prove generation entitlement. | <a href="user-guide/images/ai-provider-synthesia.png"><img src="user-guide/images/ai-provider-synthesia.png" alt="Synthesia connection-only form and video-generation limitation" width="240"></a> |
+| Shotstack | Name the connection, select sandbox or production, supply its matching key/source, save, then test. **Disconnect video connection** removes only that named connection. | <a href="user-guide/images/ai-provider-shotstack.png"><img src="user-guide/images/ai-provider-shotstack.png" alt="Shotstack sandbox and production connection-only settings" width="240"></a> |
+
+If Save is disabled, verify the connection name, credential source and required key, and whether any settings changed. If Test is disabled, save first and resolve unavailable server credentials. A voice is not required for initial discovery, but is required for narration generation. When secure storage is unavailable, use operator-provisioned server environment credentials or Google ADC rather than a plaintext fallback. Close and reopen the dialog after another administrator changes the collection; inspect before reapplying edits. Disconnecting does not unset operator-owned environment variables or delete ADC identities.
+
+Request limits are not spending limits. Non-OpenAI discovery, narration and video connection tests use a shared installation request counter with a fixed ceiling of 20 requests/day and one concurrent request; the OpenAI form does not configure these ceilings. Set a provider-account budget and confirm organisational data-use approval before enabling generation. See [AI connection](ai-connection.md) for credential-store provisioning, ADC setup and operational requirements.
 
 ### Follow the guided workflow
 
@@ -134,8 +181,10 @@ Open **Edit scene**, then choose **Canvas**. The canvas editor saves an editable
 2. Double-click a text box, or focus it and press Enter, to edit its text directly. The **Text** field also edits the selected box. Drag boxes to move them, use resize handles, or enter exact position and size in the properties panel. Text resize handles preserve the box's current aspect ratio; image resize handles allow freeform sizing. Arrow keys move the focused element; Shift changes the step from one to ten slide-space units.
 3. Drag an **Attached images** thumbnail onto the canvas. Clicking the thumbnail adds it without dragging. The media-library selector can add other project images. Selecting an image exposes replacement and crop-reset controls.
 4. Use **Layers** to select overlapping or inherited content. Master and layout artwork starts locked; unlock it before editing. Toolbar controls add text, undo/redo, duplicate/delete elements, and change stacking order. Text properties include size, color, typeface, alignment, bold, and italic.
-5. Choose a background color or project image in the properties panel. Imported picture backgrounds and supported inherited master/layout images are available as project assets. **Source slide**, when available, temporarily shows the original flattened rendering for comparison.
+5. Expand **Background** in the properties panel to choose a color and open the **Background image** thumbnail picker. Choose **Use project background**, a scene image, or **None** to explicitly opt out of the project image. Imported PowerPoint master backgrounds are labeled in the picker. Set the default using **Storyboard > Project background**, above the scene list; changing it affects only inheriting scenes, not scene-specific images or explicit None choices. Add images in Media library first. Backgrounds fill the stage and are decorative; check contrast and keep instructional information in accessible text. **Source slide**, when available, temporarily shows the original flattened rendering for comparison and is not changed by background settings.
 6. Choose **Save scene**, then check **Preview course**. The saved canvas replaces the source preview in authoring, preview, and both SCORM profiles. **Cancel** discards unsaved canvas changes.
+
+![Project background settings opened from Storyboard](user-guide/images/project-background-current.png)
 
 New imports capture editable text, images, common PowerPoint shapes, line connectors, custom freeform geometry, rotation, cropping, slide dimensions, inherited graphics, and solid/picture backgrounds. Byte-identical images are shared as one Media library asset while every source placement stays separate on the canvas. Most extracted shapes can be moved, resized, rotated, layered, locked, or deleted like other canvas elements; text inside a shape remains separately editable. The original preview remains available for comparison. Less-common preset geometry, gradients, group rotation, mixed text formatting, bullets, and some inherited styles may be approximated and are listed under **Import limitations**; charts and SmartArt remain unsupported objects. This is not full PowerPoint-equivalent editing.
 
@@ -217,9 +266,9 @@ The current upload interface accepts images and audio, up to 100 MB per file. Im
 
 ### Create a media candidate
 
-Configure image and narration generation through **Settings > Media provider** before generating candidates. In shared deployments, an installation administrator manages the connection. See [AI connection](ai-connection.md) for credential storage, connection testing, limits, and data handling. This connection is separate from Pythia.
+Configure image and narration generation through **Settings > AI connection** before generating candidates. OpenAI images/legacy narration and ElevenLabs/Google Cloud/Cartesia narration have separate provider tabs. Synthesia/Shotstack connection setup does not yet enable video generation. In shared deployments, an installation administrator manages these connections. See [AI connection](ai-connection.md) for credential storage, connection testing, limits, and data handling. These connections are separate from Pythia.
 
-Create a media candidate starts collapsed. Select its heading to expand it. When the server-side AI connection is not configured, its heading is greyed and generation controls are disabled. If connection status cannot be loaded or your role does not permit generation, controls also remain disabled. Configuration availability does not guarantee that a provider is reachable or supports a particular model. Existing candidates can still be approved or rejected without a configured AI connection; regeneration requires the connection.
+Create a media candidate starts collapsed. Select its heading to expand it. When no usable image or narration connection is configured, its heading is greyed and generation controls are disabled. A narration-only connection does not enable image generation. Narration requires explicit connection selection; the saved voice and language populate the form and can be overridden for that candidate. If connection status cannot be loaded or your role does not permit generation, controls also remain disabled. Configuration availability does not guarantee that a provider is reachable or supports a particular model. Existing candidates can still be approved or rejected without a configured connection; regeneration uses the candidate's original connection and fails if it was removed rather than choosing another provider.
 
 The Media Library project selector defaults to the current project. Selecting another project opens that project's media library and makes it the current project; media files are not copied between projects.
 
@@ -262,7 +311,52 @@ A green **Ready for production** check means the media loaded, its attribution i
 
 ## 5. Author assessments
 
+For an assessment-first workflow, open **Assessments** under **WORKSPACE** in the left rail. The **Question bank** lets you add a question directly or open an existing question and its metadata without creating a slide first. Create a named assessment, select its questions, arrange them, and download its QTI test package.
+
+![Question bank and spreadsheet export controls](user-guide/images/question-bank-current.png)
+
 Start each assessment task with a scene whose **Scene type** is **Assessment**. Set that type in Edit scene and save. Select **Create question** for a new question or **Edit question** for an existing one. The question editor supports seven types. Changing types replaces the type-specific question structure in the form; save only after checking the new content.
+
+### Import questions with review
+
+1. Open **WORKSPACE > Assessments > Import questions**.
+2. Select a QTI 2.1 item XML, QTI ZIP package, or filled CSV/XLSX template. Download either template in the import panel; each contains examples of all seven types.
+3. Choose **Review import**. Nothing is saved at this stage. Inspect the question, answer key, feedback, metadata, errors, and warnings for each row.
+4. Select the valid questions to add. Existing stable identifiers and repeated identifiers in the upload are blocked, not renamed or overwritten. Correct duplicates in the source file and review it again.
+5. Optionally select a saved assessment to receive the new questions. Otherwise they enter the question bank only.
+6. Acknowledge any warnings, then choose **Import selected questions**. The selected questions and group membership are saved together. If another author changed the project, review the file again before importing.
+
+![Question import review before any questions are saved](user-guide/images/question-import-current.png)
+
+Uploads are limited to 10 MB and 500 questions. QTI import supports the representable text-only subset of the seven question types, not arbitrary LMS question formats, media, rich HTML, or custom response processing. Unsupported content is reported rather than silently discarded. Test-level navigation, selection, timing, and scoring policies are not imported as a test; choose and review Chimera's assessment rules separately.
+
+CSV/XLSX templates use one question per row and these columns:
+
+| Columns | Content |
+| --- | --- |
+| `identifier`, `type`, `title`, `prompt` | Stable question ID, one of the seven type names, authoring title, and learner prompt. |
+| `choices`, `secondaryChoices` | JSON arrays of `{"identifier":"A","text":"Answer"}` objects. For matching and drag-and-drop, use primary items in `choices` and targets/right items in `secondaryChoices`. |
+| `answers` | JSON array of correct choice IDs, ordered IDs, accepted answer strings, `"true"`/`"false"`, or `{"sourceIdentifier":"A","targetIdentifier":"B"}` pairs, depending on type. |
+| `correctFeedback`, `incorrectFeedback`, `caseSensitive` | Feedback and fill-in-the-blank case-matching behavior. |
+| `description`, `tags`, `author`, `source`, `language`, `difficulty`, `learningObjectiveRefs` | Question metadata. Tags and objective references are JSON string arrays. Difficulty is blank, `easy`, `medium`, or `hard`. Language uses a tag such as `en-US`. |
+
+Use the supplied examples rather than changing the headers. XLSX formulas are not evaluated or imported as question content. Spreadsheet imports do not carry assessment membership or course-specific rules. **Export questions CSV/XLSX** downloads authored questions and metadata in the same format.
+
+### Edit question metadata
+
+![Collapsed reference and metadata sections at the bottom of the question editor](user-guide/images/question-metadata-collapsed.png)
+
+Open a question and expand **Tags and learning-objective references** at the bottom of the editor. This section starts collapsed; both fields use compact search/dropdowns. Focus the search field or choose **Select** to open its scrollable dropdown. Suggestions come from saved questions in the current project; search is case-insensitive and excludes values already selected. Select a suggestion to reuse its spelling, or choose **Create** (or press Enter) for a new value. Arrow keys navigate dropdown options; Enter selects and Escape closes the dropdown. Use **Remove** to remove a selected value, then **Save question** to persist your selections. Each field allows up to 50 values, each up to 200 characters. Expand **Question metadata** for its title, stable identifier, description, author, source, language, and difficulty. Tags and other metadata are authoring information and are not shown as learner-facing question content. References are identifiers or labels; adding them does not create or modify learning objectives.
+
+| Search existing tags or create one | Search existing learning-objective references or create one |
+| --- | --- |
+| <a href="user-guide/images/question-tags-current.png"><img src="user-guide/images/question-tags-current.png" alt="Tag search with existing Safety value and inline creation" width="240"></a> | <a href="user-guide/images/question-objectives-current.png"><img src="user-guide/images/question-objectives-current.png" alt="Learning-objective reference search with existing OBJ-1 value and inline creation" width="240"></a> |
+
+![Expanded question metadata fields](user-guide/images/question-metadata-current.png)
+
+The stable identifier starts with a letter and contains up to 64 letters, digits, underscores, or hyphens. Keep it unchanged when maintaining a question's identity outside Chimera. Title defaults to the scene title when not specified. Tags and objective references accept up to 50 unique entries, at most 200 characters each.
+
+Metadata is retained in project data and spreadsheet exports. QTI uses the standard item title and XML language attributes; remaining Chimera metadata and supported item settings travel in a `chimera` XML processing instruction for round trips. Other QTI systems may ignore this extension. Course-specific remediation links cannot be carried into another project and are reported during import. QTI import/export still requires qualification against the target LMS; export availability is not a certification of LMS compatibility.
 
 ### Open or create an assessment question
 
@@ -275,14 +369,14 @@ Start each assessment task with a scene whose **Scene type** is **Assessment**. 
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Choose **Multiple choice ? one answer**, enter the **Question prompt** and answer text, and mark exactly one answer as correct. Use **Add answer choice** or the minus buttons as needed. | The question content and correct response are defined. | <a href="user-guide/images/question-single-choice.png"><img src="user-guide/images/question-single-choice.png" alt="question single choice controls" width="240"></a> |
+| 1 | Choose **Multiple choice · one answer**, enter the **Question prompt** and answer text, and mark exactly one answer as correct. Use **Add answer choice** or the minus buttons as needed. | The question content and correct response are defined. | <a href="user-guide/images/question-single-choice.png"><img src="user-guide/images/question-single-choice.png" alt="question single choice controls" width="240"></a> |
 | 2 | Enter **Correct feedback** and **Incorrect feedback**, then click **Save question**. | The question is saved to the scene. | <a href="user-guide/images/question-single-choice.png"><img src="user-guide/images/question-single-choice.png" alt="question single choice controls" width="240"></a><br><a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
 ### Author a multiple-correct question
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Choose **Multiple choice ? multiple answers**, enter the prompt and answer choices, and select the checkbox for every correct answer. | The question content and correct response are defined. | <a href="user-guide/images/question-multiple-response.png"><img src="user-guide/images/question-multiple-response.png" alt="question multiple response controls" width="240"></a> |
+| 1 | Choose **Multiple choice · multiple answers**, enter the prompt and answer choices, and select the checkbox for every correct answer. | The question content and correct response are defined. | <a href="user-guide/images/question-multiple-response.png"><img src="user-guide/images/question-multiple-response.png" alt="question multiple response controls" width="240"></a> |
 | 2 | Enter **Correct feedback** and **Incorrect feedback**, then click **Save question**. | The question is saved to the scene. | <a href="user-guide/images/question-multiple-response.png"><img src="user-guide/images/question-multiple-response.png" alt="question multiple response controls" width="240"></a><br><a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
 ### Author a true/false question
@@ -301,6 +395,10 @@ Start each assessment task with a scene whose **Scene type** is **Assessment**. 
 
 ### Author a drag-and-drop question
 
+Type each draggable item and drop target into its text field. Use **Add draggable item** or **Add drop target** to extend either list, then assign the correct placements below the lists. Answer items currently support text only; images on the scene Stage are not draggable answer choices.
+
+In **Preview course** and exported SCORM courses, the targets form a vertical list below the answer tiles. Drag a tile to its matching label, or select a tile and then select its target using a mouse, touch, or keyboard. Correct tiles settle beside the label and leave the answer bank; incorrect tiles return home. Drops do not use attempts; only **Check answer** does. The question Stage expands to contain the targets and **Check answer**; scroll the preview for longer questions.
+
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | Choose **Drag and drop**, enter the prompt, draggable items, and drop targets, then choose each correct placement. Use distinct targets for the intended matches. | The question content and correct response are defined. | <a href="user-guide/images/question-drag-drop.png"><img src="user-guide/images/question-drag-drop.png" alt="question drag drop controls" width="240"></a> |
@@ -308,17 +406,23 @@ Start each assessment task with a scene whose **Scene type** is **Assessment**. 
 
 ### Author a matching question
 
+Type the items into the **Left column** and **Right column** text fields. Use **Add left item** or **Add right item** as needed, then assign the **Correct matches** below the lists. Matching answer items currently support text only, not image choices.
+
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
 | 1 | Choose **Matching**, enter the prompt and left/right items, then select each correct match. | The question content and correct response are defined. | <a href="user-guide/images/question-matching.png"><img src="user-guide/images/question-matching.png" alt="question matching controls" width="240"></a> |
 | 2 | Enter **Correct feedback** and **Incorrect feedback**, then click **Save question**. | The question is saved to the scene. | <a href="user-guide/images/question-matching.png"><img src="user-guide/images/question-matching.png" alt="question matching controls" width="240"></a><br><a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
-### Author a short-answer question
+### Author a fill-in-the-blank question
+
+**Fill-in-the-blank** replaces the former Short answer name. Learners enter one word or short phrase in a single blank after the prompt; this is automatically graded, not an essay or manually marked written response. Enter alternate accepted spellings or equivalent answers on separate lines. Matching ignores surrounding whitespace and, unless **Match letter case** is selected, capitalization.
+
+Existing questions and imported/exported CSV/XLSX templates retain the `short-answer` type identifier for compatibility; no conversion of saved answers is needed. QTI 2.1 exports use an inline `textEntryInteraction` inside a paragraph and a single primary correct-response value, with exact string comparisons retaining all accepted alternatives. This corrects the former block-level placement of the blank. Blackboard import compatibility still needs verification in the target Blackboard version; a QTI 2.1 package is not a Blackboard-native question pool.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Choose **Short answer**, enter the prompt, and enter one accepted answer per line. Select **Match letter case** only when capitalization must match. | The question content and correct response are defined. | <a href="user-guide/images/question-short-answer.png"><img src="user-guide/images/question-short-answer.png" alt="question short answer controls" width="240"></a> |
-| 2 | Enter **Correct feedback** and **Incorrect feedback**, then click **Save question**. | The question is saved to the scene. | <a href="user-guide/images/question-short-answer.png"><img src="user-guide/images/question-short-answer.png" alt="question short answer controls" width="240"></a><br><a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
+| 1 | Choose **Fill-in-the-blank**, enter the prompt, and enter one accepted answer per line. Select **Match letter case** only when capitalization must match. | One blank and its accepted answers are defined. | <a href="user-guide/images/question-short-answer.png"><img src="user-guide/images/question-short-answer.png" alt="Fill-in-the-blank prompt and accepted-answer controls" width="240"></a> |
+| 2 | Enter **Correct feedback** and **Incorrect feedback**, then click **Save question**. | The question is saved to the scene. | <a href="user-guide/images/question-short-answer.png"><img src="user-guide/images/question-short-answer.png" alt="Fill-in-the-blank prompt and accepted-answer controls" width="240"></a><br><a href="user-guide/images/assessment-actions.png"><img src="user-guide/images/assessment-actions.png" alt="assessment actions controls" width="240"></a> |
 
 ### Configure question scoring and remediation
 
@@ -349,7 +453,7 @@ Current question scoring is binary: 0% or 100%. Course score weights affect the 
 
 This section describes **New enhancement run**, which uses Pythia's `storyboard.enhance` capability. It is separate from the analysis, transformation, assessment, and course-review dialogs described in [Work with Pythia](#14-work-with-pythia). Only the references selected in this form accompany this enhancement request; they are not automatically included in the other Pythia workflows.
 
-Enhancement submission requires an available Intelligence Engine supporting `storyboard.enhance`, managed by an administrator in shared installations. Check **Settings > Intelligence Engine**, not **Media provider**. Without it, Preview submission remains useful, but Submit run is disabled. This documentation update made no live AI requests and does not certify provider output.
+Enhancement submission requires an available Pythia Engine supporting `storyboard.enhance`, managed by an administrator in shared installations. Check **Settings > Pythia**, not **AI connection**. Without it, Preview submission remains useful, but Submit run is disabled. This documentation update made no live AI requests and does not certify provider output.
 
 ### Import a Study Guide or supporting reference
 
@@ -429,11 +533,16 @@ The current provider implementation sends the prompt and dimensions to image gen
 
 ### Request narration
 
+First configure a speech-provider connection as described under [Configure media connections](#configure-media-connections). The image below uses a named documentation-only Cartesia capability/voice fixture; no speech was generated. Synthesia and Shotstack do not appear in the narration selector.
+
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | In Media library, set **Media type** to **Narration** and verify the target scene. | Narration fields replace image fields. | <a href="user-guide/images/media-narration-form.png"><img src="user-guide/images/media-narration-form.png" alt="media narration form controls" width="240"></a> |
-| 2 | Enter **Purpose**, **Narration script**, and a provider-supported **Voice**. | The narration request is prepared. | <a href="user-guide/images/media-narration-form.png"><img src="user-guide/images/media-narration-form.png" alt="media narration form controls" width="240"></a> |
-| 3 | Click **Generate candidate**. | A successful provider run returns an audio candidate for review. | <a href="user-guide/images/media-narration-form.png"><img src="user-guide/images/media-narration-form.png" alt="media narration form controls" width="240"></a> |
+| 1 | In Media library, expand **Create a media candidate**, set **Media type** to **Narration** and verify the target scene. | Narration fields replace image fields; narration is selected automatically when only speech is configured. | <a href="user-guide/images/media-narration-form.png"><img src="user-guide/images/media-narration-form.png" alt="Current narration form with explicit connection selection" width="240"></a> |
+| 2 | Explicitly choose **Narration connection**. Use a named ElevenLabs, Google Cloud or Cartesia connection, or **Existing AI connection** for legacy OpenAI. | Saved voice/language populate the form. No provider is silently selected for you. | <a href="user-guide/images/media-narration-form.png"><img src="user-guide/images/media-narration-form.png" alt="Named narration connection, voice and language" width="240"></a> |
+| 3 | Enter **Purpose** and **Narration script**; review or override the provider-supported **Voice** and **Language**. | The request is prepared. Google scripts must fit 5,000 UTF-8 bytes; ElevenLabs spoken language is model-detected rather than forced by this metadata field. | <a href="user-guide/images/media-narration-form.png"><img src="user-guide/images/media-narration-form.png" alt="Narration script, purpose, voice and language fields" width="240"></a> |
+| 4 | Click **Generate candidate**. | A successful, potentially billable provider run returns an MP3 audio candidate for review, not automatic approval. Missing/changed connections report errors rather than switching providers. | <a href="user-guide/images/media-narration-form.png"><img src="user-guide/images/media-narration-form.png" alt="Generate narration candidate action" width="240"></a> |
+
+Provider discovery sends no course text and is not an audio-quality check. Explicit generation sends the script to the selected provider and can incur charges. If no narration connections are offered, save a voice on a credential-configured speech connection and reopen the media library; a configured video-only connection is not sufficient. Regeneration retains the candidate's original connection ID, and queued jobs fail if their saved connection revision changes.
 
 ### Approve, reject, or regenerate a media candidate
 
@@ -622,8 +731,8 @@ Pythia returns drafts for human review. Chimera remains the authoring workspace:
 ### Before you start with Pythia
 
 1. Open the intended project with authoring access, save any open edits, and select a scene in **Storyboard**. Analysis, transformation, and assessment design start from the buttons above that scene. Course review starts from **Review tools > Review course with Pythia**.
-2. Open **Settings > Intelligence Engine**. Check **Engine**, **Version**, **Capabilities**, and **Provider registry**. The required capabilities are `storyboard.analyze`, `storyboard.transform`, `assessment.design` (or the supported `assessment.blueprint` alias), and `course.review`; the reference-based enhancement form additionally requires `storyboard.enhance`. An online engine alone does not guarantee that every capability is available to your installation or account.
-3. Ask the installation administrator to resolve missing capabilities, access restrictions, or an unavailable engine. This panel is diagnostic, not a provider editor. Pythia manages learning-intelligence provider/model selection; changing **Media provider** does not select a Pythia model. Usage telemetry requires administrator access and resets when the Engine restarts. Reported budget units are not a currency spending cap.
+2. Open **Settings > Pythia**. Check **Engine**, **Version**, **Capabilities**, and **Provider registry**. The required capabilities are `storyboard.analyze`, `storyboard.transform`, `assessment.design` (or the supported `assessment.blueprint` alias), and `course.review`; the reference-based enhancement form additionally requires `storyboard.enhance`. An online engine alone does not guarantee that every capability is available to your installation or account.
+3. Ask the installation administrator to resolve missing capabilities, access restrictions, or an unavailable engine. This panel is diagnostic, not a provider editor. Pythia manages learning-intelligence provider/model selection; changing **AI connection** does not select a Pythia model. Usage telemetry requires administrator access and resets when the Engine restarts. Reported budget units are not a currency spending cap.
 4. Confirm organisational permission to submit the selected course content. Pythia requests use saved scene text and notes, or the course inventory for course review. Do not assume that references checked in **New enhancement run** accompany these tasks. Check the reported provider: deterministic local drafts are not evidence of an external model call or instructional quality.
 
 For a local installation, Pythia is a third service alongside the Chimera backend and frontend. From the Pythia repository root, start it in a separate terminal:
@@ -700,7 +809,7 @@ Resolving or dismissing a finding records a human decision only. It does not fix
 
 ### Handle task failures and interruptions
 
-- **Engine unavailable or capability missing:** Check **Settings > Intelligence Engine** and the address configured for the Chimera backend. Use **Refresh engine status** there, or **Retry connection** where offered in analysis. Authoring, preview, validation, and export do not require a running Pythia engine.
+- **Engine unavailable or capability missing:** Check **Settings > Pythia** and the address configured for the Chimera backend. Use **Refresh engine status** there, or **Retry connection** where offered in analysis. Authoring, preview, validation, and export do not require a running Pythia engine.
 - **Task in progress:** Keep its dialog open until the draft is saved. **Cancel task** requests cancellation while submitted, queued, or running; inspect the returned state. Closing a dialog is not a cancellation action, and there is no general Pythia task-resume dashboard documented here.
 - **Polling error:** Use **Retry polling** when offered. This resumes checking the existing task; it is not a new submission. Do not submit duplicate tasks just because a status request failed.
 - **Failed or cancelled:** Address the reported cause, then use **Analyze again**, **Run transformation again**, **Run assessment design again**, or **Run course review again**, as appropriate. These create new work; they do not accept an earlier draft.
@@ -726,6 +835,9 @@ See the [implementation build plan](storyboard-export-enhancement-build-plan.md)
 | Symptom | What to do |
 | --- | --- |
 | Projects or libraries do not load | Confirm both local services are running and inspect the displayed error. |
+| Export questions CSV/XLSX returns Not Found | Restart the backend after installing updated code and dependencies, then refresh the frontend. A server started without reload may still serve an older route table. If it persists, check the project selection, permissions, and backend error. |
+| Tags or learning-objective references seem missing | Scroll to the bottom of the question editor and expand **Tags and learning-objective references**. Search or choose Select; Save question keeps changes. Existing suggestions come only from saved questions in this project. |
+| Drag-and-drop or matching has no answer items | Enter text in both lists and add items/targets as needed, then select the correct placements/matches. Answer images are not supported. In Preview, correct drag tiles settle beside the vertical targets; incorrect drops return home without using a Check answer attempt. |
 | A control is disabled | Select a project/scene, complete required fields, or wait for the current operation. Submit run and other Pythia tasks need authoring access and their Intelligence Engine capability; media generation needs its separate provider connection. See [Pythia prerequisites](#before-you-start-with-pythia). |
 | PowerPoint imports without a slide image | Check the render warning and LibreOffice availability. Inspect extracted text and media. |
 | Media upload is rejected | Check the supported image/audio extension, file validity, and 100 MB limit. |
@@ -737,6 +849,8 @@ See the [implementation build plan](storyboard-export-enhancement-build-plan.md)
 | AI generation does not yield a candidate | Check the visible error and ask the administrator to inspect provider/job configuration. The media form has no complete job monitor. |
 
 ## Screenshot and verification record
+
+The [2026-10-27 refresh manifest](user-guide/refresh-manifest-2026-10-27.json) records 19 updated captures: workspace rail/Storyboard background location, Review tools, question bank and import review, named assessment editing/list, all seven question types, and collapsed/expanded reference and metadata controls. The searchable dropdown captures verify existing values from another saved question in the same isolated project. No user course, provider credentials, paid generation, or external submission was used. Older images below retain their original scope; this selective refresh is not a full release or LMS qualification.
 
 Screenshots were captured from the actual local frontend and an isolated backend workspace on 2026-09-30, using a compatible headless Chromium browser, a 1500-pixel-wide viewport, and Light appearance. Images are stored in `docs/user-guide/images/` and contain demonstration data only. Proposal, generated-candidate, and enhancement-job examples were seeded locally to expose conditional controls. No paid generation or external submission was performed.
 

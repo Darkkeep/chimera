@@ -13,6 +13,7 @@ from threading import RLock, local
 from typing import Iterator, Literal
 from .models import AssessmentGroup, AssessmentGroupWrite, ProductionStageUpdate
 from .ai_connection import connection_status
+from .narration_connections import SPEECH_PROVIDERS, resolve_narration_connection
 from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalChange, EnhancementProposalChangeCreate, EnhancementProposalCreate, EnhancementProposalDecisionRecord, ExportSettings, ExtractedAsset, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, PythiaAnalysisProposal, PythiaAnalysisProposalCreate, PythiaAnalysisProposalDecisionRecord, PythiaCourseFindingDecision, PythiaCourseFindingDecisionRecord, PythiaCourseFindingReview, PythiaCourseReview, PythiaCourseReviewCreate, PythiaTransformProposal, PythiaTransformProposalCreate, PythiaTransformProposalDecisionRecord, ReferencePassage, ReferenceResource, ReferenceResourceVersion, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewCommentReply, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate, TrashedProject
 ROOT = Path(os.environ.get("CHIMERA_WORKSPACE", Path(__file__).resolve().parents[2] / "workspace"))
 from .platform import DurableEventSink, LOCAL_ACTOR, ActorContext, PlatformEvent, get_actor_context, get_correlation_id
@@ -228,7 +229,7 @@ def replace_project_file(source: Path, destination: Path) -> None:
             time.sleep(0.02 * (attempt + 1))
 
 
-def write_project_metadata(path: Path, metadata: dict[str, str]) -> None:
+def write_project_metadata(path: Path, metadata: dict[str, str | int | None]) -> None:
     with _storyboard_write_lock:
         project_file = path / "project.json"
         existing = json.loads(project_file.read_text(encoding="utf-8")) if project_file.is_file() else {}
@@ -264,9 +265,62 @@ def write_storyboard(path: Path, storyboard: Storyboard, expected_revision: int 
 
 
 def create_project(data: ProjectCreate, context: ActorContext | None = None) -> ProjectDetail:
+    with storyboard_transaction():
+        return _create_project(data, context)
+
+
+def validate_project_parent(project_id: str, parent_project_id: str | None, installation_id: str) -> None:
+    if parent_project_id is None:
+        return
+    if parent_project_id == project_id:
+        raise RuntimeError("A project cannot be its own parent.")
+    try:
+        if Path(parent_project_id).name != parent_project_id or parent_project_id in {".", ".."}:
+            raise FileNotFoundError(parent_project_id)
+        parent = read_project(parent_project_id)
+    except FileNotFoundError as error:
+        raise RuntimeError("Parent is unavailable or trashed. Choose standalone or another active parent.") from error
+    if parent.installationId != installation_id:
+        raise RuntimeError("Parent and child must belong to the same installation.")
+    if parent.parentProjectId is not None:
+        raise RuntimeError("Only root projects can be parents; cycles and more than two levels are not allowed.")
+    if any(item.parentProjectId == project_id for item in list_projects()):
+        raise RuntimeError("Detach or move active subprojects before making this project a child.")
+
+
+def update_project_relationship(project_id: str, parent_project_id: str | None, sibling_order: int, metadata_revision: int) -> ProjectDetail:
+    with storyboard_transaction():
+        project = read_project(project_id)
+        if metadata_revision != project.metadataRevision:
+            raise ProjectMetadataConflict(f"Project relationship changed; refresh and retry with metadataRevision {project.metadataRevision}.")
+        if not 0 <= sibling_order <= 2147483647:
+            raise ValueError("Display order must be between 0 and 2147483647.")
+        validate_project_parent(project_id, parent_project_id, project.installationId)
+        write_project_metadata(project_path(project_id), {
+            "parentProjectId": parent_project_id,
+            "siblingOrder": sibling_order,
+            "metadataRevision": project.metadataRevision + 1,
+            "updatedAt": now_iso(),
+        })
+        append_platform_event(project_id, "project.relationship_changed", {
+            "previousParentProjectId": project.parentProjectId,
+            "parentProjectId": parent_project_id,
+            "previousSiblingOrder": project.siblingOrder,
+            "siblingOrder": sibling_order,
+            "metadataRevision": project.metadataRevision + 1,
+        })
+        return read_project(project_id)
+
+
+class ProjectMetadataConflict(RuntimeError):
+    pass
+
+
+def _create_project(data: ProjectCreate, context: ActorContext | None = None) -> ProjectDetail:
     context = context or get_actor_context()
     PROJECTS.mkdir(parents=True, exist_ok=True)
     project_id = f"{slugify(data.title)}-{uuid.uuid4().hex[:8]}"
+    validate_project_parent(project_id, data.parentProjectId, context.installationId)
     path = project_path(project_id)
     ensure_project_dirs(path)
     timestamp = now_iso()
@@ -277,11 +331,19 @@ def create_project(data: ProjectCreate, context: ActorContext | None = None) -> 
         "installationId": context.installationId,
         "ownerId": context.actorId,
         "productionStage": "draft",
+        "metadataRevision": 1,
+        "parentProjectId": data.parentProjectId,
+        "siblingOrder": 0,
     }
     write_project_metadata(path, metadata)
     storyboard = Storyboard(projectId=project_id, title=data.title)
     write_storyboard(path, storyboard)
     append_platform_event(project_id, "project.created", {"title": data.title}, context)
+    if data.parentProjectId is not None:
+        append_platform_event(project_id, "project.relationship_changed", {
+            "previousParentProjectId": None, "parentProjectId": data.parentProjectId,
+            "siblingOrder": 0, "metadataRevision": 1,
+        }, context)
     return read_project(project_id)
 
 
@@ -310,7 +372,7 @@ def list_projects() -> list[ProjectSummary]:
                 projects.append(ProjectSummary(**project.model_dump(exclude={"storyboard"})))
             except (FileNotFoundError, ValueError):
                 continue
-    return projects
+    return sorted(projects, key=lambda item: (item.siblingOrder, item.id))
 
 
 def _read_trash_metadata(path: Path) -> tuple[dict[str, object], Storyboard]:
@@ -354,18 +416,12 @@ def list_trashed_projects(now: datetime | None = None) -> list[TrashedProject]:
                 continue
             try:
                 metadata, storyboard = _read_trash_metadata(path)
-                projects.append(TrashedProject(
-                    id=str(metadata["id"]),
-                    title=str(metadata["title"]),
-                    sceneCount=len(storyboard.scenes),
-                    updatedAt=str(metadata["updatedAt"]),
-                    hasSourceDeck=any((path / "project" / "original").iterdir()),
-                    installationId=str(metadata.get("installationId", "local-installation")),
-                    ownerId=str(metadata.get("ownerId", "local-user")),
-                    productionStage=metadata.get("productionStage", "not-set"),
-                    trashedAt=str(metadata["trashedAt"]),
-                    expiresAt=str(metadata["trashExpiresAt"]),
-                ))
+                projects.append(TrashedProject.model_validate({
+                    **metadata,
+                    "sceneCount": len(storyboard.scenes),
+                    "hasSourceDeck": any((path / "project" / "original").iterdir()),
+                    "expiresAt": metadata["trashExpiresAt"],
+                }))
             except (OSError, ValueError, KeyError):
                 continue
         return projects
@@ -376,6 +432,8 @@ def trash_project(project_id: str) -> TrashedProject:
         raise FileNotFoundError(project_id)
     with storyboard_transaction():
         project = read_project(project_id)
+        if any(item.parentProjectId == project_id for item in list_projects()):
+            raise RuntimeError("Detach or move active subprojects before moving this project to trash.")
         active_jobs = [
             job for job in [*list_enhancement_jobs(project_id), *list_media_generation_jobs(project_id)]
             if job.status in {"queued", "running"}
@@ -408,7 +466,7 @@ def trash_project(project_id: str) -> TrashedProject:
         return next(item for item in list_trashed_projects(now=timestamp) if item.id == project_id)
 
 
-def restore_trashed_project(project_id: str, now: datetime | None = None) -> ProjectDetail:
+def restore_trashed_project(project_id: str, now: datetime | None = None, *, parent_project_id: str | None = None, explicit_parent: bool = False) -> ProjectDetail:
     if Path(project_id).name != project_id or project_id in {".", ".."}:
         raise FileNotFoundError(project_id)
     with storyboard_transaction():
@@ -417,14 +475,30 @@ def restore_trashed_project(project_id: str, now: datetime | None = None) -> Pro
         if not source.is_dir():
             raise FileNotFoundError(project_id)
         metadata, _ = _read_trash_metadata(source)
+        summary = ProjectSummary.model_validate({
+            **metadata, "sceneCount": 0, "hasSourceDeck": False,
+        })
         if datetime.fromisoformat(str(metadata["trashExpiresAt"])) <= (now or datetime.now(timezone.utc)):
             shutil.rmtree(source)
             raise FileNotFoundError(project_id)
         destination = project_path(project_id)
         if destination.exists():
             raise FileExistsError(project_id)
+        previous_parent = summary.parentProjectId
+        selected_parent = parent_project_id if explicit_parent else previous_parent
+        validate_project_parent(project_id, selected_parent, summary.installationId)
+        write_project_metadata(source / "project", {
+            "parentProjectId": selected_parent,
+            "metadataRevision": summary.metadataRevision + 1,
+            "updatedAt": now_iso(),
+        })
         (source / "project").replace(destination)
         shutil.rmtree(source, ignore_errors=True)
+        append_platform_event(project_id, "project.relationship_restored", {
+            "previousParentProjectId": previous_parent,
+            "parentProjectId": selected_parent,
+            "metadataRevision": read_project(project_id).metadataRevision,
+        })
         return read_project(project_id)
 
 
@@ -605,6 +679,9 @@ def update_scene(project_id: str, scene_id: str, data: SceneUpdate, expected_rev
     for index, scene in enumerate(scenes):
         if scene.id == scene_id:
             updated_scene = Scene.model_validate({**scene.model_dump(), **updates})
+            if updated_scene.assessmentItem and (scene.assessmentItem is None or updated_scene.assessmentItem.identifier != scene.assessmentItem.identifier):
+                if any(candidate.id != scene_id and candidate.assessmentItem and candidate.assessmentItem.identifier == updated_scene.assessmentItem.identifier for candidate in scenes):
+                    raise ValueError("This stable question identifier already exists in this project")
             if "visualLayout" not in updates and updated_scene.visualLayout and any(field in updates for field in ["extractedText", "title", "imageAssets"]):
                 from .models import SceneElement
                 layout = updated_scene.visualLayout.model_copy(deep=True)
@@ -626,6 +703,8 @@ def update_scene(project_id: str, scene_id: str, data: SceneUpdate, expected_rev
                     detached = set(scene.imageAssets) - set(updated_scene.imageAssets)
                     layout.elements = [element for element in layout.elements if element.kind != "image" or element.assetId not in detached]
                 updated_scene = updated_scene.model_copy(update={"visualLayout": layout})
+            if "visualLayout" in updates and updated_scene.visualLayout:
+                updated_scene = updated_scene.model_copy(update={"backgroundAsset": updated_scene.visualLayout.backgroundAsset})
             validate_visual_assets(updated_scene, {asset.id: asset for asset in current.storyboard.assets})
             if "visualLayout" in updates and updated_scene.visualLayout and updated_scene.visualLayout.enabled:
                 visual_image_ids = [element.assetId for element in updated_scene.visualLayout.elements if element.kind == "image"]
@@ -747,6 +826,17 @@ def update_project_export_settings(project_id: str, settings: ExportSettings, ex
     write_storyboard(path, current.storyboard.model_copy(update={"exportSettings": settings}), expected_revision or current.storyboard.revision)
     metadata = {"id": project_id, "title": current.title, "updatedAt": now_iso()}
     write_project_metadata(path, metadata)
+    return read_project(project_id)
+
+
+def update_project_background(project_id: str, background_asset: str | None, expected_revision: int | None = None) -> ProjectDetail:
+    from .media import validate_backgrounds
+    path = project_path(project_id)
+    current = read_project(project_id)
+    storyboard = current.storyboard.model_copy(update={"backgroundAsset": background_asset})
+    validate_backgrounds(current.model_copy(update={"storyboard": storyboard}))
+    write_storyboard(path, storyboard, expected_revision or current.storyboard.revision)
+    write_project_metadata(path, {"id": project_id, "title": current.title, "updatedAt": now_iso()})
     return read_project(project_id)
 
 
@@ -1364,13 +1454,28 @@ def create_media_generation_job(project_id: str, data: MediaGenerationJobCreate)
         project = read_project(project_id)
         if not any(scene.id == data.sceneId for scene in project.storyboard.scenes):
             raise ValueError("Media generation must target a scene in this project")
+        connection_revision = connection_status(ROOT)["revision"]
+        values = data.model_dump()
+        if data.narrationConnectionId and data.kind != "narration":
+            raise ValueError("Narration connections cannot generate images.")
+        if data.kind == "narration" and data.narrationConnectionId not in {None, "legacy-openai"}:
+            connection = resolve_narration_connection(ROOT, data.narrationConnectionId)
+            if connection.settings["provider"] not in SPEECH_PROVIDERS:
+                raise ValueError("This connection supports setup only; video generation is not yet available.")
+            connection_revision = connection.revision
+            values["voice"] = data.voice or connection.settings["voice"]
+            values["language"] = data.language or connection.settings["language"]
+            if not values["voice"]:
+                raise ValueError("Save or select a voice for this narration connection before generating.")
+            if connection.settings["provider"] == "google-cloud" and len(data.script.encode("utf-8")) > 5000:
+                raise ValueError("Google Cloud narration is limited to 5,000 UTF-8 bytes per request.")
         timestamp = now_iso()
         job = MediaGenerationJob(
             id=f"media-generation-{uuid.uuid4().hex[:12]}",
             projectId=project_id,
             sourceRevision=project.storyboard.revision,
-            aiConnectionRevision=connection_status(ROOT)["revision"],
-            **data.model_dump(),
+            aiConnectionRevision=connection_revision,
+            **values,
             createdAt=timestamp,
             updatedAt=timestamp,
         )

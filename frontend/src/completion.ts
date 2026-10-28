@@ -1,6 +1,7 @@
 import type { AssessmentSettings, CourseCompletionSettings, Scene } from "./App";
 
 export type AssessmentOutcome = { attempts: number; isCorrect: boolean | null };
+export type VideoProgress = { position: number; duration: number; watchedRanges: [number, number][] };
 
 export type CourseEvaluation = {
   courseComplete: boolean;
@@ -11,6 +12,8 @@ export type CourseEvaluation = {
   completedRequiredAudioCount: number;
   requiredAudioTrackCount: number;
   requiredAudioSetupMissingCount: number;
+  completedRequiredVideoCount: number;
+  requiredVideoCount: number;
 };
 
 function audioCompletionKey(sceneId: string, audioId: string): string {
@@ -21,11 +24,21 @@ function assessmentSettings(scene: Scene): AssessmentSettings {
   return scene.assessmentSettings ?? { maxAttempts: 2, passingScore: 100, scoreWeight: 1, remediationSceneId: null };
 }
 
+export function videoWatchedSeconds(progress: VideoProgress | undefined): number {
+  return progress?.watchedRanges.reduce((total, [start, end]) => total + Math.max(0, end - start), 0) ?? 0;
+}
+
+export function videoCoveragePercent(progress: VideoProgress | undefined): number {
+  if (!progress || !Number.isFinite(progress.duration) || progress.duration <= 0) return 0;
+  return Math.min(100, Math.floor(videoWatchedSeconds(progress) / progress.duration * 100));
+}
+
 export function evaluateCourseCompletion(
   scenes: Scene[],
   completionSettings: CourseCompletionSettings,
   visitedSceneIds: string[],
   completedAudioKeys: string[],
+  videoProgress: Record<string, VideoProgress>,
   assessmentResults: Record<string, AssessmentOutcome | undefined>,
 ): CourseEvaluation {
   const visited = new Set(visitedSceneIds);
@@ -46,6 +59,15 @@ export function evaluateCourseCompletion(
   ).length, 0);
   const requiredAudioSetupMissingCount = requiredAudioScenes.filter((scene) => scene.audioAssets.length === 0).length;
 
+  const requiredVideos = new Map<string, number>();
+  for (const scene of scenes) {
+    for (const placement of scene.mediaPlacements ?? []) {
+      if (!placement.requiredViewing || !(scene.videoAssets ?? []).includes(placement.assetId)) continue;
+      requiredVideos.set(placement.assetId, Math.max(requiredVideos.get(placement.assetId) ?? 0, placement.viewingThresholdPercent ?? 90));
+    }
+  }
+  const completedRequiredVideoCount = [...requiredVideos].filter(([assetId, threshold]) => videoCoveragePercent(videoProgress[assetId]) >= threshold).length;
+
   const scoredAssessments = scenes.filter((scene) => scene.assessmentItem && (
     scene.required || (completionSettings.includeOptionalAssessments && (assessmentResults[scene.id]?.attempts ?? 0) > 0)
   ));
@@ -59,7 +81,8 @@ export function evaluateCourseCompletion(
   const courseComplete = scenes.length > 0
     && completedRequiredSceneCount === requiredScenes.length
     && completedRequiredAudioCount === requiredAudioTrackCount
-    && requiredAudioSetupMissingCount === 0;
+    && requiredAudioSetupMissingCount === 0
+    && completedRequiredVideoCount === requiredVideos.size;
   const coursePassed = courseComplete && (weightedScore === null || weightedScore >= completionSettings.passingScore);
 
   return {
@@ -71,5 +94,7 @@ export function evaluateCourseCompletion(
     completedRequiredAudioCount,
     requiredAudioTrackCount,
     requiredAudioSetupMissingCount,
+    completedRequiredVideoCount,
+    requiredVideoCount: requiredVideos.size,
   };
 }

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ArrowDown, ArrowUp, Download, Minus, Plus, Save, X } from "lucide-react";
 import type { AssessmentChoice, AssessmentItem, AssessmentPair, AssessmentSettings, AssessmentType, Project, Scene } from "./App";
 import { revisionConflictMessage, storyboardWriteHeaders } from "./revision";
+import { QuestionMetadataFields } from "./QuestionMetadataFields";
 import "./assessment-editor.css";
 import "./assessment-settings.css";
 import "./assessment-types.css";
@@ -87,7 +88,7 @@ function questionTypeName(type: AssessmentType): string {
     ordering: "Ordering",
     "drag-drop": "Drag and drop",
     matching: "Matching",
-    "short-answer": "Short answer",
+    "short-answer": "Fill-in-the-blank",
   })[type];
 }
 
@@ -171,7 +172,10 @@ export function AssessmentEditor({ projectId, projectTitle, revision, scene, sce
             : item.type === "drag-drop"
               ? choiceAnswersValid && secondary.length > 0 && secondary.every((choice) => choice.text.trim()) && matchesValid
               : choiceAnswersValid && secondary.length >= 2 && secondary.every((choice) => choice.text.trim()) && matchesValid;
-  const canSave = Boolean(item.identifier.trim() && item.prompt.trim() && typeAnswersValid);
+  const duplicateIdentifier = scenes.some(candidate => candidate.id !== scene.id && candidate.assessmentItem?.identifier === item.identifier);
+  const metadataValid = !item.metadata || /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/.test(item.metadata.language)
+    && [item.metadata.tags, item.metadata.learningObjectiveRefs].every(values => values.length <= 50 && new Set(values).size === values.length && values.every(value => value.length <= 200));
+  const canSave = Boolean(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(item.identifier) && !duplicateIdentifier && item.prompt.trim() && typeAnswersValid && metadataValid);
 
   async function saveQuestion() {
     if (!canSave || busy) return;
@@ -259,7 +263,7 @@ export function AssessmentEditor({ projectId, projectTitle, revision, scene, sce
       : item.type === "matching" ? side === "primary" ? "left item" : "right item"
         : item.type === "ordering" ? "step" : "answer choice";
     return <fieldset className="assessment-choices"><legend>{label}</legend>
-      {choices.map((choice, index) => <div className="assessment-choice-row" key={choice.identifier}>
+      {choices.map((choice, index) => <div className={`assessment-choice-row${!hasChoices ? " assessment-choice-row-paired" : item.type === "ordering" ? " assessment-choice-row-ordered" : ""}`} key={choice.identifier}>
         {hasChoices && item.type !== "ordering" && <input
           type={item.type === "multiple-response" ? "checkbox" : "radio"}
           name={item.type === "multiple-response" ? `correct-${side}` : `correct-${side}-${scene.id}`}
@@ -271,8 +275,8 @@ export function AssessmentEditor({ projectId, projectTitle, revision, scene, sce
             markChanged();
           }}
         />}
-        {item.type === "ordering" && <div className="assessment-order-actions"><button type="button" className="icon-button" aria-label={`Move ${choice.identifier} earlier`} onClick={() => moveOrderedChoice(index, -1)} disabled={busy || index === 0}><ArrowUp size={14} /></button><button type="button" className="icon-button" aria-label={`Move ${choice.identifier} later`} onClick={() => moveOrderedChoice(index, 1)} disabled={busy || index === choices.length - 1}><ArrowDown size={14} /></button></div>}
-        <label><span className="assessment-choice-id">{choice.identifier}</span><input value={choice.text} maxLength={1000} onChange={(event) => replaceChoice(side, index, { text: event.target.value })} aria-label={`Text for ${choice.identifier}`} placeholder={`${label} ${index + 1}`} /></label>
+        {item.type === "ordering" && <div className="assessment-order-actions"><button type="button" className="icon-button" aria-label={`Move ${choice.identifier} earlier`} title="Move step earlier" onClick={() => moveOrderedChoice(index, -1)} disabled={busy || index === 0}><ArrowUp size={18} /></button><button type="button" className="icon-button" aria-label={`Move ${choice.identifier} later`} title="Move step later" onClick={() => moveOrderedChoice(index, 1)} disabled={busy || index === choices.length - 1}><ArrowDown size={18} /></button></div>}
+        <label className="assessment-choice-label"><span className="assessment-choice-id">{choice.identifier}</span><input value={choice.text} maxLength={1000} onChange={(event) => replaceChoice(side, index, { text: event.target.value })} aria-label={`Text for ${choice.identifier}`} placeholder={`${addLabel.charAt(0).toUpperCase()}${addLabel.slice(1)} ${index + 1}`} /></label>
         <button type="button" className="icon-button assessment-remove-choice" aria-label={`Remove ${choice.identifier}`} onClick={() => removeChoice(side, index)} disabled={busy || choices.length <= 1}><Minus size={15} /></button>
       </div>)}
       <button type="button" className="assessment-add-choice" onClick={() => addChoice(side)} disabled={busy || choices.length >= 10}><Plus size={14} /> Add {addLabel}</button>
@@ -280,24 +284,30 @@ export function AssessmentEditor({ projectId, projectTitle, revision, scene, sce
   }
 
   return <div className="assessment-editor-backdrop" onMouseDown={(event) => event.target === event.currentTarget && !busy && onClose()}>
-    <section data-onboarding="assessment.editor" className="assessment-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="assessment-editor-title">
+    <section data-onboarding="assessment.editor" data-onboarding-journey={`question-${item.type}`} className="assessment-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="assessment-editor-title">
       <header className="assessment-editor-header">
         <div><p className="eyebrow">VERSION-NEUTRAL ASSESSMENT</p><h2 id="assessment-editor-title">{scene.title}</h2></div>
         <button className="icon-button" onClick={onClose} disabled={busy} aria-label="Close question editor"><X size={18} /></button>
       </header>
       <div className="assessment-editor-body">
         {error && <p className="assessment-editor-error" role="alert">{error}</p>}
-        <label className="assessment-prompt-label">Question type<select value={item.type} onChange={(event) => { setItem(createDefaultItem(event.target.value as AssessmentType, scene, item.identifier, item.prompt)); markChanged(); }}>{(["single-choice", "multiple-response", "true-false", "ordering", "drag-drop", "matching", "short-answer"] as AssessmentType[]).map((type) => <option key={type} value={type}>{questionTypeName(type)}</option>)}</select></label>
+        {duplicateIdentifier && <p className="assessment-editor-error" role="alert">This stable identifier is already used by another question in this project.</p>}
+        {!metadataValid && <p className="assessment-editor-error" role="alert">Use a language tag such as en-US and at most 50 unique tags or objective references, each up to 200 characters.</p>}
+        {!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(item.identifier) && <p className="assessment-editor-error" role="alert">The stable identifier must start with a letter and contain up to 64 letters, digits, underscores, or hyphens.</p>}
+        <label className="assessment-prompt-label">Question type<select value={item.type} onChange={(event) => { setItem({ ...createDefaultItem(event.target.value as AssessmentType, scene, item.identifier, item.prompt), metadata: item.metadata }); markChanged(); }}>{(["single-choice", "multiple-response", "true-false", "ordering", "drag-drop", "matching", "short-answer"] as AssessmentType[]).map((type) => <option key={type} value={type}>{questionTypeName(type)}</option>)}</select></label>
         <label className="assessment-prompt-label">Question prompt<textarea rows={3} maxLength={5000} value={item.prompt} onChange={(event) => { setItem({ ...item, prompt: event.target.value }); markChanged(); }} placeholder="Write a clear question" /></label>
         {(item.type === "single-choice" || item.type === "multiple-response") && <p className="field-hint">{item.type === "single-choice" ? "Select one correct answer." : "Select every correct answer."}</p>}
+        {item.type === "ordering" && <p className="assessment-authoring-hint">Enter each step below, then use the up and down arrows to arrange the correct sequence.</p>}
+        {(item.type === "drag-drop" || item.type === "matching") && <p className="assessment-authoring-hint">Enter text in both lists below, add items as needed, then select the correct {item.type === "drag-drop" ? "placements" : "matches"}. Answer items currently support text only, not images.</p>}
         {hasChoices && choiceList(item.type === "ordering" ? "Correct sequence" : "Answer choices", "primary")}
         {item.type === "true-false" && <fieldset className="assessment-choices"><legend>Correct answer</legend>{(["true", "false"] as const).map((answer) => <label className="assessment-choice-row" key={answer}><input type="radio" name={`true-false-${scene.id}`} checked={item.correctResponse === answer} onChange={() => { setItem({ ...item, correctResponse: answer }); markChanged(); }} /><span>{answer === "true" ? "True" : "False"}</span></label>)}</fieldset>}
         {item.type === "drag-drop" && <div className="assessment-pair-lists">{choiceList("Draggable items", "primary")}{choiceList("Drop targets", "secondary")}<fieldset className="assessment-choices"><legend>Correct placement</legend>{item.draggables.map((source) => <label className="assessment-pair-row" key={source.identifier}><span>{source.text || source.identifier}</span><select value={item.correctMatches.find((pair) => pair.sourceIdentifier === source.identifier)?.targetIdentifier ?? ""} onChange={(event) => setPair(source.identifier, event.target.value)}><option value="">Choose target</option>{item.targets.map((target) => <option key={target.identifier} value={target.identifier}>{target.text || target.identifier}</option>)}</select></label>)}</fieldset></div>}
         {item.type === "matching" && <div className="assessment-pair-lists">{choiceList("Left column", "primary")}{choiceList("Right column", "secondary")}<fieldset className="assessment-choices"><legend>Correct matches</legend>{item.leftItems.map((source) => <label className="assessment-pair-row" key={source.identifier}><span>{source.text || source.identifier}</span><select value={item.correctMatches.find((pair) => pair.sourceIdentifier === source.identifier)?.targetIdentifier ?? ""} onChange={(event) => setPair(source.identifier, event.target.value)}><option value="">Choose match</option>{item.rightItems.map((target) => <option key={target.identifier} value={target.identifier}>{target.text || target.identifier}</option>)}</select></label>)}</fieldset></div>}
-        {item.type === "short-answer" && <fieldset className="assessment-choices"><legend>Accepted answers</legend><label className="assessment-prompt-label">Enter one accepted answer per line<textarea rows={4} value={item.acceptedAnswers.join("\n")} onChange={(event) => { setItem({ ...item, acceptedAnswers: event.target.value.split(/\r?\n/) }); markChanged(); }} /></label><label className="assessment-toggle"><input type="checkbox" checked={item.caseSensitive} onChange={(event) => { setItem({ ...item, caseSensitive: event.target.checked }); markChanged(); }} /><span>Match letter case</span></label></fieldset>}
+        {item.type === "short-answer" && <fieldset className="assessment-choices"><legend>Accepted answers for the blank</legend><p className="assessment-authoring-hint">Learners fill in one blank after the prompt. Enter a word or short phrase, with alternate spellings or equivalent answers on separate lines. Answers must match exactly, ignoring surrounding whitespace and, unless selected below, letter case. This is not a written-response or essay question.</p><label className="assessment-prompt-label">Enter one accepted answer per line<textarea rows={4} value={item.acceptedAnswers.join("\n")} onChange={(event) => { setItem({ ...item, acceptedAnswers: event.target.value.split(/\r?\n/) }); markChanged(); }} /></label><label className="assessment-toggle"><input type="checkbox" checked={item.caseSensitive} onChange={(event) => { setItem({ ...item, caseSensitive: event.target.checked }); markChanged(); }} /><span>Match letter case</span></label></fieldset>}
         <div className="assessment-feedback-fields"><label>Correct feedback<textarea rows={2} maxLength={2000} value={item.correctFeedback} onChange={(event) => { setItem({ ...item, correctFeedback: event.target.value }); markChanged(); }} /></label><label>Incorrect feedback<textarea rows={2} maxLength={2000} value={item.incorrectFeedback} onChange={(event) => { setItem({ ...item, incorrectFeedback: event.target.value }); markChanged(); }} /></label></div>
         <fieldset className="assessment-settings"><legend>Assessment rules</legend><label>Maximum attempts<select value={settings.maxAttempts} onChange={(event) => { setSettings({ ...settings, maxAttempts: Number(event.target.value) }); markChanged(); }}>{[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((attempts) => <option key={attempts} value={attempts}>{attempts} {attempts === 1 ? "attempt" : "attempts"}</option>)}</select></label><label>Passing score<select value={settings.passingScore} onChange={(event) => { setSettings({ ...settings, passingScore: Number(event.target.value) }); markChanged(); }}>{[50, 60, 70, 75, 80, 85, 90, 100].map((score) => <option key={score} value={score}>{score}%</option>)}</select></label><label>Course score weight<input type="number" min={0.1} max={10} step={0.1} value={settings.scoreWeight} onChange={(event) => { setSettings({ ...settings, scoreWeight: Number(event.target.value) }); markChanged(); }} /></label><label>Remediation scene<select value={settings.remediationSceneId ?? ""} onChange={(event) => { setSettings({ ...settings, remediationSceneId: event.target.value || null }); markChanged(); }}><option value="">No remediation</option>{scenes.filter((candidate) => candidate.id !== scene.id).map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title}</option>)}</select></label></fieldset>
         <p className="assessment-qti-note">Question data stays version-neutral in the storyboard. Export creates a QTI 2.1 assessment item XML file.</p>
+        <QuestionMetadataFields key={scene.id} item={item} sceneTitle={scene.title} scenes={scenes} disabled={busy} onChange={updated => { setItem(updated); markChanged(); }} />
       </div>
       <footer className="assessment-editor-footer"><div>{saved && <span className="assessment-saved">Saved to {projectTitle}</span>}</div><div className="assessment-editor-actions">{scene.assessmentItem && <button className="button button-outline assessment-delete" onClick={() => void removeQuestion()} disabled={busy} title="Remove this question from the scene.">Remove question</button>}<button className="button button-outline" onClick={() => void exportQti()} disabled={busy || !scene.assessmentItem || !saved} title="Download this question as a QTI 2.1 item."><Download size={14} /> Export QTI item</button><button className="button button-accent" onClick={() => void saveQuestion()} disabled={busy || !canSave} title="Save this question and its scoring rules."><Save size={14} />{busy ? "Saving" : "Save question"}</button></div></footer>
     </section>

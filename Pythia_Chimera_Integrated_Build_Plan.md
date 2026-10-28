@@ -8,6 +8,12 @@
 
 The two products remain independently useful while sharing a stable integration contract.
 
+## Current media-provider implementation (2026-10-27)
+
+Chimera's **Settings > AI connection** has OpenAI, ElevenLabs, Google Cloud, Cartesia, Synthesia and Shotstack tabs. OpenAI images/legacy narration and ElevenLabs/Google Cloud/Cartesia MP3 narration use direct server-side media adapters with explicit candidate review. Synthesia/Shotstack currently support secure connection setup and read-only metadata tests only, not asynchronous video generation. They are excluded from generation capabilities.
+
+These media connections do not select Pythia's learning-intelligence provider or bypass proposal approval. Pythia diagnostics are named **Pythia** in the UI; internal Engine contracts remain compatible. Installation administrators/local operators own credential provisioning, with OS secure storage, fixed server environment variables or Google ADC and no browser-persisted secrets. See [connection documentation](docs/ai-connection.md) and [current implementation evidence](docs/current-work.md#october-27-media-provider-connections-and-help). The future architecture below is not evidence that video rendering, live provider quality or deployment qualification has been delivered.
+
 ---
 
 # 1. Target Product Architecture
@@ -521,7 +527,7 @@ assessment.design
 - Ordering
 - Matching
 - Drag and drop
-- Short answer
+- Fill-in-the-blank (legacy `short-answer` identifier; one automatically graded blank, not an essay)
 
 using Chimera's native assessment model.
 

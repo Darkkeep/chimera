@@ -3,7 +3,7 @@ import { BrandMark } from "./BrandMark";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, List, MessageCircle, Play, RotateCcw, Send, Square, X } from "lucide-react";
 import type { AssessmentItem, AssessmentSettings, Project, Scene } from "./App";
-import { evaluateCourseCompletion, type AssessmentOutcome } from "./completion";
+import { evaluateCourseCompletion, type AssessmentOutcome, type VideoProgress } from "./completion";
 import "./course-preview.css";
 import "./course-preview-overrides.css";
 import "./course-preview-review.css";
@@ -15,6 +15,7 @@ import { PublishedMedia } from "./PublishedMedia";
 import { resolvedProject } from "./media";
 import { SceneSurface } from "./SceneSurface";
 import { AssessmentFeedbackDialog } from "./AssessmentFeedbackDialog";
+import { DragDropQuestion } from "./DragDropQuestion";
 
 type CoursePreviewProps = {
   project: Project;
@@ -24,7 +25,7 @@ type CoursePreviewProps = {
 
 type AssessmentResult = AssessmentOutcome & { response: string[]; matches: Record<string, string>; textResponse: string; assessmentSignature: string };
 type RemediationRoute = { assessmentSceneId: string; remediationSceneId: string };
-type ResumeState = { sceneIndex: number; visitedSceneIds: string[]; completedAudioKeys: string[]; assessmentResults: Record<string, AssessmentResult>; remediationRoute: RemediationRoute | null };
+type ResumeState = { sceneIndex: number; visitedSceneIds: string[]; completedAudioKeys: string[]; videoProgress: Record<string, VideoProgress>; assessmentResults: Record<string, AssessmentResult>; remediationRoute: RemediationRoute | null };
 type ReviewReply = { id: string; authorLabel: string; body: string; createdAt: string };
 type ReviewComment = { id: string; sceneId: string; sceneTitle: string; revision: number; authorLabel: string; body: string; replies: ReviewReply[]; resolved: boolean; outdated: boolean; sceneDeleted: boolean };
 
@@ -80,7 +81,7 @@ function assessmentResponseIsCorrect(item: AssessmentItem, result: AssessmentRes
 function readResumeState(projectId: string, scenes: Scene[]): ResumeState {
   try {
     const stored = window.localStorage.getItem(`chimera.preview.${projectId}`);
-    if (!stored) return { sceneIndex: 0, visitedSceneIds: [], completedAudioKeys: [], assessmentResults: {}, remediationRoute: null };
+    if (!stored) return { sceneIndex: 0, visitedSceneIds: [], completedAudioKeys: [], videoProgress: {}, assessmentResults: {}, remediationRoute: null };
     const parsed = JSON.parse(stored) as Partial<ResumeState>;
     const sceneIndex = typeof parsed.sceneIndex === "number" && Number.isInteger(parsed.sceneIndex)
       ? Math.min(Math.max(parsed.sceneIndex, 0), Math.max(scenes.length - 1, 0))
@@ -94,6 +95,28 @@ function readResumeState(projectId: string, scenes: Scene[]): ResumeState {
     const completedAudioKeys = Array.isArray(parsed.completedAudioKeys)
       ? parsed.completedAudioKeys.filter((key): key is string => typeof key === "string" && requiredAudioKeys.has(key))
       : [];
+    const requiredVideoKeys = new Set(scenes.flatMap((scene) => (scene.mediaPlacements ?? [])
+      .filter((placement) => placement.requiredViewing && (scene.videoAssets ?? []).includes(placement.assetId))
+      .map((placement) => placement.assetId)));
+    const videoProgress = Object.fromEntries(Object.entries(parsed.videoProgress ?? {}).flatMap(([key, value]) => {
+      if (!requiredVideoKeys.has(key) || !value || typeof value !== "object") return [];
+      const progress = value as Partial<VideoProgress>;
+      const duration = progress.duration;
+      if (typeof progress.position !== "number" || !Number.isFinite(progress.position) || typeof duration !== "number" || !Number.isFinite(duration) || duration <= 0 || !Array.isArray(progress.watchedRanges)) return [];
+      const ranges = progress.watchedRanges.flatMap((range) => Array.isArray(range) && range.length === 2
+        && typeof range[0] === "number" && Number.isFinite(range[0]) && typeof range[1] === "number" && Number.isFinite(range[1])
+        && range[0] >= 0 && range[1] > range[0] && range[0] < duration
+        ? [[range[0], Math.min(range[1], duration)] as [number, number]]
+        : []);
+      ranges.sort((left, right) => left[0] - right[0]);
+      const watchedRanges = ranges.reduce<[number, number][]>((merged, [start, end]) => {
+        const previous = merged[merged.length - 1];
+        if (previous && start <= previous[1] + 0.2) previous[1] = Math.max(previous[1], end);
+        else merged.push([start, end]);
+        return merged;
+      }, []);
+      return [[key, { position: Math.min(Math.max(progress.position, 0), duration), duration, watchedRanges } as VideoProgress]];
+    }));
     const assessmentResults = Object.fromEntries(Object.entries(parsed.assessmentResults ?? {}).flatMap(([sceneId, value]) => {
       const assessment = scenes.find((scene) => scene.id === sceneId)?.assessmentItem;
       const scene = scenes.find((item) => item.id === sceneId);
@@ -122,9 +145,9 @@ function readResumeState(projectId: string, scenes: Scene[]): ResumeState {
       && route.assessmentSceneId !== route.remediationSceneId
       ? route
       : null;
-    return { sceneIndex, visitedSceneIds, completedAudioKeys, assessmentResults, remediationRoute };
+    return { sceneIndex, visitedSceneIds, completedAudioKeys, videoProgress, assessmentResults, remediationRoute };
   } catch {
-    return { sceneIndex: 0, visitedSceneIds: [], completedAudioKeys: [], assessmentResults: {}, remediationRoute: null };
+    return { sceneIndex: 0, visitedSceneIds: [], completedAudioKeys: [], videoProgress: {}, assessmentResults: {}, remediationRoute: null };
   }
 }
 
@@ -143,6 +166,7 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
   const [motionReplay, setMotionReplay] = useState(0);
   const [visitedSceneIds, setVisitedSceneIds] = useState(resumeState.visitedSceneIds);
   const [completedAudioKeys, setCompletedAudioKeys] = useState(resumeState.completedAudioKeys);
+  const [videoProgress, setVideoProgress] = useState(resumeState.videoProgress);
   const [assessmentResults, setAssessmentResults] = useState(resumeState.assessmentResults);
   const [feedbackSceneId, setFeedbackSceneId] = useState<string | null>(null);
   const [remediationRoute, setRemediationRoute] = useState(resumeState.remediationRoute);
@@ -161,6 +185,7 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
     project.storyboard.completionSettings,
     visitedSceneIds,
     completedAudioKeys,
+    videoProgress,
     assessmentResults,
   );
   const {
@@ -172,6 +197,8 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
     completedRequiredAudioCount,
     requiredAudioTrackCount,
     requiredAudioSetupMissingCount,
+    completedRequiredVideoCount,
+    requiredVideoCount,
   } = evaluation;
   const assessmentSummaries = (project.storyboard.assessments ?? []).map(group => {
     const members = [...new Set(group.questionSceneIds)].flatMap(id => {
@@ -213,11 +240,21 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(`chimera.preview.${resumeProjectId}`, JSON.stringify({ sceneIndex, visitedSceneIds, completedAudioKeys, assessmentResults, remediationRoute }));
+      window.localStorage.setItem(`chimera.preview.${resumeProjectId}`, JSON.stringify({ sceneIndex, visitedSceneIds, completedAudioKeys, videoProgress, assessmentResults, remediationRoute }));
     } catch {
       // Preview remains usable if browser storage is unavailable.
     }
-  }, [resumeProjectId, sceneIndex, visitedSceneIds, completedAudioKeys, assessmentResults, remediationRoute]);
+  }, [resumeProjectId, sceneIndex, visitedSceneIds, completedAudioKeys, videoProgress, assessmentResults, remediationRoute]);
+
+  function updateVideoProgress(key: string, progress: VideoProgress) {
+    setVideoProgress((current) => {
+      const previous = current[key];
+      if (previous && Math.abs(previous.position - progress.position) < 0.5
+        && previous.duration === progress.duration
+        && JSON.stringify(previous.watchedRanges) === JSON.stringify(progress.watchedRanges)) return current;
+      return { ...current, [key]: progress };
+    });
+  }
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -314,7 +351,7 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
   return <section data-onboarding="preview.content" className="course-preview-shell" role="dialog" aria-modal="true" aria-label={`${project.title} course preview`}>
     <header className="course-preview-header">
       <div className="preview-brand-lockup"><BrandMark /><div className="course-preview-brand"><span>CHIMERA PREVIEW</span><strong>{project.title}</strong></div></div>
-      <div className={`course-preview-progress ${coursePassed ? "course-complete" : ""}`}><span>{courseComplete ? coursePassed ? `Course passed · Score ${weightedScore ?? 100}%` : `Course complete · Score ${weightedScore ?? 0}% · Pass ${project.storyboard.completionSettings.passingScore}%` : requiredAudioSetupMissingCount ? `${requiredAudioSetupMissingCount} required-audio ${requiredAudioSetupMissingCount === 1 ? "scene has" : "scenes have"} no audio attached` : `${completedRequiredSceneCount} of ${requiredSceneCount} required scenes · ${completedRequiredAudioCount} of ${requiredAudioTrackCount} required audio tracks`}</span><div className="course-preview-progress-track" role="progressbar" aria-label="Required scenes completed" aria-valuemin={0} aria-valuemax={Math.max(requiredSceneCount, 1)} aria-valuenow={completedRequiredSceneCount}><span style={{ width: `${requiredSceneCount ? Math.round(completedRequiredSceneCount / requiredSceneCount * 100) : 0}%` }} /></div></div>
+      <div className={`course-preview-progress ${coursePassed ? "course-complete" : ""}`}><span>{courseComplete ? coursePassed ? `Course passed · Score ${weightedScore ?? 100}%` : `Course complete · Score ${weightedScore ?? 0}% · Pass ${project.storyboard.completionSettings.passingScore}%` : requiredAudioSetupMissingCount ? `${requiredAudioSetupMissingCount} required-audio ${requiredAudioSetupMissingCount === 1 ? "scene has" : "scenes have"} no audio attached` : `${completedRequiredSceneCount} of ${requiredSceneCount} required scenes · ${completedRequiredAudioCount} of ${requiredAudioTrackCount} required audio tracks${requiredVideoCount ? ` · ${completedRequiredVideoCount} of ${requiredVideoCount} required videos` : ""}`}</span><div className="course-preview-progress-track" role="progressbar" aria-label="Required scenes completed" aria-valuemin={0} aria-valuemax={Math.max(requiredSceneCount, 1)} aria-valuenow={completedRequiredSceneCount}><span style={{ width: `${requiredSceneCount ? Math.round(completedRequiredSceneCount / requiredSceneCount * 100) : 0}%` }} /></div></div>
       <button type="button" className="course-preview-close" onClick={onClose} aria-label="Close course preview"><X size={18} /><span>Exit preview</span></button>
     </header>
     <button type="button" className="course-preview-contents-toggle course-preview-nav-button" aria-expanded={contentsOpen} aria-controls="preview-contents" onClick={() => setContentsOpen(!contentsOpen)}><List size={17} /> Contents</button>
@@ -325,7 +362,7 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
       <article className="course-preview-content" aria-labelledby="course-preview-scene-title">
         {remediationRoute?.remediationSceneId === scene.id && <button type="button" className="course-preview-nav-button previous" onClick={returnToAssessment}><ArrowLeft size={16} /><span>Return to question</span></button>}
         <h1 id="course-preview-scene-title" className={scene.assessmentItem || scene.visualLayout?.enabled && scene.visualLayout.elements.some(element => element.kind === "text" && element.text.trim() === scene.title.trim()) ? "course-preview-title-on-stage" : undefined}>{scene.title || "Untitled scene"}</h1>
-        <PublishedMedia position="before" project={project} scene={scene} completedAudioKeys={completedAudioKeys} onAudioEnded={key => setCompletedAudioKeys(current => current.includes(key) ? current : [...current, key])} />
+        <PublishedMedia position="before" project={project} scene={scene} completedAudioKeys={completedAudioKeys} onAudioEnded={key => setCompletedAudioKeys(current => current.includes(key) ? current : [...current, key])} videoProgress={videoProgress} onVideoProgress={updateVideoProgress} />
         {!scene.assessmentItem && (scene.visualLayout?.enabled ? <SceneSurface key={motionReplay} project={project} scene={scene} animate={motionEnabled} /> : scene.previewImage ? <div className="course-preview-slide"><img src={`/api/projects/${project.id}/${scene.previewImage}`} alt={`Slide ${scene.sourceSlide ?? sceneIndex + 1}: ${scene.title}`} /></div> : scene.extractedText.length > 0 ? <div className="course-preview-text">{scene.extractedText.map((text, index) => <p key={`${index}-${text}`}>{text}</p>)}</div> : <p className="course-preview-empty">This scene has no learner-facing content yet.</p>)}
         {!scene.visualLayout?.enabled && scene.previewImage && scene.extractedText.length > 0 && <details className="course-preview-transcript"><summary>Read slide text</summary><div>{scene.extractedText.map((text, index) => <p key={`${index}-${text}`}>{text}</p>)}</div></details>}
 
@@ -362,21 +399,20 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
               {item.type === "true-false" && <><legend>Choose true or false</legend>{choiceList.map((choice) => <label className={`course-preview-answer ${result.response.includes(choice.identifier) ? "selected" : ""}`} key={choice.identifier}><input type="radio" name={`response-${scene.id}`} value={choice.identifier} checked={result.response[0] === choice.identifier} onChange={() => setResponse([choice.identifier])} /><span>{choice.text}</span></label>)}</>}
               {item.type === "multiple-response" && <><legend>Choose all that apply</legend>{choiceList.map((choice) => <label className={`course-preview-answer ${result.response.includes(choice.identifier) ? "selected" : ""}`} key={choice.identifier}><input type="checkbox" value={choice.identifier} checked={result.response.includes(choice.identifier)} onChange={() => setResponse(result.response.includes(choice.identifier) ? result.response.filter((id) => id !== choice.identifier) : [...result.response, choice.identifier])} /><span>{choice.text}</span></label>)}</>}
               {item.type === "ordering" && <><legend>Arrange in the correct order</legend>{orderedChoices.map((choice, index) => <div className="course-preview-order-row" key={choice.identifier}><span>{index + 1}.</span><strong>{choice.text}</strong><button type="button" className="icon-button" aria-label={`Move ${choice.text} earlier`} disabled={index === 0} onClick={() => { const next = [...orderedChoices]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; setResponse(next.map((entry) => entry.identifier)); }}><ArrowUp size={14} /></button><button type="button" className="icon-button" aria-label={`Move ${choice.text} later`} disabled={index === orderedChoices.length - 1} onClick={() => { const next = [...orderedChoices]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; setResponse(next.map((entry) => entry.identifier)); }}><ArrowDown size={14} /></button></div>)}</>}
-              {(item.type === "matching" || item.type === "drag-drop") && (() => {
-                const sources = item.type === "matching" ? item.leftItems : item.draggables;
-                const targets = item.type === "matching" ? item.rightItems : item.targets;
-                return <><legend>{item.type === "matching" ? "Match each item" : "Drag each item to a target, or choose a target"}</legend>
-                  {item.type === "drag-drop" && <div className="course-preview-draggables" aria-label="Draggable answers">{sources.map((source) => <button type="button" className="course-preview-drag-chip" draggable={!disabled} key={source.identifier} onDragStart={(event) => event.dataTransfer.setData("text/plain", source.identifier)}>{source.text}</button>)}</div>}
+              {item.type === "drag-drop" && <><legend>Place each tile beside its matching label</legend><DragDropQuestion key={scene.id} item={item} matches={result.matches} disabled={disabled} onMatch={setMatch} /></>}
+              {item.type === "matching" && (() => {
+                const sources = item.leftItems;
+                const targets = item.rightItems;
+                return <><legend>Match each item</legend>
                   <div className="course-preview-match-list">{sources.map((source) => <label className="course-preview-match-row" key={source.identifier}><span>{source.text}</span><select aria-label={`Match for ${source.text}`} value={result.matches[source.identifier] ?? ""} onChange={(event) => setMatch(source.identifier, event.target.value)}><option value="">Choose a match</option>{targets.map((target) => <option key={target.identifier} value={target.identifier}>{target.text}</option>)}</select></label>)}</div>
-                  {item.type === "drag-drop" && <div className="course-preview-drop-targets" aria-label="Drop targets">{targets.map((target) => <div className="course-preview-drop-target" key={target.identifier} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const source = event.dataTransfer.getData("text/plain"); if (source) setMatch(source, target.identifier); }}><strong>{target.text}</strong><span>{Object.entries(result.matches).find(([, targetId]) => targetId === target.identifier)?.[0] ? sources.find((source) => source.identifier === Object.entries(result.matches).find(([, targetId]) => targetId === target.identifier)?.[0])?.text : "Drop an item here"}</span></div>)}</div>}
                 </>;
               })()}
-              {item.type === "short-answer" && <label className="course-preview-short-answer">Your answer<input type="text" maxLength={1000} value={result.textResponse} onChange={(event) => setAssessmentResults((current) => ({ ...current, [scene.id]: { ...(current[scene.id] ?? createEmptyAssessmentResult(item, settings)), textResponse: event.target.value, isCorrect: null } }))} /></label>}
+              {item.type === "short-answer" && <label className="course-preview-short-answer">Fill in the blank<input type="text" maxLength={1000} autoComplete="off" value={result.textResponse} onChange={(event) => setAssessmentResults((current) => ({ ...current, [scene.id]: { ...(current[scene.id] ?? createEmptyAssessmentResult(item, settings)), textResponse: event.target.value, isCorrect: null } }))} /></label>}
             </fieldset>
             <div className="course-preview-assessment-actions"><button type="button" className="course-preview-nav-button next" onClick={() => submitAssessment(item)} disabled={!(result.response.length || Object.keys(result.matches).length || result.textResponse.trim()) || assessmentPassed || attemptsExhausted}>{assessmentPassed ? "Passed" : attemptsExhausted ? "Attempts used" : result.isCorrect === false ? "Try again" : "Check answer"}</button>{result.attempts > 0 && result.isCorrect !== null && <button type="button" data-view-feedback className="course-preview-nav-button" onClick={() => setFeedbackSceneId(scene.id)}>View feedback</button>}</div>
           </section>;
         })()} />}
-        <PublishedMedia position="after" project={project} scene={scene} completedAudioKeys={completedAudioKeys} onAudioEnded={key => setCompletedAudioKeys(current => current.includes(key) ? current : [...current, key])} />
+        <PublishedMedia position="after" project={project} scene={scene} completedAudioKeys={completedAudioKeys} onAudioEnded={key => setCompletedAudioKeys(current => current.includes(key) ? current : [...current, key])} videoProgress={videoProgress} onVideoProgress={updateVideoProgress} />
         {assessmentSummaries.length > 0 && <section className="course-preview-assessments" aria-labelledby="course-preview-assessments-title">
           <h2 id="course-preview-assessments-title">Assessments</h2>
           <ul>{assessmentSummaries.map(group => <li key={group.id}><strong>{group.title}</strong><span>{group.answeredCount}/{group.total} answered{group.score !== null ? ` · Score ${group.score}%` : ""}</span></li>)}</ul>

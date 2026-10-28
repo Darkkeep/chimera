@@ -13,6 +13,10 @@ for (const theme of ['light', 'dark']) {
       localStorage.setItem('chimera.activeProjectId', id);
       localStorage.setItem('chimera.appearance', theme);
     }, { id: project.id, theme });
+    await page.route('**/api/projects/*/pythia-status', route => route.fulfill({ json: {
+      health: { status: 'ok' }, capabilities: { capabilities: ['storyboard.analyze'] },
+      supportsStoryboardAnalyze: true, supportsStoryboardTransform: false, supportsAssessmentDesign: false,
+    } }));
     await page.goto('/');
     await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
     const workflow = page.getByRole('navigation', { name: 'Authoring workflow' });
@@ -20,6 +24,7 @@ for (const theme of ['light', 'dark']) {
       ['Analyze with Pythia', 'Close Pythia analysis', '.pythia-analysis-dialog'],
       ['Export', 'Close export', '.export-dialog'],
     ]) {
+      if (open === 'Analyze with Pythia') await page.getByRole('button', { name: 'Pythia', exact: true }).click();
       await page.getByRole('button', { name: open, exact: true }).click();
       await expect(page.locator(selector)).toBeVisible();
       const violations = (await new AxeBuilder({ page }).include(selector).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations;

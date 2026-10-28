@@ -11,6 +11,7 @@ from typing import Protocol
 from . import storage
 from .ai_connection import connection_status, open_provider_request, request_budget, resolve_connection
 from .models import GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate
+from .narration_connections import SPEECH_PROVIDERS, narration_status, resolve_narration_connection, synthesize_narration
 
 
 class MediaGenerationProvider(Protocol):
@@ -67,7 +68,21 @@ class OpenAICompatibleMediaProvider:
 
 
 def media_provider_configured() -> bool:
-    return connection_status(storage.ROOT)["configured"]
+    return connection_status(storage.ROOT)["configured"] or any(item["configured"] and item["voice"] and item["provider"] in SPEECH_PROVIDERS for item in narration_status(storage.ROOT)["connections"])
+
+
+class NarrationProvider:
+    def __init__(self, job: MediaGenerationJob) -> None:
+        self.connection = resolve_narration_connection(storage.ROOT, job.narrationConnectionId or "", job.aiConnectionRevision)
+        self.name = self.connection.settings["provider"]
+        self.audio_model = self.connection.settings["model"] or self.connection.settings["voice"]
+        self.image_model = ""
+
+    def generate_image(self, job: MediaGenerationJob) -> tuple[bytes, str, str]:
+        raise ValueError("A narration connection cannot generate images.")
+
+    def generate_narration(self, job: MediaGenerationJob) -> tuple[bytes, str, str]:
+        return synthesize_narration(self.connection, job.script, job.voice, job.language)
 
 
 def _provider(expected_revision: str | None = None) -> MediaGenerationProvider:
@@ -109,7 +124,7 @@ def _run_job(project_id: str, job_id: str) -> None:
         if job.cancelRequested:
             storage.update_media_generation_job(project_id, job_id, status="cancelled", progress=100, message="Cancelled before processing")
             return
-        provider = _provider(job.aiConnectionRevision) if _provider_factory is _provider else _provider_factory()
+        provider = NarrationProvider(job) if job.kind == "narration" and job.narrationConnectionId not in {None, "legacy-openai"} else _provider(job.aiConnectionRevision) if _provider_factory is _provider else _provider_factory()
         storage.update_media_generation_job(project_id, job_id, status="running", progress=20, message="Generating media", provider=provider.name, model=provider.image_model if job.kind == "image" else provider.audio_model)
         job = storage.read_media_generation_job(project_id, job_id)
         content, content_type, model = provider.generate_image(job) if job.kind == "image" else provider.generate_narration(job)
@@ -128,6 +143,7 @@ def _run_job(project_id: str, job_id: str) -> None:
             id=candidate_id,
             projectId=project_id,
             jobId=job.id,
+            narrationConnectionId=job.narrationConnectionId,
             sourceRevision=job.sourceRevision,
             sceneId=job.sceneId,
             kind=asset_kind,
@@ -176,7 +192,7 @@ def retry_media_generation_job(project_id: str, job_id: str) -> MediaGenerationJ
     job = storage.read_media_generation_job(project_id, job_id)
     if job.status not in {"failed", "cancelled"}:
         raise ValueError("Only failed or cancelled media jobs can be retried")
-    data = MediaGenerationJobCreate.model_validate(job.model_dump(include={"kind", "sceneId", "purpose", "style", "width", "height", "prompt", "script", "voice", "language", "altText", "captions"}))
+    data = MediaGenerationJobCreate.model_validate(job.model_dump(include={"kind", "sceneId", "purpose", "style", "width", "height", "prompt", "script", "voice", "language", "altText", "captions", "narrationConnectionId"}))
     retry = storage.create_media_generation_job(project_id, data).model_copy(update={"retryOf": job.id})
     storage.write_media_generation_job(retry)
     start_media_generation_job(project_id, retry.id)
@@ -189,6 +205,7 @@ def regenerate_candidate(project_id: str, candidate_id: str) -> MediaGenerationJ
         raise ValueError("Only pending candidates can be regenerated")
     data = MediaGenerationJobCreate(
         kind="image" if candidate.kind == "image" else "narration",
+        narrationConnectionId=candidate.narrationConnectionId,
         sceneId=candidate.sceneId,
         purpose=candidate.purpose,
         style=candidate.style,

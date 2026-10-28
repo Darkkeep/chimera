@@ -1,4 +1,5 @@
 import io
+import hashlib
 import json
 import mimetypes
 import tempfile
@@ -39,14 +40,22 @@ from .media_generation import media_provider_configured
 from .media_routes import router as media_router
 from .learning_intelligence import PythiaProvider, PythiaUnavailableError, validate_assessment_blueprint, validate_course_review, validate_storyboard_analysis, validate_storyboard_transformation
 from .ai_connection import ConnectionRevision, ConnectionUpdate, connection_status, disconnect_connection, save_connection, test_connection
+from .narration_connections import SPEECH_PROVIDERS, NarrationConnectionUpdate, disconnect_narration_connection, narration_status, save_narration_connection, test_narration_connection
 from .word_export import DOCX_MEDIA_TYPE, FULL_TEMPLATE_PATH, SME_TEMPLATE_PATH, TemplateArtworkError, build_full_storyboard_docx, build_sme_storyboard_docx, build_storyboard_docx
 from .deployment import cors_origins, installation_policy, public_origin
 from .password_auth import AccountStore, COOKIE, HostedAuthorizationPolicy, LoginRequest, ResetPasswordRequest, ReviewInvitationRequest, SESSION_SECONDS, require_origin
 from .models import AssessmentGroup, AssessmentGroupWrite, CourseDraftRequest, CourseContentDraft, SceneDraftRequest, SceneContentDraft
 from .storage import create_scenes, save_assessment_group
+from .models import ProjectBackgroundUpdate, ProjectRelationshipUpdate, ProjectRestore
+from .storage import update_project_background, update_project_relationship, ProjectMetadataConflict
+from .question_import import parse_questions, question_template, question_spreadsheet
 
 
 ROUTE_ACTIONS = {
+    "preview_question_import": "project.import", "commit_question_import": "project.import",
+    "get_question_template": "project.view", "export_question_spreadsheet": "project.export",
+    "patch_project_relationship": "project.settings.update",
+    "patch_project_background": "project.settings.update",
     "get_media_capabilities": "project.view", "patch_media_metadata": "media.manage", "get_media_captions": "project.view",
     "get_media_usage": "project.view", "delete_project_media": "media.manage", "put_course_media": "media.manage",
     "put_scene_media": "media.manage", "get_shared_media": "media.manage", "publish_shared_media": "media.manage",
@@ -74,6 +83,8 @@ ROUTE_ACTIONS = {
     "get_enhancement_jobs": "project.view", "get_ai_connection": "identity.view",
     "get_intelligence_engine": "identity.view",
     "put_ai_connection": "admin.policy.manage", "post_ai_disconnect": "admin.policy.manage", "post_ai_test": "admin.policy.manage",
+    "get_narration_connections": "identity.view", "put_narration_connection": "admin.policy.manage",
+    "post_narration_disconnect": "admin.policy.manage", "post_narration_test": "admin.policy.manage",
     "get_media_generation_capability": "project.view", "get_media_generation_jobs": "project.view",
     "post_media_generation_job": "media.job.create", "get_media_generation_job": "project.view",
     "post_media_generation_job_cancel": "media.job.manage", "post_media_generation_job_retry": "media.job.manage",
@@ -123,13 +134,17 @@ def get_authorization_policy() -> AuthorizationPolicy:
 
 def _hosted_request_action(request: Request) -> str:
     path = request.url.path
+    if "/question-import" in path:
+        return "project.view" if request.method == "GET" else "project.import"
+    if path.endswith(("/questions.csv", "/questions.xlsx")):
+        return "project.export"
     if path.endswith("/trash") and request.method == "POST":
         return "project.delete"
     if path.endswith("/restore") and request.method == "POST":
         return "project.restore"
     if path == "/api/trash/projects":
         return "workspace.view"
-    if path.startswith("/api/ai-connection"):
+    if path.startswith(("/api/ai-connection", "/api/narration-connections")):
         return "identity.self" if request.method == "GET" else "admin.policy.manage"
     if "/shared-media" in path:
         return "media.manage"
@@ -224,7 +239,7 @@ def _hosted_request_action(request: Request) -> str:
         return "project.import"
     if "/assets" in path:
         return "media.manage"
-    if "/completion-settings" in path or "/export-settings" in path or path.endswith("/production-stage"):
+    if "/completion-settings" in path or "/export-settings" in path or path.endswith(("/production-stage", "/background", "/relationship")):
         return "project.settings.update"
     if "/scenes" in path:
         return "scene.manage"
@@ -274,7 +289,7 @@ app.include_router(media_router)
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(request: Request, error: RequestValidationError):
-    if request.url.path.startswith("/api/ai-connection"):
+    if request.url.path.startswith(("/api/ai-connection", "/api/narration-connections")):
         return JSONResponse({"detail": "Provide an approved provider, supported models, a valid key, and valid request limits."}, status_code=422, headers={"Cache-Control": "no-store"})
     if request.url.path in {"/api/auth/login", "/api/auth/reset-password"}:
         return JSONResponse({"detail": "Provide an email and a password of at most 1024 characters"}, status_code=422, headers={"Cache-Control": "no-store"})
@@ -572,6 +587,11 @@ def get_project_health() -> list[dict[str, object]]:
             "canSetStage": get_authorization_policy().allows(get_actor_context(), "project.settings.update", summary.id),
             "canTrash": project.ownerId == get_actor_context().actorId or get_authorization_policy().allows(get_actor_context(), "project.membership.manage", summary.id) or get_authorization_policy().allows(get_actor_context(), "project.membership.manage"),
             "updatedAt": summary.updatedAt,
+            "parentProjectId": summary.parentProjectId,
+            "siblingOrder": summary.siblingOrder,
+            "metadataRevision": summary.metadataRevision,
+            "canManageRelationship": get_authorization_policy().allows(get_actor_context(), "project.settings.update", summary.id),
+            "canCreateSubproject": summary.parentProjectId is None and get_authorization_policy().allows(get_actor_context(), "project.create") and get_authorization_policy().allows(get_actor_context(), "project.settings.update", summary.id),
         })
     return health
 
@@ -635,7 +655,7 @@ def trash_project(project_id: str) -> dict[str, object]:
 
 
 @app.post("/api/projects/{project_id}/restore", response_model=ProjectDetail)
-def restore_project(project_id: str) -> ProjectDetail:
+def restore_project(project_id: str, data: ProjectRestore | None = None) -> ProjectDetail:
     from .storage import list_trashed_projects, restore_trashed_project
 
     actor = get_actor_context()
@@ -647,11 +667,18 @@ def restore_project(project_id: str) -> ProjectDetail:
         is_administrator = policy.allows(actor, "project.membership.manage", project_id) or policy.allows(actor, "project.membership.manage")
         if trash_item.ownerId != actor.actorId and not is_administrator:
             raise HTTPException(status_code=403, detail="Only the project owner or an administrator can restore this project.")
-        return restore_trashed_project(project_id)
+        explicit_parent = data is not None and "parentProjectId" in data.model_fields_set
+        parent_id = data.parentProjectId if explicit_parent and data else trash_item.parentProjectId
+        with storyboard_transaction():
+            if parent_id is not None:
+                _require_action(policy, actor, "project.settings.update", parent_id)
+            return restore_trashed_project(project_id, parent_project_id=parent_id, explicit_parent=explicit_parent)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Trashed project not found or its recovery period has expired.") from error
     except FileExistsError as error:
         raise HTTPException(status_code=409, detail="A project with this identifier already exists.") from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.get("/api/templates", response_model=list[TemplateRecord])
@@ -715,10 +742,33 @@ def post_project(
     actor = context or LOCAL_ACTOR
     _require_action(policy or get_authorization_policy(), actor, "project.create")
     with storyboard_transaction():
-        project = create_project(data, actor)
+        if data.parentProjectId is not None:
+            _require_action(policy or get_authorization_policy(), actor, "project.settings.update", data.parentProjectId)
+        try:
+            project = create_project(data, actor)
+        except RuntimeError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
         if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider == "builtin":
             AccountStore(ROOT).add_project_membership(ProjectMembership(projectId=project.id, userId=actor.actorId, role="instructional-designer"))
     return project
+
+
+@app.patch("/api/projects/{project_id}/relationship", response_model=ProjectDetail)
+def patch_project_relationship(project_id: str, data: ProjectRelationshipUpdate) -> ProjectDetail:
+    actor = get_actor_context()
+    policy = get_authorization_policy()
+    try:
+        with storyboard_transaction():
+            project = read_project(project_id)
+            for affected_id in {project_id, project.parentProjectId, data.parentProjectId} - {None}:
+                _require_action(policy, actor, "project.settings.update", affected_id)
+            return update_project_relationship(project_id, data.parentProjectId, data.siblingOrder, data.metadataRevision)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except ProjectMetadataConflict as error:
+        raise HTTPException(status_code=412, detail=str(error)) from error
+    except (RuntimeError, ValueError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.get("/api/projects/{project_id}", response_model=ProjectDetail)
@@ -1372,12 +1422,135 @@ def patch_project_export_settings(project_id: str, settings: ExportSettings, if_
         raise HTTPException(status_code=404, detail="Project not found") from error
 
 
+@app.patch("/api/projects/{project_id}/background", response_model=ProjectDetail)
+def patch_project_background(project_id: str, settings: ProjectBackgroundUpdate, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
+    try:
+        return update_project_background(project_id, settings.backgroundAsset, _expected_revision(if_match))
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
 @app.get("/api/projects/{project_id}/assessments", response_model=list[AssessmentGroup])
 def get_assessments(project_id: str) -> list[AssessmentGroup]:
     try:
         return read_project(project_id).storyboard.assessments
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
+
+
+def _review_question_upload(project: ProjectDetail, file: UploadFile) -> tuple[bytes, list[dict]]:
+    content = file.file.read(10 * 1024 * 1024 + 1)
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Question imports are limited to 10 MB")
+    try:
+        rows = parse_questions(file.filename or "", content)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    existing = {scene.assessmentItem.identifier for scene in project.storyboard.scenes if scene.assessmentItem}
+    identifiers = [row["item"]["identifier"] for row in rows if row.get("item")]
+    for row in rows:
+        if row.get("item"):
+            identifier = row["item"]["identifier"]
+            if identifier in existing:
+                row["errors"].append(f"Stable identifier {identifier} already exists in this project. Existing questions will not be overwritten.")
+            if identifiers.count(identifier) > 1:
+                row["errors"].append(f"Stable identifier {identifier} appears more than once in this upload.")
+    return content, rows
+
+
+@app.post("/api/projects/{project_id}/question-import/preview")
+def preview_question_import(project_id: str, file: UploadFile = File(...)) -> dict:
+    try:
+        project = read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    content, rows = _review_question_upload(project, file)
+    return {"revision": project.storyboard.revision, "digest": hashlib.sha256(content).hexdigest(), "questions": rows}
+
+
+@app.post("/api/projects/{project_id}/question-import", response_model=ProjectDetail)
+def commit_question_import(
+    project_id: str, file: UploadFile = File(...), selected: str = Form(...),
+    digest: str = Form(...), assessment_id: str = Form(""), confirm_warnings: bool = Form(False),
+    if_match: Annotated[str | None, Header()] = None,
+) -> ProjectDetail:
+    expected = _expected_revision(if_match)
+    if expected is None:
+        raise HTTPException(status_code=428, detail="An If-Match storyboard revision is required")
+    try:
+        indices = json.loads(selected)
+    except json.JSONDecodeError as error:
+        raise HTTPException(status_code=422, detail="Selected questions must be a JSON array of row indexes") from error
+    if not isinstance(indices, list) or not 1 <= len(indices) <= 500 or any(type(index) is not int or index < 0 for index in indices) or len(set(indices)) != len(indices):
+        raise HTTPException(status_code=422, detail="Select 1-500 unique question row indexes")
+    try:
+        with storyboard_transaction():
+            project = read_project(project_id)
+            _check_expected_revision(expected, project.storyboard.revision)
+            content, rows = _review_question_upload(project, file)
+            if hashlib.sha256(content).hexdigest() != digest:
+                raise HTTPException(status_code=422, detail="The upload changed. Review it again before importing.")
+            by_index = {row["index"]: row for row in rows}
+            if any(index not in by_index or by_index[index]["errors"] or not by_index[index].get("item") for index in indices):
+                raise HTTPException(status_code=422, detail="Only valid, nonduplicate reviewed questions can be imported")
+            chosen = [by_index[index] for index in indices]
+            if any(row["warnings"] for row in chosen) and not confirm_warnings:
+                raise HTTPException(status_code=422, detail="Acknowledge the selected questions' import warnings before continuing")
+            groups = list(project.storyboard.assessments)
+            group = next((group for group in groups if group.id == assessment_id), None)
+            if assessment_id and group is None:
+                raise HTTPException(status_code=404, detail="Assessment not found")
+            if group and len(group.questionSceneIds) + len(chosen) > 500:
+                raise HTTPException(status_code=422, detail="An assessment can contain at most 500 questions")
+            scenes = [Scene(
+                id=f"scene-{uuid4().hex[:8]}", sceneType="question", layoutMode="native",
+                title=row["title"] or row["item"]["identifier"], assessmentItem=row["item"],
+                assessmentSettings=row.get("settings"),
+            ) for row in chosen]
+            if group:
+                groups = [candidate.model_copy(update={"questionSceneIds": [*candidate.questionSceneIds, *(scene.id for scene in scenes)]}) if candidate.id == group.id else candidate for candidate in groups]
+            board = project.storyboard.model_copy(update={"scenes": [*project.storyboard.scenes, *scenes], "assessments": groups})
+            path = project_path(project_id)
+            write_storyboard(path, board, expected)
+            write_project_metadata(path, {"updatedAt": now_iso()})
+            return read_project(project_id)
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.get("/api/projects/{project_id}/question-import/template.{format}")
+def get_question_template(project_id: str, format: Literal["csv", "xlsx"]) -> Response:
+    try:
+        read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    return Response(question_template(format), media_type="text/csv; charset=utf-8" if format == "csv" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="chimera-questions-template.{format}"'})
+
+
+@app.get("/api/projects/{project_id}/questions.{format}")
+def export_question_spreadsheet(project_id: str, format: Literal["csv", "xlsx"], assessment_id: str = "") -> Response:
+    try:
+        project = read_project(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    scenes = project.storyboard.scenes
+    if assessment_id:
+        group = next((group for group in project.storyboard.assessments if group.id == assessment_id), None)
+        if group is None:
+            raise HTTPException(status_code=404, detail="Assessment not found")
+        by_id = {scene.id: scene for scene in scenes}
+        scenes = [by_id[scene_id] for scene_id in group.questionSceneIds]
+    return Response(question_spreadsheet(scenes, format), media_type="text/csv; charset=utf-8" if format == "csv" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{slugify(project.title)}-questions.{format}"'})
 
 
 def _save_assessment(project_id: str, data: AssessmentGroupWrite | None, assessment_id: str | None, if_match: str | None) -> ProjectDetail:
@@ -1621,6 +1794,54 @@ def get_ai_connection() -> dict:
     return {**connection_status(ROOT), "canManage": get_authorization_policy().allows(get_actor_context(), "admin.policy.manage")}
 
 
+@app.get("/api/narration-connections")
+def get_narration_connections() -> dict:
+    return {**narration_status(ROOT), "canManage": get_authorization_policy().allows(get_actor_context(), "admin.policy.manage")}
+
+
+@app.put("/api/narration-connections")
+def put_narration_connection(request: Request, data: NarrationConnectionUpdate) -> dict:
+    _require_ai_origin(request)
+    from keyring.errors import KeyringError
+    try:
+        with storyboard_transaction():
+            save_narration_connection(ROOT, data)
+            _record_ai_event("narration.connection_saved")
+        return get_narration_connections()
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    except (RuntimeError, OSError, KeyringError):
+        raise HTTPException(503, "Provider settings could not be saved securely. Check the backend credential store and workspace permissions.") from None
+
+
+@app.post("/api/narration-connections/{connection_id}/disconnect")
+def post_narration_disconnect(connection_id: str, request: Request, data: ConnectionRevision) -> dict:
+    _require_ai_origin(request)
+    from keyring.errors import KeyringError
+    try:
+        with storyboard_transaction():
+            disconnect_narration_connection(ROOT, connection_id, data.expectedRevision)
+            _record_ai_event("narration.connection_disconnected")
+        return get_narration_connections()
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    except (RuntimeError, OSError, KeyringError):
+        raise HTTPException(503, "Provider disconnection could not finish. Check the backend credential store and workspace permissions.") from None
+
+
+@app.post("/api/narration-connections/{connection_id}/test")
+def post_narration_test(connection_id: str, request: Request, data: ConnectionRevision) -> dict:
+    _require_ai_origin(request)
+    try:
+        result = test_narration_connection(ROOT, connection_id, data.expectedRevision)
+        _record_ai_event("narration.connection_tested")
+        return result
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(503, str(error)) from error
+
+
 @app.get("/api/intelligence-engine", name="get_intelligence_engine")
 def get_intelligence_engine() -> dict[str, object]:
     provider = _pythia_provider()
@@ -1687,13 +1908,20 @@ def post_ai_test(request: Request, data: ConnectionRevision) -> dict:
 
 
 @app.get("/api/projects/{project_id}/media-generation-capability")
-def get_media_generation_capability(project_id: str) -> dict[str, bool]:
+def get_media_generation_capability(project_id: str) -> dict:
     try:
         read_project(project_id)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
+    image = connection_status(ROOT)
+    narration = narration_status(ROOT)
+    connections = [item for item in narration["connections"] if item["provider"] in SPEECH_PROVIDERS and item["configured"] and item["voice"]]
+    if image["configured"]:
+        connections.insert(0, {"id": "legacy-openai", "name": "Existing AI connection", "provider": image["provider"], "voice": "alloy", "model": image["audioModel"], "language": "en-US"})
     return {
-        "providerConfigured": media_provider_configured(),
+        "providerConfigured": image["configured"] or bool(connections),
+        "imageConfigured": image["configured"],
+        "narrationConnections": connections,
         "canGenerate": get_authorization_policy().allows(get_actor_context(), "media.job.create", project_id),
     }
 
@@ -1716,6 +1944,8 @@ def post_media_generation_job(project_id: str, data: MediaGenerationJobCreate) -
         raise HTTPException(status_code=404, detail="Project not found") from error
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @app.get("/api/projects/{project_id}/media-generation-jobs/{job_id}", response_model=MediaGenerationJob)
@@ -1744,6 +1974,8 @@ def post_media_generation_job_retry(project_id: str, job_id: str) -> MediaGenera
         raise HTTPException(status_code=404, detail="Media generation job not found") from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @app.get("/api/projects/{project_id}/generated-candidates", response_model=list[GeneratedAssetCandidate])
@@ -1790,6 +2022,8 @@ def post_generated_candidate_regeneration(project_id: str, candidate_id: str) ->
         raise HTTPException(status_code=404, detail="Generated candidate not found") from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @app.get("/api/projects/{project_id}/generated-candidates/{candidate_id}/asset")

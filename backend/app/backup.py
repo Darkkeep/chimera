@@ -123,6 +123,10 @@ def restore_project_archive(project_id: str, content: bytes) -> object:
         except (OSError, json.JSONDecodeError, KeyError, TypeError) as error:
             raise ValueError("Archive contains invalid project records") from error
         with storyboard_transaction():
+            live_metadata = json.loads((root / "project.json").read_text(encoding="utf-8"))
+            for field, default in (("parentProjectId", None), ("siblingOrder", 0), ("metadataRevision", 1)):
+                restored_metadata[field] = live_metadata.get(field, default)
+            project_path_file.write_text(json.dumps(restored_metadata, indent=2), encoding="utf-8")
             backup_root = root.parent / f".{project_id}-restore-{uuid.uuid4().hex}"
             shutil.copytree(root, backup_root)
             try:

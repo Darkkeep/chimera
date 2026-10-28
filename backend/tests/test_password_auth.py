@@ -96,6 +96,10 @@ class PasswordAuthTests(unittest.TestCase):
         self.assertEqual(self.login().status_code, 200)
         self.assertEqual(self.client.get("/api/ai-connection").status_code, 200)
         self.assertTrue(self.client.get("/api/ai-connection").json()["canManage"])
+        self.assertTrue(self.client.get("/api/narration-connections").json()["canManage"])
+        invalid_narration = self.client.put("/api/narration-connections", json={"expectedRevision": "unconfigured", "apiKey": "redaction-test-only"}, headers=self.origin)
+        self.assertEqual(invalid_narration.status_code, 422)
+        self.assertNotIn("redaction-test-only", invalid_narration.text)
         invalid = self.client.put("/api/ai-connection", json={"expectedRevision": "unconfigured", "apiKey": "redaction-test-only", "baseUrl": "http://127.0.0.1"}, headers=self.origin)
         self.assertEqual(invalid.status_code, 422)
         self.assertNotIn("redaction-test-only", invalid.text)
@@ -103,6 +107,10 @@ class PasswordAuthTests(unittest.TestCase):
         response = self.client.post("/api/auth/login", json={"email": "settings-author@example.com", "password": self.password}, headers=self.origin)
         self.assertEqual(response.status_code, 200)
         self.assertFalse(self.client.get("/api/ai-connection").json()["canManage"])
+        self.assertFalse(self.client.get("/api/narration-connections").json()["canManage"])
+        for method, path in (("put", "/api/narration-connections"), ("post", "/api/narration-connections/narration-0123456789ab/test"), ("post", "/api/narration-connections/narration-0123456789ab/disconnect")):
+            denied = getattr(self.client, method)(path, json={"expectedRevision": "unconfigured"}, headers=self.origin)
+            self.assertEqual(denied.status_code, 403)
         for method, path in (("put", "/api/ai-connection"), ("post", "/api/ai-connection/test"), ("post", "/api/ai-connection/disconnect")):
             denied = getattr(self.client, method)(path, json={"expectedRevision": "unconfigured"}, headers=self.origin)
             self.assertEqual(denied.status_code, 403)

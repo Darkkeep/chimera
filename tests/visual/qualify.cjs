@@ -16,6 +16,11 @@ const environment = { ...process.env, CHIMERA_DEPLOYMENT_PROFILE: 'local', CHIME
 let backend, server, browser;
 let backendLog = '';
 
+async function expandInspector(page, title) {
+  const summary = page.locator('.visual-inspector summary').filter({ hasText: new RegExp(`^${title}$`) });
+  if (await summary.locator('..').getAttribute('open') === null) await summary.click();
+}
+
 async function freePort() {
   const probe = http.createServer();
   await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve));
@@ -67,10 +72,12 @@ async function freePort() {
   const masterBackground = masterBackgrounds[0];
   await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
   assert.equal(await page.getByRole('tab', { name: 'Stage', exact: true }).getAttribute('aria-selected'), 'true');
-  assert.equal(await page.locator('optgroup[label="PowerPoint masters"] option').count(), 1);
   const originalElementCount = await page.locator('.visual-editable').count();
   const masterElementCount = project.storyboard.scenes[0].visualLayout.elements.filter(element => element.source === 'master').length;
-  await page.getByLabel('Background image', { exact: true }).selectOption(masterBackground.id);
+  await page.locator('.visual-inspector summary').filter({ hasText: /^Background$/ }).click();
+  await page.getByRole('combobox', { name: 'Background image', exact: true }).click();
+  assert.equal(await page.getByRole('option').filter({ hasText: 'PowerPoint master' }).count(), 1);
+  await page.getByRole('option', { name: `${masterBackground.filename} PowerPoint master`, exact: true }).click();
   await expect(page.locator('.visual-editable'), 'applying a master backdrop must not draw its inherited artwork twice').toHaveCount(originalElementCount - masterElementCount);
   assert(await page.locator('.visual-stage').evaluate(async element => {
     const image = new Image();
@@ -83,6 +90,7 @@ async function freePort() {
   await expect(page.locator('.visual-editable')).toHaveCount(originalElementCount);
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await expect(page.locator('.visual-editable')).toHaveCount(originalElementCount - masterElementCount);
+  await page.locator('.visual-inspector summary').filter({ hasText: /^Stage$/ }).click();
   await page.getByLabel('Stage width', { exact: true }).fill('0');
   assert.equal(await page.getByLabel('Stage width', { exact: true }).inputValue(), '1280');
   await page.getByLabel('Stage size', { exact: true }).selectOption('square');
@@ -99,9 +107,10 @@ async function freePort() {
   assert.equal(inlineEditorStyle.background, 'rgb(255, 255, 255)', `inline editor background should remain readable in dark mode: ${JSON.stringify(inlineEditorStyle)}`);
   assert.notEqual(inlineEditorStyle.background, inlineEditorStyle.color, `inline editor text must contrast with its surface: ${JSON.stringify(inlineEditorStyle)}`);
   await page.getByLabel('Edit canvas text', { exact: true }).fill('Edited directly on canvas');
-  await page.getByRole('heading', { name: 'Layers', exact: true }).click();
+  await page.locator('.visual-inspector summary').filter({ hasText: /^Layers$/ }).click();
   const text = page.locator('.visual-editable').filter({ hasText: 'Edited directly on canvas' });
   await text.click();
+  await page.locator('.visual-inspector summary').filter({ hasText: /^Layout$/ }).click();
   const beforeX = Number(await page.getByLabel('Element x', { exact: true }).inputValue());
   const box = await text.boundingBox();
   await page.mouse.move(box.x + 30, box.y + 20); await page.mouse.down(); await page.mouse.move(box.x + 85, box.y + 50, { steps: 8 }); await page.mouse.up();
@@ -158,6 +167,7 @@ async function freePort() {
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await expect(page.locator('.visual-editable .visual-image')).toHaveCount(beforeImages + 1);
   await page.getByRole('button', { name: 'Add text', exact: true }).click();
+  await expandInspector(page, 'Layout');
   await page.getByLabel('Element text', { exact: true }).fill('Added text');
   const addedText = page.locator('.visual-editable').filter({ hasText: 'Added text' });
   const zIndexBefore = Number(await addedText.locator('xpath=..').evaluate(element => getComputedStyle(element).zIndex));
@@ -168,6 +178,7 @@ async function freePort() {
   await page.getByRole('button', { name: 'Delete element', exact: true }).click();
   await assert.rejects(() => addedText.waitFor({ state: 'visible', timeout: 1000 }));
   await page.getByRole('button', { name: 'Add text', exact: true }).click();
+  await expandInspector(page, 'Layout');
   await page.getByLabel('Element text', { exact: true }).fill('Added text');
   const expectedTextWidth = Number(await text.locator('xpath=..').evaluate(element => element.style.width.replace('px', '')));
   await page.getByLabel('Stage width', { exact: true }).fill('1400');
@@ -198,7 +209,9 @@ async function freePort() {
   await page.locator('.visual-authoring-surface').getByText('Edited directly on canvas', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
   await page.getByRole('tab', { name: 'Stage', exact: true }).click();
-  assert.equal(await page.getByLabel('Background image', { exact: true }).inputValue(), masterBackground.id);
+  await expandInspector(page, 'Background');
+  await expandInspector(page, 'Stage');
+  assert((await page.getByRole('combobox', { name: 'Background image', exact: true }).textContent()).includes(masterBackground.filename));
   assert.equal(await page.getByLabel('Stage width', { exact: true }).inputValue(), '1400');
   assert.equal(await page.getByLabel('Stage height', { exact: true }).inputValue(), '800');
   await page.screenshot({ path: path.join(output, 'editor-desktop.png'), fullPage: true });

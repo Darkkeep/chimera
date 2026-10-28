@@ -20,6 +20,8 @@ type Candidate = {
 };
 
 type Props = { project: Project; scene: Scene | undefined; busy: boolean; onProjectUpdated: (project: Project) => void };
+type NarrationConnection = { id: string; name: string; provider: string; voice: string; model: string; language: string };
+type Capability = { providerConfigured: boolean; canGenerate: boolean; imageConfigured?: boolean; narrationConnections?: NarrationConnection[] };
 
 export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated }: Props) {
   const [kind, setKind] = useState<"image" | "narration">("image");
@@ -29,15 +31,35 @@ export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated }: 
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
   const [script, setScript] = useState("");
-  const [voice, setVoice] = useState("alloy");
+  const [voice, setVoice] = useState("");
+  const [narrationConnectionId, setNarrationConnectionId] = useState("");
+  const [language, setLanguage] = useState("en-US");
   const [altText, setAltText] = useState("");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
-  const [capability, setCapability] = useState<{ providerConfigured: boolean; canGenerate: boolean } | null>(null);
+  const [capability, setCapability] = useState<Capability | null>(null);
   const [capabilityError, setCapabilityError] = useState(false);
   const [connectionVersion, setConnectionVersion] = useState(0);
+  const [creatorOpen, setCreatorOpen] = useState(false);
   const generationEnabled = Boolean(capability?.providerConfigured && capability.canGenerate);
+  const imageConfigured = capability?.imageConfigured ?? capability?.providerConfigured ?? false;
+  const narrationConnections = capability?.narrationConnections ?? (capability?.providerConfigured ? [{ id: "legacy-openai", name: "Legacy OpenAI narration", provider: "openai", voice: "alloy", model: "", language: "en-US" }] : []);
+  const selectedNarration = narrationConnections.find(connection => connection.id === narrationConnectionId);
+  const canCreate = generationEnabled && !busy && !working && scene && purpose.trim() &&
+    (kind === "image" ? imageConfigured && prompt.trim() : selectedNarration && script.trim() && voice.trim() && language.trim());
+
+  useEffect(() => {
+    if (!capability) return;
+    if (!imageConfigured) setKind("narration");
+    if (narrationConnectionId && !narrationConnections.some(connection => connection.id === narrationConnectionId)) {
+      setNarrationConnectionId(""); setVoice("");
+    }
+  }, [capability, narrationConnectionId]);
+
+  useEffect(() => {
+    if (!generationEnabled) setCreatorOpen(false);
+  }, [generationEnabled]);
 
   useEffect(() => {
     let alive = true;
@@ -46,7 +68,7 @@ export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated }: 
     if (!project.id) return;
     fetch(`/api/projects/${project.id}/media-generation-capability`).then(async (response) => {
       if (!response.ok) throw new Error("Media provider status unavailable");
-      return response.json() as Promise<{ providerConfigured: boolean; canGenerate: boolean }>;
+      return response.json() as Promise<Capability>;
     }).then((result) => { if (alive) setCapability(result); }).catch(() => { if (alive) setCapabilityError(true); });
     return () => { alive = false; };
   }, [project.id, connectionVersion]);
@@ -71,12 +93,12 @@ export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated }: 
   }, [project.id]);
 
   async function generate() {
-    if (!generationEnabled || busy || working || !scene || !purpose.trim() || (kind === "image" ? !prompt.trim() : !script.trim())) return;
+    if (!canCreate || !scene) return;
     setWorking(true); setError("");
     try {
       const response = await fetch(`/api/projects/${project.id}/media-generation-jobs`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, sceneId: scene.id, purpose, style, width: kind === "image" ? width : null, height: kind === "image" ? height : null, prompt: kind === "image" ? prompt : "", script, voice: kind === "narration" ? voice : null, altText }),
+        body: JSON.stringify({ kind, sceneId: scene.id, purpose, style, width: kind === "image" ? width : null, height: kind === "image" ? height : null, prompt: kind === "image" ? prompt : "", script, voice: kind === "narration" ? voice : null, altText, ...(kind === "narration" ? { narrationConnectionId, language } : {}) }),
       });
       if (!response.ok) throw new Error((await response.json().catch(() => null) as { detail?: string } | null)?.detail || "Media generation could not be started.");
       setPurpose(""); setPrompt(""); setScript(""); setAltText("");
@@ -114,15 +136,22 @@ export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated }: 
 
   const visibleCandidates = candidates.filter((candidate) => !scene || candidate.sceneId === scene.id);
   return <section data-onboarding="media.generated" className="generated-media-panel" aria-labelledby="generated-media-title">
-    <details className={`generation-creator${generationEnabled ? "" : " is-unavailable"}`}>
-    <summary className="generated-media-heading"><Sparkles size={18} /><h2 id="generated-media-title">Create a media candidate</h2>{!generationEnabled && <span className="generation-availability">{capabilityError ? "AI status unavailable" : !project.id ? "No project selected" : !capability ? "Checking media provider..." : !capability.providerConfigured ? "AI not configured" : "Generation access unavailable"}</span>}<ChevronRight size={18} className="generation-chevron" /></summary>
+    <details className={`generation-creator${generationEnabled ? "" : " is-unavailable"}`} open={creatorOpen && generationEnabled} onToggle={event => setCreatorOpen(event.currentTarget.open && generationEnabled)}>
+    <summary className="generated-media-heading" aria-disabled={!generationEnabled} onClick={event => {
+      if (!generationEnabled) event.preventDefault();
+    }} onKeyDown={event => {
+      if (!generationEnabled && (event.key === "Enter" || event.key === " ")) event.preventDefault();
+    }}><Sparkles size={18} /><h2 id="generated-media-title">Create a media candidate</h2>{!generationEnabled && <span className="generation-availability">{capabilityError ? "AI status unavailable" : !project.id ? "No project selected" : !capability ? "Checking media provider..." : !capability.providerConfigured ? "AI not configured" : "Generation access unavailable"}</span>}<ChevronRight size={18} className="generation-chevron" /></summary>
     <fieldset className="generated-media-form" disabled={!generationEnabled || busy || working} aria-label="Media candidate settings">
       <label>Scene<select value={scene?.id || ""} disabled><option>{scene?.title || "Select a scene first"}</option></select></label>
-      <label>Media type<select value={kind} onChange={(event) => setKind(event.target.value as "image" | "narration")}><option value="image">Image</option><option value="narration">Narration</option></select></label>
+      <label>Media type<select value={kind} onChange={(event) => setKind(event.target.value as "image" | "narration")}><option value="image" disabled={!imageConfigured}>Image</option><option value="narration" disabled={narrationConnections.length === 0}>Narration</option></select></label>
       <label>Purpose<input value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="What should this support?" /></label>
-      {kind === "image" ? <><label>Prompt<textarea rows={3} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Describe the proposed image" /></label><label>Style<input value={style} onChange={(event) => setStyle(event.target.value)} placeholder="e.g. clean technical illustration" /></label><div className="generated-media-dimensions"><span>Dimensions</span><span><input aria-label="Image width" type="number" min="64" max="4096" value={width} onChange={(event) => setWidth(Number(event.target.value))} /><input aria-label="Image height" type="number" min="64" max="4096" value={height} onChange={(event) => setHeight(Number(event.target.value))} /></span></div></> : <><label>Narration script<textarea rows={3} value={script} onChange={(event) => setScript(event.target.value)} placeholder="Write the narration to generate" /></label><label>Voice<input value={voice} onChange={(event) => setVoice(event.target.value)} placeholder="Provider voice" /></label></>}
+      {kind === "image" ? <><label>Prompt<textarea rows={3} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Describe the proposed image" /></label><label>Style<input value={style} onChange={(event) => setStyle(event.target.value)} placeholder="e.g. clean technical illustration" /></label><div className="generated-media-dimensions"><span>Dimensions</span><span><input aria-label="Image width" type="number" min="64" max="4096" value={width} onChange={(event) => setWidth(Number(event.target.value))} /><input aria-label="Image height" type="number" min="64" max="4096" value={height} onChange={(event) => setHeight(Number(event.target.value))} /></span></div></> : <><label>Narration connection<select value={selectedNarration ? narrationConnectionId : ""} onChange={event => {
+        const connection = narrationConnections.find(item => item.id === event.target.value);
+        setNarrationConnectionId(connection?.id || ""); setVoice(connection?.voice || ""); setLanguage(connection?.language || "en-US");
+      }}><option value="">Select a narration connection</option>{narrationConnections.map(connection => <option value={connection.id} key={connection.id}>{connection.name} · {connection.provider}</option>)}</select></label><label>Narration script<textarea rows={3} value={script} onChange={(event) => setScript(event.target.value)} placeholder="Write the narration to generate" /></label><label>Voice<input value={voice} onChange={(event) => setVoice(event.target.value)} placeholder="Provider voice" disabled={!selectedNarration} /></label><label>Language<input value={language} onChange={event => setLanguage(event.target.value)} disabled={!selectedNarration} /></label><p className="field-hint">Output format: MP3. Select a connection to use its default voice, or override the voice for this request.</p></>}
       {kind === "image" && <label>Alt text<input value={altText} onChange={(event) => setAltText(event.target.value)} placeholder="Describe the image for learners" /></label>}
-      <button className="button button-accent" onClick={() => void generate()} disabled={!generationEnabled || busy || working || !scene || !purpose.trim() || (kind === "image" ? !prompt.trim() : !script.trim())}>{kind === "image" ? <ImagePlus size={15} /> : <Mic size={15} />} Generate candidate</button>
+      <button className="button button-accent" onClick={() => void generate()} disabled={!canCreate}>{kind === "image" ? <ImagePlus size={15} /> : <Mic size={15} />} Generate candidate</button>
     </fieldset>
     </details>
     {error && <p className="export-error" role="alert">{error}</p>}

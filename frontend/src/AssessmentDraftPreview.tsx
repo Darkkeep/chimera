@@ -36,7 +36,18 @@ export function AssessmentDraftPreview({ item, settings, label = "Draft assessme
     <p>{item.prompt}</p>
     {choices.length > 0 && <ol>{choices.map((choice, index) => <li key={index}>{choice}</li>)}</ol>}
     <dl>
-      <dt>Type</dt><dd>{item.type}</dd>
+      <dt>Stable identifier</dt><dd>{item.identifier}</dd>
+      {item.metadata && <>
+        <dt>Question title</dt><dd>{item.metadata.title || "Not specified"}</dd>
+        <dt>Description</dt><dd>{item.metadata.description || "Not specified"}</dd>
+        <dt>Tags</dt><dd>{item.metadata.tags.join(", ") || "None"}</dd>
+        <dt>Author</dt><dd>{item.metadata.author || "Not specified"}</dd>
+        <dt>Source</dt><dd>{item.metadata.source || "Not specified"}</dd>
+        <dt>Language</dt><dd>{item.metadata.language}</dd>
+        <dt>Difficulty</dt><dd>{item.metadata.difficulty || "Not specified"}</dd>
+        <dt>Learning-objective references</dt><dd>{item.metadata.learningObjectiveRefs.join(", ") || "None"}</dd>
+      </>}
+      <dt>Type</dt><dd>{item.type === "short-answer" ? "Fill-in-the-blank" : item.type}</dd>
       <dt>Correct answer</dt><dd>{answer}</dd>
       <dt>Correct feedback</dt><dd>{item.correctFeedback}</dd>
       <dt>Incorrect feedback</dt><dd>{item.incorrectFeedback}</dd>

@@ -54,11 +54,11 @@ export function GoldenPathView({ onStartWalkthrough, onSelectWalkthrough, walkth
       action: onCreateProject,
     },
     {
-      title: "Check the Intelligence Engine",
+      title: "Check Pythia",
       instructions: "Inspect Pythia availability, capabilities and providers. Media generation uses a separate connection; opening diagnostics does not submit a task.",
       status: "review",
       statusLabel: "Connection check",
-      actionLabel: "Inspect Intelligence Engine",
+      actionLabel: "Inspect Pythia",
       action: () => onSelectWalkthrough("engine-status"),
     },
     {

@@ -9,6 +9,7 @@ from zipfile import ZipFile
 
 from docx import Document
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from backend.app import ai_budget, backup, content_generation, main, media, ocr, scorm, storage, word_export
 from backend.app.models import AssetMetadataUpdate, MediaPlacement, MediaPlacementsUpdate, ProjectCreate, ReferencePassage, ReviewCommentCreate, SceneCreate
@@ -83,6 +84,43 @@ class MediaCompletionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             media.write_placements(self.project.id, MediaPlacementsUpdate(placements=[MediaPlacement(assetId="unknown")]), version)
         self.assertEqual(storage.read_project(self.project.id).storyboard.revision, version)
+
+    def test_required_viewing_is_video_only_non_looping_and_threshold_bounded(self):
+        asset = self.video()
+        self.project = storage.add_project_asset(self.project.id, "narration.mp3", b"audio", "audio")
+        audio = self.project.storyboard.assets[-1]
+        revision = self.project.storyboard.revision
+        with self.assertRaisesRegex(ValueError, "only be configured for video"):
+            media.write_placements(self.project.id, MediaPlacementsUpdate(placements=[MediaPlacement(assetId=audio.id, requiredViewing=True)]), revision)
+        with self.assertRaisesRegex(ValueError, "cannot loop"):
+            media.write_placements(self.project.id, MediaPlacementsUpdate(placements=[MediaPlacement(assetId=asset.id, requiredViewing=True, loop=True)]), revision)
+        with self.assertRaises(ValidationError):
+            MediaPlacement(assetId=asset.id, viewingThresholdPercent=101)
+        self.assertEqual(storage.read_project(self.project.id).storyboard.revision, revision)
+
+    def test_required_video_settings_are_packaged_and_included_in_resume_estimate(self):
+        asset = self.video()
+        from backend.app.models import AssetAttributionUpdate
+        self.project = media.update_metadata(self.project.id, asset.id, AssetMetadataUpdate(
+            transcript="Inspect the valve.",
+            captionsVtt="WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nInspect the valve.",
+        ), self.project.storyboard.revision)
+        self.project = storage.update_project_asset_attribution(self.project.id, asset.id, AssetAttributionUpdate(
+            attributionStatus="complete", attributionText="Synthetic test video",
+        ))
+        self.project = media.write_placements(self.project.id, MediaPlacementsUpdate(placements=[
+            MediaPlacement(assetId=asset.id, requiredViewing=True, viewingThresholdPercent=85),
+        ]), self.project.storyboard.revision)
+        for builder, budget in ((scorm.build_scorm_12, 4096), (scorm.build_scorm_2004, 64000)):
+            package, report = builder(self.project)
+            with ZipFile(io.BytesIO(package)) as archive:
+                story = json.loads(archive.read("storyboard.json"))
+                self.assertTrue(all(scene["mediaPlacements"][0]["requiredViewing"] for scene in story["scenes"]))
+                self.assertTrue(all(scene["mediaPlacements"][0]["viewingThresholdPercent"] == 85 for scene in story["scenes"]))
+                self.assertIn("videoProgress", archive.read("player.js").decode())
+            self.assertEqual(report["resumeData"]["budgetBytes"], budget)
+            self.assertEqual(report["resumeData"]["requiredVideoCount"], 1)
+            self.assertIn("Estimate includes one range", report["resumeData"]["videoRangeFragmentationNote"])
 
     def test_packages_publish_only_used_media_with_captions_and_transcripts(self):
         asset = self.video()

@@ -20,6 +20,15 @@ Use your organization's normal process if PowerShell script execution is
 restricted. The manual commands are in README.md. The launcher uses Vite's
 local development server; it is intended for local evaluation only.
 
+## Current authoring navigation
+
+- **WORKSPACE > Assessments** opens the question bank, direct question authoring, reviewed QTI/CSV/XLSX imports, and question spreadsheet exports.
+- **Storyboard > Project background**, above the scene list, sets the course's default background. It is not under Settings.
+- **Fill-in-the-blank** replaces the Short Answer label while preserving saved questions.
+- At the bottom of the question editor, expand **Tags and learning-objective references** for searchable current-project dropdowns with reuse/create/remove actions; save the question to keep changes. Other metadata is in **Question metadata**.
+
+Read [the user guide](../docs/user-guide.md) or its [PDF edition](../docs/user-guide.pdf) for instructions and compatibility limits. QTI question-bank import into Blackboard still requires target-system verification; SCORM acceptance does not certify QTI acceptance. After installing updated application code or dependencies, restart the backend and frontend before checking new controls or routes. Use the package manifest to identify which source revision an older evaluation ZIP actually contains.
+
 Install LibreOffice separately for PPTX previews, following README.md. OCR
 engine/language setup is documented in docs/media-placement-and-ocr.md.
 No API key is required to start; configure an approved connection in Settings

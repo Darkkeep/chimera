@@ -1027,7 +1027,7 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
             ("Ordering", OrderingAssessment(identifier="ITEM_ORDER", prompt="Arrange these", choices=[{"identifier": "A", "text": "One"}, {"identifier": "B", "text": "Two"}], correctOrder=["B", "A"]), "orderInteraction", "ordered", "identifier"),
             ("Drag drop", DragDropAssessment(identifier="ITEM_DRAG", prompt="Place these", draggables=[{"identifier": "D1", "text": "Drag one"}, {"identifier": "D2", "text": "Drag two"}], targets=[{"identifier": "T1", "text": "Target one"}], correctMatches=[{"sourceIdentifier": "D1", "targetIdentifier": "T1"}]), "associateInteraction", "multiple", "directedPair"),
             ("Matching", MatchingAssessment(identifier="ITEM_MATCH", prompt="Match these", leftItems=[{"identifier": "L1", "text": "Left one"}, {"identifier": "L2", "text": "Left two"}], rightItems=[{"identifier": "R1", "text": "Right one"}, {"identifier": "R2", "text": "Right two"}], correctMatches=[{"sourceIdentifier": "L1", "targetIdentifier": "R2"}, {"sourceIdentifier": "L2", "targetIdentifier": "R1"}]), "matchInteraction", "multiple", "directedPair"),
-            ("Short answer", ShortAnswerAssessment(identifier="ITEM_SHORT", prompt="Name the item", acceptedAnswers=["Answer", "response"]), "textEntryInteraction", "single", "string"),
+            ("Fill-in-the-blank", ShortAnswerAssessment(identifier="ITEM_SHORT", prompt="Name the item", acceptedAnswers=["Answer", "response"]), "textEntryInteraction", "single", "string"),
         ]
         expected_package_paths = {"imsmanifest.xml", "assessmentTest.xml"}
         namespace = "{http://www.imsglobal.org/xsd/imsqti_v2p1}"
@@ -1044,7 +1044,12 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
             self.assertEqual(response_declaration.attrib["baseType"], base_type)
             expected_package_paths.add(f"items/{question.identifier}.xml")
             if question.type == "short-answer":
-                self.assertEqual(len(root.findall(f".//{namespace}responseIf/{namespace}or/{namespace}match")), 2)
+                self.assertEqual(len(root.findall(f".//{namespace}responseIf/{namespace}or/{namespace}stringMatch")), 2)
+                self.assertIsNone(root.find(f"{namespace}itemBody/{namespace}textEntryInteraction"))
+                self.assertIsNotNone(root.find(f"{namespace}itemBody/{namespace}p/{namespace}textEntryInteraction"))
+                self.assertEqual(root.find(f"{namespace}itemBody/{namespace}p/{namespace}span").text, question.prompt)
+                self.assertEqual([value.text for value in response_declaration.findall(f"{namespace}correctResponse/{namespace}value")], ["Answer"])
+                self.assertEqual([value.text for value in root.findall(f".//{namespace}stringMatch/{namespace}baseValue")], question.acceptedAnswers)
 
         package_response = main.export_qti_assessment_test(project.id)
         with ZipFile(io.BytesIO(package_response.body)) as package:

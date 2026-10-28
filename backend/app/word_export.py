@@ -152,7 +152,8 @@ def _add_assessment(document: DocumentType, scene: Scene, include_answer_key: bo
     if item is None:
         return
     document.add_heading("Assessment specification", level=2)
-    document.add_paragraph(f"Interaction: {item.type.replace('-', ' ').title()}")
+    interaction_name = "Fill-in-the-blank" if item.type == "short-answer" else item.type.replace("-", " ").title()
+    document.add_paragraph(f"Interaction: {interaction_name}")
     document.add_paragraph(f"Identifier: {item.identifier}")
     document.add_paragraph(f"Prompt: {item.prompt}")
     choices = _assessment_choices(item)
@@ -166,7 +167,7 @@ def _add_assessment(document: DocumentType, scene: Scene, include_answer_key: bo
             cells[0].text = identifier
             cells[1].text = text
     elif item.type == "short-answer":
-        document.add_paragraph("Accepted response: learner enters a short text answer.")
+        document.add_paragraph("Accepted response: learner fills in one blank with an exact-match word or short phrase.")
 
     if item.type == "ordering":
         document.add_paragraph("Expected interaction: order the listed elements.")

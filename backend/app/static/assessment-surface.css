@@ -1,3 +1,7 @@
+.assessment-stage-frame {
+  /* Assessment content must grow beyond the slide's inline aspect ratio. */
+  aspect-ratio: auto !important;
+}
 .assessment-stage-frame > .assessment-stage-region {
   font-size: 16px;
   line-height: 1.35;
@@ -103,3 +107,47 @@
   background: #fbe9e7 !important;
   border: 1px solid #c4938e;
 }
+.course-preview-drag-question .course-preview-draggables {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 64px;
+  padding: 12px 0;
+  align-items: center;
+}
+.course-preview-drag-question .course-preview-drop-targets { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin: 12px 0; }
+:root .course-preview-drag-question div.course-preview-drop-target {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 70px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,.6);
+  color: #24272b;
+  border: 1px dashed #858e98;
+  border-radius: 4px;
+}
+:root .course-preview-drag-question button.course-preview-drag-chip {
+  margin: 0;
+  padding: 9px 13px;
+  background: #ffffff;
+  color: #24272b;
+  border: 1px solid #53616c;
+  border-radius: 4px;
+  cursor: grab;
+}
+.course-preview-drag-question .course-preview-drag-chip[aria-pressed="true"] { outline: 2px solid #245b85; outline-offset: 2px; }
+.course-preview-drag-question button.course-preview-drop-slot {
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  padding: 9px 13px;
+  border: 1px dashed #53616c;
+  border-radius: 4px;
+  background: transparent;
+  color: #24272b;
+}
+.course-preview-drop-slot:disabled { opacity: 1; cursor: default; }
+.course-preview-drag-instructions, .course-preview-drag-status { color: #24272b; font-size: 14px; line-height: 1.4; }
+.course-preview-drag-status { min-height: 1.4em; }

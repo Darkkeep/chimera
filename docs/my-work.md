@@ -10,6 +10,18 @@ Recent activity is collapsed by default. Select its heading to expand or collaps
 
 Select a project name or its row to open that project's Storyboard authoring workspace. Project names are keyboard-accessible. Review-only members retain their existing review access and do not receive editing permissions.
 
+## Subprojects
+
+Organize full, independent projects under top-level projects. Only two levels are supported. In a parent's **Project actions**, choose **Create subproject** or **Attach existing project**. An existing project with children must remain top-level. Expand the parent's **visible subprojects** button with a click, Enter, or Space to inspect accessible children. Child statuses remain independent; the aggregate approved/published count includes only children you can see.
+
+A child's **Project actions > Manage subproject** can move it to another parent, detach it to top level, or set its display order. Lower numbers appear first; ties use project ID. Saves check the metadata revision and reject stale relationship edits. Close the dialog and refresh before retrying a conflicting change.
+
+Relationship changes require settings access on the child and its old and new parents; creating a child also requires project-creation permission. Parent access never grants child access. A visible child whose parent is restricted remains accessible independently, labeled **Parent project unavailable** without exposing the parent's title. The sidebar and Media library selectors group accessible children under accessible parents; child authoring includes a breadcrumb to the parent.
+
+Content, media, background defaults, completion rules, review records, permissions, and exports are not inherited or combined. Each preview, export, and archive includes only its selected project. Archive restore preserves the current live attachment, not the archive's historical relationship.
+
+A parent with active children cannot be trashed. Move, detach, or individually trash them first. Trashing a child leaves its siblings untouched. In Trash, **Restore parent** lets you retain the original parent if available and authorized, select another permitted parent, or explicitly restore to top level. An unavailable original parent produces an error rather than silently changing the child's placement.
+
 ## Production Stage
 
 The stage selector records an explicit project status: Not set, Draft, In production, In review, Approved, or Published. Newly created projects start at Draft. Older projects remain Not set until classified. Stage changes persist in project metadata, update the project's timestamp, and create an audit event without changing the storyboard revision.

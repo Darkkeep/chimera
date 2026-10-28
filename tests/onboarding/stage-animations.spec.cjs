@@ -21,6 +21,7 @@ test('animation authoring persists phases and Preview plays the scene timeline a
   const editor = page.getByRole('dialog').last();
   await editor.getByRole('button', { name: 'Stagger text entrances', exact: true }).click();
   await editor.getByRole('button', { name: 'First instruction element', exact: true }).click();
+  await editor.locator('.visual-inspector summary').filter({ hasText: /^Animation$/ }).click();
   await expect(editor.getByRole('combobox', { name: 'entrance effect', exact: true })).toHaveValue('bounce');
   await expect(editor.getByRole('spinbutton', { name: 'entrance delay (ms)', exact: true })).toHaveValue('150');
   await editor.getByRole('combobox', { name: 'presentation effect', exact: true }).selectOption('sway');

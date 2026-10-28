@@ -72,8 +72,14 @@ test('all assessment types answer inside the Stage without saved layouts', async
       await question.getByRole('combobox', { name: 'Match for Inspection', exact: true }).selectOption('target');
       await question.getByRole('combobox', { name: 'Match for Operation', exact: true }).selectOption('target2');
     }
-    if (item.type === 'drag-drop') await question.getByRole('combobox', { name: 'Match for Inspect equipment', exact: true }).selectOption('target');
-    if (item.type === 'short-answer') await question.getByRole('textbox', { name: 'Your answer', exact: true }).fill('Inspect');
+    if (item.type === 'drag-drop') {
+      await question.getByRole('button', { name: 'Inspect equipment', exact: true }).click();
+      await question.getByRole('button', { name: 'Place selected tile beside Before use', exact: true }).click();
+    }
+    if (item.type === 'short-answer') {
+      await expect(question.getByRole('textbox')).toHaveCount(1);
+      await question.getByRole('textbox', { name: 'Fill in the blank', exact: true }).fill('  inspect  ');
+    }
     await question.getByRole('button', { name: 'Check answer', exact: true }).click();
     const feedback = page.getByRole('dialog', { name: 'Correct', exact: true });
     await expect(feedback).toContainText('Score 100%');
