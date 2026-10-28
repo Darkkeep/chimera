@@ -65,7 +65,7 @@ async function freePort() {
   await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
   const readProject = async id => { const response = await context.request.get(`${origin}/api/projects/${id || fixture.projectId}`); assert.equal(response.status(), 200); return response.json(); };
   let project = await readProject();
-  assert(project.storyboard.scenes[0].visualLayout.backgroundAsset);
+  assert(project.storyboard.scenes[0].visualLayout.sourceBackgroundAsset);
   assert(project.storyboard.scenes[0].visualLayout.elements.some(element => element.source === 'master'));
   const masterBackgrounds = project.storyboard.assets.filter(asset => asset.role === 'background');
   assert.equal(masterBackgrounds.length, 1, 'one reusable backdrop should be extracted for the fixture master');
@@ -79,7 +79,7 @@ async function freePort() {
   assert.equal(await page.getByRole('option').filter({ hasText: 'PowerPoint master' }).count(), 1);
   await page.getByRole('option', { name: `${masterBackground.filename} PowerPoint master`, exact: true }).click();
   await expect(page.locator('.visual-editable'), 'applying a master backdrop must not draw its inherited artwork twice').toHaveCount(originalElementCount - masterElementCount);
-  assert(await page.locator('.visual-stage').evaluate(async element => {
+  assert(await page.locator('.visual-editor .visual-stage').evaluate(async element => {
     const image = new Image();
     image.src = getComputedStyle(element).backgroundImage.slice(5, -2);
     await image.decode();
@@ -241,13 +241,13 @@ async function freePort() {
   if (await resumeAuthoring.isVisible().catch(() => false)) await resumeAuthoring.click();
   await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
   await page.getByRole('tab', { name: 'Stage', exact: true }).click();
-  const [extraction] = await Promise.all([page.waitForResponse(response => response.url().endsWith('/extract-layout')), page.getByRole('button', { name: 'Extract source layout', exact: true }).click()]);
-  assert.equal(extraction.status(), 200, await extraction.text());
-  await page.getByRole('button', { name: 'Extract source layout', exact: true }).waitFor({state:'detached'});
   await page.locator('.visual-editable').filter({ hasText: 'Editable scene text' }).waitFor();
   const legacy = await readProject(fixture.legacyProjectId);
   assert.equal(legacy.storyboard.scenes[0].notes, 'Preserved legacy notes');
-  assert.equal(legacy.storyboard.scenes[0].visualLayout.enabled, false);
+  assert.equal(legacy.storyboard.scenes[0].visualLayout.enabled, true);
+  const prepared = await context.request.post(`${origin}/api/projects/${fixture.legacyProjectId}/authoring/prepare`, { headers: { 'If-Match': `"${legacy.storyboard.revision}"` } });
+  assert.equal(prepared.status(), 200, await prepared.text());
+  assert.equal((await prepared.json()).storyboard.revision, legacy.storyboard.revision, 'reopening a prepared legacy project must not write another revision');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   const built = spawnSync(python, [path.join(__dirname, 'seed.py'), fixture.projectId, output], { cwd: root, env: environment, windowsHide: true, encoding: 'utf8' });
   assert.equal(built.status, 0, built.stderr);
@@ -291,33 +291,20 @@ async function freePort() {
   await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
   await page.getByRole('tab', { name: 'Details', exact: true }).click();
   await page.locator('.visual-scene-details').waitFor();
-  await page.getByLabel('Rendering mode', { exact: true }).selectOption('native');
+  assert.equal(await page.getByLabel('Rendering mode', { exact: true }).count(), 0);
+  const authored = (await readProject()).storyboard.scenes[0].visualLayout;
+  await page.getByRole('tab', { name: 'Stage', exact: true }).click();
+  await page.getByRole('button', { name: 'Compare with original', exact: true }).click();
+  await page.locator('.visual-source').waitFor();
+  await page.getByRole('button', { name: 'Return to scene', exact: true }).click();
+  await page.locator('.visual-editable').getByText('Edited directly on canvas', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Save scene', exact: true }).click();
   await page.locator('.visual-editor').waitFor({ state: 'detached' });
   project = await readProject();
-  assert.equal(project.storyboard.scenes[0].layoutMode, 'native');
-  assert.equal(project.storyboard.scenes[0].visualLayout.enabled, true);
-  assert.equal(project.storyboard.scenes[0].visualLayout.backgroundColor, '#ddeeff');
-  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
-  await page.getByRole('tab', { name: 'Details', exact: true }).click();
-  await page.getByLabel('Rendering mode', { exact: true }).selectOption('fidelity');
-  await page.getByRole('button', { name: 'Save scene', exact: true }).click();
-  await page.locator('.visual-editor').waitFor({ state: 'detached' });
-  project = await readProject();
-  assert.equal(project.storyboard.scenes[0].layoutMode, 'fidelity');
-  assert.equal(project.storyboard.scenes[0].visualLayout.enabled, false);
-  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
-  await page.getByRole('tab', { name: 'Details', exact: true }).click();
-  await page.getByLabel('Rendering mode', { exact: true }).selectOption('hybrid');
-  await page.getByRole('button', { name: 'Save scene', exact: true }).click();
-  await page.locator('.visual-editor').waitFor({ state: 'detached' });
-  project = await readProject();
-  assert.equal(project.storyboard.scenes[0].layoutMode, 'hybrid');
-  assert.equal(project.storyboard.scenes[0].visualLayout.enabled, true);
-  assert(project.storyboard.scenes[0].visualLayout.elements.some(element => element.source === 'master'));
+  assert.deepEqual(project.storyboard.scenes[0].visualLayout, authored, 'comparison and saving must preserve the authored composition');
   assert.equal(await page.locator('.visual-authoring-surface .visual-stage-frame').count(), 1);
   assert.deepEqual(errors, []);
-  fs.writeFileSync(path.join(output, 'qualification.json'), JSON.stringify({ passed: true, checks: ['Stage-first editing', 'stage dimensions and presets', 'stage alignment and locking', 'background and stage save/reload/export', 'reusable master background selection, undo, save/reopen and SCORM rendering', 'PPTX master/background extraction', 'inline text edit', 'pointer movement', 'resize', 'attached image drag/drop', 'undo/redo', 'save/reload', 'scene 23 to 8', 'review contrast light/dark', 'editor accessibility', 'mobile editor', 'fidelity, hybrid, and native rendering strategies', 'legacy upgrade', 'SCORM 1.2 and 2004 visual parity'], fixture }, null, 2));
+  fs.writeFileSync(path.join(output, 'qualification.json'), JSON.stringify({ passed: true, checks: ['Stage-first editing', 'stage dimensions and presets', 'stage alignment and locking', 'background and stage save/reload/export', 'reusable master background selection, undo, save/reopen and SCORM rendering', 'PPTX master/background extraction', 'inline text edit', 'pointer movement', 'resize', 'attached image drag/drop', 'undo/redo', 'save/reload', 'scene 23 to 8', 'review contrast light/dark', 'editor accessibility', 'mobile editor', 'one authored composition and temporary source comparison', 'legacy upgrade', 'SCORM 1.2 and 2004 visual parity'], fixture }, null, 2));
   console.log('Visual qualification passed. Evidence: workspace/visual-qualification');
 })().catch(error => { console.error(error); console.error(backendLog); process.exitCode = 1; }).finally(async () => {
   if (browser) await browser.close();

@@ -30,7 +30,8 @@ class MediaCapabilityTests(unittest.TestCase):
     def test_capability_exposes_only_configuration_and_permission_flags(self) -> None:
         policy = Mock()
         policy.allows.return_value = False
-        with patch.object(main, "read_project"), patch.object(main, "get_authorization_policy", return_value=policy), patch.object(main, "media_provider_configured", return_value=True):
+        image_status = {"configured": True, "provider": "openai", "audioModel": "gpt-4o-mini-tts"}
+        with patch.object(main, "read_project"), patch.object(main, "get_authorization_policy", return_value=policy), patch.object(main, "connection_status", return_value=image_status), patch.object(main, "narration_status", return_value={"connections": []}):
             result = main.get_media_generation_capability("project")
         self.assertEqual(result, {
             "providerConfigured": True, "imageConfigured": True, "canGenerate": False,
