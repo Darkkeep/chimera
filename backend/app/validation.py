@@ -58,6 +58,11 @@ def validate_project(project: ProjectDetail, target: Literal["authoring", "produ
     project_root = project_path(project.id).resolve()
     assets_root = (project_root / "assets").resolve()
     for scene in scenes:
+        if scene.visualLayout and scene.visualLayout.timeline:
+            for clip in scene.visualLayout.timeline.clips:
+                asset = asset_by_id.get(clip.assetId)
+                if not asset or asset.kind != clip.kind:
+                    issues.append(ValidationIssue(severity="error", code="invalid-timeline-media", message="Timeline clip references missing or incompatible media.", sceneId=scene.id, sceneTitle=scene.title))
         for warning in _layout_review_warnings(scene):
             issues.append(ValidationIssue(severity="warning", code="visual-layout-review", message=warning, sceneId=scene.id, sceneTitle=scene.title))
         if not scene.title.strip():
@@ -83,7 +88,7 @@ def validate_project(project: ProjectDetail, target: Literal["authoring", "produ
                     sceneTitle=scene.title,
                 ))
 
-        if scene.audioRequired and not scene.audioAssets:
+        if scene.audioRequired and not scene.audioAssets and not (scene.visualLayout and scene.visualLayout.timeline and any(c.kind == "audio" for c in scene.visualLayout.timeline.clips)):
             issues.append(ValidationIssue(
                 severity="warning",
                 code="required-audio-missing",

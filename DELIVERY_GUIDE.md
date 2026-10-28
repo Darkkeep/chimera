@@ -3,6 +3,10 @@
 Last reviewed: 2026-10-18. Shared journey: `conversation-explainable-answers-files`.
 Guide revision: 13. This is a maintained snapshot, not automatic telemetry.
 
+Product-level reconciliation (2026-10-28): Chimera's local timeline/appearance delivery is recorded in [current work](docs/current-work.md); [creator pre-alpha readiness](docs/pre-alpha-readiness.md) owns the local pilot's open release checks. This guide continues to govern the named shared journey; local authoring completion does not close its integration or G3 gates.
+
+Cross-repository records below use `repository:path` locators rather than links into absent sibling checkouts. Their sources belong to [Manteion](https://github.com/Darkkeep/manteion), [Pythia](https://github.com/Darkkeep/Pythia), and [pythia-contracts](https://github.com/Darkkeep/pythia-contracts). Those records are not bundled Chimera guides; their availability and current acceptance must be verified upstream before changing shared-journey status.
+
 ## Start Here
 
 This guide owns Chimera's current responsibilities, evidence, dependencies, and
@@ -13,14 +17,14 @@ Their existing local edits must be preserved. A historical recommendation to
 submit a release candidate is not current authorization to push, merge, or deploy.
 
 Shared product intent lives in Manteion's
-[conversation, explainable answers, and files plan](../manteion/manteion/docs/product/conversational-consultation-plan.md).
+conversation, explainable answers, and files plan (`manteion:docs/product/conversational-consultation-plan.md`).
 The other root guides own their respective implementation status:
 
-- [Manteion](../manteion/manteion/DELIVERY_GUIDE.md): primary conversational
+- Manteion (`manteion:DELIVERY_GUIDE.md`): primary conversational
   consultation UI, identity/sessions, files, downloads, and product acceptance.
-- [Pythia](../Pythia/DELIVERY_GUIDE.md): dialogue, grounded answers, providers,
+- Pythia (`Pythia:DELIVERY_GUIDE.md`): dialogue, grounded answers, providers,
   ingestion and generated-content orchestration.
-- [pythia-contracts](../pythia-contracts/DELIVERY_GUIDE.md): versioned public
+- pythia-contracts (`pythia-contracts:DELIVERY_GUIDE.md`): versioned public
   exchanges, examples, types, invariants, and compatibility.
 
 These local links reflect the sibling checkout layout. Elsewhere open each named
@@ -70,7 +74,7 @@ Verified sources and their limits:
   exports and earlier qualification, including historical backend/browser test
   results and their limitations. Those suites were not rerun for this guide;
   no new live-model, media-understanding, LMS, or human approval is asserted.
-- Manteion's [cross-client record](../manteion/manteion/docs/api/pythia-compatibility.md)
+- Manteion's cross-client record (`manteion:docs/api/pythia-compatibility.md`)
   contains prior synthetic interoperability/provenance qualification. It is not
   current conversation qualification and contains dated candidate references.
 - Existing media playback/OCR or SCORM/standalone ZIP export does not establish
@@ -88,11 +92,11 @@ engine or build a second competing chat UX without an explicit design decision.
 Status: `accepted` for the Pythia packet only; independent evaluation freeze and
 separate client acceptance remain pending. Owner: product owner with affected engineers.
 
-Manteion's [synthetic reference cases](../manteion/manteion/docs/product/conversation-reference-cases.md)
-are complemented by Pythia's [G1 packet](../Pythia/docs/conversation/g1-reference-packet.md),
+Manteion's synthetic reference cases (`manteion:docs/product/conversation-reference-cases.md`)
+are complemented by Pythia's G1 packet (`Pythia:docs/conversation/g1-reference-packet.md`),
 whose file-comparison example includes exact synthetic scene provenance, a
 correction, and an explicit no-storyboard-edit boundary. The packet is committed
-locally with [owner acceptance](../Pythia/docs/conversation/g1-owner-acceptance.md)
+locally with owner acceptance (`Pythia:docs/conversation/g1-owner-acceptance.md`)
 recorded on 2026-10-18 in Pythia `8daf30d`. This accepts the Pythia target packet,
 not a complete frozen evaluation corpus or live capability. Chimera's
 [authoring handoff review](docs/conversation-authoring-handoff.md) records source
@@ -169,8 +173,8 @@ That client now validates signed pre-ingestion metadata against contracts 1.2.0
 commit `136fa58c83bfee86e953ad98a2cbe7dac98bda05`; this does not add a document
 turn or citation operation. Integrated HTTP/session compatibility, required file
 formats and overall G3 exit remain pending. See Pythia's
-[document worker evidence](../Pythia/docs/conversation/g3-parser-worker-evidence.md)
-and [CSV HTTP evidence](../Pythia/docs/conversation/g3-csv-http-evidence.md).
+document worker evidence (`Pythia:docs/conversation/g3-parser-worker-evidence.md`)
+and CSV HTTP evidence (`Pythia:docs/conversation/g3-csv-http-evidence.md`).
 
 Qualify the additive public contract against the actual Chimera adapter, including
 consumer `chimera`, tenant/project/session access, exact source versions/hashes,
@@ -256,7 +260,7 @@ refresh a documentation date or report old CI as new evidence.
 
 Use `planned`, `in-progress`, `implemented-local`, `qualified-synthetic`,
 `qualified-live`, `blocked`, and `accepted` as defined in the
-[Manteion guide](../manteion/manteion/DELIVERY_GUIDE.md#evidence-required-for-a-status-change).
+Manteion guide (`manteion:DELIVERY_GUIDE.md#evidence-required-for-a-status-change`).
 Record exact date/commands/results, full Chimera/Pythia/contracts revisions and
 dirty state, consumer/tenant setup without secrets, source/case identity, evidence
 path, owner, and limits. Acceptance requires an explicit attributable gate record.

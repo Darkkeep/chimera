@@ -34,7 +34,15 @@ async function main() {
     for (let index = 0; index < storyboard.scenes.length; index++) {
       const scene = storyboard.scenes[index];
       await page.locator('#scene-title').filter({ hasText: scene.title }).waitFor({ state: 'attached' });
-      // Static output captures the authored composition, without entrance/exit effects.
+      // Legacy scenes remain static; timed scenes use their authored snapshot time.
+      if(scene.visualLayout?.timeline) await page.evaluate(async time=>{
+        const controller=window.__CHIMERA_SCENE_TRANSPORT;
+        await Promise.all(controller.media.map(({node})=>node.readyState>=2?Promise.resolve():new Promise(resolve=>{const timeout=setTimeout(resolve,5000);node.addEventListener('loadeddata',()=>{clearTimeout(timeout);resolve();},{once:true});node.addEventListener('error',()=>{clearTimeout(timeout);resolve();},{once:true});})));
+        controller.seek(time);
+        await Promise.all([...document.querySelectorAll('[data-scene-element]')].flatMap(node=>node.getAnimations()).map(animation=>animation.ready));
+        controller.seek(time);
+        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      },scene.visualLayout.timeline.printTimeMs);
       await page.evaluate(() => {
         const motion = document.querySelector('#motion');
         if (motion && !motion.hidden && motion.textContent.includes('Stop')) motion.click();
@@ -45,7 +53,7 @@ async function main() {
       });
       const stage = page.locator('#scene-body .visual-stage-frame');
       const target = await stage.count() ? stage : page.locator('#scene-body');
-      await target.screenshot({ path: path.join(output, `${index}.png`), animations: 'disabled' });
+      await target.screenshot({ path: path.join(output, `${index}.png`), animations: scene.visualLayout?.timeline ? 'allow' : 'disabled' });
       if (index + 1 < storyboard.scenes.length) await page.locator('#next').click();
     }
   } finally {

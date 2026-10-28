@@ -1,5 +1,9 @@
 # SCORM Compatibility Checklist
 
+## October 28 timed-media scope
+
+Shared-clock animation, positioned video, trimmed audio/video, captions, seeking, and independent required-clip coverage have local browser checks in SCORM 1.2/2004 and standalone outputs. They have not been accepted in the target LMS for a new candidate package. Requalify the exact exported ZIP/hash for seek-versus-consumption behavior, clip completion, resume, retries, captions, and gradebook reporting before claiming LMS readiness for timed courses. Historical package attestations below retain their original scope. See [creator pre-alpha readiness](pre-alpha-readiness.md) and the [human acceptance packet](qualification/human-acceptance-1.1.0.md).
+
 ## October 27 question changes: qualification scope
 
 Current question types include **Fill-in-the-blank** (legacy `short-answer`), not an essay/manual-grading question. Local checks cover one text blank, exact accepted alternatives, surrounding-whitespace handling, case sensitivity, retries, and saved responses in Preview and both SCORM profiles. Drag/drop uses correct-placement feedback, unlimited drop retries, and Check answer attempts. New packages still need target-LMS requalification.

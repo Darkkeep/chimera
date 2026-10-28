@@ -1,5 +1,9 @@
 # Maintaining the illustrated user guide
 
+## October 28 timeline and appearance refresh
+
+The [timeline manifest](../refresh-timeline-2026-10-28.json) records the source, screenshot, and PDF hashes for shape appearance, named layers, and seconds-based timeline instructions. Run `scene-timeline.spec.cjs` with the existing isolated Playwright configuration; its native-shapes case captures `timeline-editor.png` and `timeline-controls.png` from synthetic courses. Copy the Chromium captures to `images/timeline-shape-editor.png` and `images/timeline-controls.png`, inspect them, then rebuild/finalize/verify the PDF using the commands below. The suite also retains mobile and light-theme views as test artifacts. No user course is used for these captures. Other screenshots retain their earlier provenance.
+
 ## October 27 authored-scene refresh
 
 The [authored-scene manifest](../refresh-authored-scenes-2026-10-27.json) records current Stage/Details, original comparison, direct template application, project background import/inheritance, new-scene, preview navigation, transcript, and discussion captures. It supersedes the older captures with matching filenames. The base Git commit alone does not identify uncommitted implementation; the manifest includes SHA-256 hashes of the relevant application source files.

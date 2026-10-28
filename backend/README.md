@@ -1,5 +1,7 @@
 # Chimera backend
 
+The scene editor's [timeline and appearance implementation](../docs/scene-timeline-implementation.md) extends the existing scene-update `visualLayout` payload. `SceneLayout.timeline` version 1 contains integer-millisecond `durationMs`, `printTimeMs`, independent audio/video `clips`, and named `cues`. Clips reference project assets and separate `startMs` from `sourceInMs`/`sourceOutMs`; source duration, volume/fades, completion threshold, and video geometry/layer order are validated. Elements optionally contain `nativeShape`, `appearance`, `timing`, `name`, `groupId`, `hidden`, and `aspectLocked`. Timeline duration is limited to one hour, with at most 200 clips and 200 cues; all endpoints must fit. Existing scenes with no timeline retain legacy playback. Native effects and transport code under `app/static` are shared with frontend/delivery/Word rendering. Save through the existing revision-guarded scene API so history, asset checks, and authorization remain enforced.
+
 Authentication profiles, hosted sign-in/recovery, project membership, and authenticated review links are documented in the [deployment guide](../docs/authentication-deployments.md). Set `CHIMERA_DEPLOYMENT_PROFILE=networked` for password authentication, or `encarta` for the intentionally disabled integration profile. Unimplemented providers never fall back to local identity. The hosted frontend and local HTTPS qualification are implemented; real Linux/Nginx server qualification awaits the deferred connection details.
 
 ```powershell

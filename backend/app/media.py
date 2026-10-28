@@ -91,6 +91,8 @@ def resolved_project(project: ProjectDetail, published: bool = False) -> Project
             used.add(background)
         if layout:
             used.update(e.assetId for e in layout.elements if e.assetId)
+            if layout.timeline:
+                used.update(clip.assetId for clip in layout.timeline.clips)
             if layout.sourceBackgroundAsset:
                 used.add(layout.sourceBackgroundAsset)
         scenes.append(scene.model_copy(update={"imageAssets": by_kind["image"], "audioAssets": by_kind["audio"], "videoAssets": by_kind["video"],
@@ -173,7 +175,7 @@ def asset_usage(project: ProjectDetail, asset_id: str) -> dict:
     return {"courseWide": project.storyboard.backgroundAsset == asset_id or any(p.assetId == asset_id for p in project.storyboard.courseMedia),
             "scenes": [{"id": s.id, "title": s.title} for s in project.storyboard.scenes
                 if asset_id in {p.assetId for p in effective_placements(project, s)} or effective_background_asset(project, s) == asset_id or s.backgroundAsset == asset_id
-                or s.visualLayout and (s.visualLayout.backgroundAsset == asset_id or s.visualLayout.sourceBackgroundAsset == asset_id or any(e.assetId == asset_id for e in s.visualLayout.elements))]}
+                or s.visualLayout and (s.visualLayout.backgroundAsset == asset_id or s.visualLayout.sourceBackgroundAsset == asset_id or any(e.assetId == asset_id for e in s.visualLayout.elements) or s.visualLayout.timeline and any(c.assetId == asset_id for c in s.visualLayout.timeline.clips))]}
 
 
 def delete_asset(project_id: str, asset_id: str, revision: int) -> ProjectDetail:

@@ -1,5 +1,7 @@
 # Repository review and completion plan
 
+Historical plan: use [current work](current-work.md) for subsequent deliveries and [creator pre-alpha readiness](pre-alpha-readiness.md) for the current outstanding release checklist. The evidence, source revision, and open gates below describe the October 15 checkpoint.
+
 Reviewed 2026-10-15 against `a181b7336a792f1a2840fbc059d7314bf09f606a` on `extract-onboarding-repository`. This is an execution plan, not release approval. Application source and user projects were not changed during review.
 
 ## Implementation status - 2026-10-15

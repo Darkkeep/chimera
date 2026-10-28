@@ -16,6 +16,10 @@ Choose **Narration** and explicitly select the saved connection; its saved voice
 
 Synthesia and Shotstack currently support **connection setup and read-only testing only**. They do not submit video/render jobs, download generated videos or enable the media generator. Uploaded MP4/WebM files remain supported independently of those connections. Shotstack's sandbox and production keys are distinct; the sandbox is not a guarantee of free future AI generation. See [provider authentication, tests, request limits and unsupported features](ai-connection.md).
 
+## Timed media and stage video
+
+The optional [scene timeline](user-guide.md#schedule-scene-objects-audio-and-video) schedules audio/video independently of before/after media placement. Add project assets as clips with a scene start and source-in/out interval; originals remain unchanged. Multiple clips may reference one asset. Video clips have stage geometry and layer order; audio clips are nonvisual. Volume/fades are saved; mute/solo audition controls are preview-only. Captions remain aligned to source time, and required coverage is recorded per trimmed clip from actual playback. Seeking alone earns no credit. Scheduling an attached asset suppresses its independent learner player in that scene; unscheduled attachments keep their existing behavior. Existing scenes are not silently converted. See [implementation and acceptance limits](scene-timeline-implementation.md).
+
 ## Local OCR
 
 Reference resources continue accepting PDF, DOCX, PPTX, TXT and Markdown. In enhancement review, expand **Local PDF text recognition (OCR)** for PDF references. OCR is explicit, local and independent of the AI provider. It creates a new reference version with page locators, retaining the source bytes and earlier versions. Inspect passages, then choose **Use inspected OCR text** before it may ground suggestions. Recognition is not factual approval. Jobs pinned to older versions retain their sources.

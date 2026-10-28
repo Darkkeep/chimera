@@ -1,5 +1,7 @@
 # Onboarding repository migration
 
+Current disposition (2026-10-28): extraction and Chimera's pinned integration are complete. Local Git history records PR #1 merged at `6475eff`. The implementation-era branch/PR statements below are historical. Manual novice/screen-reader acceptance, a second maintained consumer for API-stability claims, and applicable redistribution-rights review remain separate; see [creator pre-alpha readiness](pre-alpha-readiness.md).
+
 Implemented 2026-10-05 using the authorized defaults in the [extraction plan](onboarding-repository-plan.md).
 
 ## Result and ownership
@@ -33,7 +35,7 @@ Chimera artifact checksum/export verification, production build and all 81 retai
 
 An explicit upgrade check wrote paused progress with the baseline `0.1.0` engine and resumed/completed it using the installed `0.1.1` artifact without changing storage keys. The published release download checksum also matched the vendored bytes.
 
-The Chimera migration is pushed as [draft PR #1](https://github.com/Darkkeep/chimera/pull/1); its Linux consumer [CI run](https://github.com/Darkkeep/chimera/actions/runs/37334739347) independently verifies the committed application. The PR remains unmerged.
+At the original migration checkpoint, the work was pushed as [draft PR #1](https://github.com/Darkkeep/chimera/pull/1); its Linux consumer [CI run](https://github.com/Darkkeep/chimera/actions/runs/37334739347) independently verified that committed application. That checkpoint preceded the subsequent merge recorded above; it does not describe current PR status.
 
 ## Rollback and future updates
 

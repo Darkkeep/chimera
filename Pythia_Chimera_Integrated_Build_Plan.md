@@ -1,5 +1,7 @@
 # Pythia + Chimera Integrated Build Plan
 
+**October 28 Chimera authoring disposition:** native shapes/appearance/layers and the shared animation/audio/video timeline are implemented in Chimera. See [implementation scope](docs/scene-timeline-implementation.md) and [creator pre-alpha readiness](docs/pre-alpha-readiness.md). This local authoring work does not assert Pythia/Manteion shared-journey acceptance, live-provider qualification, or G3 exit; the integration milestones below keep their own evidence boundaries.
+
 **Working strategy:** Pythia provides learning intelligence, orchestration, evidence, validation, and governed AI execution. Chimera provides the authoring environment, production workflow, media handling, preview, assessment implementation, and learning-package export.
 
 **Primary architectural rule:**

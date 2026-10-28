@@ -1,6 +1,14 @@
 # Current work and handoff
 
-Updated 2026-10-27. The active development branch is `feature/manteion-pythia-interoperability`.
+## October 28 scene timeline, layers, shapes, and effects
+
+The [scene timeline implementation](scene-timeline-implementation.md) delivers native shape insertion and appearance, text/shape effects, grouping/layer arrangement, and an optional shared animation/media timeline following the [plan](scene-timeline-layers-plan.md). Clips support source trimming, overlaps, volume/fades, audition controls, video geometry/stacking, local waveforms, and cues. Preview and exports share timing and consumption rules; seeking does not earn completion. Word snapshots use an authored timestamp and include written timeline records. Bevel/emboss are browser lighting approximations. Existing scenes remain unscheduled until explicitly enabled.
+
+Local verification: the backend discovery run passed 403 tests with 71 skipped; all 27 focused timeline/grouping/legacy-animation browser checks passed across Chromium, Firefox, and WebKit. Seven timeline model/print tests were rerun after final adjustments. TypeScript/Vite build passed with the existing large-bundle warning. The reconciled guide has 88 pages, 450 local references, and 35 internal PDF links; its verifier reports no errors. Two current editor/timeline captures use isolated synthetic courses. These checks do not replace manual screen-reader, representative-media, Word-editing, or target-LMS acceptance.
+
+Updated 2026-10-28. The timeline implementation and reconciled documentation are delivered together in this source revision on `main`. Commit identity is available from `git log`; no release tag, distribution, or exact-head CI acceptance is asserted. See [creator pre-alpha readiness](pre-alpha-readiness.md) for the current open checklist. Historical entries below retain their original dates and evidence scope; their old feature gaps and next actions are not the current backlog.
+
+Documentation reconciliation verified 607 local file/section references without errors and exercised the eight-section human acceptance form without JavaScript errors or duplicate IDs. Timeline and clean-install/recovery observations are now explicit. Evaluation instructions supply the manual root npm/Chromium prerequisite and package-root guide paths; repair of the automatic installer remains open. Cross-repository shared-journey records are identified as upstream locators rather than broken links into absent sibling checkouts.
 
 ## October 27 authored-scene workflow and guide refresh
 

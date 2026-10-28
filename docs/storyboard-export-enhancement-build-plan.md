@@ -4,6 +4,10 @@ Status: Release qualification in progress; the integrated authoring, enhancement
 
 Prepared: 2026-09-30
 
+## Current editor and release disposition - 2026-10-28
+
+Native shape/appearance/layer editing and the optional shared media/animation timeline are implemented; see the [implementation record](scene-timeline-implementation.md). The current executable release checklist is [creator pre-alpha readiness](pre-alpha-readiness.md), with candidate CI, installation/recovery, and human acceptance still open. The October 15/27 dispositions and original backlog below retain historical scope; they do not mark already delivered media/OCR/review features as missing or certify a new release.
+
 ## Current media-provider disposition - 2026-10-27
 
 The six-tab **Settings > AI connection** dialog separates OpenAI images/legacy narration; ElevenLabs, Google Cloud and Cartesia MP3 narration; and Synthesia/Shotstack setup/testing only. Video generation remains future work, distinct from existing uploaded-video authoring/playback. Media adapters use server credentials, explicit connection selection and candidate review; they do not configure Pythia's learning-intelligence providers. See [current work](current-work.md#october-27-media-provider-connections-and-help), [provider setup](ai-connection.md) and [media placement](media-placement-and-ocr.md#generated-media-and-provider-boundaries). Dated baseline tables below retain their original scope rather than overriding this disposition.

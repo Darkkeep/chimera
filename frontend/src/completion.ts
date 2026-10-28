@@ -1,3 +1,4 @@
+import { scheduledAssets, requiredTimelineClips, clipProgressKey } from "../../backend/app/static/timeline-policy.js";
 import type { AssessmentSettings, CourseCompletionSettings, Scene } from "./App";
 
 export type AssessmentOutcome = { attempts: number; isCorrect: boolean | null };
@@ -53,19 +54,21 @@ export function evaluateCourseCompletion(
   }).length;
 
   const requiredAudioScenes = scenes.filter((scene) => scene.audioRequired);
-  const requiredAudioTrackCount = requiredAudioScenes.reduce((count, scene) => count + scene.audioAssets.length, 0);
+  const requiredAudioTrackCount = requiredAudioScenes.reduce((count, scene) => count + scene.audioAssets.filter(id=>!scheduledAssets(scene).has(id)).length, 0);
   const completedRequiredAudioCount = requiredAudioScenes.reduce((count, scene) => count + scene.audioAssets.filter(
-    (audioId) => completedAudio.has(audioCompletionKey(scene.id, audioId)),
+    (audioId) => !scheduledAssets(scene).has(audioId) && completedAudio.has(audioCompletionKey(scene.id, audioId)),
   ).length, 0);
-  const requiredAudioSetupMissingCount = requiredAudioScenes.filter((scene) => scene.audioAssets.length === 0).length;
+  const requiredAudioSetupMissingCount = requiredAudioScenes.filter((scene) => scene.audioAssets.length === 0 && !scene.visualLayout?.timeline?.clips.some(c=>c.kind==="audio")).length;
 
   const requiredVideos = new Map<string, number>();
   for (const scene of scenes) {
     for (const placement of scene.mediaPlacements ?? []) {
+      if (scheduledAssets(scene).has(placement.assetId)) continue;
       if (!placement.requiredViewing || !(scene.videoAssets ?? []).includes(placement.assetId)) continue;
       requiredVideos.set(placement.assetId, Math.max(requiredVideos.get(placement.assetId) ?? 0, placement.viewingThresholdPercent ?? 90));
     }
   }
+  for(const scene of scenes) for(const clip of requiredTimelineClips(scene)) requiredVideos.set(clipProgressKey(scene.id,clip),clip.thresholdPercent);
   const completedRequiredVideoCount = [...requiredVideos].filter(([assetId, threshold]) => videoCoveragePercent(videoProgress[assetId]) >= threshold).length;
 
   const scoredAssessments = scenes.filter((scene) => scene.assessmentItem && (
