@@ -37,7 +37,7 @@ test('a failed Pythia submit preserves the draft and does not retry automaticall
       submissions++;
       return route.fulfill({ status: 503, json: { detail: 'Synthetic transport unavailable. Retry explicitly.' } });
     }
-    return route.fallback();
+    return route.fulfill({ json: { sessionId: 'failure-fixture', turns: [], actions: [], configured: true } });
   });
   const { dialog } = await openConversation(page, request, 'Pythia failure UI');
   await dialog.getByLabel('Your message', { exact: true }).fill('A fictional test question.');
