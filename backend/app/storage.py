@@ -1354,6 +1354,8 @@ def save_reference_resource(
     extraction_status: Literal["complete", "partial", "failed"],
     extraction_message: str | None,
     resource_id: str | None = None,
+    source_kind: Literal["document", "text", "web", "pythia"] = "document",
+    source_url: str | None = None,
 ) -> ReferenceResource:
     with storyboard_transaction():
         project = read_project(project_id)
@@ -1375,6 +1377,8 @@ def save_reference_resource(
         temporary.write_bytes(content)
         temporary.replace(destination)
         version_record = ReferenceResourceVersion(
+            sourceKind=source_kind,
+            sourceUrl=source_url,
             version=version,
             filename=safe_name,
             contentType=content_type,

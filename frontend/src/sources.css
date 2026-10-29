@@ -1,0 +1,21 @@
+.modal.sources-dialog { width: min(900px, calc(100vw - 32px)); }
+.source-choices { border: 0; padding: 0; margin: 24px 0; min-width: 0; display: grid; gap: 12px; }
+.source-choices legend { margin-bottom: 12px; font-weight: 600; }
+.source-choice { border: 1px solid var(--border, #28313a); border-radius: 10px; background: var(--surface, transparent); overflow: hidden; }
+.source-choice.selected { border-color: var(--chimera-ignition, #ff6a21); }
+.source-choice-heading { display: flex; align-items: center; gap: 16px; padding: 20px; width: 100%; color: inherit; background: transparent; border: 0; text-align: left; cursor: pointer; }
+.source-choice-heading svg { flex-shrink: 0; color: var(--chimera-ignition, #ff6a21); }
+.source-choice-heading img { flex-shrink: 0; object-fit: contain; }
+.source-choice-heading span { display: grid; gap: 6px; }
+.source-choice-heading small { font-weight: normal; line-height: 1.5; }
+.source-choice-body { display: grid; gap: 16px; padding: 0 20px 20px; }
+.source-choice-body label { display: grid; gap: 8px; }
+.source-choice-body input, .source-choice-body textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+.source-choice-body textarea { resize: vertical; }
+.source-choice-body .button { justify-self: start; }
+.saved-sources { display: grid; gap: 12px; }
+.saved-sources details { padding: 16px; border: 1px solid var(--border, #28313a); border-radius: 10px; overflow-wrap: anywhere; }
+.saved-sources summary { cursor: pointer; line-height: 1.5; }
+.saved-sources blockquote { margin: 16px 0; padding-left: 16px; border-left: 2px solid var(--chimera-ignition, #ff6a21); white-space: pre-wrap; }
+.sources-dialog p { line-height: 1.5; }
+@media (max-width: 600px) { .source-choice-heading { padding: 16px; } .source-choice-body { padding: 0 16px 16px; } }

@@ -160,7 +160,7 @@ class LearningIntelligenceTests(unittest.TestCase):
         with patch.dict("os.environ", {}, clear=True):
             provider = PythiaProvider()
 
-        self.assertEqual(provider.base_url, "http://localhost:8000")
+        self.assertEqual(provider.base_url, "http://127.0.0.1:8001")
 
     def test_provider_rejects_unsafe_base_urls(self):
         for base_url in (

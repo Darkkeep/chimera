@@ -1,6 +1,7 @@
 import io
 import hashlib
 import json
+import os
 import mimetypes
 import tempfile
 from pathlib import Path
@@ -49,9 +50,19 @@ from .storage import create_scenes, save_assessment_group
 from .models import ProjectBackgroundUpdate, ProjectRelationshipUpdate, ProjectRestore
 from .storage import update_project_background, update_project_relationship, ProjectMetadataConflict
 from .question_import import parse_questions, question_template, question_spreadsheet
+from .pythia_connection import LocalEngineConnection, configured_engine_url, local_engine_url, save_engine_url
+from . import pythia_talk
+from . import pythia_actions
 
 
 ROUTE_ACTIONS = {
+    "post_pythia_action": "enhancement.proposal.create",
+    "decide_pythia_action": "enhancement.proposal.decide",
+    "get_pythia_conversation": "enhancement.job.create",
+    "post_pythia_conversation": "enhancement.job.create",
+    "reset_pythia_conversation": "enhancement.job.create",
+    "check_pythia_conversation": "enhancement.job.create",
+    "put_local_pythia_connection": "admin.policy.manage",
     "preview_question_import": "project.import", "commit_question_import": "project.import",
     "get_question_template": "project.view", "export_question_spreadsheet": "project.export",
     "patch_project_relationship": "project.settings.update",
@@ -1753,7 +1764,20 @@ async def post_reference_resource(
     authoritative: bool = Form(default=False),
     scene_ids: str = Form(default="[]"),
     resource_id: str | None = Form(default=None),
+    source_kind: Literal["document", "text", "web", "pythia"] = Form(default="document"),
+    source_url: str | None = Form(default=None),
 ) -> ReferenceResource:
+    from urllib.parse import urlsplit
+    if source_url:
+        try:
+            parsed_url = urlsplit(source_url)
+            valid_url = len(source_url) <= 4000 and parsed_url.scheme in {"http", "https"} and parsed_url.hostname and not parsed_url.username and not parsed_url.password
+        except ValueError:
+            valid_url = False
+        if not valid_url:
+            raise HTTPException(status_code=422, detail="Source URL must be an HTTP(S) link without credentials")
+    if source_kind == "web" and not source_url:
+        raise HTTPException(status_code=422, detail="Web sources require a source URL")
     if not file.filename or Path(file.filename).suffix.lower() not in SUPPORTED_REFERENCE_EXTENSIONS:
         raise HTTPException(status_code=400, detail="Reference files must be PDF, DOCX, PPTX, TXT, or Markdown")
     content = await file.read(MAX_REFERENCE_BYTES + 1)
@@ -1766,6 +1790,8 @@ async def post_reference_resource(
     except (json.JSONDecodeError, ValueError) as error:
         raise HTTPException(status_code=422, detail="Scene assignments must be a JSON array of scene IDs") from error
     passages, extraction_status, extraction_message = extract_reference_passages(file.filename, content)
+    if source_kind == "web" and not passages:
+        extraction_message = "Link saved only. Paste page text to use this source for grounding; Chimera has not fetched this page."
     try:
         return save_reference_resource(
             project_id,
@@ -1780,6 +1806,8 @@ async def post_reference_resource(
             extraction_status,
             extraction_message,
             resource_id,
+            source_kind,
+            source_url,
         )
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project or reference resource not found") from error
@@ -1881,7 +1909,98 @@ def get_intelligence_engine() -> dict[str, object]:
         "providerRegistry": registry,
         "telemetry": telemetry,
         "canViewUsage": can_view_usage,
+        "endpoint": configured_engine_url(ROOT) if can_view_usage else None,
     }
+
+
+@app.put("/api/intelligence-engine/local-connection", name="put_local_pythia_connection")
+def put_local_pythia_connection(request: Request, data: LocalEngineConnection) -> dict[str, object]:
+    _require_ai_origin(request)
+    _require_action(get_authorization_policy(), get_actor_context(), "admin.policy.manage")
+    if os.environ.get("CHIMERA_PYTHIA_BASE_URL", "").strip():
+        raise HTTPException(409, "Pythia's address is managed by the backend environment.")
+    try:
+        base_url = local_engine_url(data.baseUrl)
+        provider = PythiaProvider(base_url)
+        health = provider.health()
+        capabilities = provider.capabilities()
+        if health.get("status") != "ok" or not health.get("contract_version") or not isinstance(capabilities.get("capabilities"), dict):
+            raise ValueError("The address did not identify a compatible Pythia Engine")
+        with storyboard_transaction():
+            save_engine_url(ROOT, base_url)
+        return {"available": True, "endpoint": base_url}
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+    except PythiaUnavailableError as error:
+        raise HTTPException(503, "Could not verify this Pythia Engine. Check its address, running service, and server-side authentication.") from error
+
+
+def _local_pythia_access(project_id: str, actor: ActorContext) -> None:
+    selected = installation_policy(LocalIdentityDirectory(ROOT))
+    if selected.deploymentMode != "single-user" or actor.deploymentMode != "single-user":
+        raise HTTPException(403, "Direct local Pythia consultation is available only in a single-user local installation.")
+    _require_action(get_authorization_policy(), actor, "enhancement.job.create", project_id)
+    _require_action(get_authorization_policy(), actor, "project.view", project_id)
+    read_project(project_id)
+
+
+def _talk_operation(project_id: str, operation):
+    actor = get_actor_context()
+    try:
+        _local_pythia_access(project_id, actor)
+        return operation(actor)
+    except pythia_talk.TalkError as error:
+        raise HTTPException(error.status, str(error)) from error
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+
+
+@app.get("/api/projects/{project_id}/pythia-conversation", name="get_pythia_conversation")
+def get_pythia_conversation(project_id: str):
+    return _talk_operation(project_id, lambda actor: pythia_talk.get_conversation(project_id, actor))
+
+
+@app.post("/api/projects/{project_id}/pythia-conversation", status_code=202, name="post_pythia_conversation")
+def post_pythia_conversation(project_id: str, request: Request, data: pythia_talk.TalkRequest):
+    _require_ai_origin(request)
+    return _talk_operation(project_id, lambda actor: pythia_talk.submit(project_id, actor, data,
+        lambda: _local_pythia_access(project_id, actor)))
+
+
+@app.post("/api/projects/{project_id}/pythia-conversation/reset", name="reset_pythia_conversation")
+def reset_pythia_conversation(project_id: str, request: Request):
+    _require_ai_origin(request)
+    return _talk_operation(project_id, lambda actor: pythia_talk.reset_conversation(project_id, actor))
+
+
+@app.post("/api/projects/{project_id}/pythia-conversation/check", name="check_pythia_conversation")
+def check_pythia_conversation(project_id: str, request: Request):
+    _require_ai_origin(request)
+    return _talk_operation(project_id, lambda _actor: pythia_talk.local_mcp())
+
+
+def _pythia_action_access(project_id: str, actor: ActorContext, *, apply=False) -> None:
+    _local_pythia_access(project_id, actor)
+    _require_action(get_authorization_policy(), actor, "enhancement.proposal.decide" if apply else "enhancement.proposal.create", project_id)
+    if apply:
+        _require_action(get_authorization_policy(), actor, "scene.manage", project_id)
+
+
+@app.post("/api/projects/{project_id}/pythia-conversation/actions", status_code=202, name="post_pythia_action")
+def post_pythia_action(project_id: str, request: Request, data: pythia_actions.DraftRequest):
+    _require_ai_origin(request)
+    def run(actor):
+        return pythia_actions.submit(project_id, actor, data, lambda: _pythia_action_access(project_id, actor))
+    return _talk_operation(project_id, run)
+
+
+@app.post("/api/projects/{project_id}/pythia-conversation/actions/{action_id}/decision", name="decide_pythia_action")
+def decide_pythia_action(project_id: str, action_id: str, request: Request, data: pythia_actions.ActionDecision):
+    _require_ai_origin(request)
+    def run(actor):
+        _pythia_action_access(project_id, actor, apply=data.decision == "apply")
+        return pythia_actions.decide(project_id, actor, action_id, data)
+    return _talk_operation(project_id, run)
 
 
 @app.put("/api/ai-connection")
