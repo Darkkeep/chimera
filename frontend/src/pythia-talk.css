@@ -1,0 +1,56 @@
+.modal.pythia-talk-dialog { width: min(780px, calc(100vw - 32px)); border-radius: 18px; padding: 24px; }
+.pythia-talk-heading { display: flex; align-items: center; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.pythia-talk-heading > img { flex-shrink: 0; object-fit: contain; }
+.pythia-talk-heading > div { flex: 1; min-width: 0; }
+.pythia-talk-heading h2 { margin: 0; }
+.pythia-talk-heading p { margin: 8px 0 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.pythia-talk-connection { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0; }
+.pythia-talk-connection p { flex: 1; margin: 0; color: var(--muted); font-size: 12px; }
+.pythia-talk-history { display: grid; gap: 24px; padding: 8px 0 20px; }
+.pythia-talk-history > p { color: var(--muted); line-height: 1.6; }
+.pythia-talk-turn { display: grid; gap: 16px; }
+.pythia-talk-message { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: start; gap: 12px; }
+.pythia-talk-message > img { object-fit: contain; }
+.pythia-talk-message > div { padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--theme-panel, var(--surface)); }
+.pythia-talk-message p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; margin: 12px 0 0; }
+.pythia-talk-message small { display: block; color: var(--muted); margin-top: 10px; }
+.pythia-talk-answer > div { border-color: var(--chimera-pythia-link, #7f5cff); }
+.pythia-talk-answer-label { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.pythia-talk-answer-label span { font-size: 11px; padding: 4px 8px; background: var(--theme-raised, var(--surface)); border-radius: 12px; }
+.pythia-talk-answer details { margin-top: 16px; font-size: 12px; }
+.pythia-talk-answer summary, .pythia-talk-sources summary { cursor: pointer; }
+.pythia-talk-answer li { margin-top: 8px; line-height: 1.5; }
+.pythia-talk-working { margin: 0 0 0 48px; padding: 12px; color: var(--muted); line-height: 1.5; }
+.pythia-talk-failure { padding: 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--theme-danger, var(--ink)); line-height: 1.5; }
+.pythia-talk-compose { display: grid; gap: 16px; border-top: 1px solid var(--line); padding-top: 20px; }
+.pythia-talk-options { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.pythia-talk-options label, .pythia-talk-sources label { display: flex; gap: 8px; align-items: baseline; line-height: 1.5; font-size: 13px; }
+.pythia-talk-options input[type=checkbox], .pythia-talk-sources input[type=checkbox] { width: auto; flex-shrink: 0; }
+.pythia-talk-sources { border: 1px solid var(--line); padding: 12px; border-radius: 8px; }
+.pythia-talk-sources p { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.pythia-talk-sources label { margin-top: 12px; }
+.pythia-talk-question { display: grid; gap: 8px; font-size: 13px; }
+.pythia-talk-question textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 100px; }
+.pythia-talk-send { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.pythia-talk-send small { color: var(--muted); }
+.pythia-talk-note { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 16px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.pythia-author-direction { display: grid; gap: 8px; margin: 20px 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; }
+.pythia-author-direction label { font-weight: 600; }
+.pythia-author-direction textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+.pythia-author-direction p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.pythia-action-builder, .pythia-action-review { padding: 16px; margin: 12px 0; border: 1px solid var(--chimera-pythia-link, #7f5cff); border-radius: 12px; background: var(--theme-panel, var(--surface)); }
+.pythia-action-builder { display: grid; gap: 12px; }
+.pythia-action-builder label { display: grid; gap: 8px; }
+.pythia-action-builder .button { justify-self: start; }
+.pythia-action-review h3 { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 0; font-size: 15px; }
+.pythia-action-review h3 span { font-size: 12px; color: var(--muted); }
+.pythia-action-review p { line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pythia-action-review summary { cursor: pointer; }
+.pythia-action-diff { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pythia-action-diff > div { padding: 12px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.pythia-action-diff > div:last-child { border-color: var(--chimera-pythia-link, #7f5cff); }
+.pythia-action-buttons { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.pythia-action-new-scene { margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.pythia-draft-from-advice { justify-self: start; }
+@media (max-width: 600px) { .pythia-action-diff { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .modal.pythia-talk-dialog { padding: 16px; } .pythia-talk-heading { gap: 10px; } .pythia-talk-heading > img { width: 40px; height: 40px; } .pythia-talk-message { grid-template-columns: minmax(0, 1fr); } .pythia-talk-message > img { display: none; } .pythia-talk-working { margin-left: 0; } .pythia-talk-send { flex-wrap: wrap; } }

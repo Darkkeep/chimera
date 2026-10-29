@@ -75,6 +75,14 @@ Release-candidate follow-up from October 16: submit the reviewed 1.1.0 candidate
 
 Release-gate status (2026-10-16 addendum): backend 252 passed/6 skipped, frontend build passes, and the full onboarding suite passes in Chromium, Firefox and WebKit after test-stability fixes (collapsed inspector sections expanded in tests, WebKit button focus, polled saves, longer seed waits, and a WebKit project-switcher overflow clip at 390px). The full suite is slow and shares a growing project list; CI runs one worker with one retry. Still human-owned: Writer/LibreOffice inspection of the SME Master and Full Storyboard exports, live Linux/Nginx inspection, and Encarta verification.
 
+Cross-project handoff: Manteion's ten remaining blockers map to
+[pythia-contracts #2](https://github.com/Darkkeep/pythia-contracts/issues/2),
+[Pythia #5](https://github.com/Darkkeep/Pythia/issues/5), and
+[Pythia #6](https://github.com/Darkkeep/Pythia/issues/6). These are not new
+Chimera blockers: the existing storyboard interoperability/provenance path is
+qualified with synthetic data. Revisit Chimera only if a released versioned
+contract changes its consumed request/response surface.
+
 ## Completed
 - Portable LibreOffice discovery and Word rendering/edit-save-reopen checks.
 - TestFrame revision 8 production validation and local qualification of both SCORM profiles. The user confirmed SCORM 1.2 passes their LMS; that LMS does not accept SCORM 2004.

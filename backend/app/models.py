@@ -814,6 +814,8 @@ class ReferencePassage(BaseModel):
 
 
 class ReferenceResourceVersion(BaseModel):
+    sourceKind: Literal["document", "text", "web", "pythia"] = "document"
+    sourceUrl: str | None = None
     version: str
     filename: str
     contentType: str

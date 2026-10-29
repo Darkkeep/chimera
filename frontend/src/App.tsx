@@ -14,6 +14,10 @@ import { ManagementView } from "./ManagementView";
 import { ProjectOptions } from "./ProjectOptions";
 import { AIConnectionPanel } from "./AIConnectionPanel";
 import { IntelligenceEnginePanel } from "./IntelligenceEnginePanel";
+import { SourcesPanel } from "./SourcesPanel";
+import type { PendingSource } from "./SourcesPanel";
+import "./new-project.css";
+import { PythiaTalkPanel } from "./PythiaTalkPanel";
 import "./readiness.css";
 import { CompletionSettingsEditor } from "./CompletionSettingsEditor";
 import { EnhancementReviewView } from "./EnhancementReviewView";
@@ -22,6 +26,7 @@ import { AppearanceSelector } from "./AppearanceSelector";
 import { BrandMark } from "./BrandMark";
 import { revisionConflictMessage, storyboardWriteHeaders } from "./revision";
 import restoreIcon from "./assets/cutout-56-a86a43163042.png";
+import newProjectIcon from "./assets/new-project.png";
 import "./audio-requirement.css";
 import "./assessment-editor.css";
 import { createChimeraOnboarding } from "./onboarding";
@@ -97,6 +102,11 @@ export function App() {
   const [courseDraft, setCourseDraft] = useState<CourseSceneDraft[] | null>(null);
   const [courseDraftError, setCourseDraftError] = useState("");
   const [createdCourseForDraft, setCreatedCourseForDraft] = useState(false);
+  const [queuedProjectSources, setQueuedProjectSources] = useState<PendingSource[]>([]);
+  const [courseSetupTab, setCourseSetupTab] = useState<"pythia" | "sources" | "prompt">("pythia");
+  const [plannerSourceBusy, setPlannerSourceBusy] = useState(false);
+  const [plannerTalkBusy, setPlannerTalkBusy] = useState(false);
+  const [plannerSourcesVersion, setPlannerSourcesVersion] = useState(0);
   const [sceneDraft, setSceneDraft] = useState<SceneDraft | null>(null);
   const [visualSceneId, setVisualSceneId] = useState<string | null>(null);
   const [sceneEditorPanel, setSceneEditorPanel] = useState<"canvas" | "details">("canvas");
@@ -119,6 +129,8 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAIConnection, setShowAIConnection] = useState(false);
   const [showIntelligenceEngine, setShowIntelligenceEngine] = useState(false);
+  const [showSources, setShowSources] = useState(false);
+  const [showPythiaTalk, setShowPythiaTalk] = useState(false);
   const [showProjectBackground, setShowProjectBackground] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showManagement, setShowManagement] = useState(true);
@@ -181,7 +193,7 @@ export function App() {
     showProjectBackground ? "storyboard.background" :
     showAccessibility ? "review.accessibility" : showValidation ? "review.validation" :
     showGoldenPath ? "catalog" : showManagement ? "workspace.management" : activeView;
-  const hasOpenForm = Boolean(visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showProjectBackground || showAccessibility || showValidation);
+  const hasOpenForm = Boolean(showPythiaTalk || showSources || visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showProjectBackground || showAccessibility || showValidation);
   const preparationAttempt = useRef("");
   useEffect(() => {
     if (!project.id || !permissions.canEdit || busy || hasOpenForm || !project.storyboard.scenes.some(item => !item.visualLayout)) return;
@@ -450,16 +462,57 @@ export function App() {
     setIsCreating(true);
   }
 
-  async function createProject() {
-    if (!title.trim() || busy) return;
-    const designFiles = aiConfiguredForProject ? courseDesignFiles : [];
-    const oversizedFile = designFiles.find(file => file.size > 25 * 1024 * 1024);
-    if (oversizedFile) {
-      setError(`${oversizedFile.name} is larger than the 25 MB reference limit.`);
-      return;
+  async function attachProjectSources(projectId: string, items: PendingSource[]) {
+    const attached: string[] = [];
+    const failed: PendingSource[] = [];
+    for (const item of items) {
+      const form = new FormData();
+      form.append("file", item.file);
+      form.append("title", item.title);
+      form.append("source_kind", item.kind);
+      form.append("classification", item.kind === "document" ? "study-guide" : "supporting-document");
+      if (item.sourceUrl) form.append("source_url", item.sourceUrl);
+      try {
+        const response = await fetch(`/api/projects/${projectId}/reference-resources`, { method: "POST", body: form });
+        const resource = await response.json().catch(() => null) as { id?: string; detail?: string } | null;
+        if (!response.ok || !resource?.id) throw new Error(resource?.detail || "Source upload failed.");
+        attached.push(resource.id);
+      } catch { failed.push(item); }
     }
-    setBusy(true);
-    setError("");
+    return { attached, failed };
+  }
+
+  function closeProjectCreation() {
+    if (busy || plannerSourceBusy || plannerTalkBusy) return;
+    if (createdCourseForDraft) setTitle("");
+    setIsCreating(false); setCourseDesignFiles([]); setQueuedProjectSources([]); setCourseResourceIds([]);
+    setCreatedCourseForDraft(false); setCourseDraft(null); setCourseDraftError(""); setCoursePrompt(""); setCourseSetupTab("pythia");
+  }
+
+  function selectCourseSetupTab(next: "pythia" | "sources" | "prompt", focus = false) {
+    setCourseSetupTab(next);
+    if (focus) requestAnimationFrame(() => document.getElementById(`new-project-tab-${next}`)?.focus());
+  }
+
+  async function retryProjectSources() {
+    if (!createdCourseForDraft || busy || !queuedProjectSources.length) return;
+    setBusy(true); setError("");
+    try {
+      const result = await attachProjectSources(project.id, queuedProjectSources);
+      setQueuedProjectSources(result.failed);
+      setCourseResourceIds(current => [...new Set([...current, ...result.attached])]);
+      setPlannerSourcesVersion(value => value + 1);
+      if (result.failed.length) setError(`These sources are still not attached: ${result.failed.map(item => item.title).join(", ")}. Retry here without creating another project.`);
+    } finally { setBusy(false); }
+  }
+
+  async function createProject(planWithPythia = false) {
+    if (!title.trim() || busy || plannerSourceBusy || plannerTalkBusy || createdCourseForDraft) return;
+    const designFiles = courseDesignFiles;
+    const items: PendingSource[] = [...designFiles.map(file => ({ id: crypto.randomUUID(), file, title: file.name.replace(/\.[^.]+$/, ""), kind: "document" as const })), ...queuedProjectSources];
+    const oversized = items.find(item => item.file.size > 25 * 1024 * 1024);
+    if (oversized) { setError(`${oversized.file.name} is larger than the 25 MB reference limit.`); return; }
+    setBusy(true); setError("");
     try {
       const response = await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, parentProjectId: creatingParent?.id ?? null }) });
       if (!response.ok) {
@@ -467,51 +520,28 @@ export function App() {
         throw new Error(body.detail || "Project could not be created.");
       }
       const createdProject = await response.json() as Project;
-      const failedAttachments: string[] = [];
-      const attachedResourceIds: string[] = [];
-      for (const file of designFiles) {
-        const form = new FormData();
-        form.append("file", file);
-        form.append("title", file.name.replace(/\.[^.]+$/, ""));
-        form.append("classification", "study-guide");
-        try {
-          const uploadResponse = await fetch(`/api/projects/${createdProject.id}/reference-resources`, { method: "POST", body: form });
-          if (!uploadResponse.ok) {
-            const detail = await uploadResponse.json().catch(() => null) as { detail?: string } | null;
-            throw new Error(detail?.detail || "Upload failed");
-          }
-          const resource = await uploadResponse.json() as { id: string };
-          attachedResourceIds.push(resource.id);
-        } catch {
-          failedAttachments.push(file.name);
-        }
-      }
+      // Establish the saved project before attaching sources. Upload retries
+      // always target this known project rather than creating another one.
       applyProject(createdProject);
-      setCourseResourceIds(attachedResourceIds);
-      setCourseDraft(null);
-      setCourseDraftError("");
+      const result = await attachProjectSources(createdProject.id, items);
+      setCourseResourceIds(result.attached); setQueuedProjectSources(result.failed);
+      setCourseDraft(null); setCourseDraftError("");
+      setPlannerSourcesVersion(value => value + 1);
       guideContext.current.projectId = createdProject.id;
       const guideState = onboarding.controller.snapshot();
-      onboarding.controller.setScope(createdProject.id, { carry: guideState.status === "active" && guideState.step.id === "project" });
+      const guidedCreation = guideState.status === "active" && guideState.step.id === "project";
+      onboarding.controller.setScope(createdProject.id, { carry: guidedCreation });
       onboarding.controller.signal({ type: "project.created", scope: createdProject.id });
-      setSelectedScene(0);
-      setActiveView("storyboard");
-      setShowManagement(false);
-      setCourseDesignFiles([]);
-      const keepCourseDesignOpen = Boolean(aiConfiguredForProject) && !(guideState.status === "active" && guideState.step.id === "project");
-      setCreatedCourseForDraft(keepCourseDesignOpen);
-      if (!keepCourseDesignOpen) {
-        setIsCreating(false);
-        setTitle("");
-        setAiConfiguredForProject(null);
-      }
-      setFeedback(designFiles.length > 0 && failedAttachments.length === 0 ? "Course design documents added as references. Select them in an enhancement prompt." : "");
-      if (failedAttachments.length > 0) setError(`Project created, but these documents could not be attached: ${failedAttachments.join(", ")}. Add them from Storyboard suggestions.`);
+      setSelectedScene(0); setActiveView("storyboard"); setShowManagement(false); setCourseDesignFiles([]);
+      const keepOpen = result.failed.length > 0 || (!guidedCreation && (planWithPythia || Boolean(aiConfiguredForProject)));
+      setCreatedCourseForDraft(keepOpen);
+      setCourseSetupTab(result.failed.length ? "sources" : planWithPythia ? "pythia" : "prompt");
+      if (!keepOpen) { setIsCreating(false); setTitle(""); setAiConfiguredForProject(null); setCoursePrompt(""); }
+      setFeedback(designFiles.length && !result.failed.length ? "Course design documents added as references. Select them in an enhancement prompt." : result.attached.length ? "Project sources saved. Select readable text in the Pythia conversation when ready." : "");
+      if (result.failed.length) setError(`Project saved, but these sources could not be attached: ${result.failed.map(item => item.title).join(", ")}. Retry the queued sources here.`);
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : "Project could not be created. Check that the API is running and try again.");
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   }
 
   function beginSceneCreate() {
@@ -1121,6 +1151,7 @@ export function App() {
       setCourseDraft(null);
       setAiConfiguredForProject(null);
       setFeedback(`${selectedScenes.length} reviewed scene${selectedScenes.length === 1 ? "" : "s"} added to the course.`);
+      setQueuedProjectSources([]); setCourseSetupTab("pythia");
     } catch (issue) {
       setCourseDraftError(issue instanceof Error ? issue.message : "Course scenes could not be added.");
     } finally {
@@ -1232,6 +1263,8 @@ export function App() {
       <nav aria-label="Workspace">
         <button ref={managementButtonRef} className={`nav-item management-nav-item ${showManagement ? "active" : ""}`} aria-current={showManagement ? "page" : undefined} onClick={() => setShowManagement(true)}><ClipboardList size={18} /><span>My Work</span></button>
         <button className={`nav-item ${!showManagement && activeView === "storyboard" ? "active" : ""}`} aria-current={!showManagement && activeView === "storyboard" ? "page" : undefined} onClick={() => { setShowManagement(false); setActiveView("storyboard"); }}><Layers3 size={18} /><span>Storyboard</span></button>
+        <button className={`nav-item ${showSources ? "active" : ""}`} onClick={() => setShowSources(true)} disabled={!project.id || busy || hasOpenForm}><FileText size={18} /><span>Sources</span></button>
+        <button className={`nav-item ${showPythiaTalk ? "active" : ""}`} onClick={() => setShowPythiaTalk(true)} disabled={!project.id || busy || hasOpenForm || !permissions.canEnhance}><Sparkles size={18} /><span>Talk to Pythia</span></button>
         <button className={`nav-item ${showAssessments ? "active" : ""}`} onClick={() => setShowAssessments(true)} disabled={!project.id || busy || !permissions.canEdit}><ClipboardList size={18} /><span>Assessments</span></button>
         <button className={`nav-item ${!showManagement && activeView === "media" ? "active" : ""}`} aria-current={!showManagement && activeView === "media" ? "page" : undefined} onClick={() => { setShowManagement(false); setActiveView("media"); }}><FileUp size={18} /><span>Media library</span></button>
         <button className={`nav-item ${!showManagement && activeView === "templates" ? "active" : ""}`} aria-current={!showManagement && activeView === "templates" ? "page" : undefined} onClick={() => { setShowManagement(false); setActiveView("templates"); }}><BookOpen size={18} /><span>Templates</span></button>
@@ -1261,6 +1294,8 @@ export function App() {
       </div>
     </aside>
     {showAIConnection && <AIConnectionPanel onboardingScope={project.id || "workspace"} onClose={() => setShowAIConnection(false)} />}
+    {showSources && <SourcesPanel key={project.id} projectId={project.id} projectTitle={project.title} canAdd={permissions.canEdit} onClose={() => setShowSources(false)} />}
+    {showPythiaTalk && <PythiaTalkPanel key={project.id} project={project} scene={scene ?? undefined} onClose={() => setShowPythiaTalk(false)} onProjectUpdated={applyProject} />}
     {showIntelligenceEngine && <IntelligenceEnginePanel onClose={() => setShowIntelligenceEngine(false)} />}
     {showProjectBackground && <ProjectBackgroundPanel key={project.id} project={project} onClose={() => setShowProjectBackground(false)} onProjectUpdated={applyProject} />}
     <main className="main-content" id="workspace-content" tabIndex={-1}>
@@ -1271,7 +1306,7 @@ export function App() {
         <div className="top-actions"><span className="save-state" role="status">{busy ? "Working…" : project.id ? <><Check size={14} /> Saved locally</> : "Local authoring"}</span><button className="button button-outline" onClick={() => setShowPreview(true)} disabled={!project.id || !scenes.length || busy}><Play size={15} /> Preview course</button><button className="button button-accent" onClick={() => setShowExport(true)} disabled={!project.id || busy}><Download size={15} /> Export</button></div>
       </header>
       <nav className="production-workflow" aria-label="Authoring workflow">
-        <button onClick={() => { setActiveView("storyboard"); requestAnimationFrame(() => document.querySelector<HTMLInputElement>('[data-onboarding="storyboard.import"] input')?.click()); }} disabled={!project.id || busy || !permissions.canEdit}><span>01</span> Source</button>
+        <button onClick={() => { setActiveView("storyboard"); setShowSources(true); }} disabled={!project.id || busy || !permissions.canEdit}><span>01</span> Source</button>
         <button aria-current={activeView === "storyboard" ? "step" : undefined} onClick={() => setActiveView("storyboard")}><span>02</span> Storyboard</button>
         <button onClick={() => setShowEnhancementReview(true)} disabled={!project.id || busy}><span>03</span> Enhance</button>
         <button onClick={() => setShowValidation(true)} disabled={!project.id || busy}><span>04</span> Verify</button>
@@ -1358,29 +1393,41 @@ export function App() {
       onClose={() => setShowAssessmentEditor(false)}
       onProjectUpdated={applyProject}
     />}
-    {isCreating && <EditorDialog onResumeWalkthrough={canOfferWalkthrough ? () => startOnboarding() : undefined} walkthroughLabel={walkthroughLabel} labelledBy="create-project-title" onClose={() => { if (createdCourseForDraft) setTitle(""); setIsCreating(false); setCourseDesignFiles([]); setCourseResourceIds([]); setCreatedCourseForDraft(false); setCourseDraft(null); setCourseDraftError(""); setCoursePrompt(""); }} busy={busy}>
-      <div className="modal-head"><div><p className="eyebrow">{createdCourseForDraft ? "COURSE DRAFTING" : "NEW PROJECT"}</p><h2 id="create-project-title">{createdCourseForDraft ? "Draft course scenes" : "Name your course"}</h2></div><button className="icon-button" onClick={() => { if (createdCourseForDraft) setTitle(""); setIsCreating(false); setCourseDesignFiles([]); setCourseResourceIds([]); setCreatedCourseForDraft(false); setCourseDraft(null); setCourseDraftError(""); setCoursePrompt(""); }} disabled={busy} aria-label={createdCourseForDraft ? "Close course drafting" : "Close new project"}><X size={18} /></button></div>
+    {isCreating && <EditorDialog onResumeWalkthrough={canOfferWalkthrough ? () => startOnboarding() : undefined} walkthroughLabel={walkthroughLabel} labelledBy="create-project-title" onClose={closeProjectCreation} busy={busy || plannerSourceBusy || plannerTalkBusy} className="new-project-dialog">
+      <div className="modal-head"><img className="new-project-mark" src={newProjectIcon} alt="" width={48} height={48} /><div><p className="eyebrow">{createdCourseForDraft ? "PROJECT PLANNING" : "NEW PROJECT"}</p><h2 id="create-project-title">{createdCourseForDraft ? courseSetupTab === "prompt" ? "Draft course scenes" : "Plan your course" : "Name your course"}</h2></div><button className="icon-button" onClick={closeProjectCreation} disabled={busy || plannerSourceBusy || plannerTalkBusy} aria-label={createdCourseForDraft ? "Close course drafting" : "Close new project"}><X size={18} /></button></div>
+      {error && <p className="visual-editor-error" role="alert">{error}</p>}
       {!createdCourseForDraft ? <>
         {creatingParent && <p className="field-hint">Creating a subproject of <strong>{creatingParent.title}</strong>. Content, settings, permissions, and exports are independent.</p>}
-        <input data-onboarding="project.name" aria-label="Course name" value={title} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => event.key === "Enter" && createProject()} placeholder="e.g. Equipment Inspection Fundamentals" />
-        {aiConfiguredForProject && <section className="project-design-documents" aria-label="Course design documents">
-          <div><strong>Course design documents</strong><span>Upload source material and add a course-level prompt. PDF, DOCX, PPTX, TXT, or Markdown, up to 25 MB each.</span></div>
-          <label className="button button-outline upload-control"><FileUp size={15} /> Attach documents<input type="file" aria-label="Attach course design documents" accept=".pdf,.docx,.pptx,.txt,.md" multiple onChange={(event) => { const added = Array.from(event.currentTarget.files || []); setCourseDesignFiles(current => [...current, ...added.filter(file => !current.some(existing => existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified))]); event.currentTarget.value = ""; }} disabled={busy} /></label>
+        <input data-onboarding="project.name" aria-label="Course name" value={title} disabled={busy} onChange={event => setTitle(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void createProject(); }} placeholder="e.g. Equipment Inspection Fundamentals" />
+        <section className="project-design-documents" aria-label="Course design documents">
+          <div><strong>Sources for this project</strong><span>Attach PDF, DOCX, PPTX, TXT, or Markdown, up to 25 MB each. Source intake is available without an AI connection.</span></div>
+          <label className="button button-outline upload-control"><FileUp size={15} /> Attach documents<input type="file" aria-label="Attach course design documents" accept=".pdf,.docx,.pptx,.txt,.md" multiple onChange={event => { const added = Array.from(event.currentTarget.files || []); setCourseDesignFiles(current => [...current, ...added.filter(file => !current.some(existing => existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified))]); event.currentTarget.value = ""; }} disabled={busy} /></label>
           {courseDesignFiles.length > 0 && <ul aria-label="Selected course design documents">{courseDesignFiles.map((file, index) => <li key={`${file.name}:${file.lastModified}:${index}`}><span>{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB</span><button type="button" className="icon-button" aria-label={`Remove ${file.name}`} onClick={() => setCourseDesignFiles(current => current.filter((_, fileIndex) => fileIndex !== index))} disabled={busy}><X size={14} /></button></li>)}</ul>}
-          <label className="course-draft-prompt">Course prompt<textarea aria-label="Course prompt" rows={4} maxLength={4000} value={coursePrompt} onChange={event => setCoursePrompt(event.target.value)} placeholder="Describe the audience, learning goals, and scenes to create" /></label>
-        </section>}
-        {aiConfiguredForProject === false && <p className="project-design-documents-status">Connect an AI provider in Settings to use course prompts and design documents.</p>}
-        <button className="button button-accent modal-submit" disabled={busy || !title.trim()} onClick={createProject}>Create project <ChevronRight size={16} /></button>{error && <p role="alert">{error}</p>}
-      </> : <section className="course-draft-review" aria-label="Review course scene draft">
-        <p className="field-hint">Project created: <strong>{project.title}</strong>. {courseResourceIds.length} reference{courseResourceIds.length === 1 ? "" : "s"} available for grounding.</p>
-          {error && <p className="visual-editor-error" role="alert">{error}</p>}
+        </section>
+        <details className="new-project-extra-sources"><summary>Add pasted text, web links, or Pythia excerpts</summary><SourcesPanel projectId="" projectTitle={title} canAdd embedded onClose={() => {}} allowedKinds={["text", "web", "pythia"]} queued={queuedProjectSources} onStage={source => setQueuedProjectSources(current => [...current, source])} onRemoveQueued={id => setQueuedProjectSources(current => current.filter(source => source.id !== id))} locked={busy} onBusyChange={setPlannerSourceBusy} /></details>
+        <label className="course-draft-prompt">Course prompt<textarea aria-label="Course prompt" rows={4} maxLength={4000} value={coursePrompt} disabled={busy} onChange={event => setCoursePrompt(event.target.value)} placeholder="Tell Pythia about the audience, the problem, and what you want to explore before drafting scenes." /></label>
+        <p className="field-hint">Sources are saved when the project is created. Create &amp; plan with Pythia keeps this modal open with your prompt ready to send. Select source text before sharing it with Pythia.</p>
+        <div className="modal-actions"><button data-onboarding="project.create" type="button" className="button button-outline" onClick={() => void createProject()} disabled={!title.trim() || busy || plannerSourceBusy}><Plus size={15} /> Create project</button><button type="button" className="button button-accent" onClick={() => void createProject(true)} disabled={!title.trim() || busy || plannerSourceBusy}><Sparkles size={15} /> Create &amp; plan with Pythia</button></div>
+      </> : <>
+        <p className="field-hint">Project saved: <strong>{project.title}</strong>. {courseResourceIds.length} source{courseResourceIds.length === 1 ? "" : "s"} attached. Sent messages and scene drafts stay with this project, so you can finish planning later from Talk to Pythia.</p>
+        <div className="new-project-tabs" role="tablist" aria-label="Project planning sections">{([{ id: "pythia", label: "Plan with Pythia" }, { id: "sources", label: "Sources" }, ...(aiConfiguredForProject ? [{ id: "prompt", label: "Prompt to scenes" }] : [])] as { id: "pythia" | "sources" | "prompt"; label: string }[]).map((tab, index, tabs) => <button key={tab.id} id={`new-project-tab-${tab.id}`} type="button" role="tab" aria-selected={courseSetupTab === tab.id} aria-controls={`new-project-panel-${tab.id}`} tabIndex={courseSetupTab === tab.id ? 0 : -1} disabled={busy || plannerSourceBusy || plannerTalkBusy} onClick={() => selectCourseSetupTab(tab.id)} onKeyDown={event => { const offset = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0; if (offset || event.key === "Home" || event.key === "End") { event.preventDefault(); selectCourseSetupTab(tabs[event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + offset + tabs.length) % tabs.length].id, true); } }}>{tab.label}</button>)}</div>
+        <section id="new-project-panel-pythia" role="tabpanel" aria-labelledby="new-project-tab-pythia" hidden={courseSetupTab !== "pythia"}>
+          <PythiaTalkPanel project={project} onClose={closeProjectCreation} onProjectUpdated={applyProject} embedded planning initialMessage={coursePrompt} sourcesVersion={plannerSourcesVersion} locked={busy || plannerSourceBusy} onBusyChange={setPlannerTalkBusy} onManageSources={() => selectCourseSetupTab("sources")} />
+        </section>
+        <section id="new-project-panel-sources" role="tabpanel" aria-labelledby="new-project-tab-sources" hidden={courseSetupTab !== "sources"}>
+          {queuedProjectSources.length > 0 && <div className="new-project-source-retry"><p>These queued items have not been saved yet. Retry them before closing this setup.</p><button type="button" className="button button-outline" disabled={busy || plannerSourceBusy || plannerTalkBusy} onClick={() => void retryProjectSources()}>Retry queued sources</button></div>}
+          <SourcesPanel key={project.id} projectId={project.id} projectTitle={project.title} canAdd={permissions.canEdit} onClose={closeProjectCreation} embedded queued={queuedProjectSources} onRemoveQueued={id => setQueuedProjectSources(current => current.filter(source => source.id !== id))} locked={busy || plannerTalkBusy} refreshVersion={plannerSourcesVersion} onBusyChange={setPlannerSourceBusy} onResourceSaved={source => { setCourseResourceIds(current => [...new Set([...current, source.id])]); setPlannerSourcesVersion(value => value + 1); }} />
+        </section>
+        {aiConfiguredForProject && <section id="new-project-panel-prompt" role="tabpanel" aria-labelledby="new-project-tab-prompt" hidden={courseSetupTab !== "prompt"} aria-label="Course scene drafting">
+          <p>{courseResourceIds.length} reference{courseResourceIds.length === 1 ? "" : "s"} available for grounding.</p>
         <label className="course-draft-prompt">Course prompt<textarea aria-label="Course prompt" rows={4} maxLength={4000} value={coursePrompt} onChange={event => setCoursePrompt(event.target.value)} /></label>
         {permissions.canEnhance ? <button type="button" className="button button-outline" disabled={busy || !coursePrompt.trim()} onClick={() => void generateCourseContentDraft()}><Sparkles size={15} />{busy ? "Generating…" : "Generate course draft"}</button> : <p className="project-design-documents-status">Your project role does not allow AI draft generation.</p>}
         {courseDraftError && <p className="visual-editor-error" role="alert">{courseDraftError}</p>}
         {courseDraft && <div className="course-draft-scenes" aria-label="Generated scenes for review">{courseDraft.map((draft, index) => <article className="course-draft-scene" key={`${index}:${draft.title}`}><label className="course-draft-include"><input type="checkbox" checked={draft.included} onChange={event => setCourseDraft(current => current?.map((item, itemIndex) => itemIndex === index ? { ...item, included: event.target.checked } : item) || null)} /><span>Include scene {index + 1}</span></label><label>Title<input maxLength={120} value={draft.title} onChange={event => setCourseDraft(current => current?.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item) || null)} /></label><label>On-screen text<textarea rows={4} value={draft.extractedText.join("\n")} onChange={event => setCourseDraft(current => current?.map((item, itemIndex) => itemIndex === index ? { ...item, extractedText: event.target.value.split(/\r?\n/) } : item) || null)} /></label><label>Action description<textarea rows={2} value={draft.actionDescription} onChange={event => setCourseDraft(current => current?.map((item, itemIndex) => itemIndex === index ? { ...item, actionDescription: event.target.value } : item) || null)} /></label><label>Narration<textarea rows={2} value={draft.narration} onChange={event => setCourseDraft(current => current?.map((item, itemIndex) => itemIndex === index ? { ...item, narration: event.target.value } : item) || null)} /></label><label>Speaker notes<textarea rows={2} value={draft.notes} onChange={event => setCourseDraft(current => current?.map((item, itemIndex) => itemIndex === index ? { ...item, notes: event.target.value } : item) || null)} /></label></article>)}</div>}
         {courseDraft?.map((draft, index) => draft.assessmentItem && <AssessmentDraftPreview key={index} item={draft.assessmentItem} settings={draft.assessmentSettings} label={`Scene ${index + 1} assessment`} />)}
-        <div className="modal-actions"><button type="button" className="button button-outline" disabled={busy} onClick={() => { setIsCreating(false); setTitle(""); setCreatedCourseForDraft(false); setCourseResourceIds([]); setCourseDraftError(""); setCoursePrompt(""); setCourseDraft(null); }}>Done</button>{courseDraft && <button type="button" className="button button-accent" disabled={busy || !courseDraft.some(item => item.included)} onClick={() => void applyCourseContentDraft()}><Check size={15} /> Add selected scenes</button>}</div>
-      </section>}
+        </section>}
+        <div className="modal-actions"><button type="button" className="button button-outline" disabled={busy || plannerSourceBusy || plannerTalkBusy} onClick={closeProjectCreation}>Open storyboard</button>{courseSetupTab === "prompt" && courseDraft && <button type="button" className="button button-accent" disabled={busy || !courseDraft.some(item => item.included)} onClick={() => void applyCourseContentDraft()}><Check size={15} /> Add selected scenes</button>}</div>
+      </>}
     </EditorDialog>}
     {sceneDraft && <EditorDialog onResumeWalkthrough={canOfferWalkthrough ? () => startOnboarding() : undefined} walkthroughLabel={walkthroughLabel} className="scene-editor" labelledBy="scene-editor-title" onClose={() => setSceneDraft(null)} busy={busy}><div className="modal-head"><div><p className="eyebrow">SCENE SETTINGS</p><h2 id="scene-editor-title">{sceneDraft.id ? "Edit scene" : "New scene"}</h2></div><button className="icon-button" onClick={() => setSceneDraft(null)} disabled={busy} aria-label="Close scene editor"><X size={18} /></button></div><label data-onboarding={sceneDraft.id ? "scene.edit" : "scene.form"}>Scene title<input value={sceneDraft.title} maxLength={120} onChange={(event) => setSceneDraft({ ...sceneDraft, title: event.target.value })} /></label><label>Scene type<select value={sceneDraft.sceneType} onChange={(event) => setSceneDraft({ ...sceneDraft, sceneType: event.target.value as SceneType })}><option value="content">Content</option><option value="title">Title</option><option value="question">Question</option><option value="media">Media</option><option value="interaction">Interaction</option><option value="summary">Summary</option></select></label><label>Template<select value={sceneDraft.templateId} onChange={(event) => setSceneDraft({ ...sceneDraft, templateId: event.target.value, layoutMode: event.target.value ? "template" : "native" })}><option value="">No template</option>{templates.map((template) => <option value={template.id} key={template.id}>{template.title}</option>)}</select>{templates.length === 0 && <span className="field-hint">Upload a PPTX template in Templates to use it here.</span>}</label><label>On-screen text<textarea rows={5} value={sceneDraft.screenText} onChange={(event) => setSceneDraft({ ...sceneDraft, screenText: event.target.value })} /></label><label>Action description<textarea rows={3} maxLength={5000} value={sceneDraft.actionDescription} onChange={(event) => setSceneDraft({ ...sceneDraft, actionDescription: event.target.value })} placeholder="Describe movement, interaction, or timed actions shown in this scene" /></label><label>Speaker notes<textarea rows={4} value={sceneDraft.notes} onChange={(event) => setSceneDraft({ ...sceneDraft, notes: event.target.value })} /></label>
       <label className="required-toggle"><input type="checkbox" checked={sceneDraft.required} onChange={(event) => setSceneDraft({ ...sceneDraft, required: event.target.checked })} /> Required scene</label>

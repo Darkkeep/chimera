@@ -37,7 +37,7 @@ test('course prompt uses uploaded references and persists only the reviewed draf
   expect(generationRequest.prompt).toContain('operator course');
   expect(generationRequest.resourceIds).toHaveLength(1);
 
-  await review.getByLabel('Title').fill('Reviewed operator introduction');
+  await review.getByLabel('Title', { exact: true }).fill('Reviewed operator introduction');
   await review.getByRole('button', { name: 'Add selected scenes' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   const projectId = await page.evaluate(() => localStorage.getItem('chimera.activeProjectId'));

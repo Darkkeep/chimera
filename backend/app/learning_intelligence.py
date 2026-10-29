@@ -31,7 +31,9 @@ class PythiaUnavailableError(RuntimeError):
 
 class PythiaProvider:
     def __init__(self, base_url: str | None = None) -> None:
-        configured_url = (base_url or os.environ.get("CHIMERA_PYTHIA_BASE_URL") or "http://localhost:8000").strip()
+        from .storage import ROOT
+        from .pythia_connection import configured_engine_url
+        configured_url = (base_url or configured_engine_url(ROOT)).strip()
         parsed = urlsplit(configured_url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password or parsed.query or parsed.fragment:
             raise ValueError("CHIMERA_PYTHIA_BASE_URL must be an HTTP(S) URL without credentials, query, or fragment")
