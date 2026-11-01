@@ -27,20 +27,21 @@ class MediaCapabilityTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     _provider()
 
-    def test_capability_exposes_only_configuration_and_permission_flags(self) -> None:
+    def test_capability_uses_settings_inventory_and_preserves_permission_checks(self) -> None:
+        from backend.app import media_connections
         policy = Mock()
         policy.allows.return_value = False
-        image_status = {"configured": True, "provider": "openai", "audioModel": "gpt-4o-mini-tts"}
-        with patch.object(main, "read_project"), patch.object(main, "get_authorization_policy", return_value=policy), patch.object(main, "connection_status", return_value=image_status), patch.object(main, "narration_status", return_value={"connections": []}):
-            result = main.get_media_generation_capability("project")
-        self.assertEqual(result, {
-            "providerConfigured": True, "imageConfigured": True, "canGenerate": False,
-            "narrationConnections": [{
-                "id": "legacy-openai", "name": "Existing AI connection", "provider": "openai",
-                "voice": "alloy", "language": "en-US", "model": "gpt-4o-mini-tts",
-            }],
-        })
-        self.assertEqual(policy.allows.call_args.args[1:], ("media.job.create", "project"))
+        option = {"id":"pythia","name":"Pythia","provider":"pythia","readyFor":["image","narration"],"voice":"alloy","language":"en-US","models":{"narration":"audio-model"}}
+        catalog = {"connections":[option],"defaults":{"image":"pythia","narration":"pythia","scene":None,"video":None},"videoUnavailableReason":"No configured clip provider"}
+        with patch.object(main,"read_project"), patch.object(main,"get_authorization_policy",return_value=policy), patch.object(media_connections,"connection_catalog",return_value=catalog):
+            result=main.get_media_generation_capability("project")
+        self.assertTrue(result["imageConfigured"])
+        self.assertFalse(result["videoConfigured"])
+        self.assertFalse(result["canGenerate"])
+        self.assertEqual(result["connectionOptions"],[option])
+        self.assertEqual(result["defaultConnections"],catalog["defaults"])
+        self.assertEqual(result["narrationConnections"][0]["id"],"pythia")
+        self.assertEqual(policy.allows.call_args.args[1:],("media.job.create","project"))
 
     def test_missing_project_returns_not_found(self) -> None:
         with patch.object(main, "read_project", side_effect=FileNotFoundError):

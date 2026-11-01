@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const {mockMediaConnections} = require('./media-connection-fixtures.cjs');
 const AxeBuilder = require('@axe-core/playwright').default;
 
 async function setup(page, options = {}) {
@@ -18,17 +19,19 @@ async function setup(page, options = {}) {
     }
     return route.fulfill({ json: status });
   });
+  await mockMediaConnections(page);
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'AI connection', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'AI connection' })).toBeVisible();
+  await page.getByRole('button', { name: 'AI Connections', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'AI Connections' })).toBeVisible();
+  await page.getByRole('tab', { name: 'OpenAI', exact: true }).click();
   await expect(page.locator('.ai-connection-status > div').filter({ hasText: 'Media provider' })).toContainText('Not configured');
   return actions;
 }
 
 test('admin can save a write-only key, explicitly test and disconnect', async ({ page }) => {
   const actions = await setup(page);
-  const dialog = page.getByRole('dialog', { name: 'AI connection' });
+  const dialog = page.getByRole('dialog', { name: 'AI Connections' });
   await dialog.getByLabel('API key', { exact: true }).fill('test-only-not-a-real-key');
   await dialog.getByRole('combobox', { name: 'Image model', exact: true }).selectOption('gpt-image-2');
   await dialog.getByRole('combobox', { name: 'Audio model', exact: true }).selectOption('tts-1');
@@ -86,7 +89,7 @@ for (const theme of ['light', 'dark']) {
       await page.screenshot({ path: `test-results/ai-connection-${theme}-${width}.png`, fullPage: true });
     }
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('dialog', { name: 'AI connection' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'AI connection', exact: true })).toBeFocused();
+    await expect(page.getByRole('dialog', { name: 'AI Connections' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'AI Connections', exact: true })).toBeFocused();
   });
 }

@@ -850,6 +850,7 @@ class CourseDraftRequest(BaseModel):
 
 
 class SceneDraftRequest(BaseModel):
+    connectionId: str | None = Field(default=None, pattern=r"^(?:pythia|legacy-openai)$")
     prompt: str = Field(min_length=1, max_length=3000)
     currentScene: SceneUpdate | None = None
 
@@ -883,6 +884,8 @@ class CourseContentDraft(BaseModel):
 class SceneContentDraft(GeneratedSceneDraft):
     extractedText: list[str] = Field(default_factory=list, max_length=23)
     visualLayout: SceneLayout
+    producer: str | None = None
+    model: str | None = None
 
     @model_validator(mode="after")
     def validate_visual_layout(self) -> "SceneContentDraft":
@@ -892,11 +895,14 @@ class SceneContentDraft(GeneratedSceneDraft):
         if layout.backgroundAsset is not None:
             raise ValueError("Generated text-only scene layouts cannot reference background assets")
         expected_text = [self.title, *self.extractedText]
-        if [element.text.strip() for element in layout.elements] != [text.strip() for text in expected_text]:
+        if [element.text.strip() for element in layout.elements if element.kind == "text"] != [text.strip() for text in expected_text]:
             raise ValueError("Generated scene layouts must contain the title followed by each learner-facing paragraph exactly once")
         for element in layout.elements:
-            if element.kind != "text" or not element.text.strip():
-                raise ValueError("Generated scene layouts may contain non-empty text elements only")
+            if element.kind == "text":
+                if not element.text.strip():
+                    raise ValueError("Generated text elements cannot be empty")
+            elif element.kind != "shape" or not element.nativeShape or element.shapeSvg is not None or element.assetId or element.text:
+                raise ValueError("Generated diagrams require supported native shapes, without SVG, asset references or embedded text")
             if element.x < 0 or element.y < 0 or element.x + element.width > layout.width or element.y + element.height > layout.height:
                 raise ValueError("Generated scene text elements must fit within the canvas")
         return self
@@ -1001,8 +1007,10 @@ class ReviewCommentDecision(BaseModel):
 
 
 class MediaGenerationJobCreate(BaseModel):
-    kind: Literal["image", "narration"]
-    narrationConnectionId: str | None = Field(default=None, pattern=r"^(?:legacy-openai|narration-[a-f0-9]{12})$")
+    connectionId: str | None = Field(default=None, pattern=r"^(?:pythia|legacy-openai|narration-[a-f0-9]{12})$")
+    kind: Literal["image", "narration", "video"]
+    narrationConnectionId: str | None = Field(default=None, pattern=r"^(?:legacy-openai|pythia|narration-[a-f0-9]{12})$")
+    durationSeconds: int | None = Field(default=None, ge=4, le=4)
     sceneId: str
     purpose: str = Field(min_length=1, max_length=2000)
     style: str = Field(default="", max_length=2000)
@@ -1019,19 +1027,25 @@ class MediaGenerationJobCreate(BaseModel):
     def validate_kind(self) -> "MediaGenerationJobCreate":
         if self.kind == "narration" and not self.script.strip():
             raise ValueError("Narration generation requires a script")
-        if self.kind == "image" and not self.prompt.strip():
-            raise ValueError("Image generation requires a prompt")
+        if self.kind in {"image", "video"} and not self.prompt.strip():
+            raise ValueError("Image or video generation requires a prompt")
+        if self.kind == "video":
+            self.durationSeconds = 4
+            if (self.width or 1280, self.height or 720) not in {(1280,720),(720,1280)}:
+                raise ValueError("Pythia video requires 1280 by 720 or 720 by 1280")
         return self
 
 
 class MediaGenerationJob(BaseModel):
+    connectionId: str | None = Field(default=None, pattern=r"^(?:pythia|legacy-openai|narration-[a-f0-9]{12})$")
     id: str
     projectId: str
     sourceRevision: int
     aiConnectionRevision: str | None = None
     narrationConnectionId: str | None = None
+    durationSeconds: int | None = None
     sceneId: str
-    kind: Literal["image", "narration"]
+    kind: Literal["image", "narration", "video"]
     purpose: str
     style: str = ""
     width: int | None = None
@@ -1057,13 +1071,15 @@ class MediaGenerationJob(BaseModel):
 
 
 class GeneratedAssetCandidate(BaseModel):
+    connectionId: str | None = Field(default=None, pattern=r"^(?:pythia|legacy-openai|narration-[a-f0-9]{12})$")
     id: str
     projectId: str
     jobId: str
     narrationConnectionId: str | None = None
     sourceRevision: int
+    durationSeconds: int | None = None
     sceneId: str
-    kind: Literal["image", "audio"]
+    kind: Literal["image", "audio", "video"]
     status: Literal["pending", "approved", "rejected"] = "pending"
     filename: str
     contentType: str

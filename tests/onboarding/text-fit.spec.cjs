@@ -1,4 +1,6 @@
 const { test, expect } = require('@playwright/test');
+const {mockMediaConnections} = require('./media-connection-fixtures.cjs');
+test.beforeEach(async ({page}) => mockMediaConnections(page));
 
 test('measured text fitting preserves layout data and reports unresolved locked or crowded content', async ({ page }) => {
   await page.goto('/');

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Rnd } from "react-rnd";
 import { AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignHorizontalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, AlignVerticalJustifyStart, ArrowDown, ArrowUp, Check, ChevronRight, Copy, ImagePlus, Lock, Play, Plus, Redo2, Sparkles, Square, Trash2, Undo2, Unlock, X } from "lucide-react";
@@ -14,6 +14,7 @@ import { BackgroundImagePicker } from "./BackgroundImagePicker";
 import { SceneTimeline } from "./SceneTimeline";
 import { ElementAppearanceControls } from "./ElementAppearanceControls";
 import { animationEndMs, defaultAppearance } from "./scene-timeline";
+import { useMediaConnections } from "./media-connections";
 import { backgroundMode } from "./background";
 
 function InspectorSection({ title, children }: { title: string; children: ReactNode }) {
@@ -69,7 +70,12 @@ function syncSceneText(layout: SceneLayout, scene: Scene, title: string, screenT
   return next;
 }
 
-export function SceneVisualEditor({ project, scene, templates, onClose, onSave, onExtract, onApplyTemplate, onGenerate, canGenerate, initialPanel = "canvas" }: { project: Project; scene: Scene; templates: { id: string; title: string }[]; onClose: () => void; onSave: (layout: SceneLayout, settings: SceneEditSettings) => Promise<void>; onExtract: () => Promise<SceneLayout>; onApplyTemplate: (templateId: string, title: string, extractedText: string[]) => Promise<SceneLayout>; onGenerate: (prompt: string, currentScene: Partial<Scene>) => Promise<GeneratedSceneDraft>; canGenerate: boolean; initialPanel?: "canvas" | "details" }) {
+export function SceneVisualEditor({ project, scene, templates, onClose, onSave, onExtract, onApplyTemplate, onGenerate, canGenerate, initialPanel = "canvas" }: { project: Project; scene: Scene; templates: { id: string; title: string }[]; onClose: () => void; onSave: (layout: SceneLayout, settings: SceneEditSettings) => Promise<void>; onExtract: () => Promise<SceneLayout>; onApplyTemplate: (templateId: string, title: string, extractedText: string[]) => Promise<SceneLayout>; onGenerate: (prompt: string, currentScene: Partial<Scene>, connectionId?: string) => Promise<GeneratedSceneDraft>; canGenerate: boolean; initialPanel?: "canvas" | "details" }) {
+  const { catalog: mediaCatalog, error: connectionError } = useMediaConnections();
+  const [connectionId, setConnectionId] = useState("");
+  const sceneConnections = mediaCatalog?.connections.filter(item => item.readyFor.includes("scene")) ?? [];
+  useEffect(() => { if (!connectionId && mediaCatalog?.defaults.scene) setConnectionId(mediaCatalog.defaults.scene); }, [mediaCatalog, connectionId]);
+  const selectedSceneConnection = sceneConnections.find(item => item.id === connectionId);
   const [history, setHistory] = useState<SceneLayout[]>(() => [initialLayout(scene)]);
   const [cursor, setCursor] = useState(0);
   const [multiSelection, setMultiSelection] = useState<string[]>([]);
@@ -211,7 +217,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
         actionDescription, narration, notes, required, audioRequired,
         assessmentItem, assessmentSettings,
         visualLayout: sceneTextDirty ? syncSceneText(layout, scene, title.trim(), screenText, generatedLayoutApplied) : layout,
-      });
+      }, connectionId);
       const fitted = await fitLayoutText(draft.visualLayout, true);
       applyGeneratedDraft({ ...draft, visualLayout: fitted.layout });
       if (fitted.issues.length) setError(textFitMessage(fitted.issues));
@@ -287,8 +293,8 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
     {panel === "details" ? <div className="visual-scene-details">
       {sceneType === "question" && assessmentItem && <AssessmentDraftPreview item={assessmentItem} settings={assessmentSettings} />}
       {canGenerate && <section className="scene-ai-draft" aria-label="Draft this scene with AI">
-        <label>Scene prompt<textarea aria-label="Scene prompt" rows={2} maxLength={3000} value={scenePrompt} onChange={event => setScenePrompt(event.target.value)} placeholder="Describe how this scene should change" /></label>
-        <button type="button" className="button button-outline" disabled={!scenePrompt.trim() || generatingDraft || busy} onClick={() => void generateSceneDraft()}><Sparkles size={14} />{generatingDraft ? "Generating draft…" : "Generate scene + layout draft"}</button>
+        <label>AI connection<select value={selectedSceneConnection ? connectionId : ""} onChange={event => setConnectionId(event.target.value)} disabled={busy || generatingDraft}><option value="">Select a configured connection</option>{sceneConnections.map(item => <option key={item.id} value={item.id}>{item.name} · {item.models.scene}</option>)}</select></label>{connectionError && <p role="alert">{connectionError}</p>}<label>Scene prompt<textarea aria-label="Scene prompt" rows={2} maxLength={3000} value={scenePrompt} onChange={event => setScenePrompt(event.target.value)} placeholder="Describe how this scene should change" /></label>
+        <button type="button" className="button button-outline" disabled={!scenePrompt.trim() || generatingDraft || busy || !selectedSceneConnection} onClick={() => void generateSceneDraft()}><Sparkles size={14} />{generatingDraft ? "Generating draft…" : "Generate scene + layout draft"}</button>
         {draftError && <p className="visual-editor-error" role="alert">{draftError}</p>}
       </section>}
       <div className="visual-scene-details-grid">
