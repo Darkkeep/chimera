@@ -39,9 +39,9 @@ class PythiaProvider:
             raise ValueError("CHIMERA_PYTHIA_BASE_URL must be an HTTP(S) URL without credentials, query, or fragment")
         self.base_url = configured_url.rstrip("/")
 
-    def _request(self, method: str, path: str, body: dict[str, object] | None = None) -> dict[str, object]:
+    def _request(self, method: str, path: str, body: dict[str, object] | None = None, *, timeout: float = 10.0) -> dict[str, object]:
         try:
-            request_options: dict[str, object] = {"json": body, "timeout": 10.0}
+            request_options: dict[str, object] = {"json": body, "timeout": timeout}
             api_key = os.environ.get("CHIMERA_PYTHIA_API_KEY", "").strip()
             if api_key:
                 request_options["headers"] = {"Authorization": f"Bearer {api_key}"}
@@ -62,6 +62,30 @@ class PythiaProvider:
 
     def health(self) -> dict[str, object]:
         return self._request("GET", "/health")
+
+    def resolve_media_connection(self, document: dict[str, object]) -> dict[str, object]:
+        return self._request("POST", "/media/connections/resolve", document)
+
+    def media_status(self) -> dict[str, object]:
+        return self._request("GET", "/media/status")
+
+    def scene_draft(self, document: dict[str, object]) -> dict[str, object]:
+        return self._request("POST", "/media/scenes", document, timeout=190.0)
+
+    def generate_narration(self, document: dict[str, object]) -> dict[str, object]:
+        return self._request("POST", "/media/narration", document, timeout=190.0)
+
+    def start_video(self, document: dict[str, object]) -> dict[str, object]:
+        return self._request("POST", "/media/videos", document, timeout=190.0)
+
+    def video_status(self, operation: str) -> dict[str, object]:
+        return self._request("GET", f"/media/videos/{quote(operation, safe='')}", timeout=190.0)
+
+    def image_status(self) -> dict[str, object]:
+        return self._request("GET", "/media/images/status")
+
+    def generate_image(self, document: dict[str, object]) -> dict[str, object]:
+        return self._request("POST", "/media/images", document, timeout=310.0)
 
     def capabilities(self) -> dict[str, object]:
         return self._request("GET", "/capabilities")

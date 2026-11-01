@@ -40,6 +40,10 @@ def save_engine_url(root: Path, value: str) -> None:
     value = local_engine_url(value)
     root.mkdir(parents=True, exist_ok=True)
     target = root / "pythia-connection.json"
+    previous = json.loads(target.read_text(encoding="utf-8")) if target.exists() else {}
     temporary = root / f".pythia-connection-{uuid4().hex}.tmp"
-    temporary.write_text(json.dumps({"baseUrl": value}), encoding="utf-8")
+    document = {"baseUrl": value}
+    if previous.get("imageProvider") == "pythia":
+        document["imageProvider"] = "pythia"
+    temporary.write_text(json.dumps(document), encoding="utf-8")
     temporary.replace(target)

@@ -42,7 +42,7 @@ test('dismissed canvas guide picks up Details rather than resuming the old task 
 test('a stale first-scene review does not resume inside media settings', async ({ page }) => {
   await pauseFirstScene(page);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'AI connection', exact: true }).click();
+  await page.getByRole('button', { name: 'AI Connections', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('button', { name: 'Resume walkthrough', exact: true })).toHaveCount(0);
   await dialog.getByRole('button', { name: /^Start walkthrough/ }).click();
@@ -89,7 +89,7 @@ test('completed first-scene practice does not restart scene creation from Storyb
 test('a targetless result review pauses when leaving its workflow', async ({ page }) => {
   await pauseFirstScene(page);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'AI connection', exact: true }).click();
+  await page.getByRole('button', { name: 'AI Connections', exact: true }).click();
   await page.getByRole('button', { name: 'Start walkthrough', exact: true }).click();
   await expectStep(page, 'Configure the media provider');
   await guide(page).getByRole('button', { name: 'Next', exact: true }).click();

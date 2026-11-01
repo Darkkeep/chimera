@@ -4,6 +4,7 @@ import { EditorDialog } from "./EditorDialog";
 import { NarrationConnections } from "./NarrationConnections";
 import type { MediaConnectionProvider } from "./NarrationConnections";
 import { reportOnboardingOutcome } from "./onboarding-journeys";
+import { useMediaConnections } from "./media-connections";
 import "./ai-connection.css";
 
 type ConnectionStatus = {
@@ -12,13 +13,14 @@ type ConnectionStatus = {
   textModel: string; imageModel: string; audioModel: string; textModels: string[]; imageModels: string[]; audioModels: string[];
   maxRequestsPerDay: number; maxConcurrentRequests: number;
 };
-const providers: { id: "openai" | MediaConnectionProvider; name: string }[] = [
-  { id: "openai", name: "OpenAI" }, { id: "elevenlabs", name: "ElevenLabs" },
+const providers: { id: "connections" | "openai" | MediaConnectionProvider; name: string }[] = [
+  { id: "connections", name: "Available connections" }, { id: "openai", name: "OpenAI" }, { id: "elevenlabs", name: "ElevenLabs" },
   { id: "google-cloud", name: "Google Cloud" }, { id: "cartesia", name: "Cartesia" },
   { id: "synthesia", name: "Synthesia" }, { id: "shotstack", name: "Shotstack" },
 ];
 
 export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { onClose: () => void; onboardingScope?: string }) {
+  const { catalog, error: catalogError } = useMediaConnections();
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [textModel, setTextModel] = useState("gpt-4.1-mini");
   const [imageModel, setImageModel] = useState("gpt-image-1");
@@ -31,7 +33,7 @@ export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { 
   const [narrationWorking, setNarrationWorking] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [activeProvider, setActiveProvider] = useState<"openai" | MediaConnectionProvider>("openai");
+  const [activeProvider, setActiveProvider] = useState<"connections" | "openai" | MediaConnectionProvider>("connections");
   const [narrationDirty, setNarrationDirty] = useState(false);
 
   function applyStatus(next: ConnectionStatus) {
@@ -89,7 +91,7 @@ export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { 
   }
 
   return <EditorDialog onboardingTarget="settings.media" labelledBy="ai-connection-title" onClose={() => { setApiKey(""); onClose(); }} busy={working || narrationWorking} className="ai-connection-dialog">
-    <header className="ai-connection-header"><h2 id="ai-connection-title">AI connection</h2><button type="button" className="icon-button" aria-label="Close media provider settings" title="Close media provider settings" disabled={working || narrationWorking} onClick={onClose}><X size={18} /></button></header>
+    <header className="ai-connection-header"><h2 id="ai-connection-title">AI Connections</h2><button type="button" className="icon-button" aria-label="Close media provider settings" title="Close media provider settings" disabled={working || narrationWorking} onClick={onClose}><X size={18} /></button></header>
     <div role="tablist" aria-label="AI providers" className="ai-provider-tabs">
       {providers.map((provider, index) => <button key={provider.id} type="button" role="tab" id={`provider-tab-${provider.id}`} aria-controls={`provider-panel-${provider.id}`} aria-selected={activeProvider === provider.id} tabIndex={activeProvider === provider.id ? 0 : -1} disabled={working || narrationWorking} onClick={() => selectProvider(provider.id)} onKeyDown={event => {
         const nextIndex = event.key === "ArrowRight" ? (index + 1) % providers.length : event.key === "ArrowLeft" ? (index + providers.length - 1) % providers.length : event.key === "Home" ? 0 : event.key === "End" ? providers.length - 1 : -1;
@@ -98,6 +100,14 @@ export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { 
         const next = providers[nextIndex].id;
         if (selectProvider(next)) event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`#provider-tab-${next}`)?.focus();
       }}>{provider.name}</button>)}
+    </div>
+    <div role="tabpanel" id="provider-panel-connections" aria-labelledby="provider-tab-connections" hidden={activeProvider !== "connections"} tabIndex={0}>
+      <h3>Connections available to Chimera and Pythia</h3>
+      <p className="ai-connection-notice">Requests use these saved connections. Pythia is preferred when available. Choose a connection in the scene or media request; changing settings does not move a submitted request to another provider.</p>
+      {!catalog && !catalogError && <p role="status">Checking connections...</p>}
+      {catalogError && <p role="alert" className="ai-connection-error">{catalogError}</p>}
+      {catalog?.connections.map(item => <div key={item.id} className="ai-connection-status"><h4>{item.name}</h4><p>{item.readyFor.length ? `Ready for: ${item.readyFor.join(", ")}.` : item.reason}</p>{item.readyFor.length > 0 && <p>{item.readyFor.map(kind => `${kind}: ${item.models[kind] || item.provider}${catalog.defaults[kind] === item.id ? " (default)" : ""}`).join(" · ")}</p>}</div>)}
+      {catalog?.videoUnavailableReason && <p className="ai-connection-notice">Video: {catalog.videoUnavailableReason}</p>}
     </div>
     <div role="tabpanel" id="provider-panel-openai" aria-labelledby="provider-tab-openai" hidden={activeProvider !== "openai"} tabIndex={0}>
     <h3>OpenAI image / legacy narration</h3>
@@ -122,8 +132,8 @@ export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { 
     {error && <p role="alert" className="ai-connection-error">{error}</p>}
     <p role="status" className="ai-connection-message">{working ? "Working..." : message}</p>
     </div>
-    {providers.filter(provider => provider.id !== "openai").map(provider => <div key={provider.id} role="tabpanel" id={`provider-panel-${provider.id}`} aria-labelledby={`provider-tab-${provider.id}`} hidden={activeProvider !== provider.id} tabIndex={0}>
-      {activeProvider === provider.id && activeProvider !== "openai" && <NarrationConnections key={activeProvider} provider={activeProvider} onBusyChange={setNarrationWorking} onDirtyChange={setNarrationDirty} onActionCompleted={reportProviderOutcome} disabled={working} />}
+    {providers.filter(provider => provider.id !== "openai" && provider.id !== "connections").map(provider => <div key={provider.id} role="tabpanel" id={`provider-panel-${provider.id}`} aria-labelledby={`provider-tab-${provider.id}`} hidden={activeProvider !== provider.id} tabIndex={0}>
+      {activeProvider === provider.id && activeProvider !== "openai" && activeProvider !== "connections" && <NarrationConnections key={activeProvider} provider={activeProvider} onBusyChange={setNarrationWorking} onDirtyChange={setNarrationDirty} onActionCompleted={reportProviderOutcome} disabled={working} />}
     </div>)}
   </EditorDialog>;
 }

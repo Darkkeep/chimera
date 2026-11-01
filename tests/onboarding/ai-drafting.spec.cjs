@@ -1,4 +1,6 @@
 const { test, expect } = require('@playwright/test');
+const {mockMediaConnections} = require('./media-connection-fixtures.cjs');
+test.beforeEach(async ({page}) => mockMediaConnections(page));
 
 test('course prompt uses uploaded references and persists only the reviewed draft', async ({ page }, testInfo) => {
   await page.route('**/api/projects', async route => {

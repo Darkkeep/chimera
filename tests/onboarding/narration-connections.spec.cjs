@@ -1,4 +1,6 @@
 const { test, expect } = require('@playwright/test');
+const {mockMediaConnections,mediaCapability} = require('./media-connection-fixtures.cjs');
+test.beforeEach(async ({page}) => mockMediaConnections(page));
 const AxeBuilder = require('@axe-core/playwright').default;
 
 async function openConnections(page, options = {}, provider = 'ElevenLabs') {
@@ -30,7 +32,7 @@ async function openConnections(page, options = {}, provider = 'ElevenLabs') {
   });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'AI connection', exact: true }).click();
+  await page.getByRole('button', { name: 'AI Connections', exact: true }).click();
   await page.getByRole('tab', { name: provider, exact: true }).click();
   const section = page.getByRole('region', { name: ['Synthesia', 'Shotstack'].includes(provider) ? 'Video connections' : 'Narration connections', exact: true });
   await expect(section).toBeVisible();
@@ -150,7 +152,7 @@ test('provider tabs support keyboard navigation and confirm before discarding se
   await page.getByRole('tab', { name: 'Cartesia', exact: true }).press('ArrowRight');
   await expect(page.getByRole('tab', { name: 'Synthesia', exact: true })).toBeFocused();
   await page.getByRole('tab', { name: 'Synthesia', exact: true }).press('Home');
-  await expect(page.getByRole('tab', { name: 'OpenAI', exact: true })).toBeFocused();
+  await expect(page.getByRole('tab', { name: 'Available connections', exact: true })).toBeFocused();
   await page.getByRole('tab', { name: 'ElevenLabs', exact: true }).click();
   await expect(section.getByLabel('ElevenLabs API key', { exact: true })).toHaveValue('');
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain('discard-on-tab-fixture');
@@ -178,10 +180,10 @@ for (const theme of ['light', 'dark']) {
     test.setTimeout(90000); // Twelve full Axe scans across provider tabs and viewport sizes.
     await page.addInitScript(value => localStorage.setItem('chimera.appearance', value), theme);
     await openConnections(page);
-    const dialog = page.getByRole('dialog', { name: 'AI connection', exact: true });
+    const dialog = page.getByRole('dialog', { name: 'AI Connections', exact: true });
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1000 });
-      for (const provider of ['OpenAI', 'ElevenLabs', 'Google Cloud', 'Cartesia', 'Synthesia', 'Shotstack']) {
+      for (const provider of ['Available connections', 'OpenAI', 'ElevenLabs', 'Google Cloud', 'Cartesia', 'Synthesia', 'Shotstack']) {
         await page.getByRole('tab', { name: provider, exact: true }).click();
         await expect(page.getByRole('tabpanel', { name: provider, exact: true })).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -219,7 +221,7 @@ async function openCreator(page, request, capability) {
   project = await scene.json();
   await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
   await page.route('**/api/projects', route => route.fulfill({ json: [project] }));
-  await page.route('**/media-generation-capability', route => route.fulfill({ json: capability }));
+  await page.route('**/media-generation-capability', route => route.fulfill({ json: mediaCapability(capability) }));
   await page.route('**/generated-candidates', route => route.fulfill({ json: [] }));
   const submissions = [];
   await page.route('**/media-generation-jobs', route => {

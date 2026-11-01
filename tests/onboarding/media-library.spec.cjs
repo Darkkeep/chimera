@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const {mediaCapability} = require('./media-connection-fixtures.cjs');
 const AxeBuilder = require('@axe-core/playwright').default;
 
 for (const status of ['configured', 'unconfigured', 'unavailable', 'denied']) {
@@ -9,7 +10,7 @@ for (const status of ['configured', 'unconfigured', 'unavailable', 'denied']) {
     project = await scene.json();
     await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
     await page.route('**/api/projects', route => route.fulfill({ json: [project] }));
-    await page.route('**/media-generation-capability', route => status === 'unavailable' ? route.fulfill({ status: 503, json: { detail: 'Unavailable' } }) : route.fulfill({ json: { providerConfigured: status !== 'unconfigured', canGenerate: status !== 'denied' } }));
+    await page.route('**/media-generation-capability', route => status === 'unavailable' ? route.fulfill({ status: 503, json: { detail: 'Unavailable' } }) : route.fulfill({ json: mediaCapability({ providerConfigured: status !== 'unconfigured', canGenerate: status !== 'denied' }) }));
     let submissions = 0;
     await page.route('**/media-generation-jobs', route => {
       submissions += 1;

@@ -8,7 +8,7 @@ import urllib.error
 import urllib.request
 from typing import Protocol
 
-from . import storage
+from . import storage, pythia_media
 from .ai_connection import connection_status, open_provider_request, request_budget, resolve_connection
 from .models import GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate
 from .narration_connections import SPEECH_PROVIDERS, narration_status, resolve_narration_connection, synthesize_narration
@@ -68,7 +68,7 @@ class OpenAICompatibleMediaProvider:
 
 
 def media_provider_configured() -> bool:
-    return connection_status(storage.ROOT)["configured"] or any(item["configured"] and item["voice"] and item["provider"] in SPEECH_PROVIDERS for item in narration_status(storage.ROOT)["connections"])
+    return (pythia_media.image_status()["configured"] if pythia_media.enabled() else connection_status(storage.ROOT)["configured"]) or any(item["configured"] and item["voice"] and item["provider"] in SPEECH_PROVIDERS for item in narration_status(storage.ROOT)["connections"])
 
 
 class NarrationProvider:
@@ -112,7 +112,8 @@ def recover_media_generation_jobs() -> None:
                     storage.update_media_generation_job(project.id, job.id, status="cancelled", progress=100, message="Cancelled before server restart")
                 else:
                     if job.status == "running":
-                        storage.update_media_generation_job(project.id, job.id, status="queued", progress=0, message="Resuming after server restart")
+                        storage.update_media_generation_job(project.id, job.id, status="failed", progress=100, message="Interrupted during generation; check provider usage before explicitly retrying", error="No automatic paid retry after restart")
+                        continue
                     start_media_generation_job(project.id, job.id)
 
 
@@ -124,10 +125,19 @@ def _run_job(project_id: str, job_id: str) -> None:
         if job.cancelRequested:
             storage.update_media_generation_job(project_id, job_id, status="cancelled", progress=100, message="Cancelled before processing")
             return
-        provider = NarrationProvider(job) if job.kind == "narration" and job.narrationConnectionId not in {None, "legacy-openai"} else _provider(job.aiConnectionRevision) if _provider_factory is _provider else _provider_factory()
-        storage.update_media_generation_job(project_id, job_id, status="running", progress=20, message="Generating media", provider=provider.name, model=provider.image_model if job.kind == "image" else provider.audio_model)
+        if _provider_factory is not _provider:
+            provider = _provider_factory()
+        elif job.kind == "image" and (job.connectionId == "pythia" or job.connectionId is None and pythia_media.enabled()):
+            provider = pythia_media.PythiaImageProvider(job.aiConnectionRevision)
+        elif job.connectionId == "pythia" or job.connectionId is None and pythia_media.enabled() and (job.kind == "video" or job.narrationConnectionId == "pythia"):
+            provider = pythia_media.PythiaMediaProvider(job.kind, job.aiConnectionRevision)
+        elif job.kind == "narration" and job.narrationConnectionId not in {None, "legacy-openai"}:
+            provider = NarrationProvider(job)
+        else:
+            provider = _provider(job.aiConnectionRevision)
+        storage.update_media_generation_job(project_id, job_id, status="running", progress=20, message="Generating media", provider=provider.name, model=provider.video_model if job.kind == "video" else provider.image_model if job.kind == "image" else provider.audio_model)
         job = storage.read_media_generation_job(project_id, job_id)
-        content, content_type, model = provider.generate_image(job) if job.kind == "image" else provider.generate_narration(job)
+        content, content_type, model = getattr(provider, {"image": "generate_image", "narration": "generate_narration", "video": "generate_video"}[job.kind])(job)
         job = storage.read_media_generation_job(project_id, job_id)
         if job.cancelRequested:
             storage.update_media_generation_job(project_id, job_id, status="cancelled", progress=100, message="Cancelled; generated media was discarded")
@@ -135,18 +145,20 @@ def _run_job(project_id: str, job_id: str) -> None:
         if not content:
             raise RuntimeError("Media provider returned empty output")
         digest = hashlib.sha256(content).hexdigest()
-        extension = ".png" if job.kind == "image" else ".mp3"
-        asset_kind = "image" if job.kind == "image" else "audio"
+        extension = {"image": ".png", "narration": ".mp3", "video": ".mp4"}[job.kind]
+        asset_kind = {"image": "image", "narration": "audio", "video": "video"}[job.kind]
         candidate_id = f"candidate-{__import__('uuid').uuid4().hex[:12]}"
         filename = f"{candidate_id}{extension}"
         candidate = GeneratedAssetCandidate(
             id=candidate_id,
             projectId=project_id,
             jobId=job.id,
+            connectionId=job.connectionId,
             narrationConnectionId=job.narrationConnectionId,
             sourceRevision=job.sourceRevision,
             sceneId=job.sceneId,
             kind=asset_kind,
+            durationSeconds=job.durationSeconds,
             filename=filename,
             contentType=content_type,
             sizeBytes=len(content),
@@ -192,7 +204,7 @@ def retry_media_generation_job(project_id: str, job_id: str) -> MediaGenerationJ
     job = storage.read_media_generation_job(project_id, job_id)
     if job.status not in {"failed", "cancelled"}:
         raise ValueError("Only failed or cancelled media jobs can be retried")
-    data = MediaGenerationJobCreate.model_validate(job.model_dump(include={"kind", "sceneId", "purpose", "style", "width", "height", "prompt", "script", "voice", "language", "altText", "captions", "narrationConnectionId"}))
+    data = MediaGenerationJobCreate.model_validate(job.model_dump(include={"kind", "sceneId", "purpose", "style", "width", "height", "prompt", "script", "voice", "language", "altText", "captions", "narrationConnectionId", "durationSeconds", "connectionId"}))
     retry = storage.create_media_generation_job(project_id, data).model_copy(update={"retryOf": job.id})
     storage.write_media_generation_job(retry)
     start_media_generation_job(project_id, retry.id)
@@ -204,7 +216,9 @@ def regenerate_candidate(project_id: str, candidate_id: str) -> MediaGenerationJ
     if candidate.status != "pending":
         raise ValueError("Only pending candidates can be regenerated")
     data = MediaGenerationJobCreate(
-        kind="image" if candidate.kind == "image" else "narration",
+        kind={"image": "image", "audio": "narration", "video": "video"}[candidate.kind],
+        durationSeconds=candidate.durationSeconds,
+        connectionId=candidate.connectionId,
         narrationConnectionId=candidate.narrationConnectionId,
         sceneId=candidate.sceneId,
         purpose=candidate.purpose,

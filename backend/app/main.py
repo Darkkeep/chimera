@@ -91,7 +91,7 @@ ROUTE_ACTIONS = {
     "post_review_reply": "review.reply.create", "post_review_comment_decision": "review.comment.resolve",
     "post_enhancement_proposal": "enhancement.proposal.create", "post_enhancement_proposal_decision": "enhancement.proposal.decide",
     "get_reference_resources": "project.view", "post_reference_resource": "reference.create",
-    "get_enhancement_jobs": "project.view", "get_ai_connection": "identity.view",
+    "get_enhancement_jobs": "project.view", "get_ai_connection": "identity.view", "get_ai_connections": "identity.view",
     "get_intelligence_engine": "identity.view",
     "put_ai_connection": "admin.policy.manage", "post_ai_disconnect": "admin.policy.manage", "post_ai_test": "admin.policy.manage",
     "get_narration_connections": "identity.view", "put_narration_connection": "admin.policy.manage",
@@ -1837,6 +1837,12 @@ def _record_ai_event(name: str) -> None:
     DurableEventSink(ROOT).record(PlatformEvent(eventName=name, eventClass="security", actorId=actor.actorId, installationId=actor.installationId, deploymentMode=actor.deploymentMode))
 
 
+@app.get("/api/ai-connections")
+def get_ai_connections() -> dict:
+    from .media_connections import connection_catalog
+    return connection_catalog(ROOT)
+
+
 @app.get("/api/ai-connection")
 def get_ai_connection() -> dict:
     return {**connection_status(ROOT), "canManage": get_authorization_policy().allows(get_actor_context(), "admin.policy.manage")}
@@ -2052,17 +2058,21 @@ def get_media_generation_capability(project_id: str) -> dict:
         read_project(project_id)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
-    image = connection_status(ROOT)
-    narration = narration_status(ROOT)
-    connections = [item for item in narration["connections"] if item["provider"] in SPEECH_PROVIDERS and item["configured"] and item["voice"]]
-    if image["configured"]:
-        connections.insert(0, {"id": "legacy-openai", "name": "Existing AI connection", "provider": image["provider"], "voice": "alloy", "model": image["audioModel"], "language": "en-US"})
+    from .media_connections import connection_catalog
+    catalog = connection_catalog(ROOT)
+    connections = [{"id": item["id"], "name": item["name"], "provider": item["provider"],
+                    "voice": item["voice"], "language": item["language"], "model": item["models"].get("narration", "")}
+                   for item in catalog["connections"] if "narration" in item["readyFor"]]
     return {
-        "providerConfigured": image["configured"] or bool(connections),
-        "imageConfigured": image["configured"],
+        "connectionOptions": catalog["connections"], "defaultConnections": catalog["defaults"],
+        "providerConfigured": any(item["readyFor"] for item in catalog["connections"]),
+        "imageConfigured": catalog["defaults"]["image"] is not None,
+        "videoConfigured": catalog["defaults"]["video"] is not None,
+        "videoUnavailableReason": catalog["videoUnavailableReason"],
         "narrationConnections": connections,
         "canGenerate": get_authorization_policy().allows(get_actor_context(), "media.job.create", project_id),
     }
+
 
 
 @app.get("/api/projects/{project_id}/media-generation-jobs", response_model=list[MediaGenerationJob])
@@ -2545,7 +2555,7 @@ def generate_scene_content_draft(project_id: str, scene_id: str, data: SceneDraf
             raise HTTPException(status_code=404, detail="Scene not found")
         if data.currentScene is not None:
             scene = Scene.model_validate({**scene.model_dump(mode="json"), **data.currentScene.model_dump(mode="json", exclude_unset=True)})
-        return generate_scene_draft(project, scene, data.prompt)
+        return generate_scene_draft(project, scene, data.prompt, data.connectionId)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
     except ValueError as error:

@@ -211,13 +211,14 @@ test('media provider walkthroughs require successful explicit actions and retain
   let writes = 0;
   let fail = true;
   const status = { configured: true, keyConfigured: true, storageAvailable: true, canManage: true, revision: 'fixture', source: 'saved', provider: 'openai', textModel: 'text-fixture', textModels: ['text-fixture'], imageModel: 'image-fixture', imageModels: ['image-fixture'], audioModel: 'audio-fixture', audioModels: ['audio-fixture'], maxRequestsPerDay: 20, maxConcurrentRequests: 1 };
-  await page.route('**/api/ai-connection**', route => {
+  await page.route(/\/api\/ai-connection(?:\/.*)?$/, route => {
     if (route.request().method() === 'GET') return route.fulfill({ json: status });
     writes++;
     if (fail) return route.fulfill({ status: 503, json: { detail: 'Provider action unavailable' } });
     return route.fulfill({ json: route.request().url().endsWith('/test') ? { message: 'Connection verified.' } : status });
   });
   await choose(page, 'Save media provider settings');
+  await page.getByRole('tab', { name: 'OpenAI', exact: true }).click();
   expect(writes).toBe(0);
   await page.getByLabel('Daily request limit', { exact: true }).fill('10');
   await page.getByRole('button', { name: 'Save media settings', exact: true }).click();
@@ -228,10 +229,12 @@ test('media provider walkthroughs require successful explicit actions and retain
   await finish(page);
   await page.getByRole('button', { name: 'Close media provider settings', exact: true }).click();
   await choose(page, 'Test the media provider connection');
+  await page.getByRole('tab', { name: 'OpenAI', exact: true }).click();
   await page.getByRole('button', { name: 'Test provider', exact: true }).click();
   await finish(page);
   await page.getByRole('button', { name: 'Close media provider settings', exact: true }).click();
   await choose(page, 'Disconnect the media provider');
+  await page.getByRole('tab', { name: 'OpenAI', exact: true }).click();
   page.once('dialog', dialog => dialog.dismiss());
   await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
   await expectStep(page, 'Disconnect the media provider');

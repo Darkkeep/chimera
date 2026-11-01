@@ -1502,12 +1502,29 @@ def create_media_generation_job(project_id: str, data: MediaGenerationJobCreate)
         project = read_project(project_id)
         if not any(scene.id == data.sceneId for scene in project.storyboard.scenes):
             raise ValueError("Media generation must target a scene in this project")
-        connection_revision = connection_status(ROOT)["revision"]
+        from . import pythia_media
+        selected = None
+        if data.connectionId:
+            from .media_connections import select_connection
+            selected = select_connection(ROOT, data.kind, data.connectionId)
+        use_pythia = (selected["executor"] == "pythia" if selected else pythia_media.enabled()) and (data.kind in {"image", "video"} or data.narrationConnectionId == "pythia")
+        image = (pythia_media.image_status() if data.kind == "image" else pythia_media.media_connection_status(data.kind)) if use_pythia else None
+        if image is not None and not image["configured"]:
+            raise ValueError("Pythia media generation is unavailable. Check the Pythia connection; no direct-provider fallback.")
+        connection_revision = selected["revisions"][data.kind] if selected else image["revision"] if image is not None else connection_status(ROOT)["revision"]
         values = data.model_dump()
+        if selected:
+            values["connectionId"] = selected["id"]
+            if data.kind == "narration":
+                if data.narrationConnectionId and data.narrationConnectionId != selected["id"]:
+                    raise ValueError("Narration and media connection selections disagree")
+                values["narrationConnectionId"] = selected["id"]
+                values["voice"] = data.voice or selected["voice"]
+                values["language"] = data.language or selected["language"]
         if data.narrationConnectionId and data.kind != "narration":
             raise ValueError("Narration connections cannot generate images.")
-        if data.kind == "narration" and data.narrationConnectionId not in {None, "legacy-openai"}:
-            connection = resolve_narration_connection(ROOT, data.narrationConnectionId)
+        if data.kind == "narration" and values["narrationConnectionId"] not in {None, "legacy-openai", "pythia"}:
+            connection = resolve_narration_connection(ROOT, values["narrationConnectionId"], connection_revision if selected else None)
             if connection.settings["provider"] not in SPEECH_PROVIDERS:
                 raise ValueError("This connection supports setup only; video generation is not yet available.")
             connection_revision = connection.revision
@@ -1624,7 +1641,7 @@ def approve_generated_candidate(project_id: str, candidate_id: str, expected_rev
             raise ValueError("Generated candidate media is unavailable")
         promoted = add_project_asset(project_id, candidate.filename, candidate_path.read_bytes(), candidate.kind, expected_revision)
         scene = next(scene for scene in promoted.storyboard.scenes if scene.id == candidate.sceneId)
-        asset_field = "imageAssets" if candidate.kind == "image" else "audioAssets"
+        asset_field = {"image": "imageAssets", "audio": "audioAssets", "video": "videoAssets"}[candidate.kind]
         proposed_assets = [*getattr(scene, asset_field), next(asset.id for asset in promoted.storyboard.assets if asset.sha256 == candidate.sha256)]
         changes: list[EnhancementProposalChangeCreate] = [EnhancementProposalChangeCreate(targetSceneId=scene.id, field=asset_field, proposedValue=proposed_assets)]
         if candidate.kind == "image" and candidate.altText:

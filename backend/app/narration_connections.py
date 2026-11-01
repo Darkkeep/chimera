@@ -149,7 +149,7 @@ def narration_status(root: Path) -> dict:
             configured, credential_error = False, True
         connections.append({
             **{key: settings[key] for key in ("id", "name", "provider", "credentialSource", "voice", "model", "language", "projectId")},
-            "configured": configured, "credentialError": credential_error,
+            "configured": configured, "credentialError": credential_error, "revision": _revision(settings),
             "environment": settings.get("environment", "stage"),
         })
     return {

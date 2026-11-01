@@ -26,7 +26,13 @@ async function projectByTitle(request, title) {
 }
 
 test('New Project accepts every source kind without AI configuration and preserves the planning draft across sections', async ({ page, request }, testInfo) => {
-  const title = `Queued source planning ${testInfo.project.name}`;
+  const title = `Queued source planning ${testInfo.project.name}-${testInfo.retry}-${Date.now()}`;
+  let conversationPosts=0;
+  await page.route('**/pythia-conversation', route => {
+    if (route.request().method() === 'GET') return route.fulfill({json:{sessionId:'source-planning-fixture',turns:[],actions:[],configured:true}});
+    conversationPosts++;
+    return route.fulfill({status:503,json:{detail:'This draft-preservation test must not submit a provider request.'}});
+  });
   const initial = await begin(page, title);
   await initial.getByLabel('Attach course design documents').setInputFiles({ name: 'planning-guide.txt', mimeType: 'text/plain', buffer: Buffer.from('Use the category checklist before submitting.') });
   await initial.locator('.new-project-extra-sources > summary').click();
@@ -75,6 +81,7 @@ test('New Project accepts every source kind without AI configuration and preserv
   await expect(page.getByRole('dialog')).toHaveCount(0);
   resources = await (await request.get(`/api/projects/${project.id}/reference-resources`)).json();
   expect(resources).toHaveLength(5);
+  expect(conversationPosts).toBe(0);
 });
 
 test('a failed New Project attachment can be retried without creating another project or resending saved sources', async ({ page, request }) => {

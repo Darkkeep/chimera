@@ -1097,11 +1097,11 @@ export function App() {
     if (settings.layoutMode === "template") reportOnboardingOutcome("scene.template-saved", project.id, visualSceneId || undefined);
   }
 
-  async function generateSceneContentDraft(prompt: string, currentScene: Partial<Scene>): Promise<GeneratedSceneDraft> {
+  async function generateSceneContentDraft(prompt: string, currentScene: Partial<Scene>, connectionId?: string): Promise<GeneratedSceneDraft> {
     const response = await fetch(`/api/projects/${project.id}/scenes/${visualSceneId}/content-draft`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, currentScene }),
+      body: JSON.stringify({ prompt, currentScene, connectionId }),
     });
     const result = await response.json().catch(() => null) as (GeneratedSceneDraft & { detail?: string }) | null;
     if (!response.ok || !result) throw new Error(result?.detail || "Scene draft could not be generated.");
@@ -1286,7 +1286,7 @@ export function App() {
         {showSettings && <div id="workspace-settings" className="workspace-settings">
           <AppearanceSelector />
           <button type="button" className="nav-item" disabled={busy} onClick={() => setShowIntelligenceEngine(true)}>          <Sparkles size={16} />Pythia</button>
-          <button type="button" className="nav-item" disabled={busy} onClick={event => { event.currentTarget.focus(); setShowAIConnection(true); }}><Sparkles size={16} />AI connection</button>
+          <button type="button" className="nav-item" disabled={busy} onClick={event => { event.currentTarget.focus(); setShowAIConnection(true); }}><Sparkles size={16} />AI Connections</button>
           {session && permissions.canManageMembers && <button className="nav-item" disabled={!project.id} onClick={() => setShowProjectAccess(true)}>Project access</button>}
         </div>}
         {session && <div className="hosted-session"><span>{session.actor.actorDisplayName}</span><button onClick={() => { if (window.confirm("Sign out? Unsaved changes will be discarded.")) void logout().catch(issue => setError(issue instanceof Error ? issue.message : "Sign-out failed.")); }}>Sign out</button></div>}
@@ -1296,7 +1296,7 @@ export function App() {
     {showAIConnection && <AIConnectionPanel onboardingScope={project.id || "workspace"} onClose={() => setShowAIConnection(false)} />}
     {showSources && <SourcesPanel key={project.id} projectId={project.id} projectTitle={project.title} canAdd={permissions.canEdit} onClose={() => setShowSources(false)} />}
     {showPythiaTalk && <PythiaTalkPanel key={project.id} project={project} scene={scene ?? undefined} onClose={() => setShowPythiaTalk(false)} onProjectUpdated={applyProject} />}
-    {showIntelligenceEngine && <IntelligenceEnginePanel onClose={() => setShowIntelligenceEngine(false)} />}
+    {showIntelligenceEngine && <IntelligenceEnginePanel onClose={() => { setShowIntelligenceEngine(false); window.dispatchEvent(new Event("chimera:ai-connection-updated")); }} />}
     {showProjectBackground && <ProjectBackgroundPanel key={project.id} project={project} onClose={() => setShowProjectBackground(false)} onProjectUpdated={applyProject} />}
     <main className="main-content" id="workspace-content" tabIndex={-1}>
       {deepLinkError && <div className="notice" role="alert"><span>{deepLinkError}</span><button className="icon-button" onClick={() => setDeepLinkError("")} aria-label="Dismiss deep link error"><X size={16} /></button></div>}
