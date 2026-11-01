@@ -21,7 +21,7 @@ export function EditorDialog({ children, labelledBy, onClose, busy = false, clas
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const focusable = () => Array.from(dialog.current?.querySelectorAll<HTMLElement>(
-      'button:not(:disabled), input:not(:disabled):not([type="hidden"]), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]',
+      'button:not(:disabled), input:not(:disabled):not([type="hidden"]), select:not(:disabled), textarea:not(:disabled), summary, a[href], [tabindex="0"]',
     ) ?? []).filter((element) => element.getClientRects().length > 0);
     const initial = dialog.current?.querySelector<HTMLElement>("input:not(:disabled), textarea:not(:disabled)");
     (initial ?? focusable()[0] ?? dialog.current)?.focus();

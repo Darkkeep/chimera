@@ -54,7 +54,13 @@ test('guide controls participate in modal keyboard navigation and pass scoped ax
   await page.getByRole('textbox', { name: 'Course name' }).fill(unique('Keyboard'));
   await page.getByRole('textbox', { name: 'Course name' }).focus();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('dialog').getByRole('button', { name: 'Create project', exact: true })).toBeFocused();
+  await expect(page.getByLabel('Attach course design documents')).toBeFocused();
+  const create = page.getByRole('dialog').getByRole('button', { name: 'Create project', exact: true });
+  for (let index=0; index<8 && !await create.evaluate(element => element === document.activeElement); index++) {
+    await page.keyboard.press('Tab');
+    expect(await page.getByRole('dialog').evaluate(element => element.contains(document.activeElement))).toBe(true);
+  }
+  await expect(create).toBeFocused();
   await page.keyboard.press('Enter'); await expectStep(page, 'Create a scene');
   expect(await guide(page).evaluate(el => Boolean(el.closest('[role="dialog"]')))).toBe(true);
   const results = await new AxeBuilder({ page }).include('.onboarding-card').analyze();

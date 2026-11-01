@@ -39,8 +39,11 @@ for (const theme of ['light', 'dark']) {
     await expect(page.locator('.validation-dialog')).toBeVisible();
     expect((await new AxeBuilder({ page }).include('.validation-dialog').withTags(['wcag2a', 'wcag2aa']).analyze()).violations).toEqual([]);
     await page.getByRole('button', { name: 'Close validation report' }).click();
-    const chooser = page.waitForEvent('filechooser');
     await workflow.getByRole('button', { name: /Source/ }).click();
+    const sources = page.getByRole('dialog', { name: 'Sources', exact: true });
+    await expect(sources.getByRole('region', { name: 'Saved sources', exact: true })).toBeVisible();
+    const chooser = page.waitForEvent('filechooser');
+    await sources.getByLabel('Source document', { exact: true }).click();
     expect(await chooser).toBeTruthy();
   });
 }
