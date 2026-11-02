@@ -1,0 +1,82 @@
+name: Pythia Golden Path
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    - cron: '17 8 * * 1'
+  workflow_dispatch:
+concurrency:
+  group: pythia-golden-path-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  golden-path:
+    name: Current Pythia Engine round trip
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.PYTHIA_CONTRACTS_READ_TOKEN || github.token }}
+        submodules: recursive
+    - uses: actions/checkout@v4
+      with:
+        repository: Darkkeep/Pythia
+        ref: master
+        path: pythia
+        token: ${{ secrets.PYTHIA_CONTRACTS_READ_TOKEN || github.token }}
+        submodules: recursive
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Install integration dependencies
+      run: >-
+        python -m pip install
+        -r backend/requirements.txt
+        -r pythia/requirements-contract.txt
+        -r pythia/requirements-copilot.txt
+    - name: Record repository and contract revisions
+      run: |
+        echo "Chimera: $(git rev-parse HEAD)"
+        echo "Chimera contract: $(git -C vendor/pythia-contracts rev-parse HEAD) ($(cat vendor/pythia-contracts/VERSION))"
+        echo "Pythia: $(git -C pythia rev-parse HEAD)"
+        echo "Pythia contract: $(git -C pythia/vendor/pythia-contracts rev-parse HEAD) ($(cat pythia/vendor/pythia-contracts/VERSION))"
+    - name: Run Pythia Golden Path
+      env:
+        CHIMERA_PYTHIA_GOLDEN_PATH_INTEGRATION: '1'
+        CHIMERA_PYTHIA_BASE_URL: http://127.0.0.1:8001
+        PYTHONPATH: ${{ github.workspace }}/pythia
+        PYTHIA_CONTRACTS_DIR: ${{ github.workspace }}/pythia/vendor/pythia-contracts
+      run: |
+        python -m uvicorn service.app:create_app --factory --host 127.0.0.1 --port 8001 &
+        server_pid=$!
+        trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+        python - <<'PY'
+        import json
+        import time
+        from pathlib import Path
+        from urllib.request import urlopen
+
+        expected = Path("pythia/vendor/pythia-contracts/VERSION").read_text(encoding="utf-8").strip()
+        for _ in range(60):
+            try:
+                with urlopen("http://127.0.0.1:8001/health", timeout=2) as response:
+                    health = json.load(response)
+                if health.get("status") != "ok":
+                    raise SystemExit(f"Pythia health check failed: {health}")
+                if health.get("contract_version") != expected:
+                    raise SystemExit(
+                        f"Pythia loaded contract {health.get('contract_version')!r}, expected {expected!r}"
+                    )
+                print(f"Pythia Engine ready with contract {expected}")
+                break
+            except OSError:
+                time.sleep(0.5)
+        else:
+            raise SystemExit("Pythia Engine did not become healthy within 30 seconds")
+        PY
+        python -m unittest backend.tests.test_learning_intelligence.PythiaRouteTests.test_live_pythia_golden_path_imports_reviews_transforms_assesses_and_exports -v
