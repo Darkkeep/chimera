@@ -39,9 +39,11 @@ The revisions are intentionally independent: Chimera currently pins contracts
 validation checks their actual compatibility rather than requiring their
 version labels to match.
 
-The workflow uses Pythia's `GITHUB_TOKEN` to check out Pythia itself and needs
-`PYTHIA_CONTRACTS_READ_TOKEN` with read-only Contents access to the private
-`pythia-contracts` repository. Pull requests from forks skip this private
+The workflow uses Pythia's `GITHUB_TOKEN` to check out Pythia itself. Configure
+`PYTHIA_CONTRACTS_READ_TOKEN` under **Darkkeep/Pythia > Settings > Secrets and
+variables > Actions** with read-only Contents access to private
+`Darkkeep/pythia-contracts`; the workflow reports a setup error if it is absent.
+Never commit or share the token value. Pull requests from forks skip the private
 contract checkout.
 
 On 2026-11-02, the full Golden Path passed locally against Chimera
