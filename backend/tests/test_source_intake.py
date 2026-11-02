@@ -11,6 +11,14 @@ from backend.app.models import ProjectCreate
 
 
 class SourceIntakeTests(unittest.TestCase):
+    def test_protected_office_source_explains_extraction_failure(self):
+        from backend.app.references import extract_reference_passages
+        content = bytes.fromhex("d0cf11e0a1b11ae1") + "EncryptedPackage".encode("utf-16le")
+        passages, status, message = extract_reference_passages("protected.pptx", content)
+        self.assertEqual(passages, [])
+        self.assertEqual(status, "failed")
+        self.assertIn("unencrypted copy", message)
+
     def setUp(self):
         temporary = self.enterContext(tempfile.TemporaryDirectory())
         root = Path(temporary)

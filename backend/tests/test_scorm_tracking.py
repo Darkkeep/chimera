@@ -8,6 +8,11 @@ from backend.app.scorm import PLAYER_JS, _scorm_12_player
 
 
 class ScormTrackingTests(unittest.TestCase):
+    def test_scaled_score_is_only_written_in_scorm_2004(self):
+        self.assertIn('call("SetValue", ["cmi.score.scaled"', PLAYER_JS)
+        self.assertNotIn('cmi.score.scaled', _scorm_12_player())
+        self.assertNotIn('cmi.core.score.scaled', _scorm_12_player())
+
     @unittest.skipUnless(shutil.which("node"), "Node.js required")
     def test_popup_tracking_resume_and_rejected_calls(self):
         result = subprocess.run(

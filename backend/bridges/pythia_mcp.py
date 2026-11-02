@@ -3,29 +3,46 @@ import asyncio
 from datetime import timedelta
 import json
 import os
+import re
 from pathlib import Path
 import sys
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+MAX_BRIDGE_BYTES = 128 * 1024 * 1024
+
+
+class LocalContextLimitError(ValueError):
+    pass
+
 
 async def exchange(payload):
     checkout = Path(sys.argv[1]).resolve()
-    config = json.loads((checkout / "plugins/pythia/mcp.json").read_text(encoding="utf-8"))["mcpServers"]["pythia"]
     interpreter = checkout / ".venv/Scripts/python.exe"
     adapter = checkout / "scripts/pythia_chatgpt.py"
     # Reuse the installed, local plugin's supported adapter and provider-file
     # argument only. No browser-controlled commands, environment, or shell.
-    args = config.get("args", [])
-    if (Path(config["command"]).resolve() != interpreter.resolve() or
+    config_path = checkout / "plugins/pythia/mcp.json"
+    environment = None
+    if config_path.is_file():
+        config = json.loads(config_path.read_text(encoding="utf-8"))["mcpServers"]["pythia"]
+        args = config.get("args", [])
+        if (Path(config["command"]).resolve() != interpreter.resolve() or
             len(args) != 3 or Path(args[0]).resolve() != adapter.resolve() or
             args[1] != "--provider-file" or not Path(args[2]).is_absolute()):
-        raise ValueError("Unsupported local Pythia plugin configuration")
-    parameters = StdioServerParameters(command=str(interpreter), args=args, cwd=str(checkout))
+            raise ValueError("Unsupported local Pythia plugin configuration")
+    else:
+        provider = payload.pop("provider")
+        names = {"PYTHIA_ANALYSIS_API_URL", "PYTHIA_ANALYSIS_API_KEY", "PYTHIA_ANALYSIS_MODEL"}
+        if set(provider) != names or not all(isinstance(value, str) and value.strip() for value in provider.values()):
+            raise ValueError("Incomplete saved AI connection")
+        environment = dict(provider)
+        args = [str(adapter)]
+    parameters = StdioServerParameters(command=str(interpreter), args=args, cwd=str(checkout), env=environment)
     with open(os.devnull, "w") as errors:
         async with stdio_client(parameters, errlog=errors) as (reader, writer):
-            async with ClientSession(reader, writer, read_timeout_seconds=timedelta(seconds=75)) as session:
+            async with ClientSession(reader, writer, read_timeout_seconds=timedelta(seconds=630)) as session:
                 await session.initialize()
                 tools = await session.list_tools()
                 if not {"pythia_capabilities", "pythia_consult"} <= {tool.name for tool in tools.tools}:
@@ -42,6 +59,11 @@ async def exchange(payload):
                 else:
                     result = await session.call_tool("pythia_consult", {"question": payload["question"], "history": payload["history"]})
                 if result.isError:
+                    for block in result.content:
+                        if block.type == "text":
+                            safe = re.search(r"PYTHIA_CONTEXT_LIMIT: ([0-9,]+ input tokens exceeds [0-9,]+ available tokens\. Select fewer sources or split the material; no text was dropped\.)", block.text)
+                            if safe:
+                                raise LocalContextLimitError(safe.group(1))
                     raise ValueError("Pythia consultation failed")
                 value = result.structuredContent
                 if value is None:
@@ -54,14 +76,25 @@ async def exchange(payload):
 
 if __name__ == "__main__":
     try:
-        raw = sys.stdin.buffer.read(262145)
-        if len(raw) > 262144:
+        raw = sys.stdin.buffer.read(MAX_BRIDGE_BYTES + 1)
+        if len(raw) > MAX_BRIDGE_BYTES:
             raise ValueError("Request exceeds allowance")
         value = asyncio.run(exchange(json.loads(raw)))
         result = json.dumps({"ok": True, "result": value}, ensure_ascii=True)
-        if len(result) > 262144:
+        if len(result) > MAX_BRIDGE_BYTES:
             raise ValueError("Response exceeds allowance")
         print(result)
-    except BaseException:
+    except LocalContextLimitError as error:
+        print(json.dumps({"ok": False, "errorCode": "context_limit", "error": str(error)}))
+        sys.exit(1)
+    except BaseException as error:
+        # MCP's async task groups wrap tool failures in ExceptionGroup.
+        pending = [error]
+        while pending:
+            cause = pending.pop()
+            if isinstance(cause, LocalContextLimitError):
+                print(json.dumps({"ok": False, "errorCode": "context_limit", "error": str(cause)}))
+                sys.exit(1)
+            pending.extend(getattr(cause, "exceptions", ()))
         print(json.dumps({"ok": False, "error": "Pythia could not complete the local consultation. Check its local provider configuration and retry explicitly."}))
         sys.exit(1)

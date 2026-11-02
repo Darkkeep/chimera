@@ -214,10 +214,10 @@ test('environment source is fixed and failed saves clear passwords with safe err
   await expect(section.getByRole('alert')).toHaveText('Narration credentials could not be saved securely.');
 });
 
-async function openCreator(page, request, capability) {
+async function openCreator(page, request, capability, sceneText = {}) {
   const created = await request.post('/api/projects', { data: { title: `Narration selector ${Date.now()}` } });
   let project = await created.json();
-  const scene = await request.post(`/api/projects/${project.id}/scenes`, { data: { title: 'Narration scene' }, headers: { 'If-Match': `"${project.storyboard.revision}"` } });
+  const scene = await request.post(`/api/projects/${project.id}/scenes`, { data: { title: 'Narration scene', ...sceneText }, headers: { 'If-Match': `"${project.storyboard.revision}"` } });
   project = await scene.json();
   await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
   await page.route('**/api/projects', route => route.fulfill({ json: [project] }));
@@ -269,4 +269,28 @@ test('old capability mocks retain image access and explicit legacy narration sel
   await creator.getByRole('button', { name: 'Generate candidate', exact: true }).click();
   await expect.poll(() => submissions.length).toBe(1);
   expect(submissions[0]).toMatchObject({ narrationConnectionId: 'legacy-openai', language: 'en-US', voice: 'alloy' });
+});
+
+for (const [label, sceneText, expected] of [
+  ['narration', { narration: 'Captured narration.', notes: 'Author notes should not override narration.' }, 'Captured narration.'],
+  ['speaker notes', { notes: 'Imported speaker notes.' }, 'Imported speaker notes.'],
+]) test(`narration script reuses ${label} and preserves request edits`, async ({ page, request }) => {
+  const { creator, submissions } = await openCreator(page, request, {
+    providerConfigured: true, imageConfigured: false, canGenerate: true,
+    narrationConnections: [{ id: 'google-id', name: 'Course voice', provider: 'google-cloud', voice: 'en-US-Neural2-A', model: '', language: 'en-US' }],
+  }, sceneText);
+  const script = creator.getByRole('textbox', { name: 'Narration script', exact: true });
+  await expect(script).toHaveValue(expected);
+  await script.fill('An edited request.');
+  await page.locator('.generation-creator summary').click();
+  await page.locator('.generation-creator summary').click();
+  await expect(script).toHaveValue('An edited request.');
+  await creator.getByRole('button', { name: 'Use scene narration', exact: true }).click();
+  await expect(script).toHaveValue(expected);
+  await creator.getByLabel('Purpose', { exact: true }).fill('Narrate this scene');
+  await creator.getByRole('combobox', { name: 'Narration connection', exact: true }).selectOption('google-id');
+  await creator.getByRole('button', { name: 'Generate candidate', exact: true }).click();
+  await expect.poll(() => submissions.length).toBe(1);
+  expect(submissions[0].script).toBe(expected);
+  await expect(script).toHaveValue(expected);
 });

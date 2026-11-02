@@ -196,6 +196,32 @@ def append_platform_event(project_id: str, event_name: str, metadata: dict[str, 
     DurableEventSink(project_path(project_id)).record(event)
 
 
+def generated_media_names(project_id: str, storyboard: Storyboard) -> dict[str, str]:
+    """Readable labels for retained generated assets; storage paths and IDs stay stable."""
+    records = []
+    for path in (project_path(project_id) / "generated-candidates").glob("candidate-*.json"):
+        try:
+            records.append(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            continue
+    scenes = {scene.id: (index, scene.title) for index, scene in enumerate(storyboard.scenes, 1)}
+    counts: dict[tuple[str, str], int] = {}
+    names: dict[str, str] = {}
+    for item in sorted(records, key=lambda item: (item.get("createdAt", ""), item.get("id", ""))):
+        key = (item.get("sceneId", ""), item.get("kind", ""))
+        counts[key] = counts.get(key, 0) + 1
+        number, title = scenes.get(key[0], (0, "Removed scene"))
+        title = re.sub(r'[<>:"/\\|?*\x00-\x1f]', " ", title)
+        title = " ".join(title.split()).strip(" .")[:80] or "Untitled scene"
+        kind = {"audio": "Narration", "image": "Image", "video": "Video"}.get(key[1], "Media")
+        extension = {"audio": ".mp3", "image": ".png", "video": ".mp4"}.get(key[1], "")
+        name = f"Scene {number:02d} - {title} - {kind} - Take {counts[key]}{extension}"
+        names[item.get("id", "")] = name
+        if item.get("approvedAssetId"):
+            names[item["approvedAssetId"]] = name
+    return names
+
+
 def read_project(project_id: str) -> ProjectDetail:
     # Windows readers must close their handles before an atomic replacement.
     with _storyboard_write_lock:
@@ -208,6 +234,16 @@ def read_project(project_id: str) -> ProjectDetail:
         if metadata.get("trashedAt"):
             raise FileNotFoundError(project_id)
         storyboard = Storyboard.model_validate(json.loads(storyboard_file.read_text(encoding="utf-8")))
+        names = generated_media_names(project_id, storyboard)
+        for asset in storyboard.assets:
+            if asset.id in names:
+                asset.filename = names[asset.id]
+        for scene in storyboard.scenes:
+            timeline = scene.visualLayout.timeline if scene.visualLayout else None
+            if timeline:
+                for clip in timeline.clips:
+                    if clip.assetId in names and re.fullmatch(r"candidate-[a-f0-9]{12}\.(mp3|mp4|png)", clip.name):
+                        clip.name = names[clip.assetId]
         return ProjectDetail(
             **metadata,
             sceneCount=len(storyboard.scenes),
@@ -708,8 +744,8 @@ def update_scene(project_id: str, scene_id: str, data: SceneUpdate, expected_rev
                     if len(texts) < len(text_elements):
                         removed_ids = {element.id for element in text_elements[len(texts):]}
                         layout.elements = [element for element in layout.elements if element.id not in removed_ids]
-                    for index, text in enumerate(texts[len(text_elements):], start=len(text_elements)):
-                        layout.elements.append(SceneElement(id=f"text-{uuid.uuid4().hex[:8]}", kind="text", source="manual" if layout.enabled else "slide", text=text, x=40, y=min(layout.height - 100, 40 + index * 100), width=max(20, layout.width - 80), height=100))
+                    for text_index, text in enumerate(texts[len(text_elements):], start=len(text_elements)):
+                        layout.elements.append(SceneElement(id=f"text-{uuid.uuid4().hex[:8]}", kind="text", source="manual" if layout.enabled else "slide", text=text, x=40, y=min(layout.height - 100, 40 + text_index * 100), width=max(20, layout.width - 80), height=100))
                 if "imageAssets" in updates:
                     detached = set(scene.imageAssets) - set(updated_scene.imageAssets)
                     layout.elements = [element for element in layout.elements if element.kind != "image" or element.assetId not in detached]
@@ -1599,21 +1635,26 @@ def write_generated_candidate(candidate: GeneratedAssetCandidate, content: bytes
 
 
 def read_generated_candidate(project_id: str, candidate_id: str) -> GeneratedAssetCandidate:
-    read_project(project_id)
+    project = read_project(project_id)
     if not re.fullmatch(r"candidate-[a-f0-9]{12}", candidate_id):
         raise FileNotFoundError(candidate_id)
     path = _generated_candidates_path(project_id) / f"{candidate_id}.json"
     if not path.is_file():
         raise FileNotFoundError(candidate_id)
-    return GeneratedAssetCandidate.model_validate_json(path.read_text(encoding="utf-8"))
+    candidate = GeneratedAssetCandidate.model_validate_json(path.read_text(encoding="utf-8"))
+    candidate.filename = generated_media_names(project_id, project.storyboard).get(candidate.id, candidate.filename)
+    return candidate
 
 
 def list_generated_candidates(project_id: str) -> list[GeneratedAssetCandidate]:
-    read_project(project_id)
+    project = read_project(project_id)
     directory = _generated_candidates_path(project_id)
     if not directory.is_dir():
         return []
     candidates = [GeneratedAssetCandidate.model_validate_json(path.read_text(encoding="utf-8")) for path in directory.glob("candidate-*.json")]
+    names = generated_media_names(project_id, project.storyboard)
+    for candidate in candidates:
+        candidate.filename = names.get(candidate.id, candidate.filename)
     return sorted(candidates, key=lambda candidate: candidate.createdAt, reverse=True)
 
 
@@ -1639,7 +1680,13 @@ def approve_generated_candidate(project_id: str, candidate_id: str, expected_rev
         candidate_path = project_path(project_id) / candidate.path
         if not candidate_path.is_file():
             raise ValueError("Generated candidate media is unavailable")
-        promoted = add_project_asset(project_id, candidate.filename, candidate_path.read_bytes(), candidate.kind, expected_revision)
+        promoted = add_project_asset(project_id, candidate.filename, candidate_path.read_bytes(), candidate.kind, expected_revision,
+                                     source_metadata={"attributionText": "AI-Generated", "attributionStatus": "complete"})
+        approved_asset = next(asset for asset in promoted.storyboard.assets if asset.sha256 == candidate.sha256 and asset.kind == candidate.kind)
+        # A regenerated candidate may reuse a file already retained by content hash.
+        if not approved_asset.attributionText.strip():
+            promoted = update_project_asset_attribution(project_id, approved_asset.id,
+                AssetAttributionUpdate(attributionText="AI-Generated", attributionStatus="complete"), promoted.storyboard.revision)
         scene = next(scene for scene in promoted.storyboard.scenes if scene.id == candidate.sceneId)
         asset_field = {"image": "imageAssets", "audio": "audioAssets", "video": "videoAssets"}[candidate.kind]
         proposed_assets = [*getattr(scene, asset_field), next(asset.id for asset in promoted.storyboard.assets if asset.sha256 == candidate.sha256)]

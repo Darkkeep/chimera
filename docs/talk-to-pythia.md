@@ -3,7 +3,8 @@
 Open a project and select **Talk to Pythia** in the workspace navigation. This
 calls the local Pythia plugin's actual `pythia_consult` tool over MCP stdio, using
 Pythia's own Python environment and live `TextConversationProducer`. It is the
-same adapter used by the installed `@Pythia` plugin. It does not use Chimera's
+adapter supplied by Pythia. A ChatGPT folder mention provides project context;
+it does not configure this adapter. This feature does not use Chimera's
 deterministic Engine authoring tasks, and there is no scripted-answer fallback.
 
 ## Use
@@ -45,24 +46,35 @@ ChatGPT history or Manteion's private conversations.
 
 The backend finds a sibling `Pythia` checkout by default. Set
 `CHIMERA_PYTHIA_ROOT` in the Chimera backend environment for another checkout.
+Alternatively, an installation-local `workspace/pythia-runtime.json` can contain
+`{"root": "C:/path/to/Pythia"}`. The environment setting takes precedence.
 Required files are:
 
 - `.venv/Scripts/python.exe` with Pythia's existing MCP/runtime dependencies;
-- `scripts/pythia_chatgpt.py`;
-- `plugins/pythia/mcp.json`, with its supported local Python command, adapter
-  and explicit `--provider-file` argument.
+- `scripts/pythia_chatgpt.py`.
+
+Without a local plugin configuration, the adapter uses the OpenAI connection
+already saved under **Settings > AI connection**, including its model and OS
+credential-store key. The key passes through a private process pipe and the
+adapter's process environment; no credential file is created. Consultation and
+draft generation consume the saved connection's daily/concurrent request budget;
+capability discovery makes no model call and consumes no generation allowance.
+
+An existing `plugins/pythia/mcp.json` takes precedence. It must supply the supported
+local Python command, adapter and explicit `--provider-file` argument. That path
+continues to use Pythia's own operator-managed provider configuration.
 
 For content drafting the adapter also exposes `pythia_draft_changes`, backed by
 Pythia's live `ChimeraDraftProducer`. Its strictly validated result supports only
 title, screen text, narration, production direction and author-note edits on one
-selected scene, or 1-5 new native content/title/summary scenes. Chimera independently
+selected scene, or new native content/title/summary scenes matching the agreed outline. Chimera independently
 validates the returned mode, field/value types, target and current revision before
 an author can apply it. Existing assessments, media, layout settings and other
 scenes are preserved by the normal scene update path.
 
 The browser cannot supply executable paths, commands, provider settings or keys.
-Chimera never reads or copies the provider credential file; Pythia's adapter reads
-its existing operator-owned configuration. The bridge runs with Pythia's Python
+Chimera never reads or copies a plugin's provider credential file; Pythia's adapter
+reads that configuration when supplied. The bridge runs with Pythia's Python
 environment so its newer MCP dependencies do not replace Chimera's FastAPI stack.
 It creates no network listener and reuses no Manteion Engine service identity.
 `CHIMERA_PYTHIA_BASE_URL` and **Settings > Pythia** still configure the separate
@@ -93,13 +105,26 @@ selected scene revision or source version changes during the call, the returned
 advice is withheld and the user must ask again with current text. Scene edits
 remain under Chimera's existing authoring/review flow.
 
-Allowances: 8,000 characters per authored message, 16,000 per question including
-selected context, 24,000 combined question/history characters, 32 preceding
-history messages, 32 recorded attempts per conversation, and two simultaneous
-consultations per Chimera process. Larger context is rejected without silent
-truncation. The bridge times out after 85 seconds and terminates its own process
-tree; this cannot guarantee cancellation of a request already accepted by the
-external model provider or avoid its charges.
+Allowances: 8,000,000 characters per message plus selected context and across
+consultation history; 64,000,000 serialized characters for authoring drafts;
+32 preceding history messages, 32 recorded consultation attempts, and 20 draft
+attempts per conversation. Identical selected-source context appears once per
+request, with later copies referencing the retained text. Unique source text is
+never silently dropped. The selected model's token window is checked separately,
+including prompt/schema text and room for the response. The configured GPT-4.1
+mini model has a 1,047,576-token window; input that cannot fit is rejected with an
+explicit token-limit message before a provider request.
+
+Source files can be up to 100 MB each. Long extracted paragraphs are retained
+as consecutive passages rather than cut off at 50,000 characters. Scanned PDFs
+still require OCR before their text is available. Books larger than the model's
+window must be split across consultations; these changes do not add retrieval
+or an unlimited-context model.
+
+The private bridge accepts up to 128 MiB of serialized input. Model calls time
+out after 600 seconds and the bridge after 660 seconds; it terminates its own
+process tree. Cancellation cannot guarantee that a provider request already
+accepted stops or avoids charges.
 
 ## Verification
 
@@ -183,3 +208,17 @@ and conversation records, not applied content. Source changes during consultatio
 or after draft generation prevent applying stale material. The author remains
 responsible for inspecting content and layout after application. No full-suite,
 hosted deployment, broader action capability or release acceptance is implied.
+
+## Outline-driven first drafts
+
+Course planning and empty-project first drafts create one scene per top-level
+item in the selected expanded outline. Numbered lists and Markdown headings are
+supported; nested details become content within their parent scene. The old
+five-scene starter prompt is replaced when restoring saved author direction.
+There is no fixed total scene-count cap on this path.
+
+Chimera generates the outline in batches of four scenes, accounting for each
+model request against the saved daily allowance. Every batch must return the
+expected titles and count in order. Only a complete validated draft is offered
+for application; a failed or incomplete batch does not publish a partial draft
+or change the project. Apply changes appends the complete sequence atomically.

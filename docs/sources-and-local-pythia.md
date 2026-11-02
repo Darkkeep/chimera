@@ -6,7 +6,7 @@ Select a project, then open **Sources** in the workspace navigation. The dialog
 uses the existing reference-resource store, permissions, version history, retained
 original bytes and extraction pipeline. Uploading a source does not alter scenes.
 
-- **Documents:** PDF, DOCX, PPTX, TXT and Markdown, up to 25 MB per upload.
+- **Documents:** PDF, DOCX, PPTX, TXT and Markdown, up to 100 MB per upload.
 - **Pasted text:** named excerpts, notes or instructions retained as UTF-8 text.
 - **Web pages and links:** an HTTP(S) URL and optional pasted page text. Chimera
   does not fetch the page. URL-only records contain no grounding passages; the

@@ -123,10 +123,7 @@ test("native shapes, alpha, effects, timeline seconds and layer edits survive sa
     .filter({ has: page.locator("summary", { hasText: "Drop shadow" }) })
     .getByRole("checkbox", { name: "Enabled" })
     .check();
-  await editor.getByText("Timeline and layers", { exact: true }).click();
-  await editor
-    .getByRole("button", { name: "Enable scene timeline", exact: true })
-    .click();
+  await expect(editor.getByRole("spinbutton", { name: "Scene duration (s)", exact: true })).toBeVisible();
   await editor
     .getByRole("spinbutton", { name: "Scene duration (s)", exact: true })
     .fill("90");
@@ -248,10 +245,7 @@ test("scheduled audio supports local waveforms, preview solo/mute, fades and sou
     .click();
   await page.getByRole("button", { name: "Edit scene", exact: true }).click();
   const editor = page.getByRole("dialog").last();
-  await editor.getByText("Timeline and layers", { exact: true }).click();
-  await editor
-    .getByRole("button", { name: "Enable scene timeline", exact: true })
-    .click();
+  await expect(editor.getByRole("spinbutton", { name: "Scene duration (s)", exact: true })).toBeVisible();
   await editor
     .getByRole("combobox", { name: "Timeline media" })
     .selectOption(p.storyboard.assets[0].id);

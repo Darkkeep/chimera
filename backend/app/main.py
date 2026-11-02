@@ -342,7 +342,7 @@ app.add_middleware(
 )
 MAX_TEMPLATE_BYTES = 50 * 1024 * 1024
 MAX_MEDIA_BYTES = 100 * 1024 * 1024
-MAX_REFERENCE_BYTES = 25 * 1024 * 1024
+MAX_REFERENCE_BYTES = 100 * 1024 * 1024
 MAX_BACKUP_BYTES = 500 * 1024 * 1024
 IMAGE_UPLOAD_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 AUDIO_UPLOAD_EXTENSIONS = {".mp3", ".m4a", ".aac", ".wav", ".ogg"}
@@ -1782,7 +1782,7 @@ async def post_reference_resource(
         raise HTTPException(status_code=400, detail="Reference files must be PDF, DOCX, PPTX, TXT, or Markdown")
     content = await file.read(MAX_REFERENCE_BYTES + 1)
     if len(content) > MAX_REFERENCE_BYTES:
-        raise HTTPException(status_code=413, detail="Reference files must be 25 MB or smaller")
+        raise HTTPException(status_code=413, detail="Reference files must be 100 MB or smaller")
     try:
         parsed_scene_ids = json.loads(scene_ids)
         if not isinstance(parsed_scene_ids, list) or any(not isinstance(scene_id, str) for scene_id in parsed_scene_ids):

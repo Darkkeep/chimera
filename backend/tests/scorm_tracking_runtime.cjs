@@ -11,9 +11,11 @@ async function session(profile, stored, mode = 'popup', sceneCount = 2, videoTra
   const legacy = profile === '12';
   const names = legacy ? ['LMSInitialize', 'LMSGetValue', 'LMSSetValue', 'LMSCommit', 'LMSFinish'] : ['Initialize', 'GetValue', 'SetValue', 'Commit', 'Terminate'];
   const api = {
+    [legacy ? 'LMSGetLastError' : 'GetLastError']: () => '401',
+    [legacy ? 'LMSGetErrorString' : 'GetErrorString']: () => 'Not implemented',
     [names[0]]: () => { calls.push(['initialize']); initialized = mode !== 'init-failure'; return initialized ? 'true' : 'false'; },
     [names[1]]: key => { assert(initialized); return stored[key] || ''; },
-    [names[2]]: (key, value) => { assert(initialized); calls.push([key, value]); if (mode === 'reject') return 'false'; stored[key] = value; return 'true'; },
+    [names[2]]: (key, value) => { assert(initialized); if (legacy) assert(['cmi.suspend_data', 'cmi.core.lesson_location', 'cmi.core.exit', 'cmi.core.lesson_status', 'cmi.core.score.min', 'cmi.core.score.max', 'cmi.core.score.raw', 'cmi.core.session_time'].includes(key), `Unsupported SCORM 1.2 write: ${key}`); calls.push([key, value]); if (mode === 'reject') return 'false'; stored[key] = value; return 'true'; },
     [names[3]]: () => { assert(initialized); calls.push(['commit']); return mode === 'commit-failure' ? 'false' : 'true'; },
     [names[4]]: () => { assert(initialized); calls.push(['terminate']); initialized = false; return 'true'; },
   };
@@ -23,6 +25,8 @@ async function session(profile, stored, mode = 'popup', sceneCount = 2, videoTra
   window.parent = window;
   if (mode === 'cross-origin') Object.defineProperty(window, 'parent', { get() { throw Error('cross-origin'); } });
   const document = {
+    addEventListener() {},
+    querySelectorAll() { return []; },
     querySelector(selector) {
       if (selector === '#assessment-form' || selector === '[data-return-assessment]') return null;
       if (!nodes.has(selector)) nodes.set(selector, { textContent: '', innerHTML: '', addEventListener() {}, appendChild() {} });
@@ -35,6 +39,7 @@ async function session(profile, stored, mode = 'popup', sceneCount = 2, videoTra
         addEventListener(name, handler) { elementEvents[name] = handler; },
         setAttribute(name, value) { this.attributes[name] = value; },
         appendChild() {},
+        append() {},
         dispatch(name) { elementEvents[name]?.(); },
         events: elementEvents,
       };
@@ -82,6 +87,8 @@ async function session(profile, stored, mode = 'popup', sceneCount = 2, videoTra
     assert.equal(JSON.parse(stored['cmi.suspend_data']).visited.length, 2);
     const rejected = await session(profile, {}, 'reject');
     assert.match(rejected.nodes.get('#runtime-status').textContent, /LMS rejected/);
+    assert.match(rejected.nodes.get('#runtime-status').textContent, /cmi\./);
+    assert.match(rejected.nodes.get('#runtime-status').textContent, /error 401: Not implemented/);
     const failed = await session(profile, {}, 'init-failure');
     assert.match(failed.nodes.get('#runtime-status').textContent, /initialization failed/);
     assert.equal(failed.calls.length, 1);

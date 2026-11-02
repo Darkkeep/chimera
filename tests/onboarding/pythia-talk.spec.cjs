@@ -49,6 +49,56 @@ test('a failed Pythia submit preserves the draft and does not retry automaticall
   expect((await new AxeBuilder({ page }).include('.pythia-talk-dialog').analyze()).violations).toEqual([]);
 });
 
+test('prior exchanges roll up and processing animates for consultations and drafts', async ({ page, request }) => {
+  const advice = content => ({ content, kind: 'answer', rationale: '', limits: [], producer_id: 'live-test-provider', stopping_boundary: 'advisory-only' });
+  let state = { sessionId: 'rollup-session', configured: true, actions: [], turns: [
+    { id: 'turn-one', question: 'First question', status: 'completed', result: advice('Earlier answer retained.'), context: { sceneId: null, sourceIds: [] } },
+    { id: 'turn-two', question: 'Second question', status: 'completed', result: advice('Latest answer visible.'), context: { sceneId: null, sourceIds: [] } },
+  ] };
+  let calls = 0;
+  await page.route('**/pythia-conversation', async route => {
+    if (route.request().method() === 'POST') {
+      calls++;
+      const body = route.request().postDataJSON();
+      state = { ...state, turns: [...state.turns, { id: body.requestId, question: body.message, status: 'running', result: null, error: null, context: { sceneId: null, sourceIds: [] } }] };
+    }
+    await route.fulfill({ status: route.request().method() === 'POST' ? 202 : 200, json: state });
+  });
+  const { project, dialog } = await openConversation(page, request, 'Roll up consultation');
+  await expect(dialog.getByText('Earlier answer retained.', { exact: true })).not.toBeVisible();
+  await expect(dialog.getByText('Latest answer visible.', { exact: true })).toBeVisible();
+  await dialog.locator('.pythia-talk-turn > summary').first().click();
+  await expect(dialog.getByText('Earlier answer retained.', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Roll up prior exchanges', exact: true }).click();
+  await expect(dialog.getByText('Earlier answer retained.', { exact: true })).not.toBeVisible();
+  await dialog.getByRole('button', { name: 'Expand all exchanges', exact: true }).click();
+  await expect(dialog.getByText('Earlier answer retained.', { exact: true })).toBeVisible();
+  await dialog.getByLabel('Your message', { exact: true }).fill('Third question');
+  await dialog.getByRole('button', { name: 'Send to Pythia', exact: true }).click();
+  const processing = dialog.getByRole('status').filter({ hasText: 'Pythia Processing' });
+  await expect(processing).toBeVisible();
+  expect(await processing.locator('.pythia-processing-orb').evaluate(el => getComputedStyle(el, '::before').animationName)).toBe('pythia-orbit');
+  await expect(dialog.getByText(/close this dialog and return/)).toHaveCount(0);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  expect(await processing.locator('.pythia-processing-orb').evaluate(el => getComputedStyle(el, '::before').animationName)).toBe('none');
+  state = { ...state, turns: state.turns.map((turn, index) => index === 2 ? { ...turn, status: 'completed', result: advice('Third answer ready.') } : turn) };
+  await expect(dialog.getByText('Third answer ready.', { exact: true })).toBeVisible();
+  await expect(processing).toHaveCount(0);
+  await page.route('**/pythia-conversation/actions', async route => {
+    const body = route.request().postDataJSON();
+    state = { ...state, actions: [{ id: body.requestId, turnId: body.turnId, mode: body.mode, sceneId: body.sceneId, direction: body.direction,
+      sourceRevision: project.storyboard.revision, status: 'drafting', before: { title: 'Fictional approval queue' }, result: null, error: null }] };
+    await route.fulfill({ status: 202, json: state });
+  });
+  await dialog.getByRole('button', { name: 'Draft changes from this advice', exact: true }).last().click();
+  await dialog.getByLabel('Author direction', { exact: true }).fill('Make the title clearer.');
+  await dialog.getByRole('button', { name: 'Generate content draft', exact: true }).click();
+  await expect(processing).toBeVisible();
+  await expect(processing).toContainText('Preparing your scene draft for review');
+  expect(calls).toBe(1);
+  expect((await new AxeBuilder({ page }).include('.pythia-talk-dialog').analyze()).violations).toEqual([]);
+});
+
 test('real local Pythia answers, revises and recovers browser history', async ({ page, request }, testInfo) => {
   test.skip(process.env.CHIMERA_PYTHIA_LIVE_BROWSER !== '1', 'Explicit opt-in for two real provider consultations');
   test.setTimeout(180000);

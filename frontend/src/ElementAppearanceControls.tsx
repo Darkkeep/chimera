@@ -19,7 +19,7 @@ export function ElementAppearanceControls({
       <label className="timeline-checkbox">
         <input
           type="checkbox"
-          checked={element.aspectLocked ?? element.kind === "text"}
+          checked={element.aspectLocked ?? false}
           onChange={(event) => onChange({ aspectLocked: event.target.checked })}
         />
         Lock aspect ratio

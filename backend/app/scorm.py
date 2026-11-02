@@ -61,7 +61,10 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
         }
         return null;
   }
-        function call(name, value) { if (!api) return ""; try { const result = api[name](...value); if (result === false || result === "false") { lmsWarningShown = true; runtimeStatus(`LMS rejected ${name}; progress or grades may not be saved. Check the LMS launch and grading settings.`); } return result; } catch (_) { if (!lmsWarningShown) { lmsWarningShown = true; runtimeStatus("LMS tracking is unavailable; progress will not be reported."); } return ""; } }
+        function call(name, value) { if (!api) return ""; try { const result = api[name](...value); if (result === false || result === "false") { lmsWarningShown = true; let detail = "";
+                try { const getCode = api.LMSGetLastError || api.GetLastError; const code = getCode?.call(api); const getText = api.LMSGetErrorString || api.GetErrorString; if (code && String(code) !== "0") detail = ` (error ${code}${getText ? ": " + getText.call(api, String(code)) : ""})`; } catch (_) {}
+                const element = /SetValue$/.test(name) ? ` for ${String(value[0])}` : "";
+                runtimeStatus(`LMS rejected ${name}${element}${detail}; progress or grades may not be saved. Report this message to the course administrator.`); } return result; } catch (_) { if (!lmsWarningShown) { lmsWarningShown = true; runtimeStatus("LMS tracking is unavailable; progress will not be reported."); } return ""; } }
     function accepted(result) { return result === true || result === "true"; }
     function suspendSnapshot() {
         const snapshot = { current: state.current, visited: [...state.visited], completedAudio: [...state.completedAudio], assessments: state.assessments, remediation: state.remediation };
@@ -279,7 +282,7 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
         const layout = scene.visualLayout;
         const frame = document.createElement("div");
         frame.className = "visual-stage-frame";
-        frame.style.cssText = `position:relative;width:100%;overflow:hidden;aspect-ratio:${layout.width}/${layout.height}`;
+        frame.style.cssText = `position:relative;width:100%;overflow:hidden;aspect-ratio:${layout.width}/${layout.height};--stage-ratio:${layout.width/layout.height}`;
         const stage = document.createElement("div");
         stage.className = "visual-stage";
         stage.style.cssText = `position:absolute;left:0;top:0;transform-origin:top left;width:${layout.width}px;height:${layout.height}px`;
@@ -392,7 +395,7 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
     const placements = scene.mediaPlacements?.length ? scene.mediaPlacements : [...(scene.imageAssets || []), ...(scene.audioAssets || []), ...(scene.videoAssets || [])].map(assetId => ({ assetId, position: "after" }));
     placements.forEach(placement => {
         const id = placement.assetId, asset = window.__CHIMERA_ASSETS[id];
-        if (!asset || scheduledAssets(scene).has(id) || asset.kind === "image" && embeddedImages.has(id)) return;
+        if (!asset || scheduledAssets(scene).has(id) || asset.kind === "image" && (embeddedImages.has(id) || asset.role === "background" || id === scene.visualLayout?.backgroundAsset || id === scene.backgroundAsset)) return;
         const container = placement.position === "before" ? before : media;
         const node = document.createElement(asset.kind === "image" ? "img" : asset.kind === "video" ? "video" : "audio");
         node.src = asset.path;
@@ -462,23 +465,30 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
       const stage = body.querySelector('.visual-stage');
       stopStageAnimations = playStageAnimations(body,layout.elements);
       const controls = document.createElement('section'); controls.setAttribute('aria-label','Scene playback');
-      controls.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 0';
+      controls.className = 'scene-playback';
       const play = document.createElement('button');play.type='button';play.textContent='Play scene';
       const restart = document.createElement('button');restart.type='button';restart.textContent='Restart';
+      const mute = document.createElement('button');mute.type='button';mute.textContent='Mute audio';mute.setAttribute('aria-pressed','false');
       const seek = document.createElement('input');seek.type='range';seek.min='0';seek.max=String(timeline.durationMs);seek.step='50';seek.setAttribute('aria-label','Scene playback time');
       const output=document.createElement('output');
-      controls.append(play,restart,seek,output);body.appendChild(controls);
-      let lastSaved = 0;
+      const formatTime = ms => `${Math.floor(ms/60000)}:${String(Math.floor(ms/1000)%60).padStart(2,'0')}`;
+      controls.append(play,restart,seek,output,mute);body.appendChild(controls);
+      let lastSaved = 0, playRequested = false;
       const controller=createSceneTransport({root:body,stage,layout,resolveAsset:id=>window.__CHIMERA_ASSETS[id],initialTimeMs:(state.videoProgress[`clock:${scene.id}`]?.position||0)*1000,
         progress:Object.fromEntries(timeline.clips.map(c=>[c.id,state.videoProgress[clipProgressKey(scene.id,c)]]).filter(([,v])=>v)),
-        onUpdate:(time,playing)=>{seek.value=String(time);output.textContent=`${(time/1000).toFixed(1)} / ${(timeline.durationMs/1000).toFixed(1)} s`;play.textContent=playing?'Pause scene':'Play scene';state.videoProgress[`clock:${scene.id}`]={position:time/1000,duration:timeline.durationMs/1000,watchedRanges:[]};if(!playing||time-lastSaved>5000){lastSaved=time;save();}},
-        onProgress:(id,value)=>{const clip=timeline.clips.find(c=>c.id===id);if(clip){state.videoProgress[clipProgressKey(scene.id,clip)]=value;finish();}},onError:runtimeStatus});
+        onUpdate:(time,playing)=>{seek.value=String(time);output.textContent=`${formatTime(time)} / ${formatTime(timeline.durationMs)}`;play.textContent=playing?'Pause scene':'Play scene';if(time>=timeline.durationMs)playRequested=false;state.videoProgress[`clock:${scene.id}`]={position:time/1000,duration:timeline.durationMs/1000,watchedRanges:[]};if(!playing||time-lastSaved>5000){lastSaved=time;save();}},
+        onProgress:(id,value)=>{const clip=timeline.clips.find(c=>c.id===id);if(clip){state.videoProgress[clipProgressKey(scene.id,clip)]=value;finish();}},onError:message=>{if(!message.startsWith('Media is buffering'))playRequested=false;runtimeStatus(message);}});
       sceneTransport=controller;
       // A deterministic snapshot hook is also used by Word scene rendering.
       window.__CHIMERA_SCENE_TRANSPORT = controller;
-      play.onclick=()=>controller.playing?controller.pause():controller.play();
-      restart.onclick=()=>controller.seek(0);seek.oninput=()=>controller.seek(Number(seek.value));
+      function clearBufferStatus(){if(document.querySelector('#runtime-status').textContent.startsWith('Buffering media.'))runtimeStatus(api?'Connected to LMS tracking.':'Media ready.');}
+      play.onclick=()=>{playRequested=!playRequested;if(playRequested)controller.play();else{controller.pause();clearBufferStatus();}};
+      restart.onclick=()=>{playRequested=false;controller.pause();controller.seek(0);clearBufferStatus();};
+      mute.onclick=()=>{const muted=mute.getAttribute('aria-pressed')!=='true';controller.setAudition({muted:muted?timeline.clips.map(clip=>clip.id):[],solo:null});mute.setAttribute('aria-pressed',String(muted));mute.textContent=muted?'Unmute audio':'Mute audio';};
+      seek.oninput=()=>controller.seek(Number(seek.value));
       for(const {node,asset,clip} of controller.media){
+        node.addEventListener('waiting',()=>{if(playRequested){play.textContent='Cancel playback';runtimeStatus('Buffering media. Playback will resume when it is ready.');}});
+        node.addEventListener('canplay',()=>{if(playRequested && !controller.playing && !document.hidden){controller.play();if(document.querySelector('#runtime-status').textContent.startsWith('Buffering media.'))runtimeStatus(api?'Connected to LMS tracking.':'Media ready.');}});
         if(asset?.captionsVtt)installCaptionTrack(node,asset.captionsVtt,asset.language||'en');
         if(asset?.transcript){const details=document.createElement('details'),summary=document.createElement('summary'),text=document.createElement('p');summary.textContent=`Transcript: ${clip.name||asset.filename}`;text.textContent=asset.transcript;details.append(summary,text);body.appendChild(details);}
       }
@@ -487,6 +497,15 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
     document.querySelector("#previous").disabled = state.current === 0;
     document.querySelector("#next").disabled = state.current === state.scenes.length - 1;
     document.querySelector("#contents").value = String(state.current);
+    document.querySelectorAll("#lesson-list button").forEach((button, index) => {
+      const active = index === state.current;
+      if (active) button.setAttribute("aria-current", "step"); else button.removeAttribute("aria-current");
+      button.classList.toggle("lesson-visited", state.visited.has(state.scenes[index].id));
+      button.querySelector(".lesson-number").textContent = state.visited.has(state.scenes[index].id) && !active ? "?" : String(index + 1).padStart(2,"0");
+    });
+    const courseProgress = document.querySelector("#course-progress"); courseProgress.max = state.scenes.length; courseProgress.value = state.visited.size;
+    courseProgress.title = `${state.visited.size} of ${state.scenes.length} scenes visited`;
+    const article = document.querySelector(".player-main"); article.scrollTop = 0;
     document.querySelector("#motion").hidden = Boolean(scene.visualLayout?.timeline) || !scene.visualLayout?.elements.some(element => element.animations && Object.values(element.animations).some(phase => phase.effect !== "none"));
     document.querySelector("#motion").textContent = motionEnabled ? "Stop motion" : "Play motion";
     finish();
@@ -505,6 +524,12 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
     if (!Number.isInteger(state.current) || state.current < 0 || state.current >= state.scenes.length) state.current = 0;
     const contents = document.querySelector("#contents");
     state.scenes.forEach((scene, index) => { const option = document.createElement("option"); option.value = String(index); option.textContent = `${index + 1}. ${scene.title}`; contents.appendChild(option); });
+    const lessonList = document.querySelector("#lesson-list");
+    state.scenes.forEach((scene,index) => { const item=document.createElement("li"),button=document.createElement("button"),number=document.createElement("span"),title=document.createElement("span");button.type="button";number.className="lesson-number";number.setAttribute("aria-hidden","true");title.textContent=scene.title;button.append(number,title);button.onclick=()=>{state.current=index;state.remediation=null;save();render();document.querySelector("#scene-title").focus({preventScroll:true});};item.appendChild(button);lessonList.appendChild(item); });
+    const fullscreen = document.querySelector("#fullscreen");
+    fullscreen.hidden = !document.fullscreenEnabled;
+    fullscreen.onclick = async () => {try {if(document.fullscreenElement) await document.exitFullscreen();else await document.querySelector("#course-player").requestFullscreen();}catch(_){runtimeStatus("Full screen is unavailable in this browser or LMS window.");}};
+    document.addEventListener("fullscreenchange",()=>{fullscreen.textContent=document.fullscreenElement?"Exit full screen":"Full screen";});
     contents.addEventListener("change", () => { state.current = Number(contents.value); state.remediation = null; save(); render(); });
     document.querySelector("#previous").onclick = () => { state.current -= 1; save(); render(); };
     document.querySelector("#next").onclick = () => { state.current += 1; save(); render(); };
@@ -558,7 +583,8 @@ PLAYER_HTML = '''<!doctype html>
 <style>.assessment-stage-region h3{font-size:24px;margin:0 0 20px}.assessment-stage-region label{display:block;margin:12px 0}.assessment-stage-region button,.assessment-stage-region input,.assessment-stage-region select{font:inherit}.assessment-stage-region button{padding:8px 16px;margin:16px 0}.assessment-stage-region input[type=radio],.assessment-stage-region input[type=checkbox]{width:22px;height:22px}@media(max-width:600px){.assessment-stage-frame{min-height:600px;aspect-ratio:auto!important}}</style>
 <style>.native-slide{box-sizing:border-box;width:100%;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:center;gap:24px;padding:48px 56px;border:1px solid #ccd5cc;background:#fff;overflow-wrap:anywhere}.native-slide h3{margin:0;font-size:32px;line-height:1.25}.native-slide p{margin:0 0 16px;font-size:20px;line-height:1.6}.native-slide p:last-child{margin-bottom:0}@media(max-width:600px){.native-slide{padding:28px 24px;gap:20px}.native-slide h3{font-size:24px}.native-slide p{font-size:18px}}</style>
 <style>body{margin:0;background:#f4f5f1;color:#26352c;font:16px system-ui,sans-serif}main{max-width:960px;margin:0 auto;padding:32px 20px}header{border-bottom:1px solid #ccd5cc;margin-bottom:24px}h1{font-size:28px;margin:0 0 20px}h2{font-size:24px}#scene-body{line-height:1.6}#scene-media{display:grid;gap:16px;margin:24px 0}#scene-media img{max-width:100%;max-height:520px;object-fit:contain;background:#fff}audio,video{width:100%;max-height:540px}#scene-media-before img{max-width:100%;max-height:520px}#scene-media-before{display:grid;gap:16px;margin:20px 0}.controls{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:28px}.controls button{border:1px solid #52685a;background:#fff;color:#26352c;padding:10px 16px;border-radius:4px;font:inherit}.controls button:disabled{opacity:.45}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}</style></head>
-<body><main><header><h1 id="course-title">Loading course...</h1><p id="scene-status" aria-live="polite"></p><p id="runtime-status" role="status" aria-live="polite"></p><label for="contents">Contents</label> <select id="contents" aria-label="Contents" style="max-width:100%;padding:8px;font:inherit"></select></header><article aria-labelledby="scene-title"><h2 id="scene-title"></h2><div id="scene-media-before"></div><div id="scene-body"></div><div id="scene-assessment"></div><div id="scene-media"></div></article><nav class="controls" aria-label="Scene navigation"><button id="previous" type="button">Previous</button><button id="motion" type="button" hidden>Stop motion</button><span class="sr-only">Scene navigation</span><button id="next" type="button">Next</button></nav></main><script src="player.js"></script></body></html>'''
+<body><main class="player-shell" id="course-player"><header class="player-header"><div><span class="player-kicker">Learning course</span><h1 id="course-title">Loading course...</h1></div><div class="header-progress"><p id="scene-status" aria-live="polite"></p><progress id="course-progress" aria-label="Scenes visited" max="1" value="0"></progress><button id="fullscreen" type="button">Full screen</button></div></header><aside class="player-sidebar"><h2>Course contents</h2><nav aria-label="Lessons"><ol id="lesson-list" class="lesson-list"></ol></nav></aside><div class="mobile-contents"><label for="contents">Jump to scene</label><select id="contents" aria-label="Contents"></select></div><article class="player-main" aria-labelledby="scene-title"><h2 id="scene-title" tabindex="-1"></h2><div id="scene-media-before"></div><div id="scene-body"></div><div id="scene-assessment"></div><div id="scene-media"></div></article><nav class="controls player-footer" aria-label="Scene navigation"><button id="previous" type="button">Previous</button><p id="runtime-status" class="runtime-note" role="status" aria-live="polite"></p><button id="motion" type="button" hidden>Stop motion</button><button id="next" type="button">Next</button></nav></main><script src="player.js"></script></body></html>'''
+PLAYER_HTML = PLAYER_HTML.replace("</head>", "<style>" + (Path(__file__).parent / "static" / "player-shell.css").read_text(encoding="utf-8") + "</style></head>")
 
 
 PLAYER_HTML = PLAYER_HTML.replace("</head>", f"<style>{ASSESSMENT_SURFACE_CSS}</style></head>")
@@ -581,7 +607,8 @@ def _scorm_12_player() -> str:
     player = player.replace('"cmi.score.min"', '"cmi.core.score.min"')
     player = player.replace('"cmi.score.max"', '"cmi.core.score.max"')
     player = player.replace('"cmi.score.raw"', '"cmi.core.score.raw"')
-    player = player.replace('"cmi.score.scaled"', '"cmi.core.score.scaled"')
+    # SCORM 1.2 has raw/min/max scores, but no scaled score element.
+    player = player.replace('call("SetValue", ["cmi.score.scaled", String((score ?? 0) / 100)]);', '')
     player = player.replace('"cmi.session_time"', '"cmi.core.session_time"')
     return player.replace('call("SetValue", ["cmi.core.lesson_status", complete ? "completed" : "incomplete"]);\n    call("SetValue", ["cmi.core.lesson_status", complete ? (passed ? "passed" : "failed") : "incomplete"]);', 'call("SetValue", ["cmi.core.lesson_status", complete ? (passed ? "passed" : "failed") : "incomplete"]);')
 

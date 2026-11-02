@@ -48,7 +48,7 @@ export function SourcesPanel({ projectId, projectTitle, canAdd, onClose, embedde
       const content = kind === "document" ? file : new File([text], `${kind}-source.txt`, { type: "text/plain" });
       if (!content) throw new Error("Choose a document first.");
       if (kind !== "document" && kind !== "web" && !text.trim()) throw new Error("Enter source text first.");
-      if (content.size > 25 * 1024 * 1024) throw new Error("Sources must be 25 MB or smaller.");
+      if (content.size > 100 * 1024 * 1024) throw new Error("Sources must be 100 MB or smaller.");
       if (kind === "web") {
         let parsed: URL;
         try { parsed = new URL(url.trim()); } catch { throw new Error("Enter a valid HTTP(S) page URL."); }
@@ -74,13 +74,13 @@ export function SourcesPanel({ projectId, projectTitle, canAdd, onClose, embedde
       onResourceSaved?.(result);
       setText(""); setTitle(""); setUrl(""); setFile(null);
       setUploadKey(value => value + 1);
-      setNotice(`Saved ${result.title}. ${result.versions.at(-1)?.extractionStatus === "complete" ? "Readable text is available for suggestions." : "This source has no usable text yet; see its extraction status below."}`);
+      setNotice(`Saved ${result.title}. ${result.versions.at(-1)?.extractionStatus === "complete" ? "Readable text is available for suggestions." : (result.versions.at(-1)?.extractionMessage || "This source has no usable text yet; see its extraction status below.")}`);
     } catch (issue) { setError(issue instanceof Error ? issue.message : "Could not save this source."); }
     finally { setBusy(false); }
   }
 
   const options = [
-    { kind: "document" as const, label: "Documents", hint: "PDF, DOCX, PPTX, TXT, or Markdown. Up to 25 MB each.", icon: documentsIcon },
+    { kind: "document" as const, label: "Documents", hint: "PDF, DOCX, PPTX, TXT, or Markdown. Up to 100 MB each.", icon: documentsIcon },
     { kind: "text" as const, label: "Pasted text", hint: "Notes, excerpts, instructions, and other source text.", icon: textIcon },
     { kind: "web" as const, label: "Web pages and links", hint: "Save a link and paste the page text you want to use.", icon: webIcon },
     { kind: "pythia" as const, label: "Pythia conversations and outputs", hint: "Paste a selected conversation or output from your Pythia workspace.", icon: pythiaIcon },
@@ -109,7 +109,7 @@ export function SourcesPanel({ projectId, projectTitle, canAdd, onClose, embedde
             {kind === "document" ? <label>Source document<input type="file" key={uploadKey} accept=".pdf,.docx,.pptx,.txt,.md" required onChange={event => setFile(event.target.files?.[0] || null)} /></label> : <>
               {kind === "web" && <><label>Page URL<input type="url" required maxLength={4000} placeholder="https://example.com/page" value={url} onChange={event => setUrl(event.target.value)} /></label><p className="field-hint">Chimera does not fetch this page. A link without pasted page text is saved for reference only.</p></>}
               {kind === "pythia" && <p className="field-hint">This stores text you supply, without verifying its origin or importing ChatGPT history. Use Settings → Pythia for the local Engine connection.</p>}
-              <label>{kind === "web" ? "Page text (optional)" : kind === "pythia" ? "Conversation or output text" : "Source text"}<textarea rows={6} value={text} required={kind !== "web"} maxLength={1000000} onChange={event => setText(event.target.value)} /></label>
+              <label>{kind === "web" ? "Page text (optional)" : kind === "pythia" ? "Conversation or output text" : "Source text"}<textarea rows={6} value={text} required={kind !== "web"} maxLength={8000000} onChange={event => setText(event.target.value)} /></label>
             </>}
             <button type="submit" className="button button-accent">{busy ? "Saving source…" : projectId ? "Save source" : "Queue source"}</button>
           </div>}

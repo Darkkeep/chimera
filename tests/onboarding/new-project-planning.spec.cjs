@@ -6,6 +6,11 @@ test.beforeEach(async ({ page }) => {
   await page.route(/\/pythia-conversation(?:\/.*)?$/, async route => {
     const response = await route.fetch({ url: 'http://127.0.0.1:8027' + new URL(route.request().url()).pathname,
       headers: { ...route.request().headers(), origin: 'http://127.0.0.1:5173' } });
+    // Source intake and unsent-draft checks must not depend on a developer's
+    // sibling Pythia installation. Live opt-in cases retain real discovery.
+    if (route.request().method() === 'GET' && !process.env.CHIMERA_PYTHIA_LIVE_BROWSER && response.ok()) {
+      return route.fulfill({ response, json: { ...await response.json(), configured: true } });
+    }
     await route.fulfill({ response });
   });
 });
@@ -112,6 +117,37 @@ test('a failed New Project attachment can be retried without creating another pr
   expect(attempts).toBe(2);
 });
 
+test('rough drafts follow the expanded outline instead of the legacy five-scene default', async ({ page, request }) => {
+  const titles = Array.from({ length: 12 }, (_, index) => `Expanded topic ${index + 1}`);
+  const state = { sessionId: 'outline-session', configured: true,
+    authorDirection: 'Create a concise rough sequence of up to five content scenes from the agreed conversation.',
+    turns: [{ id: 'outline-turn', question: 'Expand the outline.', outlineItemCount: 12, status: 'completed', context: { sceneId: null, sourceIds: [] },
+      result: { content: titles.map((title, i) => `${i + 1}. ${title}`).join('\n'), kind: 'answer', rationale: '', limits: [], producer_id: 'live-test-outline', stopping_boundary: 'advisory-only' } }], actions: [] };
+  await page.route('**/pythia-conversation', route => route.fulfill({ json: state }));
+  await page.route('**/pythia-conversation/actions', async route => {
+    const body = route.request().postDataJSON();
+    expect(body.followOutline).toBe(true);
+    expect(body.direction).toContain('every top-level item');
+    expect(body.direction).not.toContain('five');
+    await route.fulfill({ status: 202, json: { ...state, actions: [{ id: body.requestId, turnId: 'outline-turn', mode: 'add-scenes', sceneId: null,
+      direction: body.direction, sourceRevision: body.expectedRevision, before: null, status: 'pending', error: null,
+      result: { rationale: 'One scene per outline item.', producer_id: 'live-chimera-authoring-v1', changes: [], scenes: titles.map(title => ({ title, sceneType: 'content', extractedText: ['Rough content.'], narration: '', actionDescription: '', notes: '' })) } }] } });
+  });
+  const title = 'Expanded-outline rough draft';
+  const initial = await begin(page, title);
+  await initial.getByRole('button', { name: 'Create & plan with Pythia', exact: true }).click();
+  const planner = page.getByRole('dialog', { name: 'Plan your course', exact: true });
+  await expect(planner.getByLabel('Author direction', { exact: true })).not.toHaveValue(/five/);
+  await expect(planner.getByRole('region', { name: 'Turn outline into scenes' })).toContainText('12 top-level items');
+  await planner.getByRole('button', { name: 'Create scene draft from outline', exact: true }).click();
+  await expect(planner.locator('.pythia-action-new-scene')).toHaveCount(12);
+  await expect(planner.getByRole('button', { name: 'Apply changes', exact: true })).toBeEnabled();
+  await planner.getByRole('button', { name: 'Review draft and apply 12 scenes', exact: true }).click();
+  await expect(planner.locator('.pythia-action-review')).toBeFocused();
+  const project = await projectByTitle(request, title);
+  expect((await (await request.get(`/api/projects/${project.id}`)).json()).storyboard.scenes).toHaveLength(0);
+});
+
 test('New Project holds a real source-grounded conversation until the author requests and applies rough scenes', async ({ page, request }, testInfo) => {
   test.skip(process.env.CHIMERA_PYTHIA_LIVE_BROWSER !== '1', 'Explicit opt-in for three real Pythia calls');
   test.setTimeout(240000);
@@ -127,10 +163,10 @@ test('New Project holds a real source-grounded conversation until the author req
   const project = await projectByTitle(request, title);
   const getProject = async () => (await request.get(`/api/projects/${project.id}`)).json();
   expect((await getProject()).storyboard.scenes).toHaveLength(0);
-  await planner.getByLabel('Your message', { exact: true }).fill('Make this self-paced and plan for two short content scenes. Confirm the plan before drafting anything.');
+  await planner.getByLabel('Your message', { exact: true }).fill('Make this self-paced. Return a numbered outline with exactly two top-level items titled Choose the label and Check before sending. Confirm the plan before drafting anything.');
   await planner.getByRole('tab', { name: 'Sources', exact: true }).click();
   await planner.getByRole('tab', { name: 'Plan with Pythia', exact: true }).click();
-  await expect(planner.getByLabel('Your message', { exact: true })).toHaveValue('Make this self-paced and plan for two short content scenes. Confirm the plan before drafting anything.');
+  await expect(planner.getByLabel('Your message', { exact: true })).toHaveValue('Make this self-paced. Return a numbered outline with exactly two top-level items titled Choose the label and Check before sending. Confirm the plan before drafting anything.');
   await planner.getByRole('button', { name: 'Send to Pythia', exact: true }).click();
   await expect(planner.locator('.pythia-talk-answer')).toHaveCount(2, { timeout: 90000 });
   expect((await getProject()).storyboard.scenes).toHaveLength(0);

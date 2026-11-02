@@ -1,11 +1,12 @@
 import { ReactNode, useEffect, useRef } from "react";
 
 /** Shared keyboard and focus behavior for the authoring dialogs. */
-export function EditorDialog({ children, labelledBy, onClose, busy = false, className = "", onResumeWalkthrough, walkthroughLabel = "Resume walkthrough", onboardingTarget, onboardingJourney }: {
+export function EditorDialog({ children, labelledBy, onClose, busy = false, dismissible = true, className = "", onResumeWalkthrough, walkthroughLabel = "Resume walkthrough", onboardingTarget, onboardingJourney }: {
   children: ReactNode;
   labelledBy: string;
   onClose: () => void;
   busy?: boolean;
+  dismissible?: boolean;
   className?: string;
   onResumeWalkthrough?: () => void;
   walkthroughLabel?: string;
@@ -13,8 +14,8 @@ export function EditorDialog({ children, labelledBy, onClose, busy = false, clas
   onboardingJourney?: string;
 }) {
   const dialog = useRef<HTMLElement>(null);
-  const latest = useRef({ onClose, busy });
-  latest.current = { onClose, busy };
+  const latest = useRef({ onClose, busy, dismissible });
+  latest.current = { onClose, busy, dismissible };
 
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -29,7 +30,7 @@ export function EditorDialog({ children, labelledBy, onClose, busy = false, clas
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        if (!latest.current.busy) latest.current.onClose();
+        if (!latest.current.busy && latest.current.dismissible) latest.current.onClose();
       }
       if (event.key !== "Tab") return;
       const elements = focusable();
@@ -55,7 +56,7 @@ export function EditorDialog({ children, labelledBy, onClose, busy = false, clas
   }, []);
 
   return <div className="modal-backdrop" onClick={(event) => {
-    if (event.target === event.currentTarget && !busy) onClose();
+    if (event.target === event.currentTarget && !busy && dismissible) onClose();
   }}>
     <section ref={dialog} data-onboarding={onboardingTarget} data-onboarding-journey={onboardingJourney} className={`modal ${className}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy} tabIndex={-1}>
       {children}

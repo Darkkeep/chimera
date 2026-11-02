@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from backend.app import main, pythia_actions as actions, pythia_talk as talk, storage
 from backend.app.models import ProjectCreate, SceneCreate, SceneUpdate, SceneLayout, SceneElement
 from backend.app.platform import LOCAL_ACTOR
+from backend.app.outline import outline_titles
 
 
 UPDATE = {"mode": "update-scene", "rationale": "Put the practical action first.",
@@ -83,6 +84,31 @@ class PythiaActionTests(unittest.TestCase):
         self.assertEqual(self.decide().status_code, 200)
         self.assertEqual(storage.read_project(self.project.id).storyboard.revision, project.storyboard.revision)
 
+    def test_apply_additional_paragraphs_keeps_the_correct_scene(self):
+        for scene_count in (1, 3):
+            with self.subTest(scene_count=scene_count):
+                self.project = storage.update_scene(self.project.id, self.scene.id, SceneUpdate(title="Original", extractedText=["Original body."]))
+                while len(self.project.storyboard.scenes) < scene_count:
+                    self.project = storage.create_scene(self.project.id, SceneCreate(title="Preserve other scene", extractedText=["Unchanged."]))
+                original_others = [s.model_dump() for s in self.project.storyboard.scenes[1:]]
+                result = copy.deepcopy(UPDATE)
+                paragraphs = ["Check the guard.", "Check the controls.", "Report any defect."]
+                result["changes"][1]["value"] = paragraphs
+                request_id = f"draft-paragraphs-{scene_count}"
+                with patch.object(talk, "local_mcp", return_value=result):
+                    self.assertEqual(self.draft(request_id=request_id).status_code, 202)
+                    self.finished()
+                response = self.client.post(self.base + f"/actions/{request_id}/decision", json={
+                    "sessionId": "session-one", "decision": "apply", "expectedRevision": self.project.storyboard.revision}, headers=self.headers)
+                self.assertEqual(response.status_code, 200, response.text)
+                self.project = storage.read_project(self.project.id)
+                self.assertEqual(len(self.project.storyboard.scenes), scene_count)
+                target = self.project.storyboard.scenes[0]
+                self.assertEqual(target.id, self.scene.id)
+                self.assertEqual(target.extractedText, paragraphs)
+                self.assertEqual([e.text for e in target.visualLayout.elements], ["Inspect before use", *paragraphs])
+                self.assertEqual([s.model_dump() for s in self.project.storyboard.scenes[1:]], original_others)
+
     def test_apply_preserves_authored_timeline_and_shape_appearance(self):
         layout = self.project.storyboard.scenes[0].visualLayout.model_dump()
         layout["timeline"] = {"durationMs": 6000, "printTimeMs": 2000}
@@ -112,6 +138,52 @@ class PythiaActionTests(unittest.TestCase):
         self.assertEqual(self.decide().status_code, 200)
         self.assertEqual(len(storage.read_project(self.project.id).storyboard.scenes), 3)
         self.assertTrue(all(scene.visualLayout is None or scene.visualLayout.timeline is None for scene in project.storyboard.scenes[1:]))
+
+    def test_outline_creates_every_scene_in_order_across_batches(self):
+        titles = [f"Expanded topic {i}" for i in range(1, 14)]
+        state = talk.read_state(self.path)
+        state["turns"][0]["result"]["content"] = "# Expanded outline\n" + "\n".join(f"{i}. **{title}**\n   - Supporting detail" for i, title in enumerate(titles, 1))
+        talk.write_state(self.path, state)
+        before = self.project.storyboard.model_dump()
+        def producer(*, authoring_request):
+            return {**ADD, "scenes": [{"title": title, "extractedText": [f"Content for {title}"]} for title in authoring_request["outlineTitles"]]}
+        with patch.object(talk, "local_mcp", side_effect=producer) as provider:
+            self.assertEqual(self.draft("add-scenes", followOutline=True).status_code, 202)
+            state = self.finished()
+            self.assertEqual(state["actions"][-1]["status"], "pending", state)
+            self.assertEqual(provider.call_count, 4)
+            self.assertEqual([s["title"] for s in state["actions"][-1]["result"]["scenes"]], titles)
+        self.assertEqual(storage.read_project(self.project.id).storyboard.model_dump(), before)
+        self.assertEqual(self.decide().status_code, 200)
+        project = storage.read_project(self.project.id)
+        self.assertEqual([s.title for s in project.storyboard.scenes[1:]], titles)
+        self.assertEqual(project.storyboard.scenes[0].model_dump(), before["scenes"][0])
+        self.assertEqual(self.decide().status_code, 200)
+        self.assertEqual(len(storage.read_project(self.project.id).storyboard.scenes), 14)
+
+    def test_incomplete_outline_batch_never_publishes_partial_draft(self):
+        state = talk.read_state(self.path)
+        state["turns"][0]["result"]["content"] = "\n".join(f"{i}. Topic {i}" for i in range(1, 9))
+        talk.write_state(self.path, state)
+        def producer(*, authoring_request):
+            titles = authoring_request["outlineTitles"]
+            if titles[0] == "Topic 5":
+                titles = titles[:-1]
+            return {**ADD, "scenes": [{"title": title, "extractedText": ["Text."]} for title in titles]}
+        before = self.project.storyboard.model_dump()
+        with patch.object(talk, "local_mcp", side_effect=producer):
+            self.assertEqual(self.draft("add-scenes", followOutline=True).status_code, 202)
+            action = self.finished()["actions"][-1]
+        self.assertEqual(action["status"], "failed")
+        self.assertIsNone(action["result"])
+        self.assertIn("every requested outline item", action["error"])
+        self.assertEqual(storage.read_project(self.project.id).storyboard.model_dump(), before)
+
+    def test_outline_headings_do_not_turn_subitems_into_scenes(self):
+        self.assertEqual(outline_titles("# Outline\n### 1. Introduction\n- Detail\n### 2. Practice\n- Detail\n#### Example"), ["Introduction", "Practice"])
+        self.assertEqual(outline_titles("1. Scene 1: Introduction\n   1. Nested detail\n2. Scene 2: Practice"), ["Scene 1: Introduction", "Scene 2: Practice"])
+        self.assertEqual(outline_titles("1. Introduction\n   - Detail\n2. Practice\n\nNotes:\n- " + "A long caution. " * 20), ["Introduction", "Practice"])
+        self.assertEqual(outline_titles("# Outline\n## Introduction\n- Detail A\n- Detail B\n## Practice\n- Detail C"), ["Introduction", "Practice"])
 
     def test_discard_preserves_storyboard(self):
         with patch.object(talk, "local_mcp", return_value=copy.deepcopy(UPDATE)):

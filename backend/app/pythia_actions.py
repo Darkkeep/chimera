@@ -7,6 +7,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from . import pythia_talk as talk, storage
+from .pythia_limits import MAX_AUTHORING_CHARS
+from .outline import outline_titles
 from .models import SceneCreate, SceneUpdate
 
 
@@ -46,7 +48,7 @@ class DraftResult(BaseModel):
     mode: Literal["update-scene", "add-scenes"]
     rationale: str = Field(min_length=1, max_length=2000)
     changes: list[FieldEdit] = Field(max_length=5)
-    scenes: list[ContentScene] = Field(max_length=5)
+    scenes: list[ContentScene]
     producer_id: Literal["live-chimera-authoring-v1"]
     stopping_boundary: Literal["draft-only"]
 
@@ -69,6 +71,7 @@ class DraftRequest(BaseModel):
     sceneId: str | None = Field(default=None, max_length=120)
     direction: str = Field(min_length=1, max_length=4000)
     expectedRevision: int = Field(ge=1)
+    followOutline: bool = False
 
 
 class ActionDecision(BaseModel):
@@ -122,8 +125,16 @@ def submit(project_id, actor, data, authorize):
             if previous["id"] == data.turnId:
                 break
         scene_data = ({field: getattr(target, field) for field in ("title", "extractedText", "narration", "actionDescription", "notes")} if target else None)
-        payload = {"mode": data.mode, "direction": data.direction.strip(), "advice": turn["result"]["content"], "history": history, "scene": scene_data}
-        if len(history) > 32 or len(json.dumps(payload, ensure_ascii=False)) > 64000:
+        payload = {"mode": data.mode, "direction": data.direction.strip(), "advice": turn["result"]["content"], "history": talk.deduplicate_source_context(history), "scene": scene_data}
+        if data.mode == "add-scenes" and data.followOutline:
+            try:
+                titles = outline_titles(turn["result"]["content"])
+            except ValueError as error:
+                raise talk.TalkError(str(error)) from None
+            if not titles:
+                raise talk.TalkError("Choose the answer containing the expanded outline. Use top-level numbered items or Markdown headings so each item can become one scene.")
+            payload["outlineTitles"] = titles
+        if len(history) > 32 or len(json.dumps(payload, ensure_ascii=False)) > MAX_AUTHORING_CHARS:
             raise talk.TalkError("The authoring context exceeds the local Pythia allowance. Start a smaller conversation; no text was silently omitted.")
         if not talk.CAPACITY.acquire(blocking=False):
             raise talk.TalkError("Two Pythia operations are already active. Try again when one finishes.", 429)
@@ -146,7 +157,23 @@ def finish(path, project_id, session_id, action, payload, authorize):
     try:
         authorize()
         talk.check_binding(project_id, action["binding"])
-        result = DraftResult.model_validate(talk.local_mcp(authoring_request=payload))
+        titles = payload.get("outlineTitles", [])
+        if titles:
+            scenes = []
+            # Generate every outline item in small complete batches instead of
+            # forcing the entire course into one model response's output limit.
+            for start in range(0, len(titles), 4):
+                authorize()
+                talk.check_binding(project_id, action["binding"])
+                batch_titles = titles[start:start + 4]
+                batch = DraftResult.model_validate(talk.local_mcp(authoring_request={**payload, "outlineTitles": batch_titles}))
+                if batch.mode != "add-scenes" or [scene.title for scene in batch.scenes] != batch_titles:
+                    raise talk.TalkError("The draft did not cover every requested outline item in order. Nothing was applied. Request a new draft.")
+                scenes.extend(batch.scenes)
+            result = DraftResult(mode="add-scenes", rationale=f"One scene for each of the {len(titles)} top-level outline items, in outline order.", changes=[], scenes=scenes,
+                producer_id="live-chimera-authoring-v1", stopping_boundary="draft-only")
+        else:
+            result = DraftResult.model_validate(talk.local_mcp(authoring_request=payload))
         if result.mode != action["mode"]:
             raise talk.TalkError("Pythia returned a different action scope. Nothing was applied.")
         if result.mode == "update-scene":

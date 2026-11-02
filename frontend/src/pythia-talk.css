@@ -1,4 +1,4 @@
-.modal.pythia-talk-dialog { width: min(780px, calc(100vw - 32px)); border-radius: 18px; padding: 24px; }
+.modal.pythia-talk-dialog { width: min(1440px, calc(100vw - 32px)); min-height: calc(100dvh - 64px); border-radius: 18px; padding: 24px; }
 .pythia-talk-heading { display: flex; align-items: center; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
 .pythia-talk-heading > img { flex-shrink: 0; object-fit: contain; }
 .pythia-talk-heading > div { flex: 1; min-width: 0; }
@@ -8,7 +8,27 @@
 .pythia-talk-connection p { flex: 1; margin: 0; color: var(--muted); font-size: 12px; }
 .pythia-talk-history { display: grid; gap: 24px; padding: 8px 0 20px; }
 .pythia-talk-history > p { color: var(--muted); line-height: 1.6; }
-.pythia-talk-turn { display: grid; gap: 16px; }
+.pythia-talk-turn { min-width: 0; border: 1px solid var(--line); border-radius: 12px; }
+.pythia-talk-turn > summary { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; overflow-wrap: anywhere; }
+.pythia-talk-turn > summary::before { content: "▸"; flex-shrink: 0; }
+.pythia-talk-turn[open] > summary::before { content: "▾"; }
+.pythia-talk-turn > summary > span { flex: 1; min-width: 0; }
+.pythia-talk-turn > summary > small { color: var(--muted); text-transform: capitalize; }
+.pythia-talk-turn > summary:focus-visible { outline: 2px solid var(--chimera-pythia-link, #7f5cff); outline-offset: 2px; border-radius: 12px; }
+.pythia-talk-exchange { display: grid; gap: 16px; padding: 0 16px 16px; }
+.pythia-history-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.pythia-processing { display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid var(--chimera-pythia-link, #7f5cff); border-radius: 12px; }
+.pythia-processing > div { flex: 1; min-width: 0; }
+.pythia-processing p { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.pythia-processing-orb { position: relative; display: grid; place-items: center; width: 52px; height: 52px; flex-shrink: 0; }
+.pythia-processing-orb::before { content: ""; position: absolute; inset: 0; border: 2px solid var(--line); border-top-color: var(--chimera-pythia-link, #7f5cff); border-radius: 50%; animation: pythia-orbit 1.6s linear infinite; }
+.pythia-processing-dots { display: flex; gap: 4px; }
+.pythia-processing-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--chimera-pythia-link, #7f5cff); animation: pythia-dot 1.4s ease-in-out infinite; }
+.pythia-processing-dots i:nth-child(2) { animation-delay: .2s; }
+.pythia-processing-dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes pythia-orbit { to { transform: rotate(360deg); } }
+@keyframes pythia-dot { 0%, 80%, 100% { opacity: .3; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pythia-processing-orb::before, .pythia-processing-dots i { animation: none; } }
 .pythia-talk-message { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: start; gap: 12px; }
 .pythia-talk-message > img { object-fit: contain; }
 .pythia-talk-message > div { padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--theme-panel, var(--surface)); }
@@ -30,7 +50,7 @@
 .pythia-talk-sources p { color: var(--muted); font-size: 12px; line-height: 1.5; }
 .pythia-talk-sources label { margin-top: 12px; }
 .pythia-talk-question { display: grid; gap: 8px; font-size: 13px; }
-.pythia-talk-question textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 100px; }
+.pythia-talk-question textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 160px; }
 .pythia-talk-send { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
 .pythia-talk-send small { color: var(--muted); }
 .pythia-talk-note { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 16px; color: var(--muted); font-size: 12px; line-height: 1.6; }

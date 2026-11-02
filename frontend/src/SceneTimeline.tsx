@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { PointerEvent } from "react";
 import type { Project } from "./App";
 import type { SceneLayout, SceneElement } from "./SceneSurface";
-import { animationEndMs } from "./scene-timeline";
+import { animationEndMs, withSceneTimeline } from "./scene-timeline";
 import type { TimelineClip } from "./scene-timeline";
 import { defaultAnimations, alignExitTiming } from "./AnimationControls";
 import "./scene-timeline.css";
@@ -79,7 +79,7 @@ export function SceneTimeline({
     [message, setMessage] = useState("");
   const [waveforms, setWaveforms] = useState<Record<string, Waveform>>({}),
     [decoding, setDecoding] = useState(false);
-  const timeline = layout.timeline;
+  const timeline = withSceneTimeline(layout).timeline;
   const media = project.storyboard.assets.filter(
     (a) => a.kind === "audio" || a.kind === "video",
   );
@@ -292,45 +292,6 @@ export function SceneTimeline({
       setDecoding(false);
     }
   }
-  if (!timeline)
-    return (
-      <details className="scene-timeline">
-        <summary>Timeline and layers</summary>
-        <p>
-          Enable a shared scene clock to schedule objects and media. Existing
-          attached media stays unchanged until explicitly added as a clip.
-        </p>
-        <button
-          type="button"
-          className="button button-outline"
-          disabled={disabled}
-          onClick={() => {
-            const endpoint = Math.max(
-              30000,
-              ...layout.elements.flatMap((e) => [
-                e.timing?.endMs || 0,
-                e.animations?.exit.effect !== "none"
-                  ? (e.animations?.exit.delayMs || 0) +
-                    (e.animations?.exit.durationMs || 0)
-                  : 0,
-              ]),
-            );
-            commit({
-              ...layout,
-              timeline: {
-                version: 1,
-                durationMs: Math.min(3600000, endpoint),
-                printTimeMs: 0,
-                clips: [],
-                cues: [],
-              },
-            });
-          }}
-        >
-          Enable scene timeline
-        </button>
-      </details>
-    );
   return (
     <details className="scene-timeline" open>
       <summary>Timeline and layers</summary>

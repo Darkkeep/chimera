@@ -2,6 +2,36 @@ const { test, expect } = require('@playwright/test');
 const {mockMediaConnections} = require('./media-connection-fixtures.cjs');
 test.beforeEach(async ({page}) => mockMediaConnections(page));
 
+test('text boxes resize independently and wrap at their new width', async ({ page, request }) => {
+  let project = await (await request.post('/api/projects', { data: { title: 'Freely wrapping text' } })).json();
+  const text = 'Narrowing a text box should wrap these words onto more lines without changing its height or font size.';
+  project = await (await request.post(`/api/projects/${project.id}/scenes`, { data: { title: 'Wrapping example', extractedText: [text] }, headers: { 'If-Match': `"${project.storyboard.revision}"` } })).json();
+  const updated = await request.patch(`/api/projects/${project.id}/scenes/${project.storyboard.scenes[0].id}`, { data: { visualLayout: {
+    enabled: true, width: 1280, height: 720, elements: [{ id: 'wrap-text', kind: 'text', text, x: 60, y: 180, width: 900, height: 300, fontSize: 28 }],
+  } }, headers: { 'If-Match': `"${project.storyboard.revision}"` } });
+  expect(updated.ok()).toBeTruthy();
+  project = await updated.json();
+  await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  const editor = page.getByRole('dialog').last();
+  await editor.getByRole('button', { name: `${text.slice(0, 50).trim()} element`, exact: true }).click();
+  await editor.locator('.visual-inspector summary').filter({ hasText: /^Layout$/ }).click();
+  const lines = () => editor.locator('.visual-text').filter({ hasText: text }).evaluate(el => {
+    const range = document.createRange(); range.selectNodeContents(el); return range.getClientRects().length;
+  });
+  const before = await lines();
+  await editor.getByRole('spinbutton', { name: 'Element width', exact: true }).fill('300');
+  await expect(editor.getByRole('spinbutton', { name: 'Element height', exact: true })).toHaveValue('300');
+  await expect(editor.getByRole('spinbutton', { name: 'Font size', exact: true })).toHaveValue('28');
+  expect(await lines()).toBeGreaterThan(before);
+  await editor.getByRole('button', { name: 'Save scene', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  const saved = await (await request.get(`/api/projects/${project.id}`)).json();
+  expect(saved.storyboard.scenes[0].visualLayout.elements[0]).toMatchObject({ width: 300, height: 300, fontSize: 28, text });
+});
+
 test('measured text fitting preserves layout data and reports unresolved locked or crowded content', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(async () => {

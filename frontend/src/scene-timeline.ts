@@ -106,3 +106,10 @@ export const defaultAppearance = (): Appearance => ({
     angle: 135,
   },
 });
+
+/** Start every scene with a shared clock, preserving any authored timeline. */
+export function withSceneTimeline<T extends { timeline?: Timeline | null; elements: { timing?: Timing | null; animations?: Parameters<typeof animationEndMs>[0] }[] }>(layout: T): T & { timeline: Timeline } {
+  if (layout.timeline) return layout as T & { timeline: Timeline };
+  const durationMs = Math.min(3600000, Math.max(30000, ...layout.elements.map(element => Math.max(element.timing?.endMs || 0, animationEndMs(element.animations)))));
+  return { ...layout, timeline: { version: 1, durationMs, printTimeMs: 0, clips: [], cues: [] } };
+}
