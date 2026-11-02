@@ -29,20 +29,20 @@ The integration test is skipped during normal offline test runs unless `CHIMERA_
 
 ## Current cross-repository check
 
-The [Pythia Golden Path workflow](../.github/workflows/pythia-golden-path.yml)
-runs on Chimera pushes and pull requests, every Monday, and by manual dispatch.
-It checks out the current `Pythia/master` alongside the Chimera revision being
-qualified, initializes both repositories' pinned `pythia-contracts` submodules,
-starts Pythia with deterministic local providers, and runs the complete test
-above. CI logs record both repository SHAs and both contract package SHAs and
-versions. The revisions are intentionally independent: Chimera currently pins
-contracts `v1.0.0`, while Pythia's Engine currently pins `v1.1.0`; successful
-round-trip validation checks their actual compatibility rather than requiring
-their version labels to match.
+The [Pythia Golden Path workflow](https://github.com/Darkkeep/Pythia/blob/master/.github/workflows/chimera-golden-path.yml)
+runs on Pythia pushes and pull requests, every Monday, and by manual dispatch.
+It checks the Pythia revision under test against current Chimera `main`, starts
+Pythia with deterministic local providers, and runs the complete test above.
+CI logs record both repository SHAs and both contract package SHAs and versions.
+The revisions are intentionally independent: Chimera currently pins contracts
+`v1.0.0`, while Pythia's Engine currently pins `v1.1.0`; successful round-trip
+validation checks their actual compatibility rather than requiring their
+version labels to match.
 
-The workflow needs `PYTHIA_CONTRACTS_READ_TOKEN` to read the private Pythia and
-contract repositories. Configure it with read-only Contents access to those
-repositories. Pull requests from forks skip this private-repository job.
+The workflow uses Pythia's `GITHUB_TOKEN` to check out Pythia itself and needs
+`PYTHIA_CONTRACTS_READ_TOKEN` with read-only Contents access to the private
+`pythia-contracts` repository. Pull requests from forks skip this private
+contract checkout.
 
 On 2026-11-02, the full Golden Path passed locally against Chimera
 `4c91da50c4b394b634507077f02fcc3c6f626491` and Pythia
