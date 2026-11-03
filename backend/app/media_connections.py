@@ -29,15 +29,16 @@ def connection_catalog(root):
         'voice': 'alloy', 'language': 'en-US', 'reason': '' if legacy['configured'] else 'Configure this connection in Settings > AI Connections.'})
     for item in saved['connections']:
         speech = item['provider'] in narration_connections.SPEECH_PROVIDERS
-        ready = speech and item['configured'] and bool(item['voice'])
-        reason = '' if ready else 'Save a narration voice.' if speech and item['configured'] else 'Configure credentials.' if speech else 'Connection setup only; video generation is not implemented for this provider.'
+        kind = 'narration' if speech else 'video'
+        ready = item['configured'] and (not speech or bool(item['voice']))
+        reason = '' if ready else 'Save a narration voice.' if speech and item['configured'] else 'Configure credentials.'
         connections.append({'id': item['id'], 'name': item['name'], 'provider': item['provider'], 'executor': 'chimera',
-            'configured': item['configured'], 'supports': ['narration'] if speech else ['video'], 'readyFor': ['narration'] if ready else [],
-            'models': {'narration': item['model']} if speech else {}, 'revisions': {'narration': item['revision']} if speech else {},
+            'configured': item['configured'], 'supports': [kind], 'readyFor': [kind] if ready else [],
+            'models': {kind: item['model'] if speech else item['provider'] + '-video'}, 'revisions': {kind: item['revision']},
             'voice': item['voice'], 'language': item['language'], 'reason': reason})
     defaults = {kind: next((item['id'] for item in connections if kind in item['readyFor']), None) for kind in KINDS}
     return {'connections': connections, 'defaults': defaults,
-        'videoUnavailableReason': '' if defaults['video'] else 'No configured connection can generate video clips. Check Settings > AI Connections; setup-only connections cannot generate yet.'}
+        'videoUnavailableReason': '' if defaults['video'] else 'Configure Synthesia or Shotstack in Settings > AI Connections to generate video clips.'}
 
 
 def select_connection(root, kind, identifier=None):

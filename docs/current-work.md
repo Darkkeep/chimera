@@ -1,5 +1,41 @@
 # Current work and handoff
 
+## November 3 video generation and scene fitting
+
+Synthesia and Shotstack now have direct asynchronous Chimera video adapters.
+Synthesia uses a presenter script and authorized avatar ID, with actual duration
+checked against the requested maximum; Shotstack renders exact title text with
+fades, not generated footage. Candidates support 4–30 seconds. Credentials remain
+server-side, connection tests are non-generating, and only explicit generation
+submits a potentially billable render.
+
+Jobs retain provider operation IDs and pinned connection revisions. Polling is
+bounded; downloads reject redirects and unsupported locations, are limited to
+100 MiB, and require an MP4 header. Cancellation/timeouts are local and do not
+cancel remote billing. Interrupted running jobs fail without automatically
+submitting another render. Approval saves a candidate asset and proposes its
+placement; attachment and transcript/caption review remain explicit.
+
+New timeline videos automatically fit the scene canvas; existing clips offer
+**Fit video to scene** with Undo/Redo. Preview and exports preserve the whole
+picture without stretching or cropping. Custom geometry remains available.
+See [video connections](ai-connection.md#video-connections-and-generation) and
+[media placement](media-placement-and-ocr.md).
+
+This supersedes the older connection-only provider descriptions below.
+Integration verification uses synthetic provider responses and local MP4
+fixtures, not live render access, avatar entitlement, billing, production media
+quality, release approval, or target-LMS acceptance.
+
+Local integration verification: 92 related backend tests ran successfully (one
+optional test skipped), and 75 provider/generation/timeline browser checks passed
+across Chromium, Firefox and WebKit. New regressions cover portrait output,
+the four-second minimum and disconnecting a queued job's connection without
+provider fallback. The TypeScript/Vite build passed with the existing bundle-size
+warning. The rebuilt bundled guide has 88 pages, 451 local references and 35
+internal PDF links; its verifier reports no errors. These checks do not replace
+live-provider or release qualification.
+
 ## October 28 CI follow-up for PR #9
 
 The first [PR #9 workflow](https://github.com/Darkkeep/chimera/actions/runs/40707489276) passed backend/build/artifact checks but hit the 60-minute job limit during the serial 576-check browser matrix. Logs also showed repeated inspector and standalone assertions against older UI structure; no successful full-matrix qualification is claimed for that run. Browser integration now uses nine isolated runner jobs (three shards for each browser, one worker per runner), with separate backend/build/visual/auth qualification. Each browser shard has 64 checks and its own report/artifacts. Inspector tests distinguish top-level sections from nested effect details; standalone checks use the authored stage and await animation pause readiness; the twelve-scan provider accessibility scenario has an explicit timeout. Fresh CI must qualify the updated PR head before merge.

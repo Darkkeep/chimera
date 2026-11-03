@@ -72,7 +72,8 @@ current OpenAI connection: [Sora 2 and the Videos API shut down on September 24,
 disabled with that explanation; the private video route returns 503 without a
 provider call. A supported provider must be selected before implementing a live
 video adapter. The first attempted clip failed and its receipt was preserved; no
-clip or successful provider render is claimed.
+clip or successful provider render is claimed. This describes the retired Pythia
+route; Chimera now offers direct Synthesia/Shotstack adapters as described below.
 
 The narration adapter reuses the existing Speech API. OpenAI's [current speech
 guide](https://developers.openai.com/api/docs/guides/text-to-speech) schedules its
@@ -97,8 +98,10 @@ Settings → AI Connections now opens an **Available connections** overview from
 same inventory used by scene and media requests (`GET /api/ai-connections`). It
 combines the saved Pythia address and its live execution capabilities, the existing
 OpenAI/compatible connection, and saved narration/video connection records.
-Configured speech adapters are selectable for narration; Synthesia/Shotstack
-setup records remain unavailable for generation until an adapter is implemented.
+Configured speech adapters are selectable for narration. Synthesia and Shotstack
+now have direct Chimera video adapters: script/avatar presenter videos and
+text/title clips respectively, up to 30 seconds. Saving/testing is still
+non-generating; see [video connections](ai-connection.md#video-connections-and-generation).
 Pythia is preferred where configured. The scene prompt and media form offer the
 connections that can execute that output type. A newly saved supported connection
 appears after settings refresh; there is no separate media provider list to edit.
@@ -111,5 +114,5 @@ external credential validity and generation are still checked by the existing
 Chimera adapter. No keys are sent in this inventory. The selected connection ID is
 stored with each new media job and candidate; execution checks its saved revision.
 Provider failure does not automatically select another provider. Existing stored
-jobs retain their original routing. This does not make every saved video setup
-executable, or prove live access to an account that has not been configured.
+jobs retain their original routing. Credential availability does not prove live
+render permissions or access to an avatar; those require account-side approval.

@@ -14,8 +14,8 @@ The dialog has six provider tabs. Arrow keys move between tabs; Home/End select 
 | ElevenLabs | MP3 narration | OS credential store or `ELEVENLABS_API_KEY` | Voices and speech-model lists |
 | Google Cloud | MP3 narration | Application Default Credentials | Voices list |
 | Cartesia | MP3 narration | OS credential store or `CARTESIA_API_KEY` | Voices list |
-| Synthesia | Connection setup/testing only; video generation not yet available | OS credential store or `SYNTHESIA_API_KEY` | Video-list metadata, discarded after validation |
-| Shotstack | Connection setup/testing only; video generation not yet available | OS credential store or environment-specific server key | Saved-template metadata, discarded after validation |
+| Synthesia | Presenter videos from script and authorized avatar ID, up to 30 seconds | OS credential store or `SYNTHESIA_API_KEY` | Video-list metadata, discarded after validation |
+| Shotstack | Text/title MP4 clips, 4–30 seconds | OS credential store or environment-specific server key | Saved-template metadata, discarded after validation |
 
 Saved non-OpenAI connections share the existing `/api/narration-connections` API and installation metadata for backward compatibility. Video connections are explicitly excluded from narration/image generation capabilities, even when configured. Saving or testing them never submits a render job.
 
@@ -30,7 +30,7 @@ For illustrated setup and the narration workflow, see [Configure media connectio
 | `PUT /api/narration-connections` | Administrator/local-operator save with `expectedRevision`; omit `id` to create, supply it to update |
 | `POST /api/narration-connections/{id}/test` | Read-only provider discovery/check with the collection's `expectedRevision` |
 | `POST /api/narration-connections/{id}/disconnect` | Remove the named connection and its owned secret with `expectedRevision` |
-| `GET /api/projects/{id}/media-generation-capability` | Project permission, separate image availability and usable speech connections, never video setup |
+| `GET /api/projects/{id}/media-generation-capability` | Project permission, separate image/video availability and usable connections from the shared catalog |
 
 Metadata is installation-scoped under `identity/narration-connections.json`, not embedded in each project. IDs retain the `narration-...` form even for video setup. `apiKey` is write-only and accepted only with `credentialSource: secure-store`; `environment` and `adc` modes reject submitted keys. An empty key retains a compatible stored key, except changing Shotstack environment requires its matching new key. Non-OpenAI updates cannot change provider in place. Concurrent collection changes return a revision conflict; reload status, inspect it and resubmit intentionally rather than overwriting another administrator's edit.
 
@@ -74,17 +74,65 @@ Narration tests list provider voices (and ElevenLabs speech models), without sen
 
 Each connection is disconnected separately, removing its metadata and any credential it owns; server environment variables and ADC identities are not deleted. Removal never falls back to another provider. Queued jobs bind to the selected connection revision; a changed/removed connection fails rather than silently switching providers. Rotating a fixed provider environment key is detected; replacing an ADC file at the same path is not a credential-version guarantee. Existing legacy jobs remain compatible.
 
-Narration discovery, synthesis and video connection tests share the installation's durable request counter with OpenAI. Each non-OpenAI request enforces a ceiling of 20 requests/day and one concurrent request in the API process; OpenAI's configurable form limits do not change these ceilings. ElevenLabs discovery makes two requests and consumes two units. Request counts are not spending controls. Provider-side limits and organisation data-use approval remain necessary.
+Narration discovery, synthesis, video connection tests and render submissions share the installation's durable request counter with OpenAI. Each non-OpenAI metered request enforces a ceiling of 20 requests/day and one concurrent HTTP request in the API process; OpenAI's configurable form limits do not change these ceilings. ElevenLabs discovery makes two requests and consumes two units. Video polling and credential-free CDN downloads do not consume additional daily units. Remote renders may overlap after submission. Request counts are not spending controls. Provider-side limits and organisation data-use approval remain necessary.
 
-## Video Connection Setup
+## Video Connections and Generation
 
 **Synthesia:** save an API-enabled account's key using the OS store or server `SYNTHESIA_API_KEY`. **Test video connection** makes `GET https://api.synthesia.io/v2/videos?limit=1` with the key in the `Authorization` header (not an added Bearer prefix). The response is checked and discarded; no video names, URLs or content are returned to the browser or written into project data. This tests list permission, not video-generation entitlement.
 
-**Shotstack:** choose **Sandbox (stage)** or **Production (v1)** and provide the matching key. Server environment mode reads `SHOTSTACK_SANDBOX_API_KEY` or `SHOTSTACK_PRODUCTION_API_KEY`, respectively. Secure-store mode requires a new key when changing environment so a sandbox credential is never silently reused for production. **Test video connection** reads `/templates` at the selected fixed `https://api.shotstack.io/edit/stage` or `/edit/v1` endpoint using `x-api-key`. It does not render a video or generate AI assets. Future sandbox renders can be watermarked and AI generation can still incur charges; sandbox is not a general spending exemption.
+**Shotstack:** choose **Sandbox (stage)** or **Production (v1)** and provide the matching key. Server environment mode reads `SHOTSTACK_SANDBOX_API_KEY` or `SHOTSTACK_PRODUCTION_API_KEY`, respectively. Secure-store mode requires a new key when changing environment so a sandbox credential is never silently reused for production. **Test video connection** reads `/templates` at the selected fixed `https://api.shotstack.io/edit/stage` or `/edit/v1` endpoint using `x-api-key`. It does not render a video or generate AI assets. Sandbox renders are watermarked; sandbox is not a general spending exemption.
 
-Both tabs explicitly state **video generation is not yet available in Chimera**. No avatar/template editor, render submission, polling, webhook handling, video download or generated-video review is provided by this connection-only setup. Existing uploaded video assets remain usable through the normal media library.
+After saving, **Media library → Create a media candidate → Video clip** offers the
+configured connections, even in a video-only installation. Set a purpose, select
+a connection, and choose 4–30 seconds (default 30).
 
-Official references: [ElevenLabs authentication](https://elevenlabs.io/docs/api-reference/authentication), [ElevenLabs speech API](https://elevenlabs.io/docs/api-reference/text-to-speech/convert), [Google authentication](https://cloud.google.com/text-to-speech/docs/authentication), [Cartesia speech](https://docs.cartesia.ai/api-reference/tts/bytes), [Cartesia voices](https://docs.cartesia.ai/api-reference/voices/list), [Synthesia list videos](https://docs.synthesia.io/reference/list-videos), and [Shotstack keys/environments](https://shotstack.io/docs/guide/getting-started/request-api-keys.md).
+- **Synthesia:** enter a video title, presenter script and an avatar ID authorized
+  for your account. The script starts from scene narration or speaker notes.
+  Chimera posts a private video to `/v2/videos` with the job ID as `callbackId`,
+  using the stock `off_white` background and the avatar's default voice. Script
+  length determines actual duration, not a provider duration parameter. Aim for
+  about 60 words or fewer for 30 seconds. A completed render over the chosen
+  maximum, or with an invalid/missing duration, fails locally without downloading.
+  The provider may still charge for it. Requested maximum and actual duration are
+  stored separately; regeneration retains the requested maximum.
+- **Shotstack:** enter the exact title text, not an AI footage prompt. Chimera
+  posts a rich-text timeline with white text, dark background and fade transitions
+  to `/edit/{environment}/render`. The chosen duration is the clip length.
+
+The form requests landscape MP4; the API also accepts portrait 720×1280.
+There is no template editor, arbitrary timeline/URL input or webhook setup.
+**Generate candidate** is the explicit, potentially billable action. Saving and
+testing remain non-generating. Provider operation IDs are saved with jobs before
+polling every five seconds, for up to 20 minutes. Only completed renders are
+downloaded, without credentials or redirects, from approved HTTPS provider/CDN
+domains. Downloads are bounded to 100 MiB and checked for an MP4 header. Signed
+download URLs and raw provider errors are not persisted.
+
+Failures never select another provider or automatically submit another render.
+Interrupted running jobs fail on restart and retain their provider operation ID.
+Local cancellation and timeouts do not cancel the remote render or its billing.
+Check the provider dashboard using the saved operation ID before an explicit
+retry or regeneration, each of which creates a new potentially billable render.
+Preview and approve the video candidate, then accept the normal placement proposal
+or attach it using the media library. Add/review transcripts and timed captions
+through existing media metadata controls before publishing; the export accessibility
+gate is unchanged. Generated clips use normal project storage, reload and export.
+
+To display a generated or uploaded video on the scene canvas, open **Edit scene →
+Timeline and layers**, select the video under **Timeline media**, and **Add clip
+at playhead**. New video clips automatically fit the scene canvas, keeping the
+whole picture visible with its original proportions. For an existing timeline
+clip, select its row and choose **Fit video to scene**, then preview and **Save
+scene**. Fitting changes only the playback box, not the file, timing or provider
+request, and works in Preview and exported courses. Mismatched proportions leave
+space around the picture rather than stretching or cropping. Existing custom
+positions remain unchanged unless Fit is selected.
+
+Integration tests use synthetic provider replies and a local MP4 fixture. These
+verify submission, polling, review/placement and export, not live account access,
+provider billing, avatar entitlement or production output quality.
+
+Official references: [ElevenLabs authentication](https://elevenlabs.io/docs/api-reference/authentication), [ElevenLabs speech API](https://elevenlabs.io/docs/api-reference/text-to-speech/convert), [Google authentication](https://cloud.google.com/text-to-speech/docs/authentication), [Cartesia speech](https://docs.cartesia.ai/api-reference/tts/bytes), [Cartesia voices](https://docs.cartesia.ai/api-reference/voices/list), [Synthesia create video](https://developers.synthesia.io/docs/video-api-reference/videos/create-a-video), [Synthesia render status](https://developers.synthesia.io/docs/video-api-reference/videos/retrieve-a-video), [Shotstack Edit API](https://shotstack.io/docs/api/), and [Shotstack keys/environments](https://shotstack.io/docs/guide/getting-started/request-api-keys.md).
 
 ## Testing and Limits
 

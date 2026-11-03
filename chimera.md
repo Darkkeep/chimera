@@ -21,6 +21,15 @@ The current product follows the separate [Pythia + Chimera integrated build plan
 
 **October 27 media configuration:** **Settings > AI connection** now uses separate provider tabs. OpenAI images/legacy narration and ElevenLabs/Google Cloud/Cartesia MP3 narration are implemented. Synthesia and Shotstack support secure setup/read-only tests only; video generation, render polling/download and generated-video review remain future work. Keys use server OS storage or fixed environment injection; Google uses ADC. This is separate from **Settings > Pythia**, not a new text-reasoning registry. See the [current handoff](docs/current-work.md#october-27-media-provider-connections-and-help) and [connection guide](docs/ai-connection.md) for precise support and verification boundaries.
 
+**November 3 video update:** Synthesia presenter-script/avatar videos and Shotstack
+text/title clips now use direct asynchronous Chimera adapters, with a 30-second
+ceiling, saved provider render IDs, bounded polling and normal MP4 candidate
+approval/placement/export. Saving/testing remains non-generating. Local
+cancellation does not cancel provider billing, and no paid request is
+automatically resubmitted after interruption. Verification uses synthetic
+provider responses and a local MP4, not live-account generation. See
+[video connections](docs/ai-connection.md#video-connections-and-generation).
+
 | Original phase | Current status |
 |---|---|
 | 0 — Foundation | Delivered. |

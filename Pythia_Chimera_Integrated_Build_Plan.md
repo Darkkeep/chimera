@@ -10,11 +10,11 @@
 
 The two products remain independently useful while sharing a stable integration contract.
 
-## Current media-provider implementation (2026-10-27)
+## Current media-provider implementation (2026-11-03)
 
-Chimera's **Settings > AI connection** has OpenAI, ElevenLabs, Google Cloud, Cartesia, Synthesia and Shotstack tabs. OpenAI images/legacy narration and ElevenLabs/Google Cloud/Cartesia MP3 narration use direct server-side media adapters with explicit candidate review. Synthesia/Shotstack currently support secure connection setup and read-only metadata tests only, not asynchronous video generation. They are excluded from generation capabilities.
+Chimera's **Settings > AI connection** has OpenAI, ElevenLabs, Google Cloud, Cartesia, Synthesia and Shotstack tabs. OpenAI images/legacy narration and ElevenLabs/Google Cloud/Cartesia MP3 narration use direct server-side media adapters with explicit candidate review. Synthesia/Shotstack now use direct asynchronous video adapters for presenter scripts and text/title clips, up to 30 seconds, with saved render IDs, bounded polling and MP4 candidate review. They remain excluded from image/narration capabilities. Saving/testing never renders; integration verification uses synthetic replies, not a live-account certification. See [video connections](docs/ai-connection.md#video-connections-and-generation).
 
-These media connections do not select Pythia's learning-intelligence provider or bypass proposal approval. Pythia diagnostics are named **Pythia** in the UI; internal Engine contracts remain compatible. Installation administrators/local operators own credential provisioning, with OS secure storage, fixed server environment variables or Google ADC and no browser-persisted secrets. See [connection documentation](docs/ai-connection.md) and [current implementation evidence](docs/current-work.md#october-27-media-provider-connections-and-help). The future architecture below is not evidence that video rendering, live provider quality or deployment qualification has been delivered.
+These media connections do not select Pythia's learning-intelligence provider or bypass proposal approval. Pythia diagnostics are named **Pythia** in the UI; internal Engine contracts remain compatible. Installation administrators/local operators own credential provisioning, with OS secure storage, fixed server environment variables or Google ADC and no browser-persisted secrets. See [connection documentation](docs/ai-connection.md) and [current implementation evidence](docs/current-work.md). The future architecture below is not evidence of live provider quality or deployment qualification.
 
 ---
 

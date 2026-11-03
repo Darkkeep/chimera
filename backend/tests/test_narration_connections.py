@@ -219,7 +219,7 @@ class NarrationConnectionTests(unittest.TestCase):
         self.assertEqual(finished.status, "completed", finished.error)
         self.assertEqual(finished.provider, "cartesia")
 
-    def test_video_tests_are_read_only_and_never_enable_media_generation(self):
+    def test_video_tests_are_read_only_and_connections_never_enable_narration(self):
         for provider, environment, url, header, response in (
             ("synthesia", "stage", "https://api.synthesia.io/v2/videos?limit=1", "Authorization", {"videos": []}),
             ("shotstack", "stage", "https://api.shotstack.io/edit/stage/templates", "X-api-key", {"success": True, "response": {"templates": []}}),
@@ -234,16 +234,17 @@ class NarrationConnectionTests(unittest.TestCase):
                 self.assertEqual(request.full_url, url)
                 self.assertEqual(request.get_header(header), "eleven-secret")
                 self.assertIsNone(request.data)
-                self.assertIn("not yet available", result["message"])
-                with self.assertRaisesRegex(ValueError, "setup only"):
+                self.assertIn("no video was generated", result["message"])
+                with self.assertRaisesRegex(ValueError, "cannot generate narration"):
                     self.job(item["id"])
                 with self.assertRaisesRegex(ValueError, "does not enable"):
                     narration.synthesize_narration(connection, "Never sent", "voice", None)
         project = storage.list_projects()[0]
         capability = main.get_media_generation_capability(project.id)
         self.assertEqual(capability["narrationConnections"], [])
-        self.assertFalse(capability["providerConfigured"])
-        self.assertFalse(media_generation.media_provider_configured())
+        self.assertTrue(capability["providerConfigured"])
+        self.assertTrue(capability["videoConfigured"])
+        self.assertTrue(media_generation.media_provider_configured())
 
     def test_new_provider_environment_rotation_and_provider_key_isolation(self):
         for provider, environment, variable in (

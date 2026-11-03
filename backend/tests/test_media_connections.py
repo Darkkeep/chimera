@@ -36,12 +36,13 @@ class ConnectionRoutingTests(unittest.TestCase):
         self.assertNotIn('apiKey', response.text)
         self.assertEqual(response.headers['cache-control'], 'no-store')
 
-    def test_catalog_combines_actual_settings_and_keeps_setup_only_video_unavailable(self):
+    def test_catalog_combines_actual_settings_and_enables_configured_video(self):
         catalog=routing.connection_catalog(self.root)
-        self.assertEqual(catalog['defaults'],{'scene':'pythia','image':'pythia','narration':'pythia','video':None})
+        self.assertEqual(catalog['defaults'],{'scene':'pythia','image':'pythia','narration':'pythia','video':'narration-222222222222'})
         self.assertEqual(len(catalog['connections']),4)
-        self.assertEqual(catalog['connections'][-1]['readyFor'],[])
-        self.assertIn('setup only',catalog['connections'][-1]['reason'])
+        self.assertEqual(catalog['connections'][-1]['readyFor'],['video'])
+        self.assertEqual(catalog['connections'][-1]['revisions'],{'video':'video-r1'})
+        self.assertEqual(catalog['videoUnavailableReason'],'')
     def test_selected_alternative_is_checked_by_pythia_without_sending_keys(self):
         selected=routing.select_connection(self.root,'narration','narration-111111111111')
         self.assertEqual(selected['provider'],'elevenlabs')
@@ -49,7 +50,7 @@ class ConnectionRoutingTests(unittest.TestCase):
         self.assertTrue(all(set(item)=={'id','provider','executor','readyFor','revision','model'} for item in document['connections']))
         self.assertEqual(document['connection_id'],selected['id'])
     def test_unavailable_and_wrong_media_do_not_choose_another_provider(self):
-        for kind,identifier in [('image','narration-111111111111'),('video','narration-222222222222'),('narration','removed')]:
+        for kind,identifier in [('image','narration-111111111111'),('narration','narration-222222222222'),('narration','removed')]:
             with self.assertRaises(ValueError): routing.select_connection(self.root,kind,identifier)
         self.client.resolve_media_connection.assert_not_called()
     def test_saved_pythia_address_is_discovered_without_old_image_opt_in(self):

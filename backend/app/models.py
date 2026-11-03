@@ -529,7 +529,7 @@ class ExportSettings(BaseModel):
 
 EnhancementField = Literal[
     "title", "extractedText", "actionDescription", "narration", "assessmentItem",
-    "assessmentSettings", "imageAssets", "imageAltText", "decorativeImages", "audioAssets",
+    "assessmentSettings", "imageAssets", "imageAltText", "decorativeImages", "audioAssets", "videoAssets",
     "required", "audioRequired", "sceneType", "layoutMode", "templateId", "notes",
     "sceneOrder", "storyboardTitle", "completionSettings",
 ]
@@ -1010,7 +1010,8 @@ class MediaGenerationJobCreate(BaseModel):
     connectionId: str | None = Field(default=None, pattern=r"^(?:pythia|legacy-openai|narration-[a-f0-9]{12})$")
     kind: Literal["image", "narration", "video"]
     narrationConnectionId: str | None = Field(default=None, pattern=r"^(?:legacy-openai|pythia|narration-[a-f0-9]{12})$")
-    durationSeconds: int | None = Field(default=None, ge=4, le=4)
+    durationSeconds: int | None = Field(default=None, ge=4, le=30)
+    avatar: str = Field(default="", max_length=200, pattern=r"^[A-Za-z0-9_.-]*$")
     sceneId: str
     purpose: str = Field(min_length=1, max_length=2000)
     style: str = Field(default="", max_length=2000)
@@ -1030,9 +1031,9 @@ class MediaGenerationJobCreate(BaseModel):
         if self.kind in {"image", "video"} and not self.prompt.strip():
             raise ValueError("Image or video generation requires a prompt")
         if self.kind == "video":
-            self.durationSeconds = 4
+            self.durationSeconds = self.durationSeconds or 30
             if (self.width or 1280, self.height or 720) not in {(1280,720),(720,1280)}:
-                raise ValueError("Pythia video requires 1280 by 720 or 720 by 1280")
+                raise ValueError("Video requires 1280 by 720 or 720 by 1280")
         return self
 
 
@@ -1044,6 +1045,9 @@ class MediaGenerationJob(BaseModel):
     aiConnectionRevision: str | None = None
     narrationConnectionId: str | None = None
     durationSeconds: int | None = None
+    avatar: str = ""
+    providerOperationId: str | None = None
+    actualDurationSeconds: float | None = None
     sceneId: str
     kind: Literal["image", "narration", "video"]
     purpose: str
@@ -1078,6 +1082,8 @@ class GeneratedAssetCandidate(BaseModel):
     narrationConnectionId: str | None = None
     sourceRevision: int
     durationSeconds: int | None = None
+    avatar: str = ""
+    actualDurationSeconds: float | None = None
     sceneId: str
     kind: Literal["image", "audio", "video"]
     status: Literal["pending", "approved", "rejected"] = "pending"

@@ -1540,9 +1540,18 @@ def create_media_generation_job(project_id: str, data: MediaGenerationJobCreate)
             raise ValueError("Media generation must target a scene in this project")
         from . import pythia_media
         selected = None
-        if data.connectionId:
+        if data.connectionId or data.kind == "video":
             from .media_connections import select_connection
             selected = select_connection(ROOT, data.kind, data.connectionId)
+        if data.kind == "video" and selected:
+            if data.style.strip():
+                raise ValueError("Video providers do not accept an image style. Use the script or title text.")
+            if selected["provider"] == "synthesia" and (not data.script.strip() or not data.avatar):
+                raise ValueError("Synthesia requires a presenter script and an authorized avatar ID.")
+            if selected["provider"] == "synthesia" and len(data.prompt) > 200:
+                raise ValueError("Synthesia video titles are limited to 200 characters.")
+            if selected["provider"] == "shotstack" and len(data.prompt) > 2000:
+                raise ValueError("Shotstack title text is limited to 2,000 characters.")
         use_pythia = (selected["executor"] == "pythia" if selected else pythia_media.enabled()) and (data.kind in {"image", "video"} or data.narrationConnectionId == "pythia")
         image = (pythia_media.image_status() if data.kind == "image" else pythia_media.media_connection_status(data.kind)) if use_pythia else None
         if image is not None and not image["configured"]:
@@ -1562,7 +1571,7 @@ def create_media_generation_job(project_id: str, data: MediaGenerationJobCreate)
         if data.kind == "narration" and values["narrationConnectionId"] not in {None, "legacy-openai", "pythia"}:
             connection = resolve_narration_connection(ROOT, values["narrationConnectionId"], connection_revision if selected else None)
             if connection.settings["provider"] not in SPEECH_PROVIDERS:
-                raise ValueError("This connection supports setup only; video generation is not yet available.")
+                raise ValueError("A video connection cannot generate narration.")
             connection_revision = connection.revision
             values["voice"] = data.voice or connection.settings["voice"]
             values["language"] = data.language or connection.settings["language"]
@@ -1871,7 +1880,7 @@ def _apply_proposal_changes(project: ProjectDetail, changes: list[EnhancementPro
 
     known_assets = {asset.id: asset for asset in storyboard.assets}
     for scene in scenes:
-        references = set(scene.imageAssets + scene.audioAssets)
+        references = set(scene.imageAssets + scene.audioAssets + scene.videoAssets)
         if not references.issubset(known_assets):
             raise EnhancementProposalConflict("The proposal references media that is not in this project")
         image_ids = set(scene.imageAssets)
@@ -1883,6 +1892,8 @@ def _apply_proposal_changes(project: ProjectDetail, changes: list[EnhancementPro
             raise EnhancementProposalConflict("An image placement proposal references a non-image asset")
         if any(known_assets[asset_id].kind != "audio" for asset_id in scene.audioAssets):
             raise EnhancementProposalConflict("An audio placement proposal references a non-audio asset")
+        if any(known_assets[asset_id].kind != "video" for asset_id in scene.videoAssets):
+            raise EnhancementProposalConflict("A video placement proposal references a non-video asset")
     validate_remediation_targets(scenes)
     path = project_path(project.id)
     write_storyboard(path, storyboard.model_copy(update={"scenes": scenes}), expected_revision)

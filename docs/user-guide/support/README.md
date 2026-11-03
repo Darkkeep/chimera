@@ -28,7 +28,7 @@ Run `node docs\user-guide\support\capture-provider-tabs.cjs` from the repository
 
 For these isolated services, set `CHIMERA_WORKSPACE` to `workspace\user-guide-20261027\data`, `CHIMERA_PYTHIA_BASE_URL` to `http://127.0.0.1:1` and clear all provider variables (`CHIMERA_AI_*`, `ELEVENLABS_API_KEY`, `CARTESIA_API_KEY`, `SYNTHESIA_API_KEY`, `SHOTSTACK_SANDBOX_API_KEY`, `SHOTSTACK_PRODUCTION_API_KEY`). Do not enable a real provider for capture. The actual service account's credential-store/ADC availability is not certified by these inert status fixtures.
 
-Inspect the seven images, update the corresponding guide instructions, rebuild/verify the PDF using the commands below, and stop only the isolated services you started. Keep Synthesia/Shotstack explicitly labelled connection-only; screenshots and mock-based tests are not proof of video generation or paid provider access.
+Inspect the seven images, update the corresponding guide instructions, rebuild/verify the PDF using the commands below, and stop only the isolated services you started. These October 27 screenshots predate video generation and remain labelled historical in the guide. Current Synthesia/Shotstack adapters are described in the [video connection instructions](../../ai-connection.md#video-connections-and-generation); screenshots and mock-based tests are not proof of paid provider access or output quality.
 
 ## October 27 documentation refresh
 

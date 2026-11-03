@@ -1,5 +1,10 @@
 # Chimera user guide
 
+Video-generation and fit-to-scene instructions and the PDF edition were updated
+on 2026-11-03. Synthesia/Shotstack setup images below are historical October 27
+captures; follow the current text for generation. Local verification uses
+synthetic provider replies, not paid renders or live-account qualification.
+
 Process-based instructions for Chimera. Shape/appearance/layer and timeline instructions and the PDF edition were refreshed on 2026-10-28; the [timeline capture manifest](user-guide/refresh-timeline-2026-10-28.json) records the synthetic fixtures and source/image/PDF hashes. Earlier workflow text and the PDF edition were refreshed on 2026-10-27 for one authored scene across Stage, storyboard, preview, and delivery; temporary original comparison; direct template application with Undo/Redo; project background import and inheritance; and presentation-first preview navigation. The [authored-scene manifest](user-guide/refresh-authored-scenes-2026-10-27.json) records the current captures and implementation hashes. Earlier October 27 assessment/navigation and provider captures remain current where their controls are unchanged. Provider images use inert status/capability fixtures, not configured accounts or generated output. Other images retain their earlier provenance in the [maintenance guide](user-guide/support/README.md). No user course or credentials are used for captures. Historical source/recovery context remains in the [recovery record](export-enhancement-recovery.md).
 
 Chimera authors one scene. Edit its content and composition, inherit project defaults unless you deliberately create an exception, and choose a destination when exporting. The [authored-scene workflow](authored-scene-workflow.md) explains migration and output behavior; the steps below show the controls.
@@ -121,9 +126,33 @@ Save credentials before discovering voices; Voice can initially be blank. Test t
 
 In **Media library**, choose **Narration** and explicitly select a saved connection with a voice, or **Existing AI connection** for legacy OpenAI. Review its voice and language, then **Generate candidate**. Generation can incur charges; listen to the candidate before **Approve asset**, which approves and attaches it to the target scene. Disconnecting a connection removes only that connection and its owned key, not environment variables or ADC identities. Google input is limited to 5,000 UTF-8 bytes; all three separate narration adapters produce MP3.
 
-**Synthesia** and **Shotstack** currently support secure connection setup and read-only testing only. Their tabs explicitly state that **video generation is not yet available in Chimera**. They never enable image/narration generation. Synthesia uses an API-enabled account key in the OS store or server `SYNTHESIA_API_KEY`; its test checks video-list metadata and discards it. Shotstack has separate **Sandbox (stage)** and **Production (v1)** settings and matching keys. Use the OS store or server `SHOTSTACK_SANDBOX_API_KEY` / `SHOTSTACK_PRODUCTION_API_KEY`; switching environments in secure-store mode requires the matching new key. Its test lists saved templates without submitting a render or generating AI assets. Save, Test and Disconnect are independent for each named connection.
+**Synthesia** and **Shotstack** enable video candidates up to **30 seconds**;
+they never enable image/narration generation. Synthesia uses an API-enabled
+account key in the OS store or server `SYNTHESIA_API_KEY`; its read-only test
+checks video-list metadata and discards it. Shotstack has separate **Sandbox
+(stage)** and **Production (v1)** settings and matching keys. Use the OS store or
+server `SHOTSTACK_SANDBOX_API_KEY` / `SHOTSTACK_PRODUCTION_API_KEY`; switching
+environments in secure-store mode requires the matching new key. Its read-only
+test lists saved templates without submitting a render. Save, Test and Disconnect
+are independent for each named connection.
 
-| Video-provider tab | Available actions, not generation | Current form |
+In **Media library → Create a media candidate**, choose **Video clip**, a saved
+connection, purpose and duration (4–30 seconds, default 30). For Synthesia, supply a
+title, presenter script and authorized avatar ID. The script starts from scene
+narration/notes; aim for about 60 words or fewer for 30 seconds. Actual duration is
+script-driven; renders above the chosen maximum are rejected locally but may
+still be billed. For Shotstack, enter the exact title text for a silent clip with
+fades, not a generative footage prompt. Sandbox output is watermarked.
+
+**Generate candidate** can incur provider charges. Preview the returned MP4,
+approve it, then accept the placement proposal or attach it normally. Add/review
+transcripts and timed captions before publishing. Cancellation/timeouts are local:
+the remote render and billing may continue. Failed/interrupted jobs retain a
+provider operation ID; check that provider's dashboard before explicitly retrying.
+There is no automatic paid retry or alternate-provider fallback.
+See [video connection details](ai-connection.md#video-connections-and-generation).
+
+| Video-provider tab | Connection actions | Setup screenshot (before video generation was added) |
 | --- | --- | --- |
 | Synthesia | Name the connection, choose secure store or server environment, **Save video connection**, then **Test video connection**. A successful read-only check does not prove generation entitlement. | <a href="user-guide/images/ai-provider-synthesia.png"><img src="user-guide/images/ai-provider-synthesia.png" alt="Synthesia connection-only form and video-generation limitation" width="240"></a> |
 | Shotstack | Name the connection, select sandbox or production, supply its matching key/source, save, then test. **Disconnect video connection** removes only that named connection. | <a href="user-guide/images/ai-provider-shotstack.png"><img src="user-guide/images/ai-provider-shotstack.png" alt="Shotstack sandbox and production connection-only settings" width="240"></a> |

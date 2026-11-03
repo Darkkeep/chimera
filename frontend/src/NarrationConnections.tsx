@@ -85,7 +85,7 @@ export function NarrationConnections({ provider = "elevenlabs", onBusyChange, on
 
   return <section aria-labelledby="narration-connections-title">
     <h3 id="narration-connections-title">{video ? "Video connections" : "Narration connections"}</h3>
-    <p className="ai-connection-notice">{providerNames[provider]}: {video ? "secure connection setup and read-only testing only. Video generation is not yet available in Chimera." : "MP3 narration with voice discovery."} Credentials are never displayed.</p>
+    <p className="ai-connection-notice">{providerNames[provider]}: {video ? provider === "synthesia" ? "presenter videos from a script and an authorized avatar ID, up to 30 seconds." : "text/title video clips from 4 to 30 seconds. Sandbox output is watermarked." : "MP3 narration with voice discovery."} Credentials are never displayed.</p>
     {!collection && !error && <p>Loading provider connections...</p>}
     {collection && <>
       {collection.legacyConfigured && <p className="ai-connection-notice">Legacy OpenAI narration is also available in the media library.</p>}
