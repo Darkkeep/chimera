@@ -250,10 +250,10 @@ export function SceneTimeline({
             volume: 1,
             required: false,
             thresholdPercent: 90,
-            x: 40,
-            y: 40,
-            width: 480,
-            height: 270,
+            x: asset.kind === "video" ? 0 : 40,
+            y: asset.kind === "video" ? 0 : 40,
+            width: asset.kind === "video" ? layout.width : 480,
+            height: asset.kind === "video" ? layout.height : 270,
             fadeInMs: 0,
             fadeOutMs: 0,
           },
@@ -890,6 +890,15 @@ export function SceneTimeline({
                 }}
               />
             </label>
+            {clip.kind === "video" &&
+              <button
+                type="button"
+                className="button button-outline"
+                onClick={() => updateClip({ x: 0, y: 0, width: layout.width, height: layout.height })}
+              >
+                Fit video to scene
+              </button>}
+            {clip.kind === "video" && <p className="field-hint">Fit uses the full scene canvas and keeps the whole video visible without stretching or cropping. Different proportions leave space around the video. Use Preview at playhead to inspect it.</p>}
             {clip.kind === "video" &&
               (["x", "y", "width", "height", "layerOrder"] as const).map(
                 (field) => (

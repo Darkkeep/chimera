@@ -46,7 +46,7 @@ export function createSceneTransport({
     node.setAttribute("aria-label", clip.name || asset?.filename || clip.kind);
     if (clip.kind === "video") {
       node.playsInline = true;
-      node.style.cssText = `position:absolute;left:${clip.x}px;top:${clip.y}px;width:${clip.width}px;height:${clip.height}px;z-index:${clip.layerOrder ?? 4001};object-fit:contain`;
+      node.style.cssText = `position:absolute;left:${clip.x}px;top:${clip.y}px;width:${clip.width}px;height:${clip.height}px;max-width:none;max-height:none;z-index:${clip.layerOrder ?? 4001};object-fit:contain`;
       stage.appendChild(node);
     } else {
       node.hidden = true;

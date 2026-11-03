@@ -9,6 +9,14 @@ Implemented on 2026-10-28 against `main` following the [plan](scene-timeline-lay
 - Named layers, drag reordering and keyboard/button alternatives, lock/hide, grouping and joint stage movement, alignment/distribution, and existing draft Undo/Redo.
 - Optional resizable/collapsible timeline with seconds, shared playhead, playback transport, zoom, snapping, object lifetimes, entrance/presentation/exit blocks, dragging and right-edge resizing, and exact timing inputs.
 - Scheduled audio/video clips with distinct clip IDs, source in/out trimming, overlaps, volume/fades, preview-only mute/solo, video position/size/layer order, cue markers, and local waveforms. PCM WAV decoding works without Web Audio; other waveform codecs depend on the browser. Waveforms are limited to 25 MB sources.
+- New video clips automatically use the scene's full canvas. Select an existing
+  video clip and choose **Fit video to scene** to reset its position to the scene
+  origin and size its playback box to the current stage dimensions. Playback
+  centers the whole picture with its original proportions, without stretching or
+  cropping; mismatched proportions leave letterboxing/pillarboxing. Manual
+  geometry stays available. Fitting is a draft edit with Undo/Redo and is retained
+  by **Save scene**. Existing clips and later stage-size edits do not silently
+  replace custom video geometry; use Fit again after changing the stage size.
 
 ## Data and playback
 

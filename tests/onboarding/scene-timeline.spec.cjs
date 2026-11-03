@@ -29,6 +29,73 @@ async function course(request, title) {
   return response.json();
 }
 
+async function expectFittedVideo(video, width, height) {
+  await expect(video).toHaveCSS("left", "0px");
+  await expect(video).toHaveCSS("top", "0px");
+  await expect(video).toHaveCSS("width", `${width}px`);
+  await expect(video).toHaveCSS("height", `${height}px`);
+  await expect(video).toHaveCSS("object-fit", "contain");
+  await expect(video).toHaveCSS("object-position", "50% 50%");
+  await expect.poll(() => video.evaluate(node => node.videoWidth)).toBeGreaterThan(0);
+  const picture = await video.evaluate(node => {
+    const box = node.getBoundingClientRect();
+    const scale = Math.min(box.width / node.videoWidth, box.height / node.videoHeight);
+    return { width: node.videoWidth * scale, height: node.videoHeight * scale, boxWidth: box.width, boxHeight: box.height,
+      ratio: node.videoWidth / node.videoHeight, fit: getComputedStyle(node).objectFit };
+  });
+  expect(picture.width).toBeLessThanOrEqual(picture.boxWidth + 0.01);
+  expect(picture.height).toBeLessThanOrEqual(picture.boxHeight + 0.01);
+  expect(picture.width / picture.height).toBeCloseTo(picture.ratio, 5);
+  expect(Math.min(picture.boxWidth - picture.width, picture.boxHeight - picture.height)).toBeCloseTo(0, 5);
+}
+
+for (const [width, height] of [[1280, 720], [720, 720], [720, 1280]]) {
+  test(`new video automatically fits a ${width} by ${height} scene and survives save/reopen`, async ({ page, request }) => {
+    let p = await course(request, `Video fit ${width}x${height}`);
+    const upload = await request.post(`/api/projects/${p.id}/assets`, {
+      multipart: { file: { name: "auto-fit.mp4", mimeType: "video/mp4", buffer: await fs.readFile("tests/fixtures/timeline-qualification.mp4") } },
+      headers: { "If-Match": `"${p.storyboard.revision}"` },
+    });
+    expect(upload.ok(), await upload.text()).toBeTruthy();
+    p = await upload.json();
+    const asset = p.storyboard.assets.find(item => item.kind === "video");
+    const changed = await request.patch(`/api/projects/${p.id}/scenes/${p.storyboard.scenes[0].id}`, {
+      headers: { "If-Match": `"${p.storyboard.revision}"` },
+      data: { visualLayout: { enabled: true, width, height, elements: [] } },
+    });
+    expect(changed.ok(), await changed.text()).toBeTruthy();
+    p = await changed.json();
+    await page.addInitScript(id => localStorage.setItem("chimera.activeProjectId", id), p.id);
+    await page.route("**/api/projects", route => route.fulfill({ json: [p] }));
+    await page.goto("/");
+    await page.getByRole("button", { name: "Resume authoring", exact: true }).click();
+    await page.getByRole("button", { name: "Edit scene", exact: true }).click();
+    const editor = page.getByRole("dialog").last();
+    await editor.getByRole("combobox", { name: "Timeline media", exact: true }).selectOption(asset.id);
+    await editor.getByRole("button", { name: "Add clip at playhead", exact: true }).click();
+    for (const [field, value] of Object.entries({ x: 0, y: 0, width, height })) {
+      await expect(editor.getByRole("spinbutton", { name: `Video ${field}`, exact: true })).toHaveValue(String(value));
+    }
+    await editor.getByRole("button", { name: "Preview at playhead", exact: true }).click();
+    await expectFittedVideo(editor.locator(".visual-stage video"), width, height);
+    await editor.getByRole("button", { name: "Save scene", exact: true }).click();
+    await expect(editor).toHaveCount(0);
+    const saved = await (await request.get(`/api/projects/${p.id}`)).json();
+    const clip = saved.storyboard.scenes[0].visualLayout.timeline.clips[0];
+    expect(clip).toMatchObject({ assetId: asset.id, kind: "video", x: 0, y: 0, width, height, startMs: 0, sourceInMs: 0, volume: 1 });
+    await page.reload();
+    await page.getByRole("button", { name: "Resume authoring", exact: true }).click();
+    await page.getByRole("button", { name: "Edit scene", exact: true }).click();
+    const reopened = page.getByRole("dialog").last();
+    await reopened.locator(".timeline-label").filter({ hasText: asset.filename }).click();
+    await expect(reopened.getByRole("spinbutton", { name: "Video width", exact: true })).toHaveValue(String(width));
+    await expect(reopened.getByRole("spinbutton", { name: "Video height", exact: true })).toHaveValue(String(height));
+    await reopened.getByRole("button", { name: "Close scene editor", exact: true }).click();
+    await page.getByRole("button", { name: "Preview course", exact: true }).click();
+    await expectFittedVideo(page.getByRole("dialog").last().locator(".visual-stage video"), width, height);
+  });
+}
+
 test("grouped layers move together and Undo/Redo preserves the group", async ({
   page,
   request,
@@ -372,6 +439,7 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
                 {
                   id: "v",
                   assetId: asset.id,
+                  name: asset.filename,
                   kind: "video",
                   startMs: 12000,
                   sourceInMs: 500,
@@ -386,6 +454,27 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
     );
     expect(patch.ok(), await patch.text()).toBeTruthy();
     p = await patch.json();
+    const originalClip = p.storyboard.scenes[0].visualLayout.timeline.clips[0];
+    await page.addInitScript(id => localStorage.setItem("chimera.activeProjectId", id), p.id);
+    await page.route("**/api/projects", route => route.fulfill({ json: [p] }));
+    await page.goto("/");
+    await page.getByRole("button", { name: "Resume authoring", exact: true }).click();
+    await page.getByRole("button", { name: "Edit scene", exact: true }).click();
+    const editor = page.getByRole("dialog").last();
+    await editor.locator(".timeline-label").filter({ hasText: asset.filename }).click();
+    await expect(editor.getByRole("spinbutton", { name: "Video x", exact: true })).toHaveValue("40");
+    await expect(editor.getByRole("spinbutton", { name: "Video width", exact: true })).toHaveValue("480");
+    await editor.getByRole("button", { name: "Fit video to scene", exact: true }).click();
+    await expect(editor.getByRole("spinbutton", { name: "Video x", exact: true })).toHaveValue("0");
+    await expect(editor.getByRole("spinbutton", { name: "Video width", exact: true })).toHaveValue("1280");
+    await editor.getByRole("button", { name: "Undo", exact: true }).click();
+    await expect(editor.getByRole("spinbutton", { name: "Video width", exact: true })).toHaveValue("480");
+    await editor.getByRole("button", { name: "Redo", exact: true }).click();
+    await expect(editor.getByRole("spinbutton", { name: "Video width", exact: true })).toHaveValue("1280");
+    await editor.getByRole("button", { name: "Save scene", exact: true }).click();
+    await expect(editor).toHaveCount(0);
+    p = await (await request.get(`/api/projects/${p.id}`)).json();
+    expect(p.storyboard.scenes[0].visualLayout.timeline.clips[0]).toEqual({ ...originalClip, x: 0, y: 0, width: 1280, height: 720 });
     const zip = await request.get(`/api/projects/${p.id}/${profile}.zip`);
     expect(zip.ok(), await zip.text()).toBeTruthy();
     const archive = testInfo.outputPath("course.zip"),
@@ -480,6 +569,7 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
         page.locator(".visual-stage video").evaluate((n) => n.currentTime),
       )
       .toBeCloseTo(1, 1);
+    await expectFittedVideo(page.locator(".visual-stage video"), 1280, 720);
     await expect(page.locator(".visual-stage video")).toHaveJSProperty(
       "paused",
       true,

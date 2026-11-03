@@ -20,6 +20,16 @@ Synthesia and Shotstack currently support **connection setup and read-only testi
 
 The optional [scene timeline](user-guide.md#schedule-scene-objects-audio-and-video) schedules audio/video independently of before/after media placement. Add project assets as clips with a scene start and source-in/out interval; originals remain unchanged. Multiple clips may reference one asset. Video clips have stage geometry and layer order; audio clips are nonvisual. Volume/fades are saved; mute/solo audition controls are preview-only. Captions remain aligned to source time, and required coverage is recorded per trimmed clip from actual playback. Seeking alone earns no credit. Scheduling an attached asset suppresses its independent learner player in that scene; unscheduled attachments keep their existing behavior. Existing scenes are not silently converted. See [implementation and acceptance limits](scene-timeline-implementation.md).
 
+New timeline videos automatically fit the scene canvas. For an existing clip,
+open **Edit scene → Timeline and layers**, select its video row and choose **Fit
+video to scene**. This centers the whole video at the largest size that fits,
+preserving proportions without cropping or stretching. Any extra space remains
+around the picture. Preview at the playhead, then **Save scene**. The fit is
+undoable and survives reload, Preview, SCORM and standalone export; source bytes,
+timing, volume and layers are unchanged. Custom geometry remains available.
+After resizing the stage, use Fit again to match its new dimensions. This fits
+on-stage timeline clips, not independent before/after scene players.
+
 ## Local OCR
 
 Reference resources continue accepting PDF, DOCX, PPTX, TXT and Markdown. In enhancement review, expand **Local PDF text recognition (OCR)** for PDF references. OCR is explicit, local and independent of the AI provider. It creates a new reference version with page locators, retaining the source bytes and earlier versions. Inspect passages, then choose **Use inspected OCR text** before it may ground suggestions. Recognition is not factual approval. Jobs pinned to older versions retain their sources.
