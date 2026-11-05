@@ -8,7 +8,12 @@ scores combined with native assessments and SCORM checkpoint restoration.
 See the [HTML5 authoring and integration guide](docs/user-guide.md#import-an-externally-authored-html5-activity)
 and [working single-file example](examples/html5-activity.html). This is a bounded
 offline HTML/classic-script subset, not arbitrary web-app or full SCORM-package
-support. Target Blackboard acceptance still requires a real LMS check.
+support. A root `imsmanifest.xml` can resolve one flat, single-SCO SCORM 1.2
+or 2004 3rd/4th Edition package to its local HTML launch file, overriding the
+manual ZIP entry point. Detected format and launch path remain visible for
+review; sequencing/navigation, multi-SCO and extended manifest semantics are
+rejected. Plain ZIP/HTML imports and explicit tracking choices are unchanged.
+Target Blackboard acceptance still requires an authorized real LMS check.
 
 Native learning experiences now include branching decisions, image-backed or
 schematic hotspots, keyboard sequencing and step-by-step guided practice, alongside

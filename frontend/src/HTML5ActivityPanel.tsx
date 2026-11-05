@@ -44,6 +44,9 @@ export function HTML5ActivityPanel({ project, scene, onClose, onProjectUpdated }
     <header className="modal-head"><h2 id="html5-title">Imported HTML5 activity</h2><button disabled={busy} onClick={close}>Close</button></header>
     <p>Import an offline HTML file or ZIP (20 MB expanded, 500 files). Assets are compiled into a portable document.
       Classic scripts, styles, images, fonts and media are supported. Bundle modules first. Network calls, nested frames, forms and multi-page navigation are not supported.</p>
+    <p>A root imsmanifest.xml selects the launch path for supported single-SCO SCORM 1.2 or 2004 3rd/4th Edition ZIPs,
+      overriding the ZIP entry point below. One flat organization and launch item only; sequencing/navigation and extended manifest rules are rejected.
+      Review the detected format and launch path. Detection does not select tracking or certify LMS compatibility.</p>
     <p>Imported code runs in a sandbox without access to Chimera, browser storage or the LMS.
       CSP restricts fetch/resource requests, but is not a network-egress firewall. Import trusted content only.
       Use the Chimera activity protocol or supported SCORM 1.2/2004 calls to report results. Arbitrary HTML does not automatically produce a score.</p>
@@ -90,7 +93,7 @@ export function HTML5ActivityPanel({ project, scene, onClose, onProjectUpdated }
     </fieldset>
     <p>Required scenes in completion/scored mode wait for the activity's completion report. Scored activities join the course weighted score.
       Optional scored activities follow Include optional assessments. The package owns its internal attempts; this is not secure testing.</p>
-    {value.assetId && <section aria-label="Imported activity preview"><HTML5Player projectId={project.id} activity={value} /></section>}
+    {value.assetId && <section aria-label="Imported activity preview"><HTML5Player projectId={project.id} activity={value} showPackageDetails /></section>}
     <label className="experience-check"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} />I reviewed the package, accessibility alternative, tracking mode and preview.</label>
     <button disabled={busy || blocked || !reviewed || !value.assetId || !value.title.trim() || !value.alternative.trim()}
       onClick={() => void act(() => save())}>Save reviewed HTML5 activity</button>

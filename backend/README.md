@@ -91,7 +91,8 @@ the [authoring procedure](../docs/user-guide.md#add-optional-video-reflections).
 
 `POST /api/projects/{project_id}/html5-import` requires `project.import`,
 `If-Match`, multipart `file`, optional `entrypoint` (default `index.html` for ZIP)
-and `credit` (up to 2,000 characters). Returns `201 {project, assetId}` without
+and `credit` (up to 2,000 characters). Returns `201 {project, assetId, format,
+entrypoint}` without
 attaching the activity. Missing revisions return 428, stale writes 412, invalid
 packages 422, and oversized uploads 413. SHA-256-addressed imports deduplicate
 without silently replacing existing credit metadata.
@@ -102,10 +103,37 @@ to 500 entries, 20 MB uploaded/expanded, and 40 MB compiled HTML. Resources beco
 data URLs; CSP blocks resource/fetch requests in the imported document. It is
 not a network-egress firewall: script-driven self-navigation cannot be prevented
 comprehensively across browsers. Navigation away is unsupported and the host
-removes a reloaded frame. Entry points are explicit, not
-inferred from a SCORM manifest. Modules must be bundled first. Nested frames,
+removes a reloaded frame. Plain ZIP entry points remain explicit. A root
+`imsmanifest.xml` instead selects the launch path, overriding the submitted
+entrypoint. `format` is `html`, `html5-zip`, `scorm-1.2` or `scorm-2004`; format
+and entrypoint are persisted in the compiled asset for later author review.
+Modules must be bundled first. Nested frames,
 forms, external URLs, multi-page links, HTTP-equiv metadata, srcset, unsafe paths,
 duplicate paths, encrypted files and symlinks are rejected.
+
+The manifest adapter accepts UTF-8 XML up to 256 KiB with SCORM 1.2
+(`imscp_rootv1p1p2`, `adlcp_rootv1p2`, schema version `1.2`) or SCORM 2004
+(`imscp_v1p1`, `adlcp_v1p3`, schema version `2004 3rd Edition` or
+`2004 4th Edition`) namespaces under `http://www.imsproject.org/` (1.2
+content packaging), `http://www.imsglobal.org/` (2004 content packaging), and
+`http://www.adlnet.org/` (SCORM attributes). Metadata must name `ADL SCORM`.
+Exactly one organization contains one direct item referencing the only
+`webcontent` SCO; a supplied default must identify that organization. Optional
+asset resources and file declarations must resolve to existing package files;
+dependencies may reference only terminal asset resources. Titles, identifiers,
+XML language and inert XSI schema-location hints are supported. Schema hints
+are never fetched.
+
+Other manifest elements/attributes are rejected, including nested items or
+manifests, multiple organizations/SCOs/launch items, sequencing/navigation,
+prerequisites, mastery/time/completion rules, launch parameters and XML base.
+DTDs/entities, malformed/mismatched schema metadata, unresolved references,
+missing or non-HTML launch files, remote/absolute/traversal paths and non-root
+or mis-cased manifests are explicit errors. ZIPs with no manifest keep the
+manual-entrypoint contract (the adapter does not guess whether one is missing).
+This is manifest-to-entrypoint adaptation, not full SCORM runtime support or
+Blackboard acceptance. Tracking, alternative text, rights and preview still
+require explicit author review.
 
 Attach via revision-guarded scene PATCH with `html5Activity` containing `assetId`,
 `title`, `alternative`, `tracking` (`view|completion|scored`), and `scoreWeight`

@@ -54,17 +54,34 @@ function document(adapter = 'custom') {
     <button id="fail">Trigger script failure</button>
     <script src="assets/run.js"></script></body></html>`, script };
 }
-function zip(adapter) {
+function zip(adapter, overrides = {}) {
   const fixture = document(adapter);
+  const scorm = adapter !== 'custom', legacy = adapter === 'scorm-12';
+  const prefix = scorm ? 'lesson/' : '';
+  const files = { [scorm ? 'lesson/start.htm' : 'index.html']: fixture.html,
+    [prefix + 'assets/run.js']: fixture.script,
+    [prefix + 'assets/style.css']: 'body{font:18px system-ui;color:#111;background:#fff}button{padding:12px;margin:6px}',
+    [prefix + 'assets/icon.svg']: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><circle cx="16" cy="16" r="15" fill="purple"/></svg>' };
+  if (scorm) {
+    files['index.html'] = '<h1>Incorrect manual launch</h1>';
+    files['imsmanifest.xml'] = `<manifest identifier="synthetic"
+      xmlns="${legacy ? 'http://www.imsproject.org/xsd/imscp_rootv1p1p2' : 'http://www.imsglobal.org/xsd/imscp_v1p1'}"
+      xmlns:adlcp="${legacy ? 'http://www.adlnet.org/xsd/adlcp_rootv1p2' : 'http://www.adlnet.org/xsd/adlcp_v1p3'}">
+      <metadata><schema>ADL SCORM</schema><schemaversion>${legacy ? '1.2' : '2004 4th Edition'}</schemaversion></metadata>
+      <organizations default="org"><organization identifier="org"><title>Synthetic</title>
+        <item identifier="item" identifierref="sco"><title>Practice</title></item>
+      </organization></organizations>
+      <resources><resource identifier="sco" type="webcontent" adlcp:${legacy ? 'scormtype' : 'scormType'}="sco" href="lesson/start.htm">
+        <file href="lesson/start.htm"/><file href="lesson/assets/run.js"/>
+      </resource></resources></manifest>`;
+  }
   return execFileSync(python, ['-c', `import io,json,sys,zipfile
 files=json.loads(sys.argv[1])
 out=io.BytesIO()
 with zipfile.ZipFile(out,'w') as archive:
  for name,value in files.items(): archive.writestr(name,value)
 sys.stdout.buffer.write(out.getvalue())`,
-  JSON.stringify({ 'index.html': fixture.html, 'assets/run.js': fixture.script,
-    'assets/style.css': 'body{font:18px system-ui;color:#111;background:#fff}button{padding:12px;margin:6px}',
-    'assets/icon.svg': '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><circle cx="16" cy="16" r="15" fill="purple"/></svg>' })]);
+  JSON.stringify({ ...files, ...overrides })]);
 }
 async function create(request, adapter = 'custom', tracking = 'scored') {
   let project = await (await request.post('/api/projects', { data: { title: 'HTML5 delivery fixture' } })).json();
@@ -78,6 +95,8 @@ async function create(request, adapter = 'custom', tracking = 'scored') {
   });
   expect(imported.ok(), await imported.text()).toBeTruthy();
   const result = await imported.json(); project = result.project;
+  expect(result.format).toBe(adapter === 'custom' ? 'html5-zip' : adapter === 'scorm-12' ? 'scorm-1.2' : 'scorm-2004');
+  expect(result.entrypoint).toBe(adapter === 'custom' ? 'index.html' : 'lesson/start.htm');
   const attached = await request.patch(`/api/projects/${project.id}/scenes/${project.storyboard.scenes[0].id}`, {
     headers: { 'If-Match': `"${project.storyboard.revision}"` },
     data: { html5Activity: { assetId: result.assetId, title: 'Portable practice', alternative: 'Practice responding, then finish to report 85 percent.',
@@ -115,7 +134,8 @@ async function deliver(page, request, project, profile, testInfo, initial = {}) 
   await page.goto(profile === 'standalone' ? pathToFileURL(path.join(directory, 'index.html')).href : 'http://html5-course.test/index.html');
 }
 
-test('author imports a package, reviews tracking, saves, reopens and removes without losing the canvas', async ({ page, request }, testInfo) => {
+for (const adapter of ['custom', 'scorm-12', 'scorm-2004']) {
+test(`author imports ${adapter} package, reviews tracking, saves, reopens and removes without losing the canvas`, async ({ page, request }, testInfo) => {
   let project = await (await request.post('/api/projects', { data: { title: 'HTML5 authoring' } })).json();
   project = await (await request.post(`/api/projects/${project.id}/scenes`, { data: { title: 'My activity' },
     headers: { 'If-Match': `"${project.storyboard.revision}"` } })).json();
@@ -123,8 +143,13 @@ test('author imports a package, reviews tracking, saves, reopens and removes wit
   await page.getByRole('button', { name: 'HTML5 activity', exact: true }).click();
   let dialog = page.getByRole('dialog').last();
   await dialog.getByLabel('Import credit and usage rights').fill('Original synthetic activity; permission to distribute');
-  await dialog.getByLabel('Upload HTML5 file or ZIP').setInputFiles({ name: 'activity.zip', mimeType: 'application/zip', buffer: zip('custom') });
+  await dialog.getByLabel('Upload HTML5 file or ZIP').setInputFiles({ name: 'activity.zip', mimeType: 'application/zip', buffer: zip(adapter) });
   await expect(dialog.getByRole('status').filter({ hasText: 'Imported. Review configuration' })).toBeVisible();
+  const detection = `Detected format: ${adapter === 'custom' ? 'html5-zip' : adapter === 'scorm-12' ? 'scorm-1.2' : 'scorm-2004'}. Launch path: ${adapter === 'custom' ? 'index.html' : 'lesson/start.htm'}`;
+  await expect(dialog.getByText(detection, { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel('Activity tracking')).toHaveValue('view');
+  await expect(dialog.getByRole('button', { name: 'Save reviewed HTML5 activity', exact: true })).toBeDisabled();
+  await expect(dialog.frameLocator('iframe').getByRole('heading', { name: 'Portable practice' })).toBeVisible();
   await dialog.getByLabel('Activity title', { exact: true }).fill('Portable practice');
   await dialog.getByLabel('Accessible text alternative').fill('Read the example and complete the practice.');
   await dialog.getByLabel('Activity tracking').selectOption('scored');
@@ -138,6 +163,7 @@ test('author imports a package, reviews tracking, saves, reopens and removes wit
   const preview = page.getByRole('dialog').last();
   const frame = preview.frameLocator('iframe[title="Portable practice"]');
   await expect(frame.getByRole('heading', { name: 'Portable practice' })).toBeVisible();
+  await expect(frame.locator('#resume')).toHaveText('New activity');
   await frame.getByRole('button', { name: 'Finish activity', exact: true }).click();
   await expect(preview.getByText('Activity completed. Score: 85%.', { exact: true })).toBeVisible();
   await expect(preview.getByText('Course passed · Score 85%', { exact: true })).toBeVisible();
@@ -148,11 +174,33 @@ test('author imports a package, reviews tracking, saves, reopens and removes wit
   await page.getByRole('button', { name: 'HTML5 activity', exact: true }).click();
   dialog = page.getByRole('dialog').last();
   await expect(dialog.getByLabel('Activity tracking')).toHaveValue('scored');
+  await expect(dialog.getByText(detection, { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Remove HTML5 activity', exact: true }).click();
   await dialog.getByRole('button', { name: 'Confirm remove HTML5 activity', exact: true }).click();
+  await expect(dialog).toBeHidden();
   const saved = await (await request.get(`/api/projects/${project.id}`)).json();
   expect(saved.storyboard.scenes[0].html5Activity).toBeNull();
   expect(saved.storyboard.assets.filter(a => a.kind === 'html5')).toHaveLength(1);
+});
+}
+
+test('unsupported SCORM upload surfaces an error without attaching an activity', async ({ page, request }) => {
+  let project = await (await request.post('/api/projects', { data: { title: 'Rejected manifest fixture' } })).json();
+  project = await (await request.post(`/api/projects/${project.id}/scenes`, { data: { title: 'Practice' },
+    headers: { 'If-Match': `"${project.storyboard.revision}"` } })).json();
+  await open(page, project);
+  await page.getByRole('button', { name: 'HTML5 activity', exact: true }).click();
+  const dialog = page.getByRole('dialog').last();
+  await dialog.getByLabel('Upload HTML5 file or ZIP').setInputFiles({
+    name: 'invalid-scorm.zip', mimeType: 'application/zip',
+    buffer: zip('scorm-12', { 'imsmanifest.xml': '<!DOCTYPE manifest [<!ENTITY x "no">]><manifest/>' }),
+  });
+  await expect(dialog.getByRole('alert')).toHaveText('SCORM manifest DTD/entity declarations are not supported');
+  await expect(dialog.getByRole('button', { name: 'Save reviewed HTML5 activity', exact: true })).toBeDisabled();
+  const saved = await (await request.get(`/api/projects/${project.id}`)).json();
+  expect(saved.storyboard.revision).toBe(project.storyboard.revision);
+  expect(saved.storyboard.assets).toHaveLength(0);
+  expect(saved.storyboard.scenes[0].html5Activity).toBeNull();
 });
 
 for (const profile of ['standalone', 'scorm-12', 'scorm-2004']) {
@@ -204,6 +252,7 @@ test('tracking modes distinguish viewing, completion, missing scores and a valid
           const preview = page.getByRole('dialog').last();
           const frame = preview.frameLocator('iframe[title="Portable practice"]');
           await expect(frame.getByRole('heading', { name: 'Portable practice' })).toBeVisible();
+          await expect(frame.locator('#resume')).toHaveText('New activity');
           await expect(preview.getByText(tracking === 'view' ? 'Course passed · Score 100%' : '0 of 1 required scenes · 0 of 0 required audio tracks', { exact: true })).toBeVisible();
           await frame.getByRole('button', { name: 'Report completion only', exact: true }).click();
           if (tracking === 'scored') {

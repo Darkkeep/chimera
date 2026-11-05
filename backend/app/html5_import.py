@@ -11,6 +11,7 @@ from html import escape
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urlsplit
+from xml.etree import ElementTree as ET
 from zipfile import ZIP_DEFLATED, ZIP_STORED, BadZipFile, ZipFile
 
 from . import storage
@@ -32,10 +33,125 @@ def safe_path(name: str) -> str:
     return path.as_posix()
 
 
+def manifest_entrypoint(content: bytes, files: dict[str, bytes]) -> tuple[str, str]:
+    if len(content) > 256 * 1024:
+        raise ValueError("SCORM manifest exceeds 256 KiB; use a single-SCO package")
+    try:
+        text = content.decode("utf-8-sig")
+        if "\x00" in text:
+            raise ValueError("SCORM manifest must be well-formed UTF-8 XML without NUL characters")
+        if re.search(r"<!\s*(DOCTYPE|ENTITY)\b", text, re.I):
+            raise ValueError("SCORM manifest DTD/entity declarations are not supported")
+        root = ET.fromstring(text)
+    except (UnicodeError, ET.ParseError) as error:
+        raise ValueError("SCORM manifest must be well-formed UTF-8 XML") from error
+    versions = {
+        "{http://www.imsproject.org/xsd/imscp_rootv1p1p2}manifest":
+            ("http://www.imsproject.org/xsd/imscp_rootv1p1p2",
+             "http://www.adlnet.org/xsd/adlcp_rootv1p2", "scorm-1.2", {"1.2"}, "scormtype"),
+        "{http://www.imsglobal.org/xsd/imscp_v1p1}manifest":
+            ("http://www.imsglobal.org/xsd/imscp_v1p1",
+             "http://www.adlnet.org/xsd/adlcp_v1p3", "scorm-2004",
+             {"2004 3rd Edition", "2004 4th Edition"}, "scormType"),
+    }
+    if root.tag not in versions:
+        raise ValueError("Unsupported SCORM manifest namespace; use SCORM 1.2 or 2004 3rd/4th Edition")
+    cp, adl, detected, supported, scorm_type = versions[root.tag]
+    def q(name):
+        return f"{{{cp}}}{name}"
+
+    type_attr = f"{{{adl}}}{scorm_type}"
+    language = "{http://www.w3.org/XML/1998/namespace}lang"
+    rules = {
+        "manifest": ({"identifier", "version", language,
+                      "{http://www.w3.org/2001/XMLSchema-instance}schemaLocation"},
+                     {"metadata", "organizations", "resources"}),
+        "metadata": (set(), {"schema", "schemaversion"}),
+        "schema": (set(), set()), "schemaversion": (set(), set()),
+        "organizations": ({"default"}, {"organization"}),
+        "organization": ({"identifier", "structure", language}, {"title", "item"}),
+        "title": ({language}, set()),
+        "item": ({"identifier", "identifierref", "isvisible", language}, {"title"}),
+        "resources": (set(), {"resource"}),
+        "resource": ({"identifier", "type", "href", type_attr}, {"file", "dependency"}),
+        "file": ({"href"}, set()), "dependency": ({"identifierref"}, set()),
+    }
+    identifiers = set()
+    for node in root.iter():
+        local = node.tag.removeprefix(f"{{{cp}}}")
+        if local not in rules or node.tag != q(local):
+            raise ValueError(f"Unsupported SCORM manifest element: {node.tag}; sequencing/navigation and extended semantics are not supported")
+        attrs, children = rules[local]
+        if set(node.attrib) - attrs or any(child.tag not in {q(name) for name in children} for child in node):
+            raise ValueError(f"Unsupported SCORM manifest attributes or structure in {local}; use one flat SCO without sequencing/navigation")
+        if local not in {"title", "schema", "schemaversion"} and node.text and node.text.strip():
+            raise ValueError(f"Unexpected SCORM manifest text in {local}")
+        if node.tail and node.tail.strip():
+            raise ValueError("Unexpected SCORM manifest text between elements")
+        if local in {"manifest", "organization", "item", "resource"}:
+            identifier = node.get("identifier", "")
+            if not identifier.strip() or identifier in identifiers:
+                raise ValueError("SCORM manifest identifiers must be present and unique")
+            identifiers.add(identifier)
+
+    def one(parent, name):
+        matches = parent.findall(q(name))
+        if len(matches) != 1:
+            raise ValueError(f"SCORM manifest requires exactly one {name}")
+        return matches[0]
+
+    metadata = one(root, "metadata")
+    if one(metadata, "schema").text != "ADL SCORM" or one(metadata, "schemaversion").text not in supported:
+        raise ValueError("Unsupported SCORM schema/version metadata for this manifest namespace")
+    organizations = one(root, "organizations")
+    organization = one(organizations, "organization")
+    if organizations.get("default", organization.get("identifier")) != organization.get("identifier"):
+        raise ValueError("SCORM default organization reference is unresolved")
+    if organization.get("structure", "hierarchical") != "hierarchical":
+        raise ValueError("Unsupported SCORM organization structure")
+    item = one(organization, "item")
+    if item.get("isvisible", "true") != "true":
+        raise ValueError("Hidden SCORM launch items are not supported")
+    resources = one(root, "resources").findall(q("resource"))
+    by_id = {node.get("identifier"): node for node in resources}
+    scos = [node for node in resources if node.get(type_attr) == "sco"]
+    if len(scos) != 1:
+        raise ValueError("SCORM package requires exactly one SCO")
+    sco = scos[0]
+    if item.get("identifierref") != sco.get("identifier"):
+        raise ValueError("SCORM launch item must reference the single SCO resource")
+
+    def package_path(value):
+        parsed = urlsplit(value)
+        if not value or parsed.scheme or parsed.netloc or parsed.query or parsed.fragment:
+            raise ValueError("SCORM paths must be local relative files without URLs, launch parameters or fragments")
+        name = safe_path(unquote(parsed.path))
+        if name not in files:
+            raise ValueError(f"SCORM referenced file is missing: {name}")
+        return name
+
+    for node in resources:
+        if node.get("type") != "webcontent" or node.get(type_attr) not in {"sco", "asset"}:
+            raise ValueError("SCORM resources must be webcontent with a supported SCO/asset type")
+        if node is not sco and node.get("href") is not None:
+            raise ValueError("Multiple SCORM launch targets are not supported; asset resources cannot have href")
+        for file in node.findall(q("file")):
+            package_path(file.get("href", ""))
+        for dependency in node.findall(q("dependency")):
+            target = by_id.get(dependency.get("identifierref"))
+            if target is None or target.get(type_attr) != "asset" or target.findall(q("dependency")):
+                raise ValueError("SCORM dependencies must reference existing terminal asset resources")
+    entry = package_path(sco.get("href", ""))
+    if Path(entry).suffix.lower() not in {".html", ".htm"}:
+        raise ValueError("SCORM launch file must be HTML/HTM")
+    return detected, entry
+
+
 def compile_package(filename: str, content: bytes, entrypoint: str) -> dict[str, str | int]:
     if len(content) > LIMIT:
         raise ValueError("HTML5 upload exceeds 20 MB")
     files = {}
+    detected = "html"
     if Path(filename).suffix.lower() == ".zip":
         try:
             with ZipFile(io.BytesIO(content)) as archive:
@@ -56,14 +172,18 @@ def compile_package(filename: str, content: bytes, entrypoint: str) -> dict[str,
                     total += item.file_size
                     if total > LIMIT:
                         raise ValueError("Expanded HTML5 package exceeds 20 MB")
+                    if PurePosixPath(name).name.casefold() == "imsmanifest.xml" and name != "imsmanifest.xml":
+                        raise ValueError("SCORM requires one root imsmanifest.xml with exact casing")
                     if Path(name).suffix.lower() not in ALLOWED and name != "imsmanifest.xml":
                         raise ValueError(f"Unsupported package file: {name}")
-                    if name == "imsmanifest.xml":
-                        continue
                     files[name] = archive.read(item)
         except BadZipFile as error:
             raise ValueError("Invalid HTML5 ZIP") from error
-        entry = safe_path(entrypoint or "index.html")
+        if "imsmanifest.xml" in files:
+            detected, entry = manifest_entrypoint(files["imsmanifest.xml"], files)
+            del files["imsmanifest.xml"]
+        else:
+            detected, entry = "html5-zip", safe_path(entrypoint or "index.html")
     elif Path(filename).suffix.lower() in {".html", ".htm"}:
         entry = "index.html"
         files[entry] = content
@@ -179,7 +299,7 @@ def compile_package(filename: str, content: bytes, entrypoint: str) -> dict[str,
     document = "".join(parser.parts)
     if len(document.encode()) > LIMIT * 2:
         raise ValueError("Compiled HTML5 activity exceeds 40 MB")
-    return {"html": document, "csp": CSP, "entrypoint": entry, "fileCount": len(files)}
+    return {"html": document, "csp": CSP, "entrypoint": entry, "fileCount": len(files), "format": detected}
 
 
 def import_activity(project_id, filename, content, entrypoint, expected_revision, credit=""):
@@ -187,12 +307,13 @@ def import_activity(project_id, filename, content, entrypoint, expected_revision
     payload = json.dumps(compiled).encode()
     digest = hashlib.sha256(payload).hexdigest()
     asset_id = "html5-" + digest
+    detection = {"format": compiled["format"], "entrypoint": compiled["entrypoint"]}
     with storage.storyboard_transaction():
         project = storage.read_project(project_id)
         if project.storyboard.revision != expected_revision:
             raise storage.StoryboardRevisionConflict(expected_revision, project.storyboard.revision)
         if any(asset.id == asset_id for asset in project.storyboard.assets):
-            return {"project": project, "assetId": asset_id}
+            return {"project": project, "assetId": asset_id, **detection}
         relative = f"assets/html5/{asset_id}.json"
         destination = storage.project_path(project_id) / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -208,4 +329,4 @@ def import_activity(project_id, filename, content, entrypoint, expected_revision
         finally:
             if not saved and not existed:
                 destination.unlink(missing_ok=True)
-        return {"project": storage.read_project(project_id), "assetId": asset_id}
+        return {"project": storage.read_project(project_id), "assetId": asset_id, **detection}

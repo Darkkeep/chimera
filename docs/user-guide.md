@@ -28,6 +28,8 @@ experience, not an arbitrary HTML object in the Stage layer stack.
 1. Prepare an offline single HTML file, or ZIP with one HTML entry point and
    relative classic-script/style/media dependencies. For a ZIP, set **ZIP entry
    point** before upload; it defaults to `index.html` and may include a subfolder.
+   For a supported SCORM ZIP, root `imsmanifest.xml` determines the launch path
+   instead, even if the manual entry point conflicts.
 2. Enter credit and redistribution rights, then upload. Import saves a reusable
    project asset but does not attach it or imply learner completion. Production
    export requires complete attribution; **Save activity credit** updates an
@@ -47,6 +49,38 @@ experience, not an arbitrary HTML object in the Stage layer stack.
 HTML5 cannot be attached over an existing native experience, assessment or
 timeline. Remove that component explicitly first. Other scenes in the course can
 still use native experiences and assessments.
+
+#### Bounded SCORM package adapter
+
+The preview displays **Detected format** and **Launch path**, including after
+save/reopen. Supported manifests use SCORM 1.2 content-packaging/ADL namespaces
+and `ADL SCORM` / `1.2` metadata, or SCORM 2004 content-packaging/ADL namespaces
+and `ADL SCORM` / `2004 3rd Edition` or `2004 4th Edition` metadata. The
+UTF-8 manifest must be at the ZIP root, named exactly `imsmanifest.xml`, and no
+larger than 256 KiB. It must contain exactly one organization with one direct
+launch item referencing the only web-content SCO. Any default organization must
+resolve to that organization. The SCO href must resolve to an existing local
+HTML/HTM file; relative classic-script, CSS and media dependencies use the same
+offline compiler as plain ZIP imports. Optional asset resources, file lists
+and dependencies on terminal assets are supported. Titles, identifiers,
+XML language and inert schema-location hints are allowed; schemas are not fetched.
+
+Unsupported elements/attributes produce an error rather than being stripped:
+multiple organizations, nested items/manifests, multiple SCOs or launch targets,
+sequencing/navigation, prerequisites, mastery/time/completion rules, XML base
+and launch queries/fragments. DTD/entity declarations, malformed or unsupported
+schema/version metadata, unresolved references, remote/absolute/traversal paths,
+missing files, non-HTML launch files, and nested/mis-cased manifests are rejected.
+Export a flat single-SCO offline package without those features, or author a
+compatible single HTML activity. A ZIP without any manifest remains a manual
+HTML5 import; Chimera cannot infer that a missing manifest was intended.
+
+The 20 MB compressed/expanded, 500-entry and 40 MB compiled limits, sandbox/CSP,
+resource checks and bounded SCORM API bridge are unchanged. Manifest detection
+does not infer tracking, guarantee result reporting, certify a package, or
+establish Blackboard acceptance. Review rights, alternative text, tracking and
+preview explicitly. Real Blackboard acceptance remains a separate authorized
+target-LMS exercise.
 
 | Tracking mode | Course behavior |
 | --- | --- |

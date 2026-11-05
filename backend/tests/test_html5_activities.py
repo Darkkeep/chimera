@@ -1,10 +1,12 @@
 import io
 import json
+import re
+import stat
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from zipfile import ZIP_DEFLATED, ZipFile
+from zipfile import ZIP_BZIP2, ZIP_DEFLATED, ZipFile, ZipInfo
 
 from fastapi.testclient import TestClient
 
@@ -20,6 +22,34 @@ def package(files):
         for name, value in files.items():
             archive.writestr(name, value)
     return output.getvalue()
+
+
+def manifest(version="1.2"):
+    legacy = version == "1.2"
+    cp = "http://www.imsproject.org/xsd/imscp_rootv1p1p2" if legacy else "http://www.imsglobal.org/xsd/imscp_v1p1"
+    adl = "http://www.adlnet.org/xsd/adlcp_rootv1p2" if legacy else "http://www.adlnet.org/xsd/adlcp_v1p3"
+    kind = "scormtype" if legacy else "scormType"
+    return f'''<?xml version="1.0" encoding="UTF-8"?>
+<manifest xmlns="{cp}" xmlns:adlcp="{adl}" identifier="synthetic">
+  <metadata><schema>ADL SCORM</schema><schemaversion>{version}</schemaversion></metadata>
+  <organizations default="org"><organization identifier="org"><title>Synthetic practice</title>
+    <item identifier="launch" identifierref="sco"><title>Practice</title></item>
+  </organization></organizations>
+  <resources><resource identifier="sco" type="webcontent" adlcp:{kind}="sco" href="lesson/start.htm">
+    <file href="lesson/start.htm"/><dependency identifierref="assets"/>
+  </resource><resource identifier="assets" type="webcontent" adlcp:{kind}="asset">
+    <file href="lesson/run.js"/>
+  </resource></resources>
+</manifest>'''
+
+
+def scorm_files(xml=None):
+    return {"imsmanifest.xml": manifest() if xml is None else xml,
+            "index.html": "<h1>Wrong entry</h1>",
+            "lesson/start.htm": '<h1>Synthetic SCO</h1><script src="run.js"></script><link rel="stylesheet" href="style.css">',
+            "lesson/run.js": 'document.body.dataset.loaded="yes";',
+            "lesson/style.css": 'body{background:url("icon.svg")}',
+            "lesson/icon.svg": '<svg xmlns="http://www.w3.org/2000/svg"/>'}
 
 
 class HTML5Tests(unittest.TestCase):
@@ -52,6 +82,165 @@ class HTML5Tests(unittest.TestCase):
         self.assertIn("data:image/svg+xml;base64,", value["html"])
         self.assertIn("connect-src 'none'", value["csp"])
         self.assertEqual(value["fileCount"], 4)
+
+    def test_scorm_versions_resolve_manifest_launch_over_manual_entry_and_persist_detection(self):
+        for version, detected in (("1.2", "scorm-1.2"), ("2004 3rd Edition", "scorm-2004"),
+                                  ("2004 4th Edition", "scorm-2004")):
+            with self.subTest(version=version):
+                result = self.upload(package(scorm_files(manifest(version))), "synthetic.zip", entrypoint="../ignored.html")
+                self.assertEqual(result.status_code, 201, result.text)
+                result = result.json()
+                self.assertEqual((result["format"], result["entrypoint"]), (detected, "lesson/start.htm"))
+                compiled = self.client.get(self.url + "/assets/" + result["assetId"]).json()
+                self.assertEqual(compiled["format"], detected)
+                self.assertEqual(compiled["entrypoint"], "lesson/start.htm")
+                self.assertIn("Synthetic SCO", compiled["html"])
+                self.assertNotIn("Wrong entry", compiled["html"])
+                self.assertIn("data:text/javascript;base64,", compiled["html"])
+                self.assertIn("data:text/css;base64,", compiled["html"])
+                self.assertEqual(compiled["csp"], html5_import.CSP)
+                self.assertEqual(compiled["fileCount"], 5)
+                self.assertIsNone(result["project"]["storyboard"]["scenes"][0]["html5Activity"])
+                duplicate = self.upload(package(scorm_files(manifest(version))), "synthetic.zip").json()
+                self.assertEqual(duplicate["assetId"], result["assetId"])
+                self.assertEqual(duplicate["format"], detected)
+                self.assertEqual(duplicate["entrypoint"], "lesson/start.htm")
+
+    def test_plain_zip_and_html_keep_manual_entry_contract(self):
+        for filename, content, entry, detected in (
+            ("plain.zip", package({"nested/start.html": "<h1>Plain</h1>"}), "nested/start.html", "html5-zip"),
+            ("plain.htm", b"<h1>Plain</h1>", "ignored.html", "html"),
+        ):
+            result = self.upload(content, filename, entrypoint=entry)
+            self.assertEqual(result.status_code, 201, result.text)
+            self.assertEqual(result.json()["format"], detected)
+            self.assertEqual(result.json()["entrypoint"], entry if filename.endswith(".zip") else "index.html")
+        with self.assertRaisesRegex(ValueError, "selected HTML entry"):
+            html5_import.compile_package("missing-manifest.zip", package({"lesson/start.htm": "x"}), "index.html")
+
+    def test_scorm_namespace_prefix_optional_default_encoded_paths_and_exact_manifest_limit(self):
+        xml = manifest().replace('xmlns=', 'xmlns:cp=').replace(' default="org"', "")
+        xml = re.sub(r"<(/?)([a-z]+)(?=[ >])", r"<\1cp:\2", xml)
+        xml = xml.replace('identifier="synthetic"', 'identifier="synthetic" xml:lang="en" '
+                          'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+                          'xsi:schemaLocation="urn:unused https://example.invalid/never-fetch.xsd"')
+        xml = xml.replace("lesson/start.htm", "lesson/start%20here.htm")
+        files = scorm_files(xml)
+        files["lesson/start here.htm"] = files.pop("lesson/start.htm")
+        remaining = 256 * 1024 - len(xml.encode())
+        files["imsmanifest.xml"] = xml + "<!--" + " " * (remaining - 7) + "-->"
+        self.assertEqual(len(files["imsmanifest.xml"].encode()), 256 * 1024)
+        result = html5_import.compile_package("synthetic.zip", package(files), "")
+        self.assertEqual(result["entrypoint"], "lesson/start here.htm")
+        files["imsmanifest.xml"] += " "
+        with self.assertRaisesRegex(ValueError, "256 KiB"):
+            html5_import.compile_package("synthetic.zip", package(files), "")
+
+    def test_scorm_rejects_malformed_hostile_and_unsupported_manifests_without_mutation(self):
+        xml = manifest()
+        cases = [
+            ("malformed", xml[:-10], "well-formed"),
+            ("dtd", '<!DOCTYPE manifest [<!ENTITY x "boom">]>' + xml.split("?>", 1)[1], "DTD/entity"),
+            ("external-entity", '<!DOCTYPE manifest SYSTEM "https://example.invalid/a.dtd">' + xml.split("?>", 1)[1], "DTD/entity"),
+            ("utf16", xml.encode("utf-16"), "UTF-8"),
+            ("utf16-no-bom-dtd", ('<!DOCTYPE manifest [<!ENTITY x "boom">]>' +
+                                  xml.split("?>", 1)[1]).encode("utf-16-le"), "UTF-8"),
+            ("utf32-no-bom-dtd", ('<!DOCTYPE manifest [<!ENTITY x "boom">]>' +
+                                  xml.split("?>", 1)[1]).encode("utf-32-be"), "UTF-8"),
+            ("size", " " * (256 * 1024 + 1), "256 KiB"),
+            ("namespace", xml.replace("imscp_rootv1p1p2", "unknown"), "namespace"),
+            ("version", xml.replace(">1.2<", ">2004 4th Edition<"), "schema/version"),
+            ("schema", xml.replace("ADL SCORM", "Other"), "schema/version"),
+            ("missing-metadata", xml.replace("<schema>ADL SCORM</schema>", ""), "one schema"),
+            ("default", xml.replace('default="org"', 'default="missing"'), "default organization"),
+            ("multiple-organizations", xml.replace("</organizations>", '<organization identifier="other"/></organizations>'), "one organization"),
+            ("missing-reference", xml.replace('identifierref="sco"', 'identifierref="missing"'), "reference"),
+            ("duplicate-identifiers", xml.replace('identifier="assets"', 'identifier="sco"'), "unique"),
+            ("two-scos", xml.replace('scormtype="asset"', 'scormtype="sco"'), "one SCO"),
+            ("no-sco", xml.replace('scormtype="sco"', 'scormtype="asset"'), "one SCO"),
+            ("two-launch-items", xml.replace("</organization>", '<item identifier="second" identifierref="sco"/></organization>'), "one item"),
+            ("nested-items", xml.replace("</item>", '<item identifier="second" identifierref="sco"/></item>'), "structure"),
+            ("asset-launch", xml.replace('scormtype="asset"', 'scormtype="asset" href="index.html"'), "launch targets"),
+            ("unknown-resource-type", xml.replace('type="webcontent"', 'type="other"'), "webcontent"),
+            ("wrong-adl-namespace", xml.replace("adlcp_rootv1p2", "adlcp_v1p3"), "attributes"),
+            ("dependency", xml.replace('identifierref="assets"', 'identifierref="missing"'), "dependencies"),
+            ("dependency-cycle", xml.replace('</resource></resources>', '<dependency identifierref="assets"/></resource></resources>'), "dependencies"),
+            ("sequencing", xml.replace("</organization>", '<sequencing xmlns="http://www.imsglobal.org/xsd/imsss"/></organization>'), "sequencing/navigation"),
+            ("prerequisites", xml.replace("</item>", "<adlcp:prerequisites>other</adlcp:prerequisites></item>"), "structure"),
+            ("parameters", xml.replace('identifierref="sco"', 'identifierref="sco" parameters="?x=1"'), "attributes"),
+            ("xml-base", xml.replace('identifier="sco"', 'identifier="sco" xml:base="lesson/"'), "attributes"),
+            ("hidden", xml.replace('identifierref="sco"', 'identifierref="sco" isvisible="false"'), "Hidden"),
+            ("2004-sequencing", manifest("2004 4th Edition").replace("</organization>",
+                '<sequencing xmlns="http://www.imsglobal.org/xsd/imsss"/></organization>'), "sequencing/navigation"),
+            ("2004-navigation", manifest("2004 3rd Edition").replace("</item>",
+                '<presentation xmlns="http://www.adlnet.org/xsd/adlnav_v1p3"/></item>'), "structure"),
+            ("2004-completion", manifest("2004 4th Edition").replace("</item>",
+                "<adlcp:completionThreshold>1</adlcp:completionThreshold></item>"), "structure"),
+        ]
+        revision = storage.read_project(self.project.id).storyboard.revision
+        for name, value, message in cases:
+            with self.subTest(name=name):
+                result = self.upload(package(scorm_files(value)), "synthetic.zip")
+                self.assertEqual(result.status_code, 422, result.text)
+                self.assertIn(message, result.json()["detail"])
+                project = storage.read_project(self.project.id)
+                self.assertEqual(project.storyboard.revision, revision)
+                self.assertEqual(project.storyboard.assets, [])
+
+    def test_scorm_rejects_unsafe_missing_or_non_html_launch_and_file_paths(self):
+        for path in ("https://example.invalid/a.htm", "//example.invalid/a.htm", "/lesson/start.htm",
+                     "../lesson/start.htm", "%2e%2e/lesson/start.htm", "lesson/%2e%2e/start.htm",
+                     "C:/lesson/start.htm", "lesson\\start.htm", "lesson/start.htm?x=1",
+                     "lesson/start.htm#page", "missing.htm", "lesson/run.js", ""):
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                html5_import.compile_package("synthetic.zip", package(scorm_files(
+                    manifest().replace('href="lesson/start.htm"', f'href="{path}"'))), "index.html")
+        with self.assertRaisesRegex(ValueError, "referenced file is missing"):
+            html5_import.compile_package("synthetic.zip", package(scorm_files(
+                manifest().replace('href="lesson/run.js"', 'href="missing.js"'))), "")
+        for name in ("IMSManifest.xml", "nested/imsmanifest.xml"):
+            files = scorm_files()
+            files[name] = files.pop("imsmanifest.xml")
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "root imsmanifest.xml"):
+                html5_import.compile_package("synthetic.zip", package(files), "")
+        files = scorm_files()
+        files["lesson/run.js"] = '<not actually UTF-8>'.encode("utf-16")
+        with self.assertRaisesRegex(ValueError, "UTF-8"):
+            html5_import.compile_package("synthetic.zip", package(files), "")
+        files = scorm_files()
+        files["lesson/start.htm"] = '<script src="https://example.invalid/a.js"></script>'
+        with self.assertRaisesRegex(ValueError, "External"):
+            html5_import.compile_package("synthetic.zip", package(files), "")
+
+    def test_scorm_preserves_archive_protections(self):
+        output = io.BytesIO(package(scorm_files()))
+        with ZipFile(output, "a") as archive:
+            archive.writestr("IMSMANIFEST.XML", manifest())
+        with self.assertRaisesRegex(ValueError, "duplicate paths"):
+            html5_import.compile_package("synthetic.zip", output.getvalue(), "")
+        encrypted = bytearray(package(scorm_files()))
+        encrypted[encrypted.index(b"PK\x01\x02") + 8] |= 1
+        with self.assertRaisesRegex(ValueError, "encrypted"):
+            html5_import.compile_package("synthetic.zip", bytes(encrypted), "")
+        for compression, symlink, message in ((ZIP_BZIP2, False, "compression"),
+                                               (ZIP_DEFLATED, True, "Symlinks")):
+            output = io.BytesIO()
+            with ZipFile(output, "w", compression) as archive:
+                for name, value in scorm_files().items():
+                    info = ZipInfo(name)
+                    info.compress_type = compression
+                    if symlink and name == "imsmanifest.xml":
+                        info.create_system = 3
+                        info.external_attr = (stat.S_IFLNK | 0o777) << 16
+                    archive.writestr(info, value)
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                html5_import.compile_package("synthetic.zip", output.getvalue(), "")
+        files = scorm_files()
+        files["lesson/run.js"] = " " * 10000
+        content = package(files)
+        with patch.object(html5_import, "LIMIT", len(content) + 1):
+            with self.assertRaisesRegex(ValueError, "Expanded"):
+                html5_import.compile_package("synthetic.zip", content, "")
 
     def test_rejects_nonportable_or_active_container_features(self):
         for content in (
