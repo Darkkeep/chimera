@@ -11,12 +11,16 @@ import "./pythia-talk.css";
 
 type Advice = { content: string; kind: "answer" | "clarification"; rationale: string; limits: string[]; producer_id: string; stopping_boundary: "advisory-only" };
 type Turn = { id: string; question: string; direction?: string; outlineItemCount?: number; status: "running" | "completed" | "failed" | "interrupted"; result: Advice | null; error: string | null; context: { sceneId: string | null; sourceIds: string[] } };
-type Conversation = { sessionId: string; turns: Turn[]; authorDirection?: string; actions?: PythiaAction[]; configured?: boolean; message?: string };
+type Planning = { stage: "consulting" | "designing"; brief: string; turnId: string | null };
+type Conversation = { sessionId: string; turns: Turn[]; authorDirection?: string; actions?: PythiaAction[]; configured?: boolean; message?: string; planning?: Planning };
 type Source = { id: string; title: string; currentVersion: string; versions: { version: string; extractionStatus: string; passages: { locator: string; text: string }[] }[] };
 type Payload = { sessionId: string; message: string; direction: string; sceneId: string | null; sourceIds: string[] };
 
-const roughDraftDirection = "Create one starting content scene for every top-level item in the agreed expanded outline, preserving its titles and order. Include every item; do not merge or omit items.";
-const restoreDirection = (value: string) => value === "Create a concise rough sequence of up to five content scenes from the agreed conversation." ? roughDraftDirection : value;
+const roughDraftDirection = "Design a learner-sized scene sequence covering every topic in the agreed expanded outline. Split topics or source slides into multiple scenes where needed for pacing, explanation, examples, practice, and reflection. Use learner-facing scene titles, not planning-section headings. Preserve the agreed content and logical order; do not omit topics. Explain the scene boundaries and describe proposed interactions and media as production notes, not completed features.";
+const restoreDirection = (value: string) => [
+  "Create a concise rough sequence of up to five content scenes from the agreed conversation.",
+  "Create one starting content scene for every top-level item in the agreed expanded outline, preserving its titles and order. Include every item; do not merge or omit items.",
+].includes(value) ? roughDraftDirection : value;
 
 async function readJson(response: Response) {
   const data = await response.json().catch(() => null);
@@ -50,14 +54,16 @@ export function PythiaTalkPanel({ project, scene, onClose, onProjectUpdated, emb
   const [checking, setChecking] = useState(false);
   const [connection, setConnection] = useState("");
   const [error, setError] = useState("");
+  const [brief, setBrief] = useState("");
+  const [editingBrief, setEditingBrief] = useState(false);
   const [expandedTurns, setExpandedTurns] = useState<Record<string, boolean>>({});
   const retry = useRef<{ signature: string; id: string } | null>(null);
   const draftRetry = useRef<{ signature: string; id: string } | null>(null);
   const sourceVersion = useRef(sourcesVersion);
   const requestedDraft = useRef<string | null>(null);
   const pending = Boolean(conversation?.turns.some(turn => turn.status === "running") || conversation?.actions?.some(action => action.status === "drafting"));
-  const latestOutline = conversation?.turns.filter(turn => turn.status === "completed" && (turn.outlineItemCount || 0) > 0).at(-1);
-  const outlineDraft = conversation?.actions?.filter(action => action.turnId === latestOutline?.id && action.mode === "add-scenes" && action.status === "pending").at(-1);
+  const latestAnswer = conversation?.turns.filter(turn => turn.status === "completed").at(-1);
+  const designing = conversation?.planning?.stage === "designing";
   function revealDraft(action: PythiaAction) {
     setExpandedTurns(current => ({ ...current, [action.turnId]: true }));
     requestAnimationFrame(() => {
@@ -77,7 +83,7 @@ export function PythiaTalkPanel({ project, scene, onClose, onProjectUpdated, emb
     Promise.all([
       fetch(base, { signal: controller.signal }).then(readJson),
       fetch(`/api/projects/${project.id}/reference-resources`, { signal: controller.signal }).then(readJson),
-    ]).then(([state, resources]) => { setConversation(state); setDirection(restoreDirection(state.authorDirection || "")); setSources(resources); })
+    ]).then(([state, resources]) => { setConversation(state); setDirection(restoreDirection(state.authorDirection || "")); setBrief(state.planning?.brief || ""); setSources(resources); })
       .catch(issue => { if (issue.name !== "AbortError") setError(issue.message); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -140,7 +146,7 @@ export function PythiaTalkPanel({ project, scene, onClose, onProjectUpdated, emb
     setMutating(true); setError("");
     try {
       setConversation(await fetch(base + "/reset", { method: "POST" }).then(readJson));
-      retry.current = null; draftRetry.current = null; setDraft(""); setDirection(""); setSelectedAdvice(null); setSourceIds([]); setIncludeScene(false);
+      retry.current = null; draftRetry.current = null; setDraft(""); setDirection(""); setSelectedAdvice(null); setSourceIds([]); setIncludeScene(false); setBrief(""); setEditingBrief(false);
     } catch (issue) { setError(issue instanceof Error ? issue.message : "Could not start a new conversation."); }
     finally { setMutating(false); }
   }
@@ -161,16 +167,32 @@ export function PythiaTalkPanel({ project, scene, onClose, onProjectUpdated, emb
     requestAnimationFrame(() => document.getElementById("pythia-author-direction")?.focus());
   }
 
-  async function prepareDraft(outline?: Turn) {
-    const turnId = outline?.id || selectedAdvice;
-    const mode = outline ? "add-scenes" : actionMode;
-    const draftDirection = outline ? roughDraftDirection + (direction.trim() ? `\n\nAdditional author direction:\n${restoreDirection(direction.trim())}` : "") : direction.trim();
-    if (!conversation || pending || mutating || locked || !turnId || !draftDirection) return;
+  async function savePlanning(stage: Planning["stage"]) {
+    if (!conversation || pending || mutating || locked) return;
+    setMutating(true); setError("");
+    try {
+      const state: Conversation = await fetch(base + "/planning", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: conversation.sessionId, stage, brief: stage === "designing" ? brief : conversation.planning?.brief || "", turnId: latestAnswer?.id || null }),
+      }).then(readJson);
+      setConversation(state);
+      setBrief(state.planning?.brief || "");
+      setEditingBrief(false); setSelectedAdvice(null); draftRetry.current = null;
+    } catch (issue) {
+      setError(issue instanceof Error ? issue.message : "Could not save your design brief. The consultation stage has not been confirmed.");
+    } finally { setMutating(false); }
+  }
+
+  async function prepareDraft() {
+    const turnId = selectedAdvice;
+    const mode = actionMode;
+    const draftDirection = direction.trim();
+    if (!conversation || !designing || editingBrief || pending || mutating || locked || !turnId || !draftDirection) return;
     if (draftDirection.length > 4000) { setError("Shorten the additional author direction to leave room for the outline instructions within 4,000 characters."); return; }
     setMutating(true); setError("");
     const payload = { sessionId: conversation.sessionId, turnId, mode,
       sceneId: mode === "update-scene" ? targetSceneId : null, direction: draftDirection, expectedRevision: project.storyboard.revision,
-      followOutline: mode === "add-scenes" && (Boolean(outline) || planning || project.storyboard.scenes.length === 0) };
+      followOutline: mode === "add-scenes" && Boolean(conversation.turns.find(turn => turn.id === turnId)?.outlineItemCount) };
     const signature = JSON.stringify(payload);
     if (draftRetry.current?.signature !== signature) draftRetry.current = { signature, id: crypto.randomUUID() };
     requestedDraft.current = draftRetry.current.id;
@@ -198,15 +220,25 @@ export function PythiaTalkPanel({ project, scene, onClose, onProjectUpdated, emb
 
   const disabled = loading || mutating || locked || pending || conversation?.configured === false || !conversation;
   const content = <>
-    <header className="pythia-talk-heading"><img src={pythiaIcon} alt="" width={56} height={56} /><div><h2 id="pythia-talk-title">{planning ? "Plan with Pythia" : "Talk to Pythia"}</h2><p>Direct advice from your local Pythia · {project.title}</p></div>{!embedded && <button type="button" className="icon-button" aria-label="Close Pythia conversation" disabled={mutating} onClick={onClose}><X size={18} /></button>}</header>
-    {planning && <p className="field-hint">Discuss the audience, goals, and source material here. Your sent conversation is saved with this project. Choose Draft rough scenes when you are ready; no scenes are added until you apply a reviewed draft.</p>}
+    <header className="pythia-talk-heading"><img src={pythiaIcon} alt="" width={56} height={56} /><div><h2 id="pythia-talk-title">{planning ? "Plan with Pythia" : "Consult Pythia"}</h2><p>Direct advice from your local Pythia · {project.title}</p></div>{!embedded && <button type="button" className="icon-button" aria-label="Close Pythia conversation" disabled={mutating} onClick={onClose}><X size={18} /></button>}</header>
+    <section className="pythia-action-builder" aria-label="Consultation and design brief">
+      <h3>{designing ? "Explore the learning design" : "Consult first. Design together."}</h3>
+      <p>{designing ? "Your brief is agreed for exploration, not final approval. Discuss the learner experience, sequence, pacing, and scene boundaries with Pythia. Only request a content draft when the design feels right." : "Understand the sources, audience, purpose, and gaps with Pythia. Explore approaches and challenge assumptions. There is no required interview or number of exchanges, and a numbered reply does not move you into scene production."}</p>
+      {conversation?.planning?.brief && <details><summary>Your recorded design brief</summary><p className="pythia-design-brief">{conversation.planning.brief}</p></details>}
+      {latestAnswer && !editingBrief && <button type="button" className="button button-outline" disabled={disabled} onClick={() => setEditingBrief(true)}>{designing ? "Revisit the design brief" : "Review our design brief"}</button>}
+      {editingBrief && <>
+        <label htmlFor="pythia-design-brief">Design brief<textarea id="pythia-design-brief" rows={6} maxLength={8000} value={brief} disabled={disabled} onChange={event => setBrief(event.target.value)} placeholder="Record the audience, purpose, outcomes, approach, constraints, and open questions you have discussed. Mark assumptions and undecided ideas explicitly." /></label>
+        <p>Ask Pythia to summarize the brief in the conversation if helpful. Review and edit it here: you decide what is agreed, what is assumed, and what is still open. Saving this brief makes no model call and creates no scenes.</p>
+        <button type="button" className="button button-outline" disabled={disabled || !latestAnswer?.result} onClick={() => setBrief(latestAnswer?.result?.content || "")}>Use latest reply as a starting point</button>
+        {brief.length > 8000 && <p role="alert">The design brief is {brief.length.toLocaleString()} characters. Edit it to at most 8,000 characters; nothing has been truncated or saved.</p>}
+        <button type="button" className="button button-accent" disabled={disabled || !brief.trim() || brief.length > 8000} onClick={() => void savePlanning("designing")}>Agree brief and explore scene design</button>
+        <button type="button" className="button button-outline" disabled={mutating} onClick={() => { setBrief(conversation?.planning?.brief || ""); setEditingBrief(false); }}>Keep consulting without changing the brief</button>
+      </>}
+      {designing && <button type="button" className="button button-outline" disabled={disabled} onClick={() => void savePlanning("consulting")}>Return to consultation</button>}
+    </section>
     {loading && <p role="status">Loading your Pythia conversation…</p>}
     {conversation?.configured === false && <p role="alert">{conversation.message}</p>}
     <div className="pythia-talk-connection"><button className="button button-outline" type="button" disabled={checking || loading || mutating || pending} onClick={() => void checkConnection()}>{checking ? "Checking local Pythia…" : "Check connection"}</button>{connection && <p role="status">{connection}</p>}</div>
-    {latestOutline && <section className="pythia-action-builder" aria-label="Turn outline into scenes"><h3>Turn your outline into scenes</h3><p>{latestOutline.outlineItemCount} top-level items → {latestOutline.outlineItemCount} new scenes. Create the draft, review it, then choose Apply changes. Existing scenes stay in the project.</p>
-      {outlineDraft ? <button type="button" className="button button-accent" disabled={mutating} onClick={() => revealDraft(outlineDraft)}>Review draft and apply {outlineDraft.result?.scenes.length} scenes</button>
-        : <button type="button" className="button button-accent" disabled={disabled} onClick={() => void prepareDraft(latestOutline)}>{pending ? "Preparing scenes…" : "Create scene draft from outline"}</button>}
-    </section>}
     <section className="pythia-talk-history" aria-label="Pythia conversation history">
       {(conversation?.turns.length || 0) > 1 && <div className="pythia-history-controls"><button type="button" className="button button-outline" onClick={() => setExpandedTurns(Object.fromEntries(conversation!.turns.map(turn => [turn.id, true])))}>Expand all exchanges</button><button type="button" className="button button-outline" onClick={() => setExpandedTurns({})}>Roll up prior exchanges</button></div>}
       {!loading && conversation?.turns.length === 0 && <p>Ask a question, discuss an idea, or challenge Pythia's advice. Your conversation is saved privately in this local Chimera installation.</p>}
@@ -221,17 +253,20 @@ export function PythiaTalkPanel({ project, scene, onClose, onProjectUpdated, emb
         {turn.result && <div className="pythia-talk-message pythia-talk-answer"><img src={pythiaIcon} alt="" width={36} height={36} /><div><div className="pythia-talk-answer-label"><strong>Pythia</strong><span>Live model via local Pythia</span></div><p>{turn.result.content}</p>
           <details><summary>Explanation and limits</summary>{turn.result.rationale && <p>{turn.result.rationale}</p>}{turn.result.limits.length > 0 && <ul>{turn.result.limits.map((limit, index) => <li key={index}>{limit}</li>)}</ul>}<small>Producer: {turn.result.producer_id} · Advisory only</small></details>
         </div></div>}
-        {turn.status === "completed" && <button type="button" className="button button-outline pythia-draft-from-advice" disabled={disabled} aria-pressed={selectedAdvice === turn.id} onClick={() => selectAdvice(turn.id)}>{planning ? "Draft rough scenes from this advice" : "Draft changes from this advice"}</button>}
-        {conversation.actions?.filter(action => action.turnId === turn.id).map(action => <PythiaActionReview key={action.id} action={action} revision={project.storyboard.revision} disabled={disabled} onDecision={(item, decision) => void decideAction(item, decision)} onRedraft={item => { setDirection(item.direction); setActionMode(item.mode); setTargetSceneId(item.sceneId || scene?.id || ""); draftRetry.current = null; selectAdvice(item.turnId); }} />)}
+        {turn.status === "completed" && designing && <button type="button" className="button button-outline pythia-draft-from-advice" disabled={disabled || editingBrief} aria-pressed={selectedAdvice === turn.id} onClick={() => selectAdvice(turn.id)}>Prepare a content draft from this advice</button>}
+        {conversation.actions?.filter(action => action.turnId === turn.id).map(action => <PythiaActionReview key={action.id} action={action} revision={project.storyboard.revision} disabled={disabled} onDecision={(item, decision) => void decideAction(item, decision)} onRedraft={item => {
+          if (!designing) { setEditingBrief(true); setError("Review and agree the design brief before preparing another content draft."); return; }
+          setDirection(restoreDirection(item.direction)); setActionMode(item.mode); setTargetSceneId(item.sceneId || scene?.id || ""); draftRetry.current = null; selectAdvice(item.turnId);
+        }} />)}
         {(turn.status === "failed" || turn.status === "interrupted") && <div className="pythia-talk-failure"><p role="alert">{turn.error}</p><button type="button" className="button button-outline" disabled={disabled} onClick={() => { retry.current = null; void send({ sessionId: conversation.sessionId, message: turn.question, direction: turn.direction || "", sceneId: turn.context?.sceneId || null, sourceIds: turn.context?.sourceIds || [] }); }}>Retry this question</button></div>}
         </div></details>;
       })}
     </section>
     {error && <p role="alert" className="pythia-talk-failure">{error}</p>}
     <section className="pythia-author-direction"><label htmlFor="pythia-author-direction">Author direction</label><textarea id="pythia-author-direction" rows={3} maxLength={4000} value={direction} disabled={disabled} placeholder="For example: Keep this under five minutes, use plain language, and preserve existing narration." onChange={event => setDirection(event.target.value)} /><p>Used for your next question or content draft, and saved when you send it. You can change this direction as the conversation develops.</p></section>
-    {selectedAdvice && <section className="pythia-action-builder" aria-label="Prepare content changes"><h3>{planning ? "Prepare a rough scene draft" : "Prepare changes from selected advice"}</h3><p>Choose what Chimera should draft. You will review the exact changes before applying them.</p><label>Action<select aria-label="Content action" value={actionMode} disabled={disabled} onChange={event => setActionMode(event.target.value as "update-scene" | "add-scenes")}><option value="update-scene" disabled={project.storyboard.scenes.length === 0}>Update selected scene</option><option value="add-scenes">Add new content scenes</option></select></label>
+    {selectedAdvice && designing && <section className="pythia-action-builder" aria-label="Prepare content changes"><h3>Prepare changes from the agreed design</h3><p>This is a separate production request, not another consultation reply. Choose what Chimera should draft. You will review the exact changes before applying them.</p><label>Action<select aria-label="Content action" value={actionMode} disabled={disabled} onChange={event => setActionMode(event.target.value as "update-scene" | "add-scenes")}><option value="update-scene" disabled={project.storyboard.scenes.length === 0}>Update selected scene</option><option value="add-scenes">Add new content scenes</option></select></label>
       {actionMode === "update-scene" && <label>Target scene<select aria-label="Target scene" value={targetSceneId} disabled={disabled} onChange={event => setTargetSceneId(event.target.value)}><option value="" disabled>Choose a scene</option>{project.storyboard.scenes.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>}
-      <p className="field-hint">Supports titles, screen text, narration, author notes, and new content scenes. Course planning creates one scene per top-level outline item, preserving every title and its order. Drafting shares the selected advice, its conversation context, your direction, and the update target's text.</p><button className="button button-accent" type="button" disabled={disabled || !direction.trim() || (actionMode === "update-scene" && !targetSceneId)} onClick={() => void prepareDraft()}>Generate content draft</button><button className="button button-outline" type="button" disabled={mutating} onClick={() => setSelectedAdvice(null)}>Close draft controls</button>
+      <p className="field-hint">Supports titles, screen text, narration, author notes, and new content scenes. Planning topics are coverage requirements, not scene boundaries: Pythia may split each into several learner-sized scenes. Review the complete sequence before applying. Add new content scenes appends; it does not split or replace saved scenes. Drafting shares the agreed design brief, selected advice, its conversation context, your direction, and the update target's text.</p><button className="button button-accent" type="button" disabled={disabled || editingBrief || !direction.trim() || (actionMode === "update-scene" && !targetSceneId)} onClick={() => void prepareDraft()}>Generate content draft</button><button className="button button-outline" type="button" disabled={mutating} onClick={() => setSelectedAdvice(null)}>Close draft controls</button>
     </section>}
     <form className="pythia-talk-compose" onSubmit={event => { event.preventDefault(); if (conversation) void send({ sessionId: conversation.sessionId, message: draft, direction, sceneId: includeScene && scene ? scene.id : null, sourceIds }); }}>
       <div className="pythia-talk-options"><button type="button" className="button button-outline" disabled={disabled || conversation.turns.length === 0} onClick={() => void reset()}><RefreshCw size={15} /> New conversation</button><label><input type="checkbox" checked={includeScene} disabled={disabled || !scene} onChange={event => setIncludeScene(event.target.checked)} /> Include current scene text{scene ? `: ${scene.title}` : " (select a scene first)"}</label></div>

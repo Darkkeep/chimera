@@ -1,5 +1,32 @@
 # AI Connection
 
+Storyboard suggestions can optionally execute registered specialists and public
+web research before drafting. They use the local Pythia plugin's text provider,
+or the saved legacy text-model AI connection when no plugin is configured, not
+the image/speech/video provider tabs. Public research currently requires the
+approved OpenAI endpoint and provider/model access to hosted web search.
+Preview discovers endpoint capability without testing account eligibility.
+Selecting **Search the public web before drafting** requires a cited, completed
+web search as the first tool call, leaving up to two specialist calls. Search
+failure stops the run; synthesis is not a fallback. The option remains off by
+default and requires specialist orchestration.
+Each explicitly submitted tool run permits up to three tool calls and seven
+provider requests, including planning and final drafting. Saved text connections
+reserve seven daily requests before launch; unused reservations are not refunded.
+Queries can leave the model provider for web search: enable research only for
+public, non-confidential questions. See
+[Connect specialist work and public research](user-guide.md#connect-specialist-work-and-public-research).
+
+For whole-scene learning design, use the storyboard's **Design experience**,
+not the video-provider form. The local adapter advertises
+`experience_treatments` and exposes `pythia_experience_treatment`.
+Only an explicit design/refinement calls the configured Pythia model.
+Native flow/reveal preview, private saving and approved application need no
+media-provider connection. See [Native scene experiences](talk-to-pythia.md#native-scene-experiences).
+Shotstack remains a separate text-video production component; its treatment
+context now discloses an applied native experience when present, without
+claiming that an MP4 can implement the native interactions.
+
 Pythia diagnostics are available separately under **Settings > Pythia** (formerly Intelligence Engine). Pythia manages learning-intelligence providers; **Settings > AI connection** configures media-provider connections, not Pythia's provider registry.
 
 Open Settings in the sidebar, then AI connection. The local single-user operator can manage the connection. In shared deployments, only installation administrators can save, test, or disconnect; other authenticated users can view connection status.
@@ -95,18 +122,63 @@ a connection, and choose 4–30 seconds (default 30).
   maximum, or with an invalid/missing duration, fails locally without downloading.
   The provider may still charge for it. Requested maximum and actual duration are
   stored separately; regeneration retains the requested maximum.
-- **Shotstack:** enter the exact title text, not an AI footage prompt. Chimera
-  posts a rich-text timeline with white text, dark background and fade transitions
-  to `/edit/{environment}/render`. The chosen duration is the clip length.
+- **Shotstack:** direct connections default to a scene-aware treatment designed
+  with Pythia, reviewed and edited before rendering (below). **Manual single title
+  card** retains exact-text input without a Pythia call. Chimera posts a rich-text
+  timeline with white text and a dark background to `/edit/{environment}/render`.
+  This is text rendering, not AI footage generation.
 
 The form requests landscape MP4; the API also accepts portrait 720×1280.
 There is no template editor, arbitrary timeline/URL input or webhook setup.
-**Generate candidate** is the explicit, potentially billable action. Saving and
-testing remain non-generating. Provider operation IDs are saved with jobs before
+**Generate candidate** (manual/presenter) or **Render reviewed treatment** is the
+explicit, potentially billable render action. Saving connections/treatments and
+testing connections remain non-generating. Provider operation IDs are saved with jobs before
 polling every five seconds, for up to 20 minutes. Only completed renders are
 downloaded, without credentials or redirects, from approved HTTPS provider/CDN
 domains. Downloads are bounded to 100 MiB and checked for an MP4 header. Signed
 download URLs and raw provider errors are not persisted.
+
+### Scene-aware Shotstack treatments
+
+This design path uses the local single-user Pythia MCP adapter and a **direct
+Shotstack** connection. Update that adapter to include `pythia_video_treatment`.
+Remote Engine media execution and Synthesia retain their existing forms.
+
+1. Select the scene, video type and direct Shotstack connection in Media Library.
+   The workflow defaults to **Design a scene-aware treatment with Pythia**.
+2. Expand **Context shared with Pythia** to review the saved screen text,
+   narration, production direction, author notes and agreed design brief. The
+   brief is available only in the conversation's agreed design stage and can be
+   excluded. No source files, attachments or conversation history are sent.
+3. Enter **Video design direction**, choose 4-30 seconds, and explicitly request
+   a treatment. This calls the configured Pythia model provider and may incur
+   model charges, but makes no Shotstack request and changes no scene.
+4. Review the learning purpose, rationale, shot text, timing and transitions.
+   Edit, add or remove shots, or ask Pythia to refine your current edited treatment.
+   Use **Save treatment edits** before leaving the form. Drafts and saved edits
+   survive reopening in the same actor/project/scene scope under installation
+   `private-pythia`, outside project archives. Resetting consultation does not
+   remove video treatments. Failed refinement retains the previous saved draft.
+5. **Render reviewed treatment** saves the exact edits first, then submits a
+   separate potentially billable Shotstack render. A failed save cannot render.
+   Shotstack receives only the shot text, timing, transitions and fixed styling,
+   not the brief, scene notes, rationale or production-needs list.
+6. Preview the resulting MP4 candidate for readability, pacing and clipping.
+   Approval and attachment remain separate; no automatic scene placement occurs.
+
+Treatments permit 1-10 shots, up to 240 characters each, integer durations of
+at least 2 seconds totaling 4-30 seconds, and fade or no transition. Shots play
+sequentially with cumulative start times. Output is silent landscape text on a
+dark background. Imagery, footage, music, voice and interactions are **not**
+implemented: proposed needs are displayed separately, not rendered. Timing and
+schema tests cannot establish instructional quality or text fit on real output.
+
+Scene revision or included brief changes require renewed treatment review; stale
+saves/renders are rejected rather than silently rebinding a treatment. Media jobs,
+candidates, explicit retries and regeneration preserve the reviewed shot sequence.
+Existing single-card API calls remain compatible. Refresh context/status after
+an ambiguous design response. Check media status and the provider dashboard after
+an ambiguous render response before intentionally submitting another paid request.
 
 Failures never select another provider or automatically submit another render.
 Interrupted running jobs fail on restart and retain their provider operation ID.

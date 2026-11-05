@@ -44,6 +44,7 @@ async function main() {
         await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
       },scene.visualLayout.timeline.printTimeMs);
       await page.evaluate(() => {
+        document.querySelectorAll('.native-experience details').forEach(detail => { detail.open = true; });
         const motion = document.querySelector('#motion');
         if (motion && !motion.hidden && motion.textContent.includes('Stop')) motion.click();
       });

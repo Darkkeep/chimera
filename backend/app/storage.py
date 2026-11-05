@@ -13,6 +13,7 @@ from threading import RLock, local
 from typing import Iterator, Literal
 from .models import AssessmentGroup, AssessmentGroupWrite, ProductionStageUpdate
 from .ai_connection import connection_status
+from .models import EnhancementSceneDraft
 from .narration_connections import SPEECH_PROVIDERS, resolve_narration_connection
 from .models import AssetAttributionUpdate, CourseCompletionSettings, EnhancementJob, EnhancementJobCreate, EnhancementProposal, EnhancementProposalChange, EnhancementProposalChangeCreate, EnhancementProposalCreate, EnhancementProposalDecisionRecord, ExportSettings, ExtractedAsset, GeneratedAssetCandidate, MediaGenerationJob, MediaGenerationJobCreate, ProjectCreate, ProjectDetail, ProjectSummary, PythiaAnalysisProposal, PythiaAnalysisProposalCreate, PythiaAnalysisProposalDecisionRecord, PythiaCourseFindingDecision, PythiaCourseFindingDecisionRecord, PythiaCourseFindingReview, PythiaCourseReview, PythiaCourseReviewCreate, PythiaTransformProposal, PythiaTransformProposalCreate, PythiaTransformProposalDecisionRecord, ReferencePassage, ReferenceResource, ReferenceResourceVersion, ReviewComment, ReviewCommentCreate, ReviewCommentDecision, ReviewCommentReply, ReviewReplyCreate, Scene, SceneCreate, SceneOrder, SceneUpdate, Storyboard, TemplateRecord, TemplateUpdate, TrashedProject
 ROOT = Path(os.environ.get("CHIMERA_WORKSPACE", Path(__file__).resolve().parents[2] / "workspace"))
@@ -1472,6 +1473,8 @@ def create_enhancement_job(
         if set(data.resourceIds) - set(resources):
             raise ValueError("One or more selected reference resources do not exist")
         selected_resources = [resources[resource_id] for resource_id in data.resourceIds]
+        if data.useTools and get_actor_context().deploymentMode != "single-user":
+            raise ValueError("Authoring tool orchestration is available only through the single-user local Pythia connection")
         for resource in selected_resources:
             selected_version = (resource_versions or {}).get(resource.id, resource.currentVersion)
             version = next((item for item in resource.versions if item.version == selected_version), None)
@@ -1488,6 +1491,8 @@ def create_enhancement_job(
             sceneIds=scene_ids,
             goal=data.goal,
             resourceIds=data.resourceIds,
+            useTools=data.useTools,
+            allowWebResearch=data.allowWebResearch,
             resourceVersions={resource.id: (resource_versions or {}).get(resource.id, resource.currentVersion) for resource in selected_resources},
             commentId=data.commentId,
             createdAt=timestamp,
@@ -1543,6 +1548,11 @@ def create_media_generation_job(project_id: str, data: MediaGenerationJobCreate)
         if data.connectionId or data.kind == "video":
             from .media_connections import select_connection
             selected = select_connection(ROOT, data.kind, data.connectionId)
+        if data.videoTreatment is not None:
+            if not selected or selected["provider"] != "shotstack" or selected["executor"] != "chimera":
+                raise ValueError("Shot treatments require a direct Shotstack connection")
+            if data.videoTreatment.sourceRevision != project.storyboard.revision:
+                raise ValueError("The scene context changed. Review a new treatment before rendering.")
         if data.kind == "video" and selected:
             if data.style.strip():
                 raise ValueError("Video providers do not accept an image style. Use the script or title text.")
@@ -1744,6 +1754,22 @@ def _proposal_value(value: object) -> object:
 
 
 def _snapshot_proposal_change(project: ProjectDetail, change: EnhancementProposalChangeCreate) -> EnhancementProposalChange:
+    if change.field == "additionalScenes":
+        if not change.targetSceneId or not any(scene.id == change.targetSceneId for scene in project.storyboard.scenes):
+            raise ValueError("Additional scenes require an existing anchor scene")
+        if not isinstance(change.proposedValue, list) or not 1 <= len(change.proposedValue) <= 40:
+            raise ValueError("Propose 1-40 additional scenes per anchor")
+        drafts = [EnhancementSceneDraft.model_validate(value) for value in change.proposedValue]
+        from .authoring import native_layout
+        additions = []
+        for draft in drafts:
+            scene = Scene(id=f"scene-{uuid.uuid4().hex[:8]}", layoutMode="native", **draft.model_dump())
+            scene = scene.model_copy(update={"visualLayout": native_layout(scene)})
+            additions.append(scene.model_dump(mode="json"))
+        return EnhancementProposalChange(
+            targetSceneId=change.targetSceneId, field=change.field, beforeValue=[],
+            proposedValue=additions,
+        )
     if change.field == "sceneOrder":
         if change.targetSceneId is not None:
             raise ValueError("Scene order changes cannot target an individual scene")
@@ -1838,6 +1864,26 @@ def _apply_proposal_changes(project: ProjectDetail, changes: list[EnhancementPro
     scenes = list(project.storyboard.scenes)
     storyboard = project.storyboard
     for change in changes:
+        if change.field == "additionalScenes":
+            anchor = next((index for index, scene in enumerate(scenes) if scene.id == change.targetSceneId), None)
+            if anchor is None:
+                raise EnhancementProposalConflict("The anchor scene no longer exists")
+            if change.beforeValue:
+                removed = {value["id"]: value for value in change.beforeValue}
+                if change.proposedValue or any(
+                    next((scene.model_dump(mode="json") for scene in scenes if scene.id == scene_id), None) != value
+                    for scene_id, value in removed.items()
+                ):
+                    raise EnhancementProposalConflict("Added scenes have changed; restore them through storyboard history instead")
+                if any(set(group.questionSceneIds) & removed.keys() for group in storyboard.assessments):
+                    raise EnhancementProposalConflict("An added scene is used by an assessment")
+                scenes = [scene for scene in scenes if scene.id not in removed]
+            else:
+                additions = [Scene.model_validate(value) for value in change.proposedValue]
+                if not additions or {scene.id for scene in additions} & {scene.id for scene in scenes}:
+                    raise EnhancementProposalConflict("Additional scenes must have unique new identities")
+                scenes[anchor + 1:anchor + 1] = additions
+            continue
         if change.field == "sceneOrder":
             proposed_ids = change.proposedValue
             current_ids = [scene.id for scene in scenes]
@@ -1951,6 +1997,8 @@ def decide_enhancement_proposal(
                     _write_enhancement_proposals(project_id, proposals)
                     raise EnhancementProposalConflict("This suggestion is stale because the storyboard revision changed")
                 if edited_changes is not None:
+                    if any(change.field == "additionalScenes" for change in changes):
+                        raise ValueError("New-scene proposals are reviewed as a unit. Accept or reject, then edit added scenes in the Scene Editor.")
                     if len(edited_changes) != len(changes) or any(
                         (edit.targetSceneId, edit.field) != (original.targetSceneId, original.field)
                         for edit, original in zip(edited_changes, changes)

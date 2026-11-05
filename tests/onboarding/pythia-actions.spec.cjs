@@ -20,8 +20,8 @@ test('author direction drives real Pythia drafts that update and add scenes only
   const getProject = async () => (await request.get(`/api/projects/${project.id}`)).json();
   await page.goto('/');
   await page.getByRole('combobox', { name: 'Switch project', exact: true }).selectOption(project.id);
-  await page.getByRole('button', { name: 'Talk to Pythia', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Talk to Pythia', exact: true });
+  await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
   await expect(dialog.getByLabel('Author direction', { exact: true })).toBeEnabled();
   await dialog.getByLabel('Author direction', { exact: true }).fill('Use short plain sentences for a first-time operator.');
   await dialog.getByLabel(/Include current scene text/).check();
@@ -29,7 +29,10 @@ test('author direction drives real Pythia drafts that update and add scenes only
   await dialog.getByRole('button', { name: 'Send to Pythia', exact: true }).click();
   await expect(dialog.locator('.pythia-talk-answer')).toHaveCount(1, { timeout: 90000 });
   const initial = await getProject();
-  await dialog.getByRole('button', { name: 'Draft changes from this advice', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Review our design brief', exact: true }).click();
+  await dialog.getByRole('textbox', { name: 'Design brief', exact: true }).fill('Help first-time operators check ambiguous category labels before submitting. Use plain language and preserve narration.');
+  await dialog.getByRole('button', { name: 'Agree brief and explore scene design', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Prepare a content draft from this advice', exact: true }).click();
   await dialog.getByLabel('Author direction', { exact: true }).fill("Change only the scene title to exactly 'Check the labels first' and screen text to exactly one paragraph: 'Confirm the category before submitting.' Preserve narration, notes, and all other fields.");
   await dialog.getByRole('button', { name: 'Generate content draft', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Apply changes', exact: true })).toBeEnabled({ timeout: 90000 });
@@ -66,8 +69,8 @@ test('author direction drives real Pythia drafts that update and add scenes only
   await page.screenshot({ path: testInfo.outputPath('pythia-actions-desktop.png'), fullPage: true });
   await dialog.getByRole('button', { name: 'Close Pythia conversation', exact: true }).click();
   await page.reload();
-  await page.getByRole('button', { name: 'Talk to Pythia', exact: true }).click();
-  const restored = page.getByRole('dialog', { name: 'Talk to Pythia', exact: true });
+  await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
+  const restored = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
   await expect(restored.getByText(/Applied to storyboard revision/)).toHaveCount(2);
   await expect(restored.getByLabel('Author direction', { exact: true })).toHaveValue(conversation.authorDirection);
   await page.setViewportSize({ width: 390, height: 844 });

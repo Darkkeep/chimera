@@ -15,13 +15,32 @@ function Seconds({
   onChange,
   min = 0,
   max = 3600000,
+  commitOnBlur = false,
+  onValidityChange,
 }: {
   label: string;
   value: number;
   onChange: (n: number) => void;
   min?: number;
   max?: number;
+  commitOnBlur?: boolean;
+  onValidityChange?: (valid: boolean) => void;
 }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState(false);
+  function finish() {
+    if (draft === null) return;
+    const n = Math.round(Number(draft) * 1000);
+    if (!draft.trim() || !Number.isFinite(n) || n < min || n > max) {
+      setInvalid(true);
+      onValidityChange?.(false);
+      return;
+    }
+    onChange(n);
+    setDraft(null);
+    setInvalid(false);
+    onValidityChange?.(true);
+  }
   return (
     <label>
       {label} (s)
@@ -31,12 +50,36 @@ function Seconds({
         min={min / 1000}
         max={max / 1000}
         step={0.05}
-        value={Math.round(value) / 1000}
+        value={draft ?? Math.round(value) / 1000}
+        aria-invalid={invalid || undefined}
+        onBlur={commitOnBlur ? finish : undefined}
+        onKeyDown={event => {
+          if (!commitOnBlur) return;
+          if (event.key === "Enter") {
+            event.preventDefault();
+            finish();
+          }
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            setDraft(null);
+            setInvalid(false);
+            onValidityChange?.(true);
+          }
+        }}
         onChange={(event) => {
+          if (commitOnBlur) {
+            const raw = event.target.value;
+            const n = Math.round(Number(raw) * 1000);
+            setDraft(raw);
+            setInvalid(false);
+            onValidityChange?.(Boolean(raw.trim()) && Number.isFinite(n) && n >= min && n <= max);
+            return;
+          }
           const n = Math.round(event.target.valueAsNumber * 1000);
           if (Number.isFinite(n) && n >= min && n <= max) onChange(n);
         }}
       />
+      {invalid && <span role="alert">Enter a duration between {min / 1000} and {max / 1000} seconds.</span>}
     </label>
   );
 }
@@ -56,6 +99,7 @@ export function SceneTimeline({
   disabled,
   audition,
   onAudition,
+  onDurationValidityChange,
 }: {
   layout: SceneLayout;
   project: Project;
@@ -71,6 +115,7 @@ export function SceneTimeline({
   disabled: boolean;
   audition: { muted: string[]; solo: string | null };
   onAudition: (a: { muted: string[]; solo: string | null }) => void;
+  onDurationValidityChange: (valid: boolean) => void;
 }) {
   const [zoom, setZoom] = useState(1),
     [snap, setSnap] = useState(true),
@@ -355,6 +400,8 @@ export function SceneTimeline({
         <div className="timeline-tools">
           <Seconds
             label="Scene duration"
+            commitOnBlur
+            onValidityChange={onDurationValidityChange}
             value={timeline.durationMs}
             min={100}
             onChange={(n) => save({ ...timeline, durationMs: n })}

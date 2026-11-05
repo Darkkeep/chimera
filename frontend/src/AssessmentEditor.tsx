@@ -1,6 +1,6 @@
 import { reportOnboardingOutcome } from "./onboarding-journeys";
 import { useState } from "react";
-import { ArrowDown, ArrowUp, Download, Minus, Plus, Save, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Download, Minus, Plus, Save, X } from "lucide-react";
 import type { AssessmentChoice, AssessmentItem, AssessmentPair, AssessmentSettings, AssessmentType, Project, Scene } from "./App";
 import { revisionConflictMessage, storyboardWriteHeaders } from "./revision";
 import { QuestionMetadataFields } from "./QuestionMetadataFields";
@@ -181,6 +181,7 @@ export function AssessmentEditor({ projectId, projectTitle, revision, scene, sce
     if (!canSave || busy) return;
     setBusy(true);
     setError("");
+    setSaved(false);
     try {
       const response = await fetch(`/api/projects/${projectId}/scenes/${scene.id}`, {
         method: "PATCH",
@@ -309,7 +310,7 @@ export function AssessmentEditor({ projectId, projectTitle, revision, scene, sce
         <p className="assessment-qti-note">Question data stays version-neutral in the storyboard. Export creates a QTI 2.1 assessment item XML file.</p>
         <QuestionMetadataFields key={scene.id} item={item} sceneTitle={scene.title} scenes={scenes} disabled={busy} onChange={updated => { setItem(updated); markChanged(); }} />
       </div>
-      <footer className="assessment-editor-footer"><div>{saved && <span className="assessment-saved">Saved to {projectTitle}</span>}</div><div className="assessment-editor-actions">{scene.assessmentItem && <button className="button button-outline assessment-delete" onClick={() => void removeQuestion()} disabled={busy} title="Remove this question from the scene.">Remove question</button>}<button className="button button-outline" onClick={() => void exportQti()} disabled={busy || !scene.assessmentItem || !saved} title="Download this question as a QTI 2.1 item."><Download size={14} /> Export QTI item</button><button className="button button-accent" onClick={() => void saveQuestion()} disabled={busy || !canSave} title="Save this question and its scoring rules."><Save size={14} />{busy ? "Saving" : "Save question"}</button></div></footer>
+      <footer className="assessment-editor-footer"><div role="status" aria-live="polite">{saved && <span className="assessment-saved"><Check size={18} aria-hidden="true" />Saved to {projectTitle}</span>}</div><div className="assessment-editor-actions">{scene.assessmentItem && <button className="button button-outline assessment-delete" onClick={() => void removeQuestion()} disabled={busy} title="Remove this question from the scene.">Remove question</button>}<button className="button button-outline" onClick={() => void exportQti()} disabled={busy || !scene.assessmentItem || !saved} title="Download this question as a QTI 2.1 item."><Download size={14} /> Export QTI item</button><button className="button button-accent" onClick={() => void saveQuestion()} disabled={busy || !canSave} title="Save this question and its scoring rules.">{saved ? <Check size={14} /> : <Save size={14} />}{busy ? "Saving" : saved ? "Question saved" : "Save question"}</button></div></footer>
     </section>
   </div>;
 }

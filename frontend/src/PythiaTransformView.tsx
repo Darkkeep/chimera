@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { AlertCircle, Check, LoaderCircle, Sparkles, X } from "lucide-react";
 import { EditorDialog } from "./EditorDialog";
 import { reportOnboardingOutcome } from "./onboarding-journeys";
-import type { Scene } from "./App";
+import type { Project, Scene } from "./App";
+import { revisionConflictMessage, storyboardWriteHeaders } from "./revision";
 
 type EngineStatus = {
   health: { status?: string; version?: string };
@@ -51,7 +52,7 @@ function capabilityRecords(value: EngineStatus["capabilities"]): (Exclude<Capabi
   return records ? Object.entries(records).map(([id, item]) => typeof item === "string" ? { id, provider: item } : { ...item, id }) : [];
 }
 
-export function PythiaTransformView({ projectId, scene, scenes, onClose }: { projectId: string; scene: Scene; scenes: Scene[]; onClose: () => void }) {
+export function PythiaTransformView({ projectId, revision, scene, scenes, onClose, onProjectUpdated }: { projectId: string; revision: number; scene: Scene; scenes: Scene[]; onClose: () => void; onProjectUpdated: (project: Project) => void }) {
   const [engine, setEngine] = useState<EngineStatus | null>(null);
   const [checking, setChecking] = useState(true);
   const [task, setTask] = useState<Task | null>(null);
@@ -151,6 +152,28 @@ export function PythiaTransformView({ projectId, scene, scenes, onClose }: { pro
     }
   }
 
+  async function applyTransformation() {
+    if (!proposal || proposal.status !== "pending" || submitting || proposal.sourceRevision !== revision) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/projects/${projectId}/pythia-transform-proposals/${encodeURIComponent(proposal.id)}/decision`, {
+        method: "POST",
+        headers: storyboardWriteHeaders(revision),
+        body: JSON.stringify({ decision: "accept" }),
+      });
+      const result = await response.json() as { proposal?: TransformProposal; project?: Project | null; detail?: string };
+      if (!response.ok) throw new Error(revisionConflictMessage(response.status) || result.detail || "The transformation could not be applied.");
+      if (!result.project || result.proposal?.status !== "accepted") throw new Error("The server did not confirm the applied transformation. Check Review suggestions before retrying.");
+      onProjectUpdated(result.project);
+      onClose();
+    } catch (issue) {
+      setError(issue instanceof Error ? issue.message : "The transformation could not be applied.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   const active = Boolean(task && ["submitted", "queued", "running"].includes(task.status));
   const capabilities = engine ? capabilityRecords(engine.capabilities) : [];
   const transformAdvertised = capabilities.some((item) => item.id === "storyboard.transform");
@@ -186,7 +209,12 @@ export function PythiaTransformView({ projectId, scene, scenes, onClose }: { pro
         {item.media_requirements.length > 0 && <p><strong>Media:</strong> {item.media_requirements.join("; ")}</p>}
         {item.assessment_opportunities.length > 0 && <p><strong>Assessment:</strong> {item.assessment_opportunities.join("; ")}</p>}
       </article>)}</section>
-      <p className="pythia-readonly-note">Saved to Review suggestions. It will not replace the current scene unless you accept it there.</p>
+      {proposal.status === "pending" && <>
+        <p className="pythia-readonly-note">Applying replaces the {selectedScenes.length} selected source scene(s) with this entire proposed sequence and saves a new storyboard revision. Other scenes stay unchanged. Suggested interactions and media still need to be implemented separately. There is no transformation undo button; download a storyboard backup first if you need a recovery copy.</p>
+        {proposal.sourceRevision !== revision && <p role="alert">The storyboard changed after this proposal was created. Run a new transformation before applying.</p>}
+        <div className="pythia-submit-row"><button type="button" className="button button-accent" disabled={submitting || proposal.sourceRevision !== revision} onClick={() => void applyTransformation()}><Check size={16} />{submitting ? "Applying transformation…" : "Apply transformation"}</button></div>
+      </>}
+      <p className="pythia-readonly-note">This proposal is also saved in Review tools &gt; Review suggestions, where you can edit or reject it.</p>
     </div>}
   </EditorDialog>;
 }

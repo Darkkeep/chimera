@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -52,15 +52,24 @@ from .storage import update_project_background, update_project_relationship, Pro
 from .question_import import parse_questions, question_template, question_spreadsheet
 from .pythia_connection import LocalEngineConnection, configured_engine_url, local_engine_url, save_engine_url
 from . import pythia_talk
+from . import experience_treatments
+from .experience_models import ExperienceDesignRequest, ExperienceReview
+from . import video_treatments
+from .models import ReviewedVideoTreatment
 from . import pythia_actions
 
 
 ROUTE_ACTIONS = {
+    "get_scene_experience": "project.view", "post_scene_experience": "enhancement.proposal.create",
+    "save_scene_experience": "enhancement.proposal.create", "apply_scene_experience": "enhancement.proposal.decide",
     "post_pythia_action": "enhancement.proposal.create",
     "decide_pythia_action": "enhancement.proposal.decide",
     "get_pythia_conversation": "enhancement.job.create",
     "post_pythia_conversation": "enhancement.job.create",
     "reset_pythia_conversation": "enhancement.job.create",
+    "save_pythia_planning": "enhancement.job.create",
+    "get_video_treatment": "project.view", "post_video_treatment": "enhancement.job.create",
+    "save_video_treatment": "enhancement.job.create",
     "check_pythia_conversation": "enhancement.job.create",
     "put_local_pythia_connection": "admin.policy.manage",
     "preview_question_import": "project.import", "commit_question_import": "project.import",
@@ -1985,11 +1994,69 @@ def check_pythia_conversation(project_id: str, request: Request):
     return _talk_operation(project_id, lambda _actor: pythia_talk.local_mcp())
 
 
+@app.post("/api/projects/{project_id}/pythia-conversation/planning", name="save_pythia_planning")
+def save_pythia_planning(project_id: str, request: Request, data: pythia_talk.PlanningDecision):
+    _require_ai_origin(request)
+    return _talk_operation(project_id, lambda actor: pythia_talk.save_planning(project_id, actor, data))
+
+
+@app.get("/api/projects/{project_id}/scenes/{scene_id}/video-treatment", name="get_video_treatment")
+def get_video_treatment(project_id: str, scene_id: str):
+    return _talk_operation(project_id, lambda actor: video_treatments.get(project_id, scene_id, actor))
+
+
+@app.post("/api/projects/{project_id}/scenes/{scene_id}/video-treatment", status_code=202, name="post_video_treatment")
+def post_video_treatment(project_id: str, scene_id: str, request: Request, data: video_treatments.TreatmentRequest):
+    _require_ai_origin(request)
+    return _talk_operation(project_id, lambda actor: video_treatments.submit(project_id, scene_id, actor, data,
+        lambda: _local_pythia_access(project_id, actor)))
+
+
+@app.put("/api/projects/{project_id}/scenes/{scene_id}/video-treatment", name="save_video_treatment")
+def save_video_treatment(project_id: str, scene_id: str, request: Request, data: ReviewedVideoTreatment):
+    _require_ai_origin(request)
+    return _talk_operation(project_id, lambda actor: video_treatments.save(project_id, scene_id, actor, data))
+
+
 def _pythia_action_access(project_id: str, actor: ActorContext, *, apply=False) -> None:
     _local_pythia_access(project_id, actor)
     _require_action(get_authorization_policy(), actor, "enhancement.proposal.decide" if apply else "enhancement.proposal.create", project_id)
     if apply:
         _require_action(get_authorization_policy(), actor, "scene.manage", project_id)
+
+
+@app.get("/api/projects/{project_id}/scenes/{scene_id}/experience-treatment", name="get_scene_experience")
+def get_scene_experience(project_id: str, scene_id: str, source_ids: Annotated[list[str], Query()] = []):
+    return _talk_operation(project_id, lambda actor: experience_treatments.get(project_id, scene_id, actor, source_ids))
+
+
+@app.post("/api/projects/{project_id}/scenes/{scene_id}/experience-treatment", status_code=202, name="post_scene_experience")
+def post_scene_experience(project_id: str, scene_id: str, request: Request, data: ExperienceDesignRequest):
+    _require_ai_origin(request)
+    return _talk_operation(project_id, lambda actor: experience_treatments.submit(
+        project_id, scene_id, actor, data, lambda: _pythia_action_access(project_id, actor)))
+
+
+@app.put("/api/projects/{project_id}/scenes/{scene_id}/experience-treatment", name="save_scene_experience")
+def save_scene_experience(project_id: str, scene_id: str, request: Request, data: ExperienceReview):
+    _require_ai_origin(request)
+    def save(actor):
+        _pythia_action_access(project_id, actor)
+        return experience_treatments.review(project_id, scene_id, actor, data)
+    return _talk_operation(project_id, save)
+
+
+@app.post("/api/projects/{project_id}/scenes/{scene_id}/experience-treatment/apply", name="apply_scene_experience")
+def apply_scene_experience(project_id: str, scene_id: str, request: Request, data: ExperienceReview,
+                           if_match: Annotated[str | None, Header()] = None):
+    _require_ai_origin(request)
+    expected = _expected_revision(if_match)
+    if expected is None:
+        raise HTTPException(428, "An If-Match storyboard revision is required")
+    def apply(actor):
+        _pythia_action_access(project_id, actor, apply=True)
+        return experience_treatments.review(project_id, scene_id, actor, data, apply=True, expected_revision=expected)
+    return _talk_operation(project_id, apply)
 
 
 @app.post("/api/projects/{project_id}/pythia-conversation/actions", status_code=202, name="post_pythia_action")

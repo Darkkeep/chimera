@@ -117,6 +117,40 @@ class VideoGenerationTests(unittest.TestCase):
         self.assertNotIn("fixture-video-secret", candidate.model_dump_json())
         self.assertNotIn("https://", finished.model_dump_json())
 
+    def test_reviewed_shots_render_in_order_and_survive_candidates_regeneration_and_retry(self):
+        from .test_video_treatments import TREATMENT
+        reviewed = {"sourceRevision": self.project.storyboard.revision, "treatment": TREATMENT}
+        job = self.job(videoTreatment=reviewed, prompt=TREATMENT["title"], purpose=TREATMENT["purpose"], durationSeconds=12)
+        with self.transport("shotstack") as transport:
+            media_generation._run_job(job.projectId, job.id)
+        finished = storage.read_media_generation_job(job.projectId, job.id)
+        self.assertEqual(finished.status, "completed", finished.error)
+        payload = json.loads(transport.call_args_list[0].args[1].data)
+        clips = payload["timeline"]["tracks"][0]["clips"]
+        self.assertEqual([clip["asset"]["text"] for clip in clips], ["Inspect the valve.", "Only then open it."])
+        self.assertEqual([clip["start"] for clip in clips], [0, 6])
+        self.assertEqual([clip["length"] for clip in clips], [6, 6])
+        self.assertEqual(clips[0]["transition"], {"in": "fade", "out": "fade"})
+        self.assertNotIn("transition", clips[1])
+        self.assertNotIn("productionNeeds", json.dumps(payload))
+        self.assertNotIn("Optional spoken narration", json.dumps(payload))
+        candidate = storage.read_generated_candidate(job.projectId, finished.candidateIds[0])
+        self.assertEqual(candidate.videoTreatment.model_dump(), reviewed)
+        with patch.object(media_generation, "start_media_generation_job"):
+            regenerated = media_generation.regenerate_candidate(job.projectId, candidate.id)
+            storage.update_media_generation_job(job.projectId, regenerated.id, status="failed")
+            retry = media_generation.retry_media_generation_job(job.projectId, regenerated.id)
+        self.assertEqual(retry.videoTreatment, job.videoTreatment)
+        self.assertEqual(regenerated.videoTreatment, job.videoTreatment)
+        stale = {**reviewed, "sourceRevision": self.project.storyboard.revision + 1}
+        with self.assertRaisesRegex(ValueError, "context changed"):
+            self.job(videoTreatment=stale, prompt=TREATMENT["title"], purpose=TREATMENT["purpose"], durationSeconds=12)
+        with self.assertRaisesRegex(ValueError, "direct Shotstack"):
+            self.job("synthesia", videoTreatment=reviewed, prompt=TREATMENT["title"], purpose=TREATMENT["purpose"], durationSeconds=12)
+        with self.assertRaisesRegex(ValidationError, "total duration"):
+            MediaGenerationJobCreate(kind="video", sceneId=self.scene_id, videoTreatment=reviewed,
+                                     purpose=TREATMENT["purpose"], prompt=TREATMENT["title"], durationSeconds=13)
+
     def test_portrait_and_minimum_duration_payloads(self):
         for provider in ("shotstack", "synthesia"):
             with self.subTest(provider=provider):

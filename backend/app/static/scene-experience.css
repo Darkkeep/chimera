@@ -1,0 +1,21 @@
+.native-experience { box-sizing: border-box; padding: clamp(16px, 3vw, 36px); background: var(--experience-bg); color: var(--experience-fg); font: 1rem/1.6 system-ui, sans-serif; overflow-wrap: anywhere; }
+.native-experience *, .native-experience *::before, .native-experience *::after { box-sizing: border-box; }
+.native-experience :is(h2,h3,p) { color: inherit; margin: 0 0 1rem; }
+.native-experience h2 { font-size: clamp(1.35rem, 3vw, 2rem); line-height: 1.25; }
+.native-experience h3 { font-size: 1.15rem; }
+.native-experience .experience-flow { display: flex; padding: 0; gap: 30px; list-style: none; margin: 24px 0; }
+.native-experience .experience-flow li { flex: 1; min-width: 0; position: relative; border: 2px solid var(--experience-diagram-accent); border-radius: 12px; padding: 16px; }
+.native-experience .experience-flow p { margin: 0; }
+.native-experience .experience-arrow { position: absolute; right: -27px; top: 30%; font-size: 24px; color: var(--experience-diagram-accent); }
+.native-experience .experience-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+.native-experience .experience-controls button, .native-experience summary { background: var(--experience-accent); color: var(--experience-accent-text); font: inherit; font-weight: 650; border: 2px solid transparent; border-radius: 6px; padding: 10px 14px; cursor: pointer; min-height: 44px; }
+.native-experience :is(button,summary):focus-visible { outline: 3px solid var(--experience-fg); outline-offset: 3px; }
+.native-experience .experience-reveals { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,240px),1fr)); gap: 16px; }
+.native-experience details { min-width: 0; border: 1px solid currentColor; border-radius: 8px; }
+.native-experience details p { padding: 16px; margin: 0; white-space: pre-wrap; }
+.native-experience .experience-conclusion { margin-top: 24px; }
+@media(max-width:600px) {
+  .native-experience .experience-flow { flex-direction: column; }
+  .native-experience .experience-arrow { right: 50%; top: auto; bottom: -34px; transform: rotate(90deg); }
+}
+@media print { .native-experience .experience-controls { display: none; } }

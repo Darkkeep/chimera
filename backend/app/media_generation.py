@@ -179,6 +179,7 @@ def _run_job(project_id: str, job_id: str) -> None:
             language=job.language,
             altText=job.altText,
             captions=job.captions,
+            videoTreatment=job.videoTreatment,
             provider=provider.name,
             model=model,
             createdAt=storage.now_iso(),
@@ -210,7 +211,7 @@ def retry_media_generation_job(project_id: str, job_id: str) -> MediaGenerationJ
     job = storage.read_media_generation_job(project_id, job_id)
     if job.status not in {"failed", "cancelled"}:
         raise ValueError("Only failed or cancelled media jobs can be retried")
-    data = MediaGenerationJobCreate.model_validate(job.model_dump(include={"kind", "sceneId", "purpose", "style", "width", "height", "prompt", "script", "voice", "language", "altText", "captions", "narrationConnectionId", "durationSeconds", "connectionId", "avatar"}))
+    data = MediaGenerationJobCreate.model_validate(job.model_dump(include={"kind", "sceneId", "purpose", "style", "width", "height", "prompt", "script", "voice", "language", "altText", "captions", "narrationConnectionId", "durationSeconds", "connectionId", "avatar", "videoTreatment"}))
     retry = storage.create_media_generation_job(project_id, data).model_copy(update={"retryOf": job.id})
     storage.write_media_generation_job(retry)
     start_media_generation_job(project_id, retry.id)
@@ -234,6 +235,7 @@ def regenerate_candidate(project_id: str, candidate_id: str) -> MediaGenerationJ
         height=candidate.height,
         prompt=candidate.prompt,
         script=candidate.script,
+        videoTreatment=candidate.videoTreatment,
         voice=candidate.voice,
         language=candidate.language,
         altText=candidate.altText,

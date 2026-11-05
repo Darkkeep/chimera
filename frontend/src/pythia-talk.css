@@ -74,3 +74,5 @@
 .pythia-draft-from-advice { justify-self: start; }
 @media (max-width: 600px) { .pythia-action-diff { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 600px) { .modal.pythia-talk-dialog { padding: 16px; } .pythia-talk-heading { gap: 10px; } .pythia-talk-heading > img { width: 40px; height: 40px; } .pythia-talk-message { grid-template-columns: minmax(0, 1fr); } .pythia-talk-message > img { display: none; } .pythia-talk-working { margin-left: 0; } .pythia-talk-send { flex-wrap: wrap; } }
+.pythia-action-builder textarea { width: 100%; min-width: 0; resize: vertical; }
+.pythia-design-brief { white-space: pre-wrap; overflow-wrap: anywhere; }

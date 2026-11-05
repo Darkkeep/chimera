@@ -96,6 +96,9 @@ def submit(project_id, actor, data, authorize):
             if prior["fingerprint"] != digest:
                 raise talk.TalkError("This request ID belongs to a different draft.", 409)
             return talk.public_state(state)
+        planning = state.get("planning", {})
+        if planning.get("stage") != "designing" or not planning.get("brief", "").strip():
+            raise talk.TalkError("Stay in consultation until you have reviewed the design brief. Choose Agree brief and explore scene design before requesting a content draft.", 409)
         if any(t["status"] == "running" for t in state["turns"]) or any(a["status"] in {"drafting", "applying"} for a in actions):
             raise talk.TalkError("Wait for the current Pythia operation to finish.", 409)
         if len(actions) >= 20:
@@ -125,21 +128,23 @@ def submit(project_id, actor, data, authorize):
             if previous["id"] == data.turnId:
                 break
         scene_data = ({field: getattr(target, field) for field in ("title", "extractedText", "narration", "actionDescription", "notes")} if target else None)
-        payload = {"mode": data.mode, "direction": data.direction.strip(), "advice": turn["result"]["content"], "history": talk.deduplicate_source_context(history), "scene": scene_data}
+        payload = {"mode": data.mode, "direction": data.direction.strip(), "advice": turn["result"]["content"], "history": talk.deduplicate_source_context(history), "scene": scene_data,
+            "designBrief": planning["brief"]}
         if data.mode == "add-scenes" and data.followOutline:
             try:
                 titles = outline_titles(turn["result"]["content"])
             except ValueError as error:
                 raise talk.TalkError(str(error)) from None
             if not titles:
-                raise talk.TalkError("Choose the answer containing the expanded outline. Use top-level numbered items or Markdown headings so each item can become one scene.")
-            payload["outlineTitles"] = titles
+                raise talk.TalkError("Choose the answer containing the expanded outline. Use top-level numbered items or Markdown headings to identify the topics to cover.")
+            payload["outlineTopics"] = titles
         if len(history) > 32 or len(json.dumps(payload, ensure_ascii=False)) > MAX_AUTHORING_CHARS:
             raise talk.TalkError("The authoring context exceeds the local Pythia allowance. Start a smaller conversation; no text was silently omitted.")
         if not talk.CAPACITY.acquire(blocking=False):
             raise talk.TalkError("Two Pythia operations are already active. Try again when one finishes.", 429)
         action = {"id": data.requestId, "turnId": data.turnId, "mode": data.mode, "sceneId": data.sceneId,
             "direction": data.direction.strip(), "sourceRevision": data.expectedRevision,
+            "designBrief": planning["brief"],
             "before": scene_data, "binding": {"sceneRevision": data.expectedRevision, "sources": sources},
             "fingerprint": digest, "runId": talk.RUN_ID, "status": "drafting", "result": None, "error": None}
         actions.append(action)
@@ -157,20 +162,17 @@ def finish(path, project_id, session_id, action, payload, authorize):
     try:
         authorize()
         talk.check_binding(project_id, action["binding"])
-        titles = payload.get("outlineTitles", [])
-        if titles:
+        topics = payload.get("outlineTopics", [])
+        if topics:
             scenes = []
-            # Generate every outline item in small complete batches instead of
-            # forcing the entire course into one model response's output limit.
-            for start in range(0, len(titles), 4):
+            for topic in topics:
                 authorize()
                 talk.check_binding(project_id, action["binding"])
-                batch_titles = titles[start:start + 4]
-                batch = DraftResult.model_validate(talk.local_mcp(authoring_request={**payload, "outlineTitles": batch_titles}))
-                if batch.mode != "add-scenes" or [scene.title for scene in batch.scenes] != batch_titles:
-                    raise talk.TalkError("The draft did not cover every requested outline item in order. Nothing was applied. Request a new draft.")
+                batch = DraftResult.model_validate(talk.local_mcp(authoring_request={**payload, "outlineTopics": [topic]}))
+                if batch.mode != "add-scenes":
+                    raise talk.TalkError("Pythia returned a different action scope. Nothing was applied.")
                 scenes.extend(batch.scenes)
-            result = DraftResult(mode="add-scenes", rationale=f"One scene for each of the {len(titles)} top-level outline items, in outline order.", changes=[], scenes=scenes,
+            result = DraftResult(mode="add-scenes", rationale=f"{len(scenes)} learner-sized scenes drafted across {len(topics)} planning topics, in topic order. Review topic coverage, scene boundaries, and pacing before applying.", changes=[], scenes=scenes,
                 producer_id="live-chimera-authoring-v1", stopping_boundary="draft-only")
         else:
             result = DraftResult.model_validate(talk.local_mcp(authoring_request=payload))

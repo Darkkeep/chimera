@@ -1,7 +1,8 @@
 const { test, expect } = require('@playwright/test');
 
 for (const provider of ['shotstack', 'synthesia']) {
-  test(`${provider}: video-only installation submits a 30-second candidate request`, async ({ page, request }) => {
+ for (const surface of ['Media library', 'Scene editor']) {
+  test(`${provider}: ${surface} submits a 30-second candidate request`, async ({ page, request }) => {
     let project = await (await request.post('/api/projects', { data: { title: `${provider} video authoring` } })).json();
     project = await (await request.post(`/api/projects/${project.id}/scenes`, {
       data: { title: 'Video destination', narration: 'Inspect the valve before opening it.' },
@@ -30,10 +31,14 @@ for (const provider of ['shotstack', 'synthesia']) {
     await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
     await page.goto('/');
     await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
-    await page.getByRole('button', { name: 'Media library', exact: true }).click();
-    await page.locator('.generation-creator summary').click();
+    if (surface === 'Scene editor') {
+      await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+      await page.getByRole('tab', { name: 'Media', exact: true }).click();
+    } else await page.getByRole('button', { name: 'Media library', exact: true }).click();
+    await page.locator('.generation-creator > summary').click();
     await expect(page.getByRole('combobox', { name: 'Media type', exact: true })).toHaveValue('video');
     await expect(page.getByRole('combobox', { name: 'AI connection', exact: true })).toHaveValue(connection.id);
+    if (provider === 'shotstack') await page.getByRole('combobox', { name: 'Video workflow', exact: true }).selectOption('manual');
     await page.getByRole('textbox', { name: 'Purpose', exact: true }).fill('Explain the valve');
     await page.getByRole('textbox', { name: provider === 'synthesia' ? 'Video title' : 'Title text', exact: true }).fill('Inspect the valve');
     const duration = page.getByRole('spinbutton', { name: provider === 'synthesia' ? 'Maximum duration (seconds)' : 'Duration (seconds)', exact: true });
@@ -66,4 +71,5 @@ for (const provider of ['shotstack', 'synthesia']) {
     });
     expect(submissions[0]).not.toHaveProperty('apiKey');
   });
+ }
 }

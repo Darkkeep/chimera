@@ -11,6 +11,7 @@ import type { Appearance, Timing, Timeline } from "./scene-timeline";
 import { TimelinePlayback } from "./TimelinePlayback";
 import type { ClipProgress } from "../../backend/app/static/scene-transport.js";
 import { effectiveBackgroundAsset } from "./background";
+import { NativeExperience } from "./NativeExperience";
 
 export type AnimationStep = { effect: string; durationMs: number; delayMs: number; iterations?: number };
 export type ElementAnimations = { entrance: AnimationStep; presentation: AnimationStep; exit: AnimationStep };
@@ -78,10 +79,11 @@ export function SceneSurface({ project, scene, assessment, animate = false, time
   const animationRoot = useRef<HTMLDivElement>(null);
   const animationSignature = JSON.stringify(scene.visualLayout?.elements.map(element => ({ id: element.id, animations: element.animations })) || []);
   useEffect(() => {
-    if (scene.visualLayout?.timeline || !animate || !animationRoot.current) return;
+    if (scene.experience || scene.visualLayout?.timeline || !animate || !animationRoot.current) return;
     return playStageAnimations(animationRoot.current, JSON.parse(animationSignature));
-  }, [scene.id, animate, animationSignature]);
+  }, [scene.id, scene.experience, animate, animationSignature]);
   const resolved = resolvedSceneBackground(project, scene);
+  if (scene.experience) return <NativeExperience experience={scene.experience} />;
   const layout = scene.assessmentItem ? initialLayout(resolved) : resolved.visualLayout;
   if (!layout) return null;
   const region = assessmentRegion(scene.visualLayout || layout, scene.title);

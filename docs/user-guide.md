@@ -1,5 +1,30 @@
 # Chimera user guide
 
+## Design a native learning experience
+
+On the storyboard, choose **Design experience** beside the Pythia tools.
+Inspect scene context and explicitly select/load reference passages, state
+your learning and brand direction, and request a scene-level proposal.
+Review and edit the actual responsive concept diagram, click-reveal
+explanations, colors and production dependencies before explicitly applying.
+This first native assembly works on content scenes without existing
+timeline or assessment components; it does not overwrite those components
+or submit video, audio or image-generation jobs.
+
+Saving a treatment is private and does not change the scene. Applying it
+retains the original canvas, source text, attachments and revision history.
+Use **Edit applied scene without Pythia** for provider-free edits, or
+**Restore underlying canvas** to return to the retained stage. The native
+experience plays in Chimera preview and standalone/SCORM exports with
+keyboard/touch reveals, a show-all reading alternative, mobile reflow,
+contrast validation and reduced-motion support. Print/document snapshots
+include all explanations.
+
+See [Native scene experiences](talk-to-pythia.md#native-scene-experiences)
+for the full review/apply procedure, context/privacy boundaries and current
+production limitations. This new section updates the Markdown guide; the
+bundled illustrated PDF has not been regenerated.
+
 Video-generation and fit-to-scene instructions and the PDF edition were updated
 on 2026-11-03. Synthesia/Shotstack setup images below are historical October 27
 captures; follow the current text for generation. Local verification uses
@@ -19,7 +44,7 @@ The source has changed since the original capability review: Word export, refere
 
 **Help while authoring:** choose **User guide**, immediately below **Templates** in the left rail. The bundled PDF opens in a new tab without leaving your current workspace or discarding edits. It is available even before you select or create a project and does not require access to GitHub.
 
-**Navigation at a glance:** the left rail's **WORKSPACE** group contains My Work, Storyboard, Assessments, Media library, and Templates. **Assessments** opens the question bank and assessment manager directly. **Project background** is above the scene list in **Storyboard**. Review tools retains guided review, accessibility, validation, completion rules, and suggestion/Pythia review; Settings retains appearance and connection/access controls.
+**Navigation at a glance:** the left rail's **WORKSPACE** group begins with **Consult Pythia**, followed by My Work, Storyboard, Sources, Assessments, Media library, Templates, and User guide. **Consult Pythia** opens the project's consultation without automatically drafting or applying scenes. **Assessments** opens the question bank and assessment manager directly. **Project background** is above the scene list in **Storyboard**. Review tools retains guided review, accessibility, validation, completion rules, and suggestion/Pythia review; Settings retains appearance and connection/access controls.
 
 My Work opens after normal launch/sign-in and refresh. It is first in the workspace menu. Select a project row to open its authoring workspace, choose New Project to create one, or Resume authoring to return to the remembered project. Direct authenticated review links retain their review destination.
 
@@ -141,8 +166,16 @@ connection, purpose and duration (4–30 seconds, default 30). For Synthesia, su
 title, presenter script and authorized avatar ID. The script starts from scene
 narration/notes; aim for about 60 words or fewer for 30 seconds. Actual duration is
 script-driven; renders above the chosen maximum are rejected locally but may
-still be billed. For Shotstack, enter the exact title text for a silent clip with
-fades, not a generative footage prompt. Sandbox output is watermarked.
+still be billed. For direct Shotstack connections, the default workflow is
+**Design a scene-aware treatment with Pythia**. Review the disclosed scene text
+and optional agreed design brief, enter your video design direction, and request
+a treatment. Edit/refine its text shots, timing and transitions, then explicitly
+choose **Render reviewed treatment**. Save edits before leaving the form.
+Pythia design and Shotstack rendering are separate potentially billable actions;
+designing never renders or modifies scenes. The result is a silent text sequence,
+not generated footage. Proposed imagery or narration is labelled unimplemented.
+The **Manual single title card** option retains the previous exact-text form.
+Sandbox output is watermarked. See [scene-aware treatments](ai-connection.md#scene-aware-shotstack-treatments).
 
 **Generate candidate** can incur provider charges. Preview the returned MP4,
 approve it, then accept the placement proposal or attach it normally. Add/review
@@ -221,7 +254,31 @@ New imports capture editable text, images, common PowerPoint shapes, line connec
 
 Saving content changes in Details updates the authored scene; use Stage for precise placement and text-box styling. Preview and export use the saved composition, not unsaved dialog edits.
 
+### Request and generate media without leaving the Scene Editor
+
+Open **Edit scene > Media** to use the same candidate workflow as Media Library.
+Choose an image, narration, or video connection, describe its purpose, and submit
+an explicit **Generate candidate** request. Shotstack retains its scene-aware
+Pythia treatment workflow: review and save the proposed treatment before choosing
+to render. Opening the tab alone does not call a generation provider.
+
+If Stage or Details has unsaved changes, choose **Save scene for media** first.
+This saves the scene without closing the editor, so narration and Pythia's
+scene-aware treatment use the current saved context. A failed save keeps the
+draft and blocks new requests until the scene is saved. Media request fields
+remain intact when switching between editor tabs; unsent requests are not
+persisted after closing the editor.
+
+Review the candidate and explicitly approve or reject it. Approval adds an asset
+to the project; it does not attach it. Expand **Placement, captions, and shared
+media**, select the asset, describe its placement, and choose **Save placement**.
+Approved images are also available from Stage's existing image insertion control;
+audio/video can be scheduled with the timeline. Media placement is saved
+immediately, separately from Stage edits. Generation may incur provider charges.
+
 ### Insert shapes and style layers
+
+Use the labeled **Text layer** button alongside **Insert shape** in the **Add layers** controls to insert and select editable text. Text insertion supports Undo/Redo and is persisted with **Save scene**.
 
 On **Edit scene > Stage**, use **Insert shape** for rectangles, rounded rectangles, ellipses, lines, arrows, triangles, and diamonds. Select the object and expand **Appearance**. Give it a layer name, set whole-object opacity, and choose fill/outline colors, their individual opacity, and outline width. Rounded rectangles also have a corner-radius control. Zero fill opacity gives an unfilled shape. **Lock aspect ratio** controls resizing; **Layout** retains exact position, size, rotation, and alignment controls.
 
@@ -237,7 +294,7 @@ Below the stage, expand **Timeline and layers** and choose **Enable scene timeli
 
 | Task | Procedure |
 | --- | --- |
-| Set scene length | Enter **Scene duration (s)**. Objects, clips, animations, cue markers, and the Word snapshot time must fit. Adding or extending content can extend the duration. |
+| Set scene length | Type **Scene duration (s)**, then press Enter or leave the field to commit. Escape restores the current duration. Valid durations range from 0.1 to 3600 seconds. Objects, clips, animations, cue markers, and the Word snapshot time must fit. Adding or extending content can extend the duration. |
 | Place an object in time | Select its named timeline row. Set **Object start/end (s)**, or drag its block; drag the right edge to adjust its end. The stage and row share selection. |
 | Time native animations | Choose the entrance/presentation/exit effects in Animation. Use their blocks or timeline fields to set scene start and duration in seconds. The presentation start is displayed on the scene clock; Chimera handles its relative delay internally. |
 | Add audio or video | Choose a project asset in **Timeline media**, position the playhead, then choose **Add clip at playhead**. Select the clip row to edit it. The same asset can appear in multiple clips. |
@@ -348,7 +405,7 @@ Media uploads support JPG/PNG/GIF/WebP images, MP3/M4A/AAC/WAV/OGG audio, and MP
 
 ### Create a media candidate
 
-Configure image and narration generation through **Settings > AI connection** before generating candidates. OpenAI images/legacy narration and ElevenLabs/Google Cloud/Cartesia narration have separate provider tabs. Synthesia/Shotstack connection setup does not yet enable video generation. In shared deployments, an installation administrator manages these connections. See [AI connection](ai-connection.md) for credential storage, connection testing, limits, and data handling. These connections are separate from Pythia.
+Configure media generation through **Settings > AI connection** before generating candidates. OpenAI images/legacy narration, ElevenLabs/Google Cloud/Cartesia narration, and Synthesia/Shotstack video have separate provider tabs. In shared deployments, an installation administrator manages these connections. See [AI connection](ai-connection.md) for credential storage, connection testing, limits, and data handling. These connections are separate from Pythia; scene-aware Shotstack treatment design also requires the local Pythia adapter.
 
 Create a media candidate starts collapsed. Select its heading to expand it. When no usable image or narration connection is configured, its heading is greyed and generation controls are disabled. A narration-only connection does not enable image generation. Narration requires explicit connection selection; the saved voice and language populate the form and can be overridden for that candidate. If connection status cannot be loaded or your role does not permit generation, controls also remain disabled. Configuration availability does not guarantee that a provider is reachable or supports a particular model. Existing candidates can still be approved or rejected without a configured connection; regeneration uses the candidate's original connection and fails if it was removed rather than choosing another provider.
 
@@ -394,6 +451,8 @@ A green **Ready for production** check means the media loaded, its attribution i
 ## 5. Author assessments
 
 For an assessment-first workflow, open **Assessments** under **WORKSPACE** in the left rail. The **Question bank** lets you add a question directly or open an existing question and its metadata without creating a slide first. Create a named assessment, select its questions, arrange them, and download its QTI test package.
+
+After **Save question** succeeds, the button changes to a checkmarked **Question saved**, and a bordered **Saved to [project]** confirmation appears in the footer and is announced to assistive technology. Editing the question clears the saved confirmation; a failed save shows an error rather than success.
 
 ![Question bank and spreadsheet export controls](user-guide/images/question-bank-current.png)
 
@@ -533,9 +592,35 @@ Current question scoring is binary: 0% or 100%. Course score weights affect the 
 
 ## 6. Import references and request enhancement
 
-This section describes **New enhancement run**, which uses Pythia's `storyboard.enhance` capability. It is separate from the analysis, transformation, assessment, and course-review dialogs described in [Work with Pythia](#14-work-with-pythia). Only the references selected in this form accompany this enhancement request; they are not automatically included in the other Pythia workflows.
+This section describes **New enhancement run**. In single-user installations it uses the local model-backed `pythia_storyboard_enhancement` tool; shared installations retain the configured Engine's `storyboard.enhance` capability. It is separate from the analysis, transformation, assessment, and course-review dialogs described in [Work with Pythia](#14-work-with-pythia). Only the references selected in this form accompany this enhancement request; they are not automatically included in the other Pythia workflows.
 
-Enhancement submission requires an available Pythia Engine supporting `storyboard.enhance`, managed by an administrator in shared installations. Check **Settings > Pythia**, not **AI connection**. Without it, Preview submission remains useful, but Submit run is disabled. This documentation update made no live AI requests and does not certify provider output.
+Local submission requires the prepared sibling Pythia checkout and its storyboard enhancement tool, using the same installed plugin configuration or saved text-model **AI connection** as Consult Pythia. The separate image/narration/video provider forms do not configure this drafting tool. Shared installations require an available Engine supporting `storyboard.enhance`, managed by an administrator under **Settings > Pythia**. Preview checks capabilities without generating content; submission may incur model charges.
+
+Local expansion drafts new learner-sized scenes immediately after their selected original anchors, preserving originals and media. It can cover one scene or the whole course. File paths never grant file access. `@research` alone does not grant permission to search: use the explicit authoring-tool controls below. The legacy Engine only fills missing action descriptions and cannot fulfill expansion goals. Empty results fail explicitly rather than claiming success; older zero-result runs remain visible and are never automatically retried.
+
+### Connect specialist work and public research
+
+In **Storyboard suggestions**, select **Enable specialist tool orchestration** to let local Pythia plan and execute registered Research, Learning Design, Storyboard, Assessment, Standards/Technology Fit, and Evaluation specialist calls before drafting. Each call uses the registered provider's canonical guidance and payload schema; results are advisory drafts, not accepted kernel artifacts or expert approval. This is actual bounded execution, not a claim that typing a specialist name invokes one.
+
+Select **Search the public web before drafting** separately for current external evidence. This requires a completed search with cited sources as the first tool call, leaving up to two specialist calls. It is not merely permission for the planner to skip search. Failed or uncited searches stop the run without substituting synthesis or automatically retrying. The approved OpenAI connection uses the Responses API's hosted web-search tool. Pythia formulates public queries; do not enable this for confidential research. Search queries can leave the model provider for web search. Account and model eligibility are established only by an actual submitted request, not by capability preview. Research uses provider-cited synthesis, not verbatim downloaded pages or independently verified truth. Other provider endpoints cannot silently substitute a text answer for a search.
+
+**Preview submission** lists the permitted specialists, web permission and a maximum of seven provider requests. **Submit run** authorizes up to three tool calls plus planning and final drafting (at most seven model/search requests). Initial input/cost estimates exclude later tool context and search charges. Saved text-model connections reserve seven daily requests conservatively before starting; unused reservations are not refunded. Installed plugin connections retain their operator-managed billing configuration.
+
+After the run returns, expand **Authoring tool execution records → Tool execution** to inspect actual completed/failed calls, instructions, specialist results and clickable web sources. Completed evidence remains available if final drafting fails. Citations in proposals must match selected source passages or retained web-search synthesis. Nothing changes in the storyboard until proposal acceptance. Failed, timed-out or interrupted runs do not automatically retry; a restart marks unfinished tool runs failed rather than replaying potentially charged work. Cancellation discards returned proposals but cannot retract provider calls already underway.
+
+While a job is queued or running, an **Enhancement in progress** (or **Enhancement queued**) banner stays beneath the review dialog header, visible while the submission form scrolls. It includes a working indicator, elapsed time and the latest server message. Tool steps are not streamed; elapsed time does not imply measurable completion. The indicator respects reduced-motion preferences and disappears when no jobs remain active. A status-refresh error is reported without clearing the last known active job.
+
+Research queries support up to 2,000 characters, matching planner instructions. New failed runs report the failing stage and safe provider/contract reason, rather than only a generic orchestration failure. Older failure records remain unchanged and may have less diagnostic detail.
+
+Local Pythia selects source-passage IDs for proposal citations; the adapter inserts the exact source identity and excerpt instead of asking the model to retype quotations. Unknown IDs and non-verbatim quotations are rejected, not approximately matched or silently repaired. Cited web passages remain provider synthesis, not verbatim downloaded pages.
+
+For the approved OpenAI connection, final storyboard drafting requests a schema-constrained response envelope rather than plain JSON mode. This enforces proposal/conflict array structure and citation selections; Chimera still validates field values, sources and applicability before creating pending proposals. Unsupported-model/schema errors, refusals and truncation fail explicitly without another paid call or silent fallback. Specialist calls still use their existing JSON mode and validation. Structured output is not evidence of factual or instructional quality.
+
+Specialist drafts have a 16,384-token output allowance, like final storyboard drafting, to accommodate structured assessment items with feedback and alignment. Planning calls retain their smaller default allowance. Larger drafts can consume more output tokens; tool-count, time, validation and explicit-retry safeguards still apply. Research synthesis uses supplied context; only an actual completed `research_web` record demonstrates live web research.
+
+Assessment specialists use native scored question formats; polls and subjective reflections remain recommendations for review rather than invented scored items. Invalid assessment drafts stop the run. Execution details identify affected question indices (zero-based), supported types or missing required fields where available, without exposing answer bodies. The job error presents question numbers starting at one.
+
+This first connection is scoped to **Storyboard suggestions**. Consult Pythia, experience/video treatments and the shared Engine are unchanged. Arbitrary installed plugins, shell commands, filesystem tools, media production and publishing are not exposed by these controls.
 
 ### Import a Study Guide or supporting reference
 
@@ -559,7 +644,7 @@ Failed or incomplete extraction disables selection. The current form does not pr
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Complete and inspect the submission preview. Resolve any Intelligence Engine unavailable or unsupported-capability message. | You know what will be sent and whether submission is available. | <a href="user-guide/images/submission-preview.png"><img src="user-guide/images/submission-preview.png" alt="submission preview controls" width="240"></a> |
+| 1 | Complete and inspect the submission preview. Resolve any Pythia unavailable or unsupported-capability message. | You know what will be sent and whether submission is available. | <a href="user-guide/images/submission-preview.png"><img src="user-guide/images/submission-preview.png" alt="submission preview controls" width="240"></a> |
 | 2 | Click **Submit run** when enabled. | An enhancement job is created; it produces proposals rather than directly applying changes. | <a href="user-guide/images/submission-actions.png"><img src="user-guide/images/submission-actions.png" alt="submission preview controls" width="240"></a> |
 | 3 | Review the job status and any reported resource conflicts, then review returned suggestions individually. | You can distinguish completion, failure, and suggestions needing a decision. | <a href="user-guide/images/enhancement-jobs.png"><img src="user-guide/images/enhancement-jobs.png" alt="enhancement jobs controls" width="240"></a><br><a href="user-guide/images/proposal.png"><img src="user-guide/images/proposal.png" alt="proposal controls" width="240"></a> |
 
@@ -585,6 +670,8 @@ A proposal can contain multiple related changes. Accept change applies that disp
 | 3 | Click **Accept change** to apply the proposal, or **Reject** to leave the storyboard unchanged. | The decision is recorded. A stale/conflicting proposal cannot overwrite newer edits. | <a href="user-guide/images/proposal.png"><img src="user-guide/images/proposal.png" alt="proposal controls" width="240"></a> |
 
 ### Edit a suggestion before accepting
+
+Expansion proposals are reviewed as a unit: **Edit values** is unavailable when a proposal adds scenes. Review the displayed titles, learner text, narration and production notes, then accept or reject. Edit accepted new scenes in the Scene Editor. **Undo acceptance** removes them only if they are still unchanged and not referenced by an assessment; human edits are never silently deleted.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
@@ -863,9 +950,9 @@ Use **Review tools > Guided review** for the Golden Path checklist and its task 
 
 1. Select a scene and click **Transform with Pythia**. In **Scenes to transform**, check every source scene to include. At least one is required; selected scenes are submitted in storyboard order.
 2. Click **Propose transformation**. Wait for **Draft saved for review**. Compare **Current** with **Proposed sequence**, including purpose, learner content, interaction recommendations, production notes, media requirements, and assessment opportunities.
-3. Close the dialog and open **Review tools > Review suggestions**. Find **Storyboard transformation**, labeled **Pythia · storyboard.transform**. Verify the selected source scenes and source revision, not just the proposal title.
-4. To revise the sequence before accepting, click **Edit proposal**. This exposes **Proposed scene sequence · JSON**, not a visual scene editor. Preserve the structured fields and valid JSON; use **Cancel edit** to discard form edits. Editing alone does not apply the sequence.
-5. Click **Accept transformation** to replace the selected scenes and save a new storyboard revision, or **Reject** to keep the storyboard unchanged. Acceptance applies the whole proposed sequence, not one displayed scene at a time.
+3. Verify the selected source scenes and source revision, then click **Apply transformation** below the proposed sequence. This replaces the selected scenes with the entire proposed sequence and saves a new storyboard revision. The dialog closes and Storyboard updates immediately; no separate review screen is required.
+4. To edit or reject instead, close the dialog and open **Review tools > Review suggestions**. Find **Storyboard transformation**, labeled **Pythia · storyboard.transform**. Click **Edit proposal** to expose **Proposed scene sequence · JSON**, not a visual scene editor. Preserve the structured fields and valid JSON; use **Cancel edit** to discard form edits. Editing alone does not apply the sequence.
+5. In Review suggestions, **Accept transformation** applies the whole proposed sequence, or **Reject** keeps the storyboard unchanged. Both acceptance controls use the same revision checks; neither applies only one displayed scene at a time.
 6. Return to **Storyboard** and inspect the actual saved order, learner text, layouts, media, and any assessment or navigation dependencies. Implement and verify suggested interactions and media separately; a production note is not a finished interaction.
 
 If the proposal becomes **stale** or acceptance reports that the storyboard changed, reload the current project and run a new transformation. Do not repeatedly accept the old proposal to overwrite newer work. Decide a transformation before submitting downstream assessment/review work that depends on the resulting scenes.

@@ -1,6 +1,6 @@
 import { reportOnboardingOutcome } from "./onboarding-journeys";
 import { ChangeEvent, useEffect, useState } from "react";
-import { Check, FileUp, RotateCw, Sparkles, X } from "lucide-react";
+import { Check, FileUp, LoaderCircle, RotateCw, Sparkles, X } from "lucide-react";
 import type { Project } from "./App";
 import { revisionConflictMessage, storyboardWriteHeaders } from "./revision";
 import { ReferenceOcrPanel } from "./ReferenceOcrPanel";
@@ -96,6 +96,7 @@ type ReferenceResource = {
 };
 type EnhancementJob = {
   id: string;
+  createdAt?: string;
   sourceRevision: number;
   scope: "selected-scenes" | "whole-course";
   sceneIds: string[];
@@ -113,9 +114,58 @@ type EnhancementJob = {
   resourceConflicts: { explanation: string; citations: { resourceId: string; version: string | null; locator: string | null; excerpt: string | null }[] }[];
   error: string | null;
   retryOf: string | null;
+  useTools?: boolean;
+  allowWebResearch?: boolean;
+  toolExecutions?: { sequence: number; tool: string; instruction: string; status: "completed" | "failed"; error?: string | null; result?: Record<string, unknown> | null }[];
+  researchSources?: { id: string; title: string; url: string; version: string; evidenceKind: string; passages: { locator: string; text: string }[] }[];
 };
-type JobRequest = { scope: "selected-scenes" | "whole-course"; sceneIds: string[]; goal: string; resourceIds: string[] };
-type SubmissionPreview = { sourceRevision: number; sceneCount: number; resourceCount: number; estimatedInputTokens: number; estimatedCostUsd: number | null; engineConfigured: boolean; payload: { scenes: { id: string; title: string; learnerText: string[]; actionDescription: string; narration: string; assessmentItem: unknown }[]; references: { id: string; title: string; version: string; passages: { locator: string; text: string }[] }[] } };
+type JobRequest = { scope: "selected-scenes" | "whole-course"; sceneIds: string[]; goal: string; resourceIds: string[]; useTools: boolean; allowWebResearch: boolean };
+type SubmissionPreview = { sourceRevision: number; sceneCount: number; resourceCount: number; estimatedInputTokens: number; estimatedCostUsd: number | null; engineConfigured: boolean; tools?: { name: string; description: string }[]; webResearchAvailable?: boolean; maxProviderRequests?: number; payload: { scenes: { id: string; title: string; learnerText: string[]; actionDescription: string; narration: string; assessmentItem: unknown }[]; references: { id: string; title: string; version: string; passages: { locator: string; text: string }[] }[] } };
+
+function ActiveEnhancementStatus({ jobs }: { jobs: EnhancementJob[] }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const active = jobs.filter(job => job.status === "queued" || job.status === "running");
+  if (!active.length) return null;
+  return <aside className="enhancement-active-status" aria-label="Active enhancements">
+    <LoaderCircle className="enhancement-working-spinner" size={24} aria-hidden="true" />
+    <div>
+      <strong role="status">{active.some(job => job.status === "running") ? "Enhancement in progress" : "Enhancement queued"}{active.length > 1 ? ` · ${active.length} active runs` : ""}</strong>
+      {active.map(job => {
+        const started = job.createdAt ? Date.parse(job.createdAt) : NaN;
+        const elapsed = Number.isFinite(started) ? Math.max(0, Math.floor((now - started) / 1000)) : null;
+        return <p key={job.id}>{job.message}{elapsed !== null && <span className="enhancement-elapsed"> · {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")} elapsed</span>}</p>;
+      })}
+      <small>This may take several minutes. Tool results appear when the run returns. Nothing is applied until you accept suggestions.</small>
+    </div>
+  </aside>;
+}
+
+function ToolExecutionDetails({ job }: { job: EnhancementJob }) {
+  if (!job.useTools) return null;
+  const executions = job.toolExecutions ?? [];
+  const sources = job.researchSources ?? [];
+  return <details className="enhancement-tool-results">
+    <summary>Tool execution · {executions.filter(item => item.status === "completed").length} completed</summary>
+    {!executions.length && <p>No completed execution record received yet. This is not evidence that research or specialist work happened.</p>}
+    <ol>{executions.map(item => <li key={item.sequence}>
+      <strong>{item.tool} · {item.status}</strong><p>{item.instruction}</p>
+      {item.error && <p className="enhancement-resource-warning">{item.error}</p>}
+      {item.result && <details><summary>Inspect tool result</summary><pre>{JSON.stringify(item.result, null, 2)}</pre></details>}
+    </li>)}</ol>
+    {sources.length > 0 && <section aria-label="Web research sources"><h5>Web research sources</h5>
+      <p>Provider-cited web-search synthesis, not verbatim page text or independent expert verification.</p>
+      <ul>{sources.map(source => <li key={source.id}>
+        <a href={source.url} target="_blank" rel="noopener noreferrer">{source.title}</a>
+        <p>{source.id} · retrieved {source.version}</p>
+        <details><summary>Inspect cited synthesis</summary>{source.passages.map(passage => <p key={passage.locator}>{passage.text}</p>)}</details>
+      </li>)}</ul>
+    </section>}
+  </details>;
+}
 
 type EnhancementReviewViewProps = {
   project: Project;
@@ -139,9 +189,12 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
   const [selectedSceneIds, setSelectedSceneIds] = useState<string[]>([]);
   const [selectedResourceIds, setSelectedResourceIds] = useState<string[]>([]);
   const [goal, setGoal] = useState("Improve clarity and alignment with the selected references.");
+  const [useTools, setUseTools] = useState(false);
+  const [allowWebResearch, setAllowWebResearch] = useState(false);
   const [preview, setPreview] = useState<SubmissionPreview | null>(null);
   const [jobBusy, setJobBusy] = useState(false);
   const [error, setError] = useState("");
+  const [statusError, setStatusError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -175,6 +228,8 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
 
   useEffect(() => {
     const controller = new AbortController();
+    setJobs([]);
+    setStatusError("");
     Promise.all([
       fetch(`/api/projects/${project.id}/reference-resources`, { signal: controller.signal }),
       fetch(`/api/projects/${project.id}/enhancement-jobs`, { signal: controller.signal }),
@@ -184,8 +239,9 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
         resourceResponse.json() as Promise<ReferenceResource[]>,
         jobResponse.json() as Promise<EnhancementJob[]>,
       ]);
+      if (controller.signal.aborted) return;
       setResources(loadedResources);
-      setJobs(loadedJobs);
+      setJobs(current => [...current.filter(job => !loadedJobs.some(loaded => loaded.id === job.id)), ...loadedJobs]);
     }).catch((loadError: unknown) => {
       if (loadError instanceof Error && loadError.name !== "AbortError") setError(loadError.message);
     });
@@ -197,16 +253,24 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
     if (!hasActiveJobs) return;
     const timer = window.setInterval(() => {
       fetch(`/api/projects/${project.id}/enhancement-jobs`)
-        .then(async (response) => response.ok ? response.json() as Promise<EnhancementJob[]> : [])
+        .then(async (response) => {
+          if (!response.ok) throw new Error("Enhancement status could not be refreshed. The run may still be active.");
+          return response.json() as Promise<EnhancementJob[]>;
+        })
         .then((updatedJobs) => {
+          setStatusError("");
           setJobs(updatedJobs);
           if (updatedJobs.some((job) => job.status === "completed")) {
             fetch(`/api/projects/${project.id}/enhancement-proposals`)
-              .then((response) => response.ok ? response.json() as Promise<EnhancementProposal[]> : [])
-              .then(setProposals);
+              .then((response) => {
+                if (!response.ok) throw new Error("Completed enhancement suggestions could not be loaded.");
+                return response.json() as Promise<EnhancementProposal[]>;
+              })
+              .then(setProposals)
+              .catch((loadError: unknown) => setError(loadError instanceof Error ? loadError.message : "Completed enhancement suggestions could not be loaded."));
           }
         })
-        .catch(() => undefined);
+        .catch((loadError: unknown) => setStatusError(loadError instanceof Error ? loadError.message : "Enhancement status could not be refreshed."));
     }, 1800);
     return () => window.clearInterval(timer);
   }, [hasActiveJobs, project.id]);
@@ -217,6 +281,8 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
       sceneIds: scope === "selected-scenes" ? selectedSceneIds : [],
       goal: goal.trim(),
       resourceIds: selectedResourceIds,
+      useTools,
+      allowWebResearch,
     };
   }
 
@@ -419,6 +485,17 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
     return JSON.stringify(value, null, 2) ?? "Empty";
   }
 
+  function displayAdditionalScenes(value: unknown) {
+    if (!Array.isArray(value)) return displayValue(value);
+    return value.map((scene: unknown) => {
+      if (!scene || typeof scene !== "object" || !("title" in scene)) return displayValue(scene);
+      const text = "extractedText" in scene && Array.isArray(scene.extractedText) ? scene.extractedText.join("\n\n") : "";
+      const narration = "narration" in scene && typeof scene.narration === "string" ? scene.narration : "";
+      const notes = "notes" in scene && typeof scene.notes === "string" ? scene.notes : "";
+      return `${String(scene.title)}\n${text}${narration ? `\nNarration: ${narration}` : ""}${notes ? `\nProduction notes: ${notes}` : ""}`;
+    }).join("\n\n---\n\n");
+  }
+
   function beginEditing(proposal: EnhancementProposal) {
     const proposalChanges = proposal.changes.length > 0 ? proposal.changes : [{
       targetSceneId: proposal.targetSceneId,
@@ -441,23 +518,49 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
         <div><p className="eyebrow">AUTHOR APPROVAL · {pendingCount} PENDING</p><h2 id="enhancement-review-title">Storyboard suggestions</h2></div>
         <button className="icon-button" onClick={onClose} disabled={Boolean(busyProposalId)} aria-label="Close suggestion review"><X size={18} /></button>
       </header>
+      {hasActiveJobs && <ActiveEnhancementStatus jobs={jobs} />}
       {error && <p className="assessment-editor-error enhancement-review-error" role="alert">{error}</p>}
+      {statusError && <p className="assessment-editor-error enhancement-review-error" role="alert">{statusError}</p>}
       <div className="enhancement-submission-scroll">
         <section className="enhancement-submission" aria-labelledby="enhancement-submit-title">
           <div className="enhancement-section-heading"><div><p className="eyebrow">STEP 9 · SUBMIT FOR REVIEW</p><h3 id="enhancement-submit-title">New enhancement run</h3></div><label className="button button-outline enhancement-upload-button"><FileUp size={14} /> Add reference<input type="file" accept=".pdf,.docx,.pptx,.txt,.md" onChange={(event) => void uploadReference(event)} disabled={jobBusy} /></label></div>
+          <p className="field-hint">In single-user installations, local Pythia drafts changes and can expand selected scenes into additional learner-sized scenes for your approval. Enable tool orchestration below to let Pythia execute registered specialists and, with separate permission, public web research before drafting. Expansion keeps originals and media. Shared installations retain their legacy Engine. File paths do not grant file access, and @research alone does not grant web permission. Submitting may incur model and search charges.</p>
+          {jobs.some(job => job.status === "completed" && job.proposalIds.length === 0) && <p role="status" className="enhancement-resource-warning">An earlier run completed without suggestions. Older Engine runs only checked for missing action descriptions; they did not fulfill expansion goals. Submit a new run to use live local Pythia drafting. No previous run will be retried automatically.</p>}
           <ReferenceOcrPanel projectId={project.id} resources={resources} onUpdated={(updated) => setResources((current) => current.map((resource) => resource.id === updated.id ? { ...resource, ...updated } : resource))} />
           <div className="enhancement-submit-grid">
             <label className="enhancement-form-field">Scope<select value={scope} onChange={(event) => { setScope(event.target.value as JobRequest["scope"]); setPreview(null); }}><option value="whole-course">Whole course</option><option value="selected-scenes">Selected scenes</option></select></label>
             <label className="enhancement-form-field enhancement-goal-field">Enhancement goal<textarea value={goal} maxLength={2000} rows={2} onChange={(event) => { setGoal(event.target.value); setPreview(null); }} /></label>
           </div>
+          <fieldset className="enhancement-choice-group"><legend>Authoring tools · local Pythia</legend>
+            <label><input type="checkbox" checked={useTools} disabled={jobBusy} onChange={event => {
+              setUseTools(event.target.checked); if (!event.target.checked) setAllowWebResearch(false); setPreview(null);
+            }} /> Enable specialist tool orchestration</label>
+            <p className="field-hint">Up to 3 tool calls and 7 provider requests per run, including planning and final drafting. No automatic retries. Saved-connection daily limits reserve all 7 requests conservatively, even if fewer are used. Specialists produce advisory drafts, not approvals.</p>
+            <label><input type="checkbox" checked={allowWebResearch} disabled={jobBusy || !useTools} onChange={event => {
+              setAllowWebResearch(event.target.checked); setPreview(null);
+            }} /> Search the public web before drafting</label>
+            <p className="field-hint">Requires a completed public search with cited sources before specialist drafting. Uses one of the 3 tool calls, leaving up to 2 specialist calls. Pythia formulates public queries through the configured OpenAI provider. Do not enable for confidential research; queries can leave the model provider for web search. Account/model support is checked by the actual request, not guaranteed by preview. Search failure stops the run, without silently substituting synthesis or automatically retrying. No shell, arbitrary plugins, local-file access, publishing or media production is enabled.</p>
+          </fieldset>
           {scope === "selected-scenes" && <fieldset className="enhancement-choice-group"><legend>Scenes</legend><div className="enhancement-choice-list">{project.storyboard.scenes.map((scene) => <label key={scene.id}><input type="checkbox" checked={selectedSceneIds.includes(scene.id)} onChange={(event) => { setSelectedSceneIds((current) => event.target.checked ? [...current, scene.id] : current.filter((id) => id !== scene.id)); setPreview(null); }} /><span>{scene.title}</span></label>)}</div></fieldset>}
           <fieldset className="enhancement-choice-group"><legend>Permitted references</legend>{resources.length === 0 ? <p className="enhancement-inline-empty">No references added</p> : <div className="enhancement-choice-list">{resources.map((resource) => {
             const currentVersion = resource.versions.find((version) => version.version === resource.currentVersion);
             return <label key={resource.id} className="enhancement-resource-choice"><input type="checkbox" checked={selectedResourceIds.includes(resource.id)} disabled={currentVersion?.extractionStatus !== "complete"} onChange={(event) => { setSelectedResourceIds((current) => event.target.checked ? [...current, resource.id] : current.filter((id) => id !== resource.id)); setPreview(null); }} /><span><strong>{resource.title}</strong><small>{resource.classification} · v{resource.currentVersion}{resource.authoritative ? " · authoritative" : ""} · {currentVersion?.extractionStatus ?? "unavailable"}</small>{currentVersion?.extractionMessage && <small className="enhancement-resource-warning">{currentVersion.extractionMessage}</small>}</span></label>;
           })}</div>}</fieldset>
-          <div className="enhancement-submit-actions"><button className="button button-outline" onClick={() => void previewSubmission()} disabled={jobBusy || !goal.trim() || (scope === "selected-scenes" && selectedSceneIds.length === 0)}><Sparkles size={14} /> Preview submission</button>{preview && <button className="button button-accent" onClick={() => void submitEnhancement()} disabled={jobBusy || !preview.engineConfigured} title={!preview.engineConfigured ? "Configure the Intelligence Engine before submitting." : "Submit this exact selection for proposal generation."}>Submit run</button>}</div>
-          {preview && <div className="enhancement-submission-preview" role="status"><div><strong>Revision {preview.sourceRevision}</strong><span>{preview.sceneCount} scene{preview.sceneCount === 1 ? "" : "s"} · {preview.resourceCount} reference{preview.resourceCount === 1 ? "" : "s"} · about {preview.estimatedInputTokens.toLocaleString()} input units{preview.estimatedCostUsd === null ? "" : ` · estimated $${preview.estimatedCostUsd.toFixed(4)}`}</span></div>{!preview.engineConfigured && <p className="enhancement-resource-warning">The Intelligence Engine is unavailable or does not support storyboard enhancement. Check Engine status in Settings.</p>}<details><summary>Inspect submitted content</summary><pre>{JSON.stringify(preview.payload, null, 2)}</pre></details></div>}
+          <div className="enhancement-submit-actions"><button className="button button-outline" onClick={() => void previewSubmission()} disabled={jobBusy || !goal.trim() || (scope === "selected-scenes" && selectedSceneIds.length === 0)}><Sparkles size={14} /> Preview submission</button>{preview && <button className="button button-accent" onClick={() => void submitEnhancement()} disabled={jobBusy || !preview.engineConfigured} title={!preview.engineConfigured ? "Connect a compatible Pythia provider before submitting." : "Submit this exact selection for proposal generation."}>Submit run</button>}</div>
+          {preview && <div className="enhancement-submission-preview" role="status"><div><strong>Revision {preview.sourceRevision}</strong><span>{preview.sceneCount} scene{preview.sceneCount === 1 ? "" : "s"} · {preview.resourceCount} reference{preview.resourceCount === 1 ? "" : "s"} · about {preview.estimatedInputTokens.toLocaleString()} input units{preview.estimatedCostUsd === null ? "" : ` · estimated $${preview.estimatedCostUsd.toFixed(4)}`}</span></div>
+            {useTools && <section aria-label="Permitted authoring tools"><p>Up to {preview.maxProviderRequests ?? 7} provider requests. Initial input estimate excludes later tool context and search charges.</p>
+              <ul>{(preview.tools ?? []).map(tool => <li key={tool.name}><strong>{tool.name}</strong> · {tool.description}</li>)}</ul>
+              <p>Public web research: {allowWebResearch ? preview.webResearchAvailable ? "required before drafting; provider account support not yet tested" : "unavailable on this connection" : "not permitted"}</p>
+            </section>}
+            {!preview.engineConfigured && <p className="enhancement-resource-warning">Pythia is unavailable or does not support the requested drafting/tools. Check the local adapter and text-model connection; web research requires the approved OpenAI endpoint. Shared Engine connections do not execute these tools.</p>}
+            <details><summary>Inspect submitted content</summary><pre>{JSON.stringify(preview.payload, null, 2)}</pre></details></div>}
           {jobs.length > 0 && <div className="enhancement-job-list"><h4>Enhancement jobs</h4>{jobs.map((job) => <article className={`enhancement-job ${job.status}`} key={job.id}><div className="enhancement-job-heading"><strong>{job.status}</strong><span>Revision {job.sourceRevision}{job.provider ? ` · ${job.provider}${job.model ? ` / ${job.model}` : ""}` : ""}</span></div><p>{job.message}</p>{job.error && <p className="enhancement-resource-warning">{job.error}</p>}{job.resourceConflicts.map((conflict, index) => <section className="enhancement-resource-conflict" key={`${job.id}-conflict-${index}`}><strong>Reference conflict</strong><p>{conflict.explanation}</p><ul>{conflict.citations.map((citation, citationIndex) => <li key={`${citation.resourceId}-${citationIndex}`}>{citation.resourceId}{citation.version ? ` · v${citation.version}` : ""}{citation.locator ? ` · ${citation.locator}` : ""}{citation.excerpt ? `: “${citation.excerpt}”` : ""}</li>)}</ul></section>)}<div className="enhancement-job-meter" role="progressbar" aria-label={`${job.status} progress`} aria-valuenow={job.progress} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${job.progress}%` }} /></div><div className="enhancement-job-footer"><span>{job.estimatedInputTokens ? `~${job.estimatedInputTokens.toLocaleString()} tokens` : ""}{job.estimatedCostUsd === null ? "" : ` · ~$${job.estimatedCostUsd.toFixed(4)}`}{job.proposalIds.length ? ` · ${job.proposalIds.length} proposals` : ""}</span>{(job.status === "queued" || job.status === "running") && <button className="button button-outline" onClick={() => void updateJob(job.id, "cancel")} disabled={jobBusy}>Cancel</button>}{(job.status === "failed" || job.status === "cancelled") && <button className="button button-outline" onClick={() => void updateJob(job.id, "retry")} disabled={jobBusy}><RotateCw size={13} /> Retry</button>}</div></article>)}</div>}
+          {jobs.some(job => job.useTools) && <section aria-label="Authoring tool execution records">
+            <h4>Authoring tool execution records</h4>
+            {jobs.filter(job => job.useTools).map(job => <article key={job.id}>
+              <p>{job.id} · {job.status}</p><ToolExecutionDetails job={job} />
+            </article>)}
+          </section>}
         </section>
       </div>
       {loading ? <p className="enhancement-review-empty" role="status">Loading suggestions…</p> : proposals.length === 0 && pythiaProposals.length === 0 && transformProposals.length === 0
@@ -519,6 +622,7 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
             beforeValue: proposal.beforeValue,
             proposedValue: proposal.proposedValue,
           }];
+          const addsScenes = proposalChanges.some(change => change.field === "additionalScenes");
           return <article className={`enhancement-proposal ${proposal.status}`} key={proposal.id}>
             <div className="enhancement-proposal-heading"><div><span className="enhancement-proposal-status">{proposal.status}</span><h3>{targetScene?.title ?? (proposal.targetSceneId ? "Scene no longer exists" : "Storyboard change")}</h3><span className="enhancement-proposal-field">{proposalChanges.length} change{proposalChanges.length === 1 ? "" : "s"} · source revision {proposal.sourceRevision}{proposal.dependencyGroupId ? ` · group ${proposal.dependencyGroupId}` : ""}</span></div><span className="enhancement-proposal-origin">{proposal.origin === "ai" ? `AI suggestion · ${proposal.referenceCitations.length ? "source-backed" : "ungrounded"}` : "Author suggestion"}{proposal.provider ? ` · ${proposal.provider}` : ""}{proposal.model ? ` / ${proposal.model}` : ""}</span></div>
             <p className="enhancement-proposal-rationale">{proposal.rationale}</p>
@@ -528,13 +632,14 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
             {proposalChanges.map((change, index) => <section className="enhancement-proposal-change" key={`${change.targetSceneId ?? "storyboard"}-${change.field}-${index}`}>
               <div className="enhancement-proposal-field">{change.field.replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`)}{change.targetSceneId ? ` · ${project.storyboard.scenes.find((scene) => scene.id === change.targetSceneId)?.title ?? "Missing scene"}` : " · storyboard"}</div>
               {editingProposalId === proposal.id ? <label className="enhancement-proposal-editor"><span>Suggested value{typeof change.proposedValue !== "string" ? " · JSON" : ""}</span><textarea value={changeDrafts[proposal.id]?.[index] ?? ""} onChange={(event) => setChangeDrafts((current) => ({ ...current, [proposal.id]: (current[proposal.id] ?? []).map((value, draftIndex) => draftIndex === index ? event.target.value : value) }))} rows={Math.min(8, Math.max(3, (changeDrafts[proposal.id]?.[index]?.split("\n").length ?? 3)))} /></label>
-                : <dl className="enhancement-proposal-values"><div><dt>Current</dt><dd>{displayValue(change.beforeValue)}</dd></div><div><dt>Suggested</dt><dd>{displayValue(change.proposedValue)}</dd></div></dl>}
+                : <dl className="enhancement-proposal-values"><div><dt>Current</dt><dd>{change.field === "additionalScenes" ? "Original scene is retained" : displayValue(change.beforeValue)}</dd></div><div><dt>Suggested</dt><dd>{change.field === "additionalScenes" ? displayAdditionalScenes(change.proposedValue) : displayValue(change.proposedValue)}</dd></div></dl>}
             </section>)}
             {proposal.referenceCitations.length > 0 && <ul className="enhancement-proposal-citations">{proposal.referenceCitations.map((citation, index) => <li key={`${citation.resourceId}-${index}`}>{citation.resourceId}{citation.version ? ` · v${citation.version}` : ""}{citation.locator ? ` · ${citation.locator}` : ""}{citation.excerpt ? `: “${citation.excerpt}”` : ""}</li>)}</ul>}
             {proposal.status === "pending" && <div className="enhancement-proposal-actions">
               <button className="button button-outline" onClick={() => void decide(proposal.id, "reject")} disabled={Boolean(busyProposalId)} title="Reject this suggestion without changing the storyboard."><X size={14} /> Reject</button>
               {editingProposalId === proposal.id ? <button className="button button-outline" onClick={() => setEditingProposalId("")} disabled={Boolean(busyProposalId)}>Cancel edit</button>
-                : <button className="button button-outline" onClick={() => beginEditing(proposal)} disabled={Boolean(busyProposalId)}>Edit values</button>}
+                : !addsScenes && <button className="button button-outline" onClick={() => beginEditing(proposal)} disabled={Boolean(busyProposalId)}>Edit values</button>}
+              {addsScenes && <p className="field-hint">Accept to insert these scenes after their anchors without replacing existing content. Edit the new scenes in the Scene Editor afterward.</p>}
               <button className="button button-accent" onClick={() => void decide(proposal.id, "accept")} disabled={Boolean(busyProposalId)} title="Apply this suggestion to the storyboard and save a history snapshot."><Check size={14} /> Accept change</button>
             </div>}
             {proposal.status === "accepted" && <div className="enhancement-proposal-actions"><button className="button button-outline" onClick={() => void decide(proposal.id, "reverse")} disabled={Boolean(busyProposalId)} title="Restore the captured prior values if they have not since changed."><X size={14} /> Undo acceptance</button></div>}

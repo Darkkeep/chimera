@@ -1,6 +1,7 @@
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
+from .experience_models import Experience
 
 
 SceneType = Annotated[
@@ -320,6 +321,7 @@ class AssetMetadataUpdate(BaseModel):
 
 
 class SceneUpdate(BaseModel):
+    experience: Experience | None = None
     visualLayout: SceneLayout | None = None
     backgroundAsset: str | None = None
     title: str | None = Field(default=None, min_length=1, max_length=120)
@@ -527,11 +529,27 @@ class ExportSettings(BaseModel):
     packageWarningThresholdMB: int = Field(default=200, ge=1, le=4096)
 
 
+class EnhancementSceneDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(min_length=1, max_length=120)
+    sceneType: Literal["content", "title", "summary"] = "content"
+    extractedText: list[str] = Field(min_length=1, max_length=12)
+    narration: str = Field(default="", max_length=10000)
+    actionDescription: str = Field(default="", max_length=5000)
+    notes: str = Field(default="", max_length=10000)
+
+    @model_validator(mode="after")
+    def bounded_content(self):
+        if not self.title.strip() or any(not text.strip() or len(text) > 2000 for text in self.extractedText):
+            raise ValueError("New scenes require a title and nonempty paragraphs of at most 2000 characters")
+        return self
+
+
 EnhancementField = Literal[
     "title", "extractedText", "actionDescription", "narration", "assessmentItem",
     "assessmentSettings", "imageAssets", "imageAltText", "decorativeImages", "audioAssets", "videoAssets",
     "required", "audioRequired", "sceneType", "layoutMode", "templateId", "notes",
-    "sceneOrder", "storyboardTitle", "completionSettings",
+    "sceneOrder", "storyboardTitle", "completionSettings", "additionalScenes",
 ]
 
 
@@ -914,9 +932,13 @@ class EnhancementJobCreate(BaseModel):
     goal: str = Field(min_length=1, max_length=2000)
     resourceIds: list[str] = Field(default_factory=list, max_length=100)
     commentId: str | None = None
+    useTools: bool = False
+    allowWebResearch: bool = False
 
     @model_validator(mode="after")
     def validate_scope(self) -> "EnhancementJobCreate":
+        if self.allowWebResearch and not self.useTools:
+            raise ValueError("Web research requires tool orchestration")
         if self.scope == "selected-scenes" and not self.sceneIds:
             raise ValueError("Select at least one scene for a selected-scenes run")
         if self.scope == "whole-course" and self.sceneIds:
@@ -933,6 +955,38 @@ class EnhancementResourceConflict(BaseModel):
     citations: list[EnhancementReferenceCitation] = Field(min_length=2, max_length=10)
 
 
+class EnhancementToolExecution(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    sequence: int = Field(ge=1, le=3)
+    tool: str = Field(min_length=1, max_length=100)
+    instruction: str = Field(min_length=1, max_length=2000)
+    status: Literal["completed", "failed"]
+    startedAt: str
+    finishedAt: str | None = None
+    result: dict[str, Any] | None = None
+    error: str | None = Field(default=None, max_length=2000)
+
+
+class EnhancementResearchSource(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(pattern=r"^web-[a-f0-9]{16}$")
+    title: str = Field(min_length=1, max_length=500)
+    url: str = Field(min_length=1, max_length=2000)
+    version: str = Field(min_length=1, max_length=100)
+    passages: list[ReferencePassage] = Field(min_length=1, max_length=1)
+    evidenceKind: Literal["web-search-synthesis"]
+
+    @model_validator(mode="after")
+    def public_source(self):
+        from urllib.parse import urlsplit
+        parsed = urlsplit(self.url)
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError("Research sources require HTTPS links without credentials")
+        if self.passages[0].locator != "provider-synthesis" or len(self.passages[0].text) > 32000:
+            raise ValueError("Research passages must be bounded provider synthesis")
+        return self
+
+
 class EnhancementJob(BaseModel):
     id: str
     actualUsage: dict[str, int] | None = None
@@ -943,6 +997,10 @@ class EnhancementJob(BaseModel):
     sceneIds: list[str]
     goal: str
     resourceIds: list[str]
+    useTools: bool = False
+    allowWebResearch: bool = False
+    toolExecutions: list[EnhancementToolExecution] = Field(default_factory=list, max_length=3)
+    researchSources: list[EnhancementResearchSource] = Field(default_factory=list, max_length=36)
     commentId: str | None = None
     resourceVersions: dict[str, str] = Field(default_factory=dict)
     status: Literal["queued", "running", "completed", "cancelled", "failed"] = "queued"
@@ -1006,6 +1064,46 @@ class ReviewCommentDecision(BaseModel):
     resolved: bool
 
 
+class VideoShot(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1, max_length=240)
+    durationSeconds: int = Field(ge=2, le=30, strict=True)
+    transition: Literal["fade", "none"] = "fade"
+
+    @field_validator("text")
+    @classmethod
+    def readable_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Shot text cannot be blank")
+        return value
+
+
+class VideoTreatment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=120)
+    purpose: str = Field(min_length=1, max_length=2000)
+    rationale: str = Field(min_length=1, max_length=2000)
+    shots: list[VideoShot] = Field(min_length=1, max_length=10)
+    productionNeeds: list[Annotated[str, Field(min_length=1, max_length=1000)]] = Field(default_factory=list, max_length=8)
+
+    @model_validator(mode="after")
+    def bounded_treatment(self) -> "VideoTreatment":
+        if not all(value.strip() for value in (self.title, self.purpose, self.rationale)):
+            raise ValueError("Treatment title, purpose and rationale cannot be blank")
+        if not 4 <= sum(shot.durationSeconds for shot in self.shots) <= 30:
+            raise ValueError("Treatment must total 4-30 seconds")
+        return self
+
+
+class ReviewedVideoTreatment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    sourceRevision: int = Field(ge=1, strict=True)
+    treatment: VideoTreatment
+
+
 class MediaGenerationJobCreate(BaseModel):
     connectionId: str | None = Field(default=None, pattern=r"^(?:pythia|legacy-openai|narration-[a-f0-9]{12})$")
     kind: Literal["image", "narration", "video"]
@@ -1023,6 +1121,7 @@ class MediaGenerationJobCreate(BaseModel):
     language: str | None = Field(default=None, max_length=40)
     altText: str = Field(default="", max_length=2000)
     captions: str = Field(default="", max_length=20000)
+    videoTreatment: ReviewedVideoTreatment | None = None
 
     @model_validator(mode="after")
     def validate_kind(self) -> "MediaGenerationJobCreate":
@@ -1034,6 +1133,14 @@ class MediaGenerationJobCreate(BaseModel):
             self.durationSeconds = self.durationSeconds or 30
             if (self.width or 1280, self.height or 720) not in {(1280,720),(720,1280)}:
                 raise ValueError("Video requires 1280 by 720 or 720 by 1280")
+        if self.videoTreatment is not None:
+            treatment = self.videoTreatment.treatment
+            if self.kind != "video":
+                raise ValueError("Shot treatments require video generation")
+            if self.durationSeconds != sum(shot.durationSeconds for shot in treatment.shots):
+                raise ValueError("Video duration must equal the reviewed shots' total duration")
+            if self.prompt != treatment.title or self.purpose != treatment.purpose:
+                raise ValueError("Video title and purpose must match the reviewed treatment")
         return self
 
 
@@ -1060,6 +1167,7 @@ class MediaGenerationJob(BaseModel):
     language: str | None = None
     altText: str = ""
     captions: str = ""
+    videoTreatment: ReviewedVideoTreatment | None = None
     status: Literal["queued", "running", "completed", "cancelled", "failed"] = "queued"
     progress: int = Field(default=0, ge=0, le=100)
     message: str = "Queued"
@@ -1102,6 +1210,7 @@ class GeneratedAssetCandidate(BaseModel):
     language: str | None = None
     altText: str = ""
     captions: str = ""
+    videoTreatment: ReviewedVideoTreatment | None = None
     provider: str | None = None
     model: str | None = None
     createdAt: str
@@ -1139,6 +1248,7 @@ class AssetAttributionUpdate(BaseModel):
 
 
 class Scene(BaseModel):
+    experience: Experience | None = None
     id: str
     visualLayout: SceneLayout | None = None
     sourceSlide: int | None = None
@@ -1166,6 +1276,12 @@ class Scene(BaseModel):
     notes: str = ""
     sourceAnimationXml: str | None = None
     sourceTransitionXml: str | None = None
+
+    @model_validator(mode="after")
+    def native_experience_components(self):
+        if self.experience and (self.assessmentItem or self.visualLayout and self.visualLayout.timeline):
+            raise ValueError("Native experience assembly cannot replace an assessment or timeline. Remove the experience first.")
+        return self
 
     @model_validator(mode="before")
     @classmethod

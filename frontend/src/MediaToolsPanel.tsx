@@ -8,7 +8,7 @@ import "./media-tools.css";
 type SharedRecord = { id: string; asset: Asset; createdAt: string };
 type Capability = { canPublishShared: boolean; ocr: { available: boolean; languages: string[]; message: string } };
 
-export function MediaToolsPanel({ project, scene, onProjectUpdated }: { project: Project; scene?: Scene; onProjectUpdated: (p: Project) => void }) {
+export function MediaToolsPanel({ project, scene, onProjectUpdated, onBusyChange }: { project: Project; scene?: Scene; onProjectUpdated: (p: Project) => void; onBusyChange?: (busy: boolean) => void }) {
   const [shared, setShared] = useState<SharedRecord[]>([]);
   const [capability, setCapability] = useState<Capability | null>(null);
   const [selected, setSelected] = useState("");
@@ -18,6 +18,7 @@ export function MediaToolsPanel({ project, scene, onProjectUpdated }: { project:
   const [captions, setCaptions] = useState("");
   const [language, setLanguage] = useState("en");
   const [busy, setBusy] = useState(false);
+  useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const asset = project.storyboard.assets.find(a => a.id === selected) ?? project.storyboard.assets[0];

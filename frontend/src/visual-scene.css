@@ -78,3 +78,7 @@
 :root[data-theme="dark"] .modal.visual-editor { background:var(--theme-panel); color:var(--ink); }
 @media (max-width: 800px) { .visual-editor-workspace { grid-template-columns: minmax(0, 1fr); } .visual-inspector { padding: 14px 0 0; border-left:0; border-top:1px solid var(--line); } .modal.visual-editor { padding: 12px; } }
 @media (max-width: 560px) { .visual-scene-details-grid { grid-template-columns: minmax(0, 1fr); } .visual-scene-details-grid .visual-scene-details-wide { grid-column: auto; } }
+.visual-layer-insert { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.scene-editor-media { min-width: 0; padding: 16px; }
+.scene-editor-media[hidden] { display: none; }
+.scene-editor-placement { min-width: 0; border: 0; margin: 0; padding: 0; }

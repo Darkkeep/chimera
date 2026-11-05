@@ -3,7 +3,7 @@ import { PythiaProcessing } from "./PythiaProcessing";
 export type ContentSceneDraft = { title: string; sceneType: "content" | "title" | "summary"; extractedText: string[]; narration: string; actionDescription: string; notes: string };
 export type PythiaAction = { id: string; turnId: string; mode: "update-scene" | "add-scenes"; sceneId: string | null; direction: string; sourceRevision: number;
   before: Record<string, string | string[]> | null; status: "drafting" | "pending" | "applied" | "discarded" | "failed";
-  appliedRevision?: number; error: string | null; result: { rationale: string; producer_id: string; changes: { field: string; value: string | string[] }[]; scenes: ContentSceneDraft[] } | null };
+  appliedRevision?: number; designBrief?: string; error: string | null; result: { rationale: string; producer_id: string; changes: { field: string; value: string | string[] }[]; scenes: ContentSceneDraft[] } | null };
 
 const labels: Record<string, string> = { title: "Title", extractedText: "Screen text", narration: "Narration", actionDescription: "Production direction", notes: "Author notes" };
 const text = (value: string | string[] | undefined) => Array.isArray(value) ? value.join("\n\n") : value || "(empty)";
@@ -15,6 +15,7 @@ export function PythiaActionReview({ action, revision, disabled, onDecision, onR
     <h3>{action.mode === "update-scene" ? "Proposed scene update" : "Proposed new content scenes"} <span>{action.status}</span></h3>
     <p>Source revision {action.sourceRevision}{action.before?.title ? ` · Target: ${action.before.title}` : " · Append to this project"}</p>
     <details><summary>Author direction used</summary><p>{action.direction}</p></details>
+    {action.designBrief && <details><summary>Design brief used</summary><p>{action.designBrief}</p></details>}
     {action.status === "drafting" && <PythiaProcessing detail="Preparing your scene draft for review. No changes have been applied." />}
     {action.error && <p role="alert">{action.error}</p>}
     {action.result && <>

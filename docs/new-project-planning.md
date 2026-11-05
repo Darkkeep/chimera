@@ -27,21 +27,40 @@ local Pythia consultation tool, account/project scope, successful-only history,
 limits and provider charges apply. Nothing in the planning conversation creates
 scenes automatically.
 
-When ready, choose **Draft rough scenes from this advice** on a completed answer.
-The controls default to adding new content scenes, with a starting direction that
-the author can edit. **Generate content draft** returns up to five proposed
-native content/title/summary scenes for review. **Apply changes** adds them;
+Consultation comes first. A numbered reply or an attached source never advances
+the process automatically. Discuss the sources and gaps, audience, purpose,
+outcomes, constraints, and possible approaches. Pythia receives this process
+context; no fixed intake interview or minimum number of exchanges is required.
+
+When the brief is ready, choose **Review our design brief**. Write or edit the
+agreed decisions, assumptions, and open issues (up to 8,000 characters).
+**Use latest reply as a starting point** is optional and requires your review.
+**Agree brief and explore scene design** saves the brief without a model call,
+then allows discussion of the learner experience, sequence, and boundaries.
+You can **Return to consultation** at any time when no operation is running;
+the brief and conversation remain saved.
+
+Only when ready for production, choose **Prepare a content draft from this advice**
+on a completed answer. The controls default to adding new content scenes, with a
+starting direction that the author can edit. The backend requires the explicit
+agreed-brief decision. **Generate content draft** returns proposed native
+content/title/summary scenes for review. Outline headings define topics to cover,
+not scene boundaries: Pythia can split each topic into multiple learner-sized
+scenes and choose learner-facing titles. The final count comes from the draft,
+not the number of headings. Review the complete sequence before applying it.
+**Apply changes** adds the scenes;
 **Discard draft** leaves the storyboard untouched. Existing revision checks,
 author permissions and audit/history behavior remain in force. More batches can
 be requested within the conversation allowances.
 
 **Open storyboard** finishes setup. The project, saved sources, sent conversation
 and server-recorded drafts remain available after closing or reloading; resume
-from **Talk to Pythia**. Unsent text is preserved across setup tabs, but is not
+from **Consult Pythia**. Unsent text is preserved across setup tabs, but is not
 promised across closing the modal or reloading the page.
 
 The existing prompt-to-scenes workflow remains available when its AI connection
-is configured. The first-scene onboarding handoff still opens one scene dialog
+is configured, explicitly labeled as a separate quick-draft path that bypasses
+consultation and does not agree its brief. The first-scene onboarding handoff still opens one scene dialog
 rather than being intercepted by project planning.
 
 ## Upload recovery

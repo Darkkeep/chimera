@@ -82,16 +82,27 @@ class VideoProvider:
                     "input": [{"avatar": job.avatar, "background": "off_white", "scriptText": job.script}]}
         else:
             path = "/render"
+            shots = [(shot.text, shot.durationSeconds, shot.transition) for shot in job.videoTreatment.treatment.shots] if job.videoTreatment else [
+                (job.prompt, job.durationSeconds or 30, "fade")
+            ]
+            clips = []
+            start = 0
+            for text, duration, transition in shots:
+                clip = {
+                    "asset": {"type": "rich-text", "text": text,
+                              "font": {"family": "SpecialElite-Regular", "size": 48, "color": "#ffffff"},
+                              "align": {"horizontal": "center", "vertical": "middle"}},
+                    "width": 640 if portrait else 1120, "height": 1120 if portrait else 640,
+                    "start": start, "length": duration,
+                }
+                if transition == "fade":
+                    clip["transition"] = {"in": "fade", "out": "fade"}
+                clips.append(clip)
+                start += duration
             body = {"timeline": {"background": "#101828",
                 "fonts": [{"src": "https://shotstack-assets.s3.amazonaws.com/fonts/SpecialElite-Regular.ttf"}],
-                "tracks": [{"clips": [{
-                "asset": {"type": "rich-text", "text": job.prompt,
-                          "font": {"family": "SpecialElite-Regular", "size": 48, "color": "#ffffff"},
-                          "align": {"horizontal": "center", "vertical": "middle"}},
-                "width": 640 if portrait else 1120, "height": 1120 if portrait else 640,
-                "start": 0, "length": job.durationSeconds or 30,
-                "transition": {"in": "fade", "out": "fade"},
-            }]}]}, "output": {"format": "mp4", "resolution": "hd", "aspectRatio": "9:16" if portrait else "16:9"}}
+                "tracks": [{"clips": clips}]},
+                "output": {"format": "mp4", "resolution": "hd", "aspectRatio": "9:16" if portrait else "16:9"}}
         submitted = _document(self.connection, path, body)
         operation = submitted.get("id")
         if not isinstance(operation, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,200}", operation):

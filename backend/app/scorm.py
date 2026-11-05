@@ -37,8 +37,10 @@ APPEARANCE_RUNTIME = (Path(__file__).parent / "static" / "scene-appearance.js").
 
 TRANSPORT_RUNTIME = (Path(__file__).parent / "static" / "scene-transport.js").read_text(encoding="utf-8").replace("export function ", "function ")
 TIMELINE_POLICY = (Path(__file__).parent / "static" / "timeline-policy.js").read_text(encoding="utf-8").replace("export function ", "function ")
+EXPERIENCE_RUNTIME = (Path(__file__).parent / "static" / "scene-experience.js").read_text(encoding="utf-8").replace("export function ", "function ")
+EXPERIENCE_CSS = (Path(__file__).parent / "static" / "scene-experience.css").read_text(encoding="utf-8")
 
-PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
+PLAYER_JS = EXPERIENCE_RUNTIME + TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
 (() => {
     const suspendDataLimit = 64000;
     const state = { scenes: [], completionSettings: { passingScore: 80, includeOptionalAssessments: false }, current: 0, visited: new Set(), completedAudio: new Set(), videoProgress: {}, assessments: {}, remediation: null, startedAt: Date.now() };
@@ -279,6 +281,10 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
     let motionEnabled = true;
     let sceneTransport = null;
     function renderVisualScene(scene, body) {
+        if (scene.experience) {
+            stopStageAnimations = mountExperience(body, scene.experience);
+            return;
+        }
         const layout = scene.visualLayout;
         const frame = document.createElement("div");
         frame.className = "visual-stage-frame";
@@ -367,7 +373,7 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
     document.querySelector("#scene-title").textContent = scene.title;
     const body = document.querySelector("#scene-body");
     if (visualObserver) { visualObserver.disconnect(); visualObserver = null; }
-    const visual = scene.visualLayout && scene.visualLayout.enabled;
+    const visual = Boolean(scene.experience || scene.visualLayout && scene.visualLayout.enabled);
     const nativeSlide = !visual && !scene.previewImage && scene.layoutMode === "native";
     document.querySelector("#scene-title").className = nativeSlide || scene.assessmentItem ? "sr-only" : "";
     body.innerHTML = (state.remediation && state.remediation.remediationSceneId === scene.id ? `<button type="button" data-return-assessment>Return to question</button>` : "") + (visual ? "" : nativeSlide ? `<section class="native-slide" aria-label="Scene content"><h3>${escapeHtml(scene.title)}</h3><div>${text(scene)}</div></section>` : text(scene));
@@ -391,7 +397,7 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
     if (returnButton) returnButton.addEventListener("click", () => { state.current = state.scenes.findIndex(item => item.id === state.remediation.assessmentSceneId); state.remediation = null; save(); render(); });
     const media = document.querySelector("#scene-media"); media.innerHTML = "";
     const before = document.querySelector("#scene-media-before"); before.innerHTML = "";
-    const embeddedImages = new Set(visual ? scene.visualLayout.elements.filter(e => e.kind === "image").map(e => e.assetId) : []);
+    const embeddedImages = new Set(visual && !scene.experience ? scene.visualLayout.elements.filter(e => e.kind === "image").map(e => e.assetId) : []);
     const placements = scene.mediaPlacements?.length ? scene.mediaPlacements : [...(scene.imageAssets || []), ...(scene.audioAssets || []), ...(scene.videoAssets || [])].map(assetId => ({ assetId, position: "after" }));
     placements.forEach(placement => {
         const id = placement.assetId, asset = window.__CHIMERA_ASSETS[id];
@@ -506,7 +512,7 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
     const courseProgress = document.querySelector("#course-progress"); courseProgress.max = state.scenes.length; courseProgress.value = state.visited.size;
     courseProgress.title = `${state.visited.size} of ${state.scenes.length} scenes visited`;
     const article = document.querySelector(".player-main"); article.scrollTop = 0;
-    document.querySelector("#motion").hidden = Boolean(scene.visualLayout?.timeline) || !scene.visualLayout?.elements.some(element => element.animations && Object.values(element.animations).some(phase => phase.effect !== "none"));
+    document.querySelector("#motion").hidden = Boolean(scene.experience || scene.visualLayout?.timeline) || !scene.visualLayout?.elements.some(element => element.animations && Object.values(element.animations).some(phase => phase.effect !== "none"));
     document.querySelector("#motion").textContent = motionEnabled ? "Stop motion" : "Play motion";
     finish();
   }
@@ -587,7 +593,7 @@ PLAYER_HTML = '''<!doctype html>
 PLAYER_HTML = PLAYER_HTML.replace("</head>", "<style>" + (Path(__file__).parent / "static" / "player-shell.css").read_text(encoding="utf-8") + "</style></head>")
 
 
-PLAYER_HTML = PLAYER_HTML.replace("</head>", f"<style>{ASSESSMENT_SURFACE_CSS}</style></head>")
+PLAYER_HTML = PLAYER_HTML.replace("</head>", f"<style>{ASSESSMENT_SURFACE_CSS}\n{EXPERIENCE_CSS}</style></head>")
 
 
 def _scorm_12_player() -> str:

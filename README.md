@@ -1,5 +1,15 @@
 # Chimera
 
+The storyboard's **Design experience** connects Pythia's scene-level learning
+direction to an executable native concept flow and accessible click-reveals.
+Authors explicitly select source context, review/edit the actual responsive
+preview, resolve production dependencies and apply with revision checks.
+Save, preview and apply do not call media providers. Existing canvas/source
+content and attachments are retained, and the same interaction plays in
+Chimera, standalone and SCORM exports. This first native slice does not replace
+existing timeline/assessment components or implement rich-media production.
+See [Native scene experiences](docs/talk-to-pythia.md#native-scene-experiences).
+
 Start with the [living delivery guide](DELIVERY_GUIDE.md) for current priorities,
 verified progress, cross-repository responsibilities, and the developer update procedure.
 
@@ -38,9 +48,9 @@ Chimera authors one scene composition. **Stage**, storyboard, course preview, an
 
 Set a course-wide default under **Storyboard > Project background**, above the scene list. **Import graphic** accepts PNG, JPEG, GIF, or WebP directly; save once to apply it to all inheriting scenes. **Edit scene > Stage > Background** offers **Use project default**, a scene-specific image, or explicit **None**. Changing the project default preserves those exceptions. Backgrounds fill the stage and are decorative; check contrast and keep instructional details in accessible content. Word visuals, Preview, SCORM 1.2/2004, and standalone exports use the resolved authored composition; JSON and full backups retain the source data and inheritance settings.
 
-Open **Talk to Pythia** to consult your local Pythia directly, add author direction, and optionally share selected scene/source text. Use **Draft changes from this advice** to prepare a scene update or new content scenes, review the exact changes, and choose **Apply changes**. This uses the local `@Pythia` plugin's live consultation and drafting tools; see [direct Pythia conversation](docs/talk-to-pythia.md). Open **Sources** to add documents, pasted text, web links with supplied page text, and selected Pythia conversation/output text. **Settings > Pythia** configures the separate Engine task API; see [sources and local Pythia](docs/sources-and-local-pythia.md).
+Open **Consult Pythia** to consult your local Pythia directly, add author direction, and optionally share selected scene/source text. Review and agree your design brief before choosing **Prepare a content draft from this advice**. Request a scene update or new content scenes, review the exact changes, and choose **Apply changes**. This uses the local `@Pythia` plugin's live consultation and drafting tools; see [direct Pythia conversation](docs/talk-to-pythia.md). Open **Sources** to add documents, pasted text, web links with supplied page text, and selected Pythia conversation/output text. **Settings > Pythia** configures the separate Engine task API; see [sources and local Pythia](docs/sources-and-local-pythia.md).
 
-**New Project** accepts sources before creation, without requiring an AI connection. **Create & plan with Pythia** keeps the modal open for a saved conversation, source selection, and a rough scene draft when the author is ready. See [New Project planning](docs/new-project-planning.md).
+**New Project** accepts sources before creation, without requiring an AI connection. **Create & plan with Pythia** starts with consultation: understand sources, explore the audience and purpose, and develop the learning approach together. A numbered answer does not trigger scene drafting. The author reviews and agrees a saved design brief, explores scene design, and explicitly requests a content draft only when ready. See [New Project planning](docs/new-project-planning.md).
 
 The **Pythia** group beside **Edit scene** contains scene analysis, transformation, and assessment design. It activates only after a healthy Pythia Engine connection is verified; individual actions also require their advertised capability and author permissions. Connection status refreshes every 30 seconds and appears in the Pythia button's tooltip, including when disabled. When unavailable, use **Check Pythia connection** to retry and inspect **Settings > Pythia**. Media provider settings do not enable Pythia.
 
@@ -55,6 +65,8 @@ The Media Library **Project** selector defaults to the active course and switche
 **Settings > AI connection** has provider tabs for OpenAI images/legacy narration, ElevenLabs/Google Cloud/Cartesia narration, and Synthesia/Shotstack video. Synthesia creates presenter videos from a script and authorized avatar ID; Shotstack renders text/title clips with fades, not generated footage. Video candidates support 4–30 seconds and require explicit, potentially billable generation and author review. Saving/testing never renders. New timeline videos fit the scene automatically; existing clips offer **Fit video to scene**. Keys use the server account's OS credential store or fixed server-side environment injection; Google uses Application Default Credentials. Secrets never enter browser storage or project backups. Shared-deployment changes require an installation administrator. See [AI connection](docs/ai-connection.md) for provider setup, local cancellation/billing limits, explicit connection selection, request limits, and data-handling requirements.
 
 The [illustrated connection setup](docs/user-guide.md#configure-media-connections) shows all six provider forms; [Request narration](docs/user-guide.md#request-narration) covers explicit connection selection and review. Use **User guide** below Templates for the bundled PDF. The [current-work handoff](docs/current-work.md#october-27-media-provider-connections-and-help) records implementation evidence and remaining live-provider/video/release gates.
+
+For a direct Shotstack connection, video creation defaults to **Design a scene-aware treatment with Pythia**. Inspect the saved scene text and optional agreed design brief, give a learning purpose, then explicitly request a treatment. Review/refine its text shots, durations and transitions before **Render reviewed treatment**. Pythia design and Shotstack rendering are separate potentially billable calls; neither happens automatically. Drafts are private to the local actor/project/scene, survive reopening, and never modify scenes. Saved shot edits, media jobs, retries and candidates retain the treatment. Text-only silent MP4 is supported, not footage, imagery or voice; additional production needs are labelled unimplemented. **Manual single title card** remains available. See [video workflow](docs/ai-connection.md#scene-aware-shotstack-treatments).
 
 Choose **Light**, **Dark**, or **System** under **Appearance** in the sidebar. The preference is remembered in this browser and shared across its tabs. Dark is the default; System follows changes to your device's color scheme. Slide images and uploaded media retain their original colors.
 

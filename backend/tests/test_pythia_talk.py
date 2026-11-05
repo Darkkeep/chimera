@@ -49,11 +49,62 @@ class SavedConnectionBridgeTests(unittest.TestCase):
             talk.local_mcp()
         self.assertFalse((self.root / "identity/ai-usage.json").exists())
 
+    def test_video_request_routes_and_validates_treatment_instead_of_consultation_advice(self):
+        treatment = {"title": "Inspection", "purpose": "Inspect before opening", "rationale": "Two sequential steps.",
+                     "shots": [{"text": "Inspect the valve.", "durationSeconds": 6, "transition": "fade"},
+                               {"text": "Then open it.", "durationSeconds": 6, "transition": "none"}],
+                     "productionNeeds": []}
+        process = Mock(returncode=0)
+        process.communicate.return_value = (json.dumps({"ok": True, "result": treatment}).encode(), b"")
+        request = {"scene": {"title": "Valve"}, "direction": "Show the inspection", "durationSeconds": 12}
+        with patch.object(talk.subprocess, "Popen", return_value=process):
+            self.assertEqual(talk.local_mcp(video_request=request), treatment)
+        payload = json.loads(process.communicate.call_args.args[0])
+        self.assertEqual(payload["action"], "video-treatment")
+        self.assertEqual(payload["request"], request)
+
     def test_missing_credential_is_actionable_and_does_not_launch(self):
         with patch.object(talk, "resolve_connection", return_value=None), patch.object(talk, "_run_local_mcp") as bridge:
             with self.assertRaisesRegex(talk.TalkError, "Settings > AI connection"):
                 talk.local_mcp()
         bridge.assert_not_called()
+
+    def test_enhancement_request_routes_complete_payload_without_consultation_parsing(self):
+        output = {"proposals": [{"changes": [{"targetSceneId": "anchor", "field": "additionalScenes",
+                                             "proposedValue": [{"title": "More detail", "extractedText": ["Learner content."]}]}],
+                                 "rationale": "Expand the source scene.", "referenceCitations": []}],
+                  "resourceConflicts": []}
+        process = Mock(returncode=0)
+        process.communicate.return_value = (json.dumps({"ok": True, "result": output}).encode(), b"")
+        request = {"goal": "Expand the selected scene", "scenes": [{"id": "anchor", "title": "Original"}]}
+        with patch.object(talk.subprocess, "Popen", return_value=process):
+            self.assertEqual(talk.local_mcp(enhancement_request=request), output)
+        payload = json.loads(process.communicate.call_args.args[0])
+        self.assertEqual(payload["action"], "storyboard-enhancement")
+        self.assertEqual(payload["request"], request)
+
+    def test_tool_run_daily_allowance_is_checked_before_bridge_launch(self):
+        request = {"goal": "Develop the course", "useTools": True, "allowWebResearch": False}
+        with patch.object(talk, "_run_local_mcp") as bridge, self.assertRaisesRegex(RuntimeError, "daily AI request limit"):
+            talk.local_mcp(enhancement_request=request)
+        bridge.assert_not_called()
+        self.assertFalse((self.root / "identity/ai-usage.json").exists())
+
+    def test_experience_request_routes_schema_and_rejects_non_treatment_output(self):
+        from backend.tests.test_experience_treatments import TREATMENT
+        process = Mock(returncode=0)
+        process.communicate.return_value = (json.dumps({"ok": True, "result": TREATMENT}).encode(), b"")
+        request = {"scene": {"title": "Fair competition"}, "direction": "Show performance and results"}
+        with patch.object(talk.subprocess, "Popen", return_value=process):
+            self.assertEqual(talk.local_mcp(experience_request=request), TREATMENT)
+        payload = json.loads(process.communicate.call_args.args[0])
+        self.assertEqual(payload["action"], "experience-treatment")
+        self.assertEqual(payload["request"]["direction"], request["direction"])
+        self.assertEqual(payload["request"]["outputSchema"]["additionalProperties"], False)
+        self.assertIn("experience", payload["request"]["outputSchema"]["properties"])
+        process.communicate.return_value = (json.dumps({"ok": True, "result": ADVICE}).encode(), b"")
+        with patch.object(talk.subprocess, "Popen", return_value=process), self.assertRaises(talk.TalkError):
+            talk._run_local_mcp(self.root, {"action": "experience-treatment"})
 
     def test_existing_plugin_takes_precedence_over_saved_connection(self):
         config = self.root / "plugins/pythia/mcp.json"
@@ -113,7 +164,9 @@ class PythiaTalkTests(unittest.TestCase):
             first = self.finished()
             self.assertEqual(first["turns"][0]["result"], ADVICE)
             question, history = provider.call_args.args
-            self.assertEqual(question, "Should we start with training?")
+            self.assertTrue(question.endswith("Should we start with training?"))
+            self.assertIn("Current stage: consultation", question)
+            self.assertIn("not a fixed intake questionnaire", question)
             self.assertEqual(history, [])
             self.assertNotIn("Private", question)
             self.assertEqual(self.send("Correction: they already know the process.", "request-second").status_code, 202)
@@ -183,9 +236,12 @@ class PythiaTalkTests(unittest.TestCase):
         with patch.object(talk, "local_mcp") as provider:
             response = self.client.post(self.url, json={"message": "Question", "requestId": "request-first", "sessionId": "session"})
             self.assertEqual(response.status_code, 403)
+            decision = {"sessionId": "session", "stage": "consulting"}
+            self.assertEqual(self.client.post(self.url + "/planning", json=decision).status_code, 403)
             selected = main.installation_policy(main.LocalIdentityDirectory(self.root))
             with patch.object(main, "installation_policy", return_value=selected.model_copy(update={"deploymentMode": "team"})):
                 self.assertEqual(self.client.get(self.url).status_code, 403)
+                self.assertEqual(self.client.post(self.url + "/planning", json=decision, headers=self.headers).status_code, 403)
             provider.assert_not_called()
 
     def test_restart_marks_uncertain_turn_interrupted_and_reset_clears_private_history(self):
@@ -216,6 +272,62 @@ class PythiaTalkTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["turns"][0]["outlineItemCount"], 2)
         self.assertNotIn("private selected source", response.text)
+        self.assertEqual(response.json()["planning"]["stage"], "consulting")
+
+    def test_author_agrees_brief_without_model_call_and_can_return_to_consultation(self):
+        with patch.object(talk, "local_mcp", return_value=copy.deepcopy(ADVICE)):
+            self.send()
+            state = self.finished()
+        before = storage.read_project(self.project.id).storyboard.model_dump()
+        decision = {"sessionId": state["sessionId"], "stage": "designing",
+            "brief": "New operators need to check labels. Use a worked example. Duration is undecided.", "turnId": "request-first"}
+        with patch.object(talk, "local_mcp") as provider:
+            response = self.client.post(self.url + "/planning", json=decision, headers=self.headers)
+            self.assertEqual(response.status_code, 200, response.text)
+            provider.assert_not_called()
+        self.assertEqual(self.client.get(self.url).json()["planning"], {key: value for key, value in decision.items() if key != "sessionId"})
+        other = LOCAL_ACTOR.model_copy(update={"actorId": "another-local-actor"})
+        self.assertEqual(talk.get_conversation(self.project.id, other)["planning"], {"stage": "consulting", "brief": "", "turnId": None})
+        with patch.object(talk, "local_mcp", return_value=copy.deepcopy(ADVICE)) as provider:
+            self.send("Explore pacing and scene boundaries.", "request-design")
+            state = self.finished()
+            self.assertIn("opened scene-design exploration", provider.call_args.args[0])
+            self.assertIn(decision["brief"], provider.call_args.args[0])
+            self.assertEqual(state["turns"][-1]["planningStage"], "designing")
+        response = self.client.post(self.url + "/planning", json={**decision, "stage": "consulting"}, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        with patch.object(talk, "local_mcp", return_value=copy.deepcopy(ADVICE)) as provider:
+            self.send("Reconsider the audience.", "request-reconsider")
+            self.finished()
+            self.assertIn("Current stage: consultation", provider.call_args.args[0])
+            self.assertIn(decision["brief"], provider.call_args.args[0])
+        self.assertEqual(storage.read_project(self.project.id).storyboard.model_dump(), before)
+        self.assertEqual(self.client.post(self.url + "/reset", headers=self.headers).json()["planning"]["stage"], "consulting")
+
+    def test_brief_requires_explicit_nonempty_author_decision_and_completed_exchange(self):
+        state = self.client.get(self.url).json()
+        body = {"sessionId": state["sessionId"], "stage": "designing", "brief": "A proposed brief.", "turnId": "foreign-turn"}
+        with patch.object(talk, "local_mcp") as provider:
+            for change, expected in (({"sessionId": "foreign-session"}, 409), ({"brief": " "}, 422), ({}, 409)):
+                response = self.client.post(self.url + "/planning", json={**body, **change}, headers=self.headers)
+                self.assertEqual(response.status_code, expected, response.text)
+            provider.assert_not_called()
+        self.assertEqual(self.client.get(self.url).json()["planning"]["stage"], "consulting")
+
+    def test_consultation_stage_cannot_change_while_a_turn_is_running(self):
+        started, release = Event(), Event()
+        def producer(*_):
+            started.set()
+            release.wait(3)
+            return copy.deepcopy(ADVICE)
+        with patch.object(talk, "local_mcp", side_effect=producer):
+            self.send()
+            self.assertTrue(started.wait(2))
+            state = self.client.get(self.url).json()
+            response = self.client.post(self.url + "/planning", json={"sessionId": state["sessionId"], "stage": "consulting"}, headers=self.headers)
+            self.assertEqual(response.status_code, 409)
+            release.set()
+            self.finished()
 
     def test_multiple_book_sources_and_followup_retain_all_unique_text(self):
         from backend.app.references import extract_reference_passages
