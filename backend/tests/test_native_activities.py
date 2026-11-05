@@ -240,13 +240,19 @@ class NativeActivityTests(unittest.TestCase):
         image = storage.update_project_asset_attribution(project.id, asset.id,
             AssetAttributionUpdate(attributionText="Synthetic image credit", attributionStatus="complete"),
             image.storyboard.revision)
-        scene = image.storyboard.scenes[0]
+        walkthrough_project = storage.add_project_asset(project.id, "walkthrough-screen.png",
+            b"\x89PNG\r\n\x1a\nsynthetic screenshot", "image", image.storyboard.revision)
+        screenshot = next(item for item in walkthrough_project.storyboard.assets if item.filename == "walkthrough-screen.png")
+        walkthrough_project = storage.update_project_asset_attribution(project.id, screenshot.id,
+            AssetAttributionUpdate(attributionText="Synthetic walkthrough credit", attributionStatus="complete"),
+            walkthrough_project.storyboard.revision)
+        scene = walkthrough_project.storyboard.scenes[0]
         url = f"/api/projects/{project.id}/scenes/{scene.id}"
-        headers = {"Origin": "http://127.0.0.1:5173", "If-Match": f'"{image.storyboard.revision}"'}
+        headers = {"Origin": "http://127.0.0.1:5173", "If-Match": f'"{walkthrough_project.storyboard.revision}"'}
         data = experience()
         data["activities"][1]["imageAssetId"] = asset.id
-        data["activities"][4]["steps"][0]["screenshotAssetId"] = asset.id
-        data["activities"][4]["steps"][1]["screenshotAssetId"] = asset.id
+        data["activities"][4]["steps"][0]["screenshotAssetId"] = screenshot.id
+        data["activities"][4]["steps"][1]["screenshotAssetId"] = screenshot.id
 
         invalid = copy.deepcopy(data)
         invalid["activities"][1]["imageAssetId"] = "missing-image"
@@ -255,7 +261,7 @@ class NativeActivityTests(unittest.TestCase):
         invalid["activities"][4]["steps"][0]["screenshotAssetId"] = "missing-image"
         self.assertEqual(client.patch(url, json={"experience": invalid}, headers=headers).status_code, 422)
         audio_project = storage.add_project_asset(project.id, "sound.wav", b"audio", "audio",
-            image.storyboard.revision)
+            walkthrough_project.storyboard.revision)
         headers["If-Match"] = f'"{audio_project.storyboard.revision}"'
         invalid = copy.deepcopy(data)
         invalid["activities"][4]["steps"][0]["screenshotAssetId"] = next(
@@ -274,25 +280,33 @@ class NativeActivityTests(unittest.TestCase):
         self.assertEqual(loaded.storyboard.scenes[0].experience.activities[1].imageAssetId, asset.id)
         from backend.app.media import asset_usage, delete_asset
         self.assertEqual(asset_usage(loaded, asset.id)["scenes"][0]["id"], scene.id)
+        self.assertEqual(asset_usage(loaded, screenshot.id)["scenes"][0]["id"], scene.id)
         with self.assertRaisesRegex(ValueError, "Remove this media"):
             delete_asset(project.id, asset.id, loaded.storyboard.revision)
+        with self.assertRaisesRegex(ValueError, "Remove this media"):
+            delete_asset(project.id, screenshot.id, loaded.storyboard.revision)
 
         for builder in (build_scorm_12, build_scorm_2004, build_standalone_course):
             with self.subTest(builder=builder.__name__):
                 content, _ = builder(loaded)
                 with ZipFile(io.BytesIO(content)) as archive:
                     self.assertIn(asset.path, archive.namelist())
+                    self.assertIn(screenshot.path, archive.namelist())
                     published = json.loads(archive.read("storyboard.json"))
                     self.assertEqual(published["scenes"][0]["experience"]["activities"][1]["imageAssetId"], asset.id)
-                    self.assertEqual(published["scenes"][0]["experience"]["activities"][4]["steps"][0]["screenshotAssetId"], asset.id)
+                    self.assertEqual(published["scenes"][0]["experience"]["activities"][4]["steps"][0]["screenshotAssetId"], screenshot.id)
                     script = archive.read("player.js").decode()
                     self.assertIn("globalThis.__CHIMERA_ASSETS", script)
 
         backup = build_project_archive(project.id)
         current = storage.update_scene(project.id, scene.id, SceneUpdate(experience=None), loaded.storyboard.revision)
         delete_asset(project.id, asset.id, current.storyboard.revision)
+        current = storage.read_project(project.id)
+        delete_asset(project.id, screenshot.id, current.storyboard.revision)
         restore_project_archive(project.id, backup)
         restored = storage.read_project(project.id)
         restored_scene = restored.storyboard.scenes[0]
         self.assertEqual(restored_scene.experience.activities[1].imageAssetId, asset.id)
+        self.assertEqual(restored_scene.experience.activities[4].steps[0].screenshotAssetId, screenshot.id)
         self.assertTrue((root / "projects" / project.id / asset.path).is_file())
+        self.assertTrue((root / "projects" / project.id / screenshot.path).is_file())

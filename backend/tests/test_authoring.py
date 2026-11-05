@@ -1,3 +1,4 @@
+import copy
 import io
 import tempfile
 import unittest
@@ -10,9 +11,10 @@ from pptx.util import Inches
 
 from backend.app import main, storage
 from backend.app.media import resolved_project
-from backend.app.models import ProjectCreate, Scene, SceneCreate, SceneElement, SceneLayout, SceneUpdate
+from backend.app.models import AssetAttributionUpdate, ProjectCreate, Scene, SceneCreate, SceneElement, SceneLayout, SceneUpdate
 from backend.app.scene_print import render_scene_images
 from backend.app.word_export import build_storyboard_docx
+from backend.tests.test_experience_treatments import EXPERIENCE
 
 
 class AuthoringTests(unittest.TestCase):
@@ -100,6 +102,41 @@ class AuthoringTests(unittest.TestCase):
             expected = Image.open(io.BytesIO(next(iter(images.values())))).convert("RGB")
             self.assertEqual(actual.size, expected.size)
             self.assertEqual(actual.tobytes(), expected.tobytes())
+
+    def test_document_snapshot_includes_walkthrough_screenshots(self):
+        from PIL import Image
+
+        self.project = storage.create_scene(self.project.id, SceneCreate(title="Software walkthrough"))
+        scene = self.project.storyboard.scenes[0]
+        source = io.BytesIO()
+        screenshot_color = (23, 190, 87)
+        Image.new("RGB", (120, 80), screenshot_color).save(source, format="PNG")
+        self.project = storage.add_project_asset(self.project.id, "walkthrough.png", source.getvalue(), "image",
+            self.project.storyboard.revision)
+        asset = next(item for item in self.project.storyboard.assets if item.filename == "walkthrough.png")
+        self.project = storage.update_project_asset_attribution(self.project.id, asset.id,
+            AssetAttributionUpdate(attributionText="Synthetic walkthrough screenshot", attributionStatus="complete"),
+            self.project.storyboard.revision)
+        data = copy.deepcopy(EXPERIENCE)
+        data.update(flow=[], reveals=[], activities=[{
+            "kind": "software-walkthrough", "id": "walkthrough", "title": "Update account settings", "steps": [
+                {"id": "open", "label": "Open settings", "screenshotAssetId": asset.id,
+                 "screenshotAltText": "Account settings screen.", "description": "Settings are open.",
+                 "actionPrompt": "Open the account settings."},
+                {"id": "save", "label": "Save settings", "screenshotAssetId": asset.id,
+                 "screenshotAltText": "Settings form with Save button.", "description": "The form is ready.",
+                 "actionPrompt": "Save the updated settings."},
+            ],
+        }])
+        self.project = storage.update_scene(self.project.id, scene.id, SceneUpdate(experience=data),
+            self.project.storyboard.revision)
+
+        document = build_storyboard_docx(self.project)
+        with ZipFile(io.BytesIO(document)) as archive:
+            embedded = [archive.read(name) for name in archive.namelist() if name.startswith("word/media/")]
+        self.assertTrue(embedded)
+        rendered = Image.open(io.BytesIO(embedded[0])).convert("RGB")
+        self.assertGreater(rendered.tobytes().count(bytes(screenshot_color)), 100)
 
     def test_preparation_requires_revision_and_uses_scene_authorization(self):
         from fastapi import HTTPException
