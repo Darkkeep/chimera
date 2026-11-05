@@ -488,6 +488,54 @@ Scheduling an already attached asset replaces its independent player in that sce
 
 Learner preview and SCORM retain the shared scene position and earned media coverage. Standalone progress still lasts only while the page is open. Buffering or browser playback restrictions can pause the clock and show a retry message. Captions follow source time, transcripts remain available, and reduced motion suppresses movement while keeping timed visibility. Always verify the exported course and its completion rules before publishing.
 
+### Add optional video reflections
+
+1. In **Edit scene > Timeline and layers**, schedule a video clip and place the
+   playhead inside it (not at its end).
+2. Under **Video reflections**, choose **Add video pause at playhead**.
+   Author a non-empty prompt, two to four response labels, and feedback for
+   every response. Limits: eight pauses per scene, distinct scene times,
+   1,000 characters per prompt/feedback and 200 per response label.
+3. Use the pause's time field to reposition it, **Add response** to extend the
+   choices, or **Remove video pause** to delete it. Move/remove affected pauses
+   before moving, trimming or deleting the video that contains them.
+4. Choose **Preview reflection**, then **Save scene**. Draft Undo/Redo and the
+   normal revision-conflict guard apply. Verify in course preview and exports.
+
+These are optional, formative questions/decisions, not secure assessment
+questions. No response is marked correct or scored. They do not change course
+completion, pass/fail, required-media coverage or assessment attempts.
+There are no response-driven seeks or branching video paths.
+
+Playback stops on the exact scene-clock millisecond and focuses the reflection
+heading. Learners can try any response repeatedly, read its feedback, and choose
+**Continue video**, or **Skip reflection and continue** without answering.
+Both continue from the same clock position only after learner action. The video
+does not continue merely because a response was selected. All controls work
+with the keyboard; feedback is announced as status text.
+
+Seeking past a pause skips it without media credit. Seeking backward allows the
+pause to be offered again during playback. Seeking exactly to a pause while
+paused offers it on Play; while playing it stops there immediately. **Restart**
+returns to zero without starting playback. **Video reflections: text alternative
+and replay** exposes every prompt, response and feedback without timed playback,
+plus explicit replay buttons.
+
+Course preview and SCORM 1.2/2004 save only the existing validated scene clock
+and media coverage, not responses, attempts, or a pause-completion flag.
+Continue restores the saved millisecond, paused. If it is a reflection
+timestamp, Play offers the reflection again with no saved answer. Invalid or
+changed-duration clocks are discarded. SCORM **Start over** clears progress;
+standalone progress lasts only while that page remains open. Suspend-data
+limits and overflow warnings remain unchanged.
+
+Word storyboard and SME documents include all prompts and response feedback
+alongside the timeline's written timing information; the visual is still the
+authored Word snapshot time. Printing expands the text alternative to expose
+all responses and feedback. Existing cue markers still only seek/snap and do
+not become interactions. The bundled PDF has not been refreshed for this
+addition; this Markdown procedure is current.
+
 ### Compare with the original slide
 
 1. On Stage, choose **Compare with original** when the scene has a retained PowerPoint rendering.

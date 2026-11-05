@@ -3,7 +3,7 @@ import type { PointerEvent } from "react";
 import type { Project } from "./App";
 import type { SceneLayout, SceneElement } from "./SceneSurface";
 import { animationEndMs, withSceneTimeline } from "./scene-timeline";
-import type { TimelineClip } from "./scene-timeline";
+import type { TimelineClip, VideoPause } from "./scene-timeline";
 import { defaultAnimations, alignExitTiming } from "./AnimationControls";
 import "./scene-timeline.css";
 import { decodeWaveform } from "./waveform";
@@ -131,6 +131,12 @@ export function SceneTimeline({
   const clip = timeline?.clips.find((c) => c.id === clipId);
   const selected = layout.elements.find((e) => e.id === selection);
   function save(next: NonNullable<SceneLayout["timeline"]>) {
+    const pauses = next.pauses || [];
+    if (new Set(pauses.map(point => point.timeMs)).size !== pauses.length ||
+      pauses.some(point => !next.clips.some(c => c.kind === "video" && c.startMs <= point.timeMs && point.timeMs < c.startMs + c.sourceOutMs - c.sourceInMs))) {
+      setMessage("Video pauses need distinct times inside scheduled video clips. Move or remove affected pauses before changing a clip.");
+      return;
+    }
     const endpoint = Math.max(
       100,
       ...next.clips.map((c) => c.startMs + c.sourceOutMs - c.sourceInMs),
@@ -148,6 +154,9 @@ export function SceneTimeline({
     }
     setMessage("");
     commit({ ...layout, timeline: next });
+  }
+  function updatePause(id: string, patch: Partial<VideoPause>) {
+    save({ ...timeline, pauses: (timeline.pauses || []).map(point => point.id === id ? { ...point, ...patch } : point) });
   }
   function updateClip(patch: Partial<TimelineClip>) {
     if (!clip || !timeline) return;
@@ -1045,6 +1054,54 @@ export function SceneTimeline({
             </span>
           ))}
         </div>
+        <section aria-label="Interactive video authoring">
+          <h3>Video reflections</h3>
+          <p>Optional, formative pauses (up to 8). Seeking past a pause skips it; replay allows unlimited retries. No grades or completion gates. Responses are not saved.</p>
+          <button type="button" className="button button-outline"
+            disabled={(timeline.pauses || []).length >= 8}
+            onClick={() => save({ ...timeline, pauses: [...(timeline.pauses || []), {
+              id: crypto.randomUUID(), timeMs: Math.round(time), prompt: "What would you do next?",
+              choices: [
+                { id: crypto.randomUUID(), label: "Consider the first approach", feedback: "Reflect on the consequences of this approach." },
+                { id: crypto.randomUUID(), label: "Consider another approach", feedback: "Compare this approach with the first." },
+              ],
+            }] })}>
+            Add video pause at playhead
+          </button>
+          {(timeline.pauses || []).map((point, index) => (
+            <fieldset key={point.id} aria-label={`Video pause ${index + 1}`}>
+              <legend>Video pause {index + 1}</legend>
+              <Seconds label={`Pause ${index + 1} time`} value={point.timeMs} max={timeline.durationMs}
+                onChange={timeMs => updatePause(point.id, { timeMs })} />
+              <label>Reflection prompt
+                <textarea aria-label={`Pause ${index + 1} prompt`} maxLength={1000} value={point.prompt}
+                  onChange={e => updatePause(point.id, { prompt: e.target.value })} />
+              </label>
+              {point.choices.map((choice, choiceIndex) => (
+                <div key={choice.id}>
+                  <label>Response {choiceIndex + 1}
+                    <input aria-label={`Pause ${index + 1} response ${choiceIndex + 1}`} maxLength={200} value={choice.label}
+                      onChange={e => updatePause(point.id, { choices: point.choices.map(c => c.id === choice.id ? { ...c, label: e.target.value } : c) })} />
+                  </label>
+                  <label>Feedback {choiceIndex + 1}
+                    <textarea aria-label={`Pause ${index + 1} feedback ${choiceIndex + 1}`} maxLength={1000} value={choice.feedback}
+                      onChange={e => updatePause(point.id, { choices: point.choices.map(c => c.id === choice.id ? { ...c, feedback: e.target.value } : c) })} />
+                  </label>
+                  <button type="button" disabled={point.choices.length <= 2}
+                    onClick={() => updatePause(point.id, { choices: point.choices.filter(c => c.id !== choice.id) })}>
+                    Remove response {choiceIndex + 1}
+                  </button>
+                </div>
+              ))}
+              <button type="button" disabled={point.choices.length >= 4}
+                onClick={() => updatePause(point.id, { choices: [...point.choices, { id: crypto.randomUUID(), label: "Another approach", feedback: "Consider this alternative." }] })}>
+                Add response
+              </button>
+              <button type="button" onClick={() => { setTime(point.timeMs); setPreview(true); setPlaying(true); }}>Preview reflection</button>
+              <button type="button" onClick={() => save({ ...timeline, pauses: (timeline.pauses || []).filter(p => p.id !== point.id) })}>Remove video pause {index + 1}</button>
+            </fieldset>
+          ))}
+        </section>
         <p className="field-hint">
           Drag blocks to move them; use the time fields to resize precisely.
           Source media is preserved. Required clips earn credit only from

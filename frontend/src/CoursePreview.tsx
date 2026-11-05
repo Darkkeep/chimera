@@ -1,4 +1,4 @@
-import { clipProgressKey } from "../../backend/app/static/timeline-policy.js";
+import { clipProgressKey, normalizeTimelineClock } from "../../backend/app/static/timeline-policy.js";
 import { reportOnboardingOutcome } from "./onboarding-journeys";
 import { BrandMark } from "./BrandMark";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -106,6 +106,11 @@ function readResumeState(projectId: string, scenes: Scene[]): ResumeState {
     for(const scene of scenes){if(scene.visualLayout?.timeline)requiredVideoKeys.add(`clock:${scene.id}`);for(const clip of scene.visualLayout?.timeline?.clips||[])requiredVideoKeys.add(clipProgressKey(scene.id,clip));}
     const videoProgress = Object.fromEntries(Object.entries(parsed.videoProgress ?? {}).flatMap(([key, value]) => {
       if (!requiredVideoKeys.has(key) || !value || typeof value !== "object") return [];
+      const clock = scenes.find(scene => key === `clock:${scene.id}`)?.visualLayout?.timeline;
+      if (clock) {
+        const progress = normalizeTimelineClock(clock, value);
+        return progress ? [[key, progress]] : [];
+      }
       const progress = value as Partial<VideoProgress>;
       const duration = progress.duration;
       if (typeof progress.position !== "number" || !Number.isFinite(progress.position) || typeof duration !== "number" || !Number.isFinite(duration) || duration <= 0 || !Array.isArray(progress.watchedRanges)) return [];

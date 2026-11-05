@@ -1,5 +1,22 @@
 # Chimera backend
 
+## Optional video reflections
+
+`SceneLayout.timeline` version 1 accepts up to eight `pauses` (default empty).
+Each has a unique `id` and integer `timeMs` inside a scheduled video interval
+(start inclusive, end exclusive), a `prompt`, and two to four uniquely identified
+choices with `label` and `feedback`. Pause timestamps must be distinct. Prompts
+and feedback are limited to 1,000 characters; labels to 200. Extra fields,
+including grading and required flags, are rejected.
+
+The shared transport keeps reflections formative and skippable. Forward seeks
+skip them; backward playback and explicit replay permit unlimited retries.
+Only the existing validated scene clock and media coverage persist. Responses
+are ephemeral, with no additional suspend-data budget. Continue at a pause
+offers it again on Play. Word and print alternatives expose all feedback.
+Use the existing revision-guarded scene API; no new endpoint is needed. See
+the [authoring procedure](../docs/user-guide.md#add-optional-video-reflections).
+
 ## Imported HTML5 activities
 
 `POST /api/projects/{project_id}/html5-import` requires `project.import`,

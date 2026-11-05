@@ -78,6 +78,10 @@ for (const [width, height] of [[1280, 720], [720, 720], [720, 1280]]) {
     }
     await editor.getByRole("button", { name: "Preview at playhead", exact: true }).click();
     await expectFittedVideo(editor.locator(".visual-stage video"), width, height);
+    await editor.getByRole("button", { name: "Add video pause at playhead", exact: true }).click();
+    await editor.getByRole("textbox", { name: "Pause 1 prompt", exact: true }).fill("What should you inspect?");
+    await editor.getByRole("button", { name: "Preview reflection", exact: true }).click();
+    await expect(editor.getByRole("region", { name: "Video reflection", exact: true })).toBeVisible();
     await editor.getByRole("button", { name: "Save scene", exact: true }).click();
     await expect(editor).toHaveCount(0);
     const saved = await (await request.get(`/api/projects/${p.id}`)).json();
@@ -87,12 +91,17 @@ for (const [width, height] of [[1280, 720], [720, 720], [720, 1280]]) {
     await page.getByRole("button", { name: "Resume authoring", exact: true }).click();
     await page.getByRole("button", { name: "Edit scene", exact: true }).click();
     const reopened = page.getByRole("dialog").last();
+    await expect(reopened.getByRole("textbox", { name: "Pause 1 prompt", exact: true })).toHaveValue("What should you inspect?");
     await reopened.locator(".timeline-label").filter({ hasText: asset.filename }).click();
     await expect(reopened.getByRole("spinbutton", { name: "Video width", exact: true })).toHaveValue(String(width));
     await expect(reopened.getByRole("spinbutton", { name: "Video height", exact: true })).toHaveValue(String(height));
     await reopened.getByRole("button", { name: "Close scene editor", exact: true }).click();
     await page.getByRole("button", { name: "Preview course", exact: true }).click();
     await expectFittedVideo(page.getByRole("dialog").last().locator(".visual-stage video"), width, height);
+    await page.getByRole("dialog").last().getByRole("button", { name: "Play scene", exact: true }).click();
+    const reflection = page.getByRole("region", { name: "Video reflection", exact: true });
+    await expect(reflection).toContainText("What should you inspect?");
+    await expect(reflection.getByRole("heading")).toBeFocused();
   });
 }
 
@@ -372,6 +381,7 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
     page,
     request,
   }, testInfo) => {
+    test.setTimeout(60000);
     let p = await course(request, `Timed ${profile}`);
     const upload = await request.post(`/api/projects/${p.id}/assets`, {
       multipart: {
@@ -435,6 +445,10 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
             ],
             timeline: {
               durationMs: 20000,
+              pauses: [{ id: "reflection", timeMs: 12500, prompt: "Which approach would you consider?", choices: [
+                { id: "inspect", label: "Inspect first", feedback: "Observe the situation before acting." },
+                { id: "proceed", label: "Proceed carefully", feedback: "Consider the consequences." },
+              ] }],
               clips: [
                 {
                   id: "v",
@@ -534,10 +548,13 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
         "LMSFinish",
       ])
         api[name] = () => "true";
-      for (const name of ["GetValue", "LMSGetValue"]) api[name] = () => "";
+      for (const name of ["GetValue", "LMSGetValue"]) api[name] = key => JSON.parse(localStorage.getItem("timeline-lms") || "{}")[key] || "";
       for (const name of ["SetValue", "LMSSetValue"])
         api[name] = (key, value) => {
           window.__writes.push([key, value]);
+          const saved = JSON.parse(localStorage.getItem("timeline-lms") || "{}");
+          saved[key] = value;
+          localStorage.setItem("timeline-lms", JSON.stringify(saved));
           return "true";
         };
       window[profile === "scorm-2004" ? "API_1484_11" : "API"] = api;
@@ -577,6 +594,13 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
     await page
       .getByRole("slider", { name: "Scene playback time" })
       .fill("18000");
+    const alternative = page.locator("details").filter({ hasText: "Video reflections: text alternative and replay" });
+    await expect(alternative).toHaveJSProperty("open", false);
+    await page.evaluate(() => window.dispatchEvent(new Event("beforeprint")));
+    await expect(alternative).toHaveJSProperty("open", true);
+    await expect(alternative).toContainText("Observe the situation before acting.");
+    await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+    await expect(alternative).toHaveJSProperty("open", false);
     await expect(page.locator('[data-scene-element="shape"]')).toHaveCSS(
       "visibility",
       "hidden",
@@ -599,6 +623,36 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
     await expect
       .poll(() => page.locator("video").evaluate((n) => n.played.length))
       .toBeGreaterThan(0);
+    const reflection = page.getByRole("region", { name: "Video reflection", exact: true });
+    await expect(reflection).toBeVisible();
+    await expect(reflection.getByRole("heading")).toBeFocused();
+    await expect(page.getByRole("slider", { name: "Scene playback time" })).toHaveValue("12500");
+    await expect(page.locator(".visual-stage video")).toHaveJSProperty("paused", true);
+    await reflection.getByRole("button", { name: "Inspect first", exact: true }).focus();
+    await page.keyboard.press("Enter");
+    await expect(reflection.getByRole("status")).toHaveText("Observe the situation before acting.");
+    await reflection.getByRole("button", { name: "Proceed carefully", exact: true }).click();
+    await expect(reflection.getByRole("status")).toHaveText("Consider the consequences.");
+    if (profile !== "standalone") {
+      const saved = await page.evaluate(() => JSON.parse(JSON.parse(localStorage.getItem("timeline-lms"))["cmi.suspend_data"]));
+      expect(Object.values(saved.videoProgress).some(value => value.position === 12.5 && value.watchedRanges.length === 0)).toBe(true);
+      expect(JSON.stringify(saved)).not.toContain("Inspect first");
+      await page.reload();
+      await page.getByRole("dialog", { name: "Continue your course?", exact: true }).getByRole("button", { name: "Continue", exact: true }).click();
+      await expect(page.getByRole("slider", { name: "Scene playback time" })).toHaveValue("12500");
+      await page.getByRole("button", { name: "Play scene", exact: true }).click();
+      await expect(reflection).toBeVisible();
+      await expect(reflection.getByRole("status")).toBeEmpty();
+    }
+    await reflection.getByRole("button", { name: /continue/i }).click();
+    await expect(reflection).toBeHidden();
+    // Continue resumes playback, and the main playback control must pause on its first click.
+    await page.getByRole("button", { name: "Pause scene", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Play scene", exact: true })).toBeVisible();
+    await page.getByRole("slider", { name: "Scene playback time" }).fill("12000");
+    await page.getByRole("button", { name: "Play scene", exact: true }).click();
+    await expect(reflection).toBeVisible();
+    await reflection.getByRole("button", { name: "Skip reflection and continue", exact: true }).click();
     if (profile !== "standalone")
       await expect
         .poll(() =>
@@ -612,5 +666,10 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
           ),
         )
         .toBe(true);
+    if (profile !== "standalone") {
+      await page.reload();
+      await page.getByRole("dialog", { name: "Continue your course?", exact: true }).getByRole("button", { name: "Start over", exact: true }).click();
+      await expect(page.getByRole("slider", { name: "Scene playback time" })).toHaveValue("0");
+    }
     expect(errors).toEqual([]);
   });

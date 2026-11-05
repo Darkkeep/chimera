@@ -95,6 +95,13 @@ New media controls support explicit scene/course-wide placement, project copies 
 
 The scene editor now includes native shape insertion, opacity/fill/outline controls, text/shape shadow and bevel/emboss approximations, layer grouping/arrangement, and an optional shared timeline for animations and trimmed audio/video clips. Open **Edit scene > Stage**, then **Appearance** or **Timeline and layers**. See the [timeline procedures](docs/user-guide.md#schedule-scene-objects-audio-and-video) and [implementation plan](docs/scene-timeline-layers-plan.md). Existing scenes retain their playback until a timeline is explicitly enabled.
 
+Scheduled videos also support up to eight optional **Video reflections**:
+question/decision pauses with two to four responses and authored feedback.
+They are skippable, replayable and formative, never grades or completion gates.
+Seeking past a pause skips it; saved progress retains the scene clock, not
+responses. See the [reflection procedure](docs/user-guide.md#add-optional-video-reflections)
+for authoring, resume and text alternatives. This is not branching video.
+
 For local, Encarta, and networked authentication preparation, see the [deployment authentication guide](docs/authentication-deployments.md). Local single-user operation remains the default; hosted profiles use separate workspaces.
 
 ### Backend

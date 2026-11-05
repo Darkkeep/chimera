@@ -510,7 +510,8 @@ PLAYER_JS = EXPERIENCE_RUNTIME + TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANC
       let lastSaved = 0, playRequested = false;
       const controller=createSceneTransport({root:body,stage,layout,resolveAsset:id=>window.__CHIMERA_ASSETS[id],initialTimeMs:(state.videoProgress[`clock:${scene.id}`]?.position||0)*1000,
         progress:Object.fromEntries(timeline.clips.map(c=>[c.id,state.videoProgress[clipProgressKey(scene.id,c)]]).filter(([,v])=>v)),
-        onUpdate:(time,playing)=>{seek.value=String(time);output.textContent=`${formatTime(time)} / ${formatTime(timeline.durationMs)}`;play.textContent=playing?'Pause scene':'Play scene';if(time>=timeline.durationMs)playRequested=false;state.videoProgress[`clock:${scene.id}`]={position:time/1000,duration:timeline.durationMs/1000,watchedRanges:[]};if(!playing||time-lastSaved>5000){lastSaved=time;save();}},
+        onUpdate:(time,playing)=>{seek.value=String(time);output.textContent=`${formatTime(time)} / ${formatTime(timeline.durationMs)}`;play.textContent=playing?'Pause scene':'Play scene';if(playing)playRequested=true;if(time>=timeline.durationMs)playRequested=false;state.videoProgress[`clock:${scene.id}`]={position:time/1000,duration:timeline.durationMs/1000,watchedRanges:[]};if(!playing||time-lastSaved>5000){lastSaved=time;save();}},
+        onInteraction:()=>{playRequested=false;},
         onProgress:(id,value)=>{const clip=timeline.clips.find(c=>c.id===id);if(clip){state.videoProgress[clipProgressKey(scene.id,clip)]=value;finish();}},onError:message=>{if(!message.startsWith('Media is buffering'))playRequested=false;runtimeStatus(message);}});
       sceneTransport=controller;
       // A deterministic snapshot hook is also used by Word scene rendering.
@@ -521,7 +522,7 @@ PLAYER_JS = EXPERIENCE_RUNTIME + TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANC
       mute.onclick=()=>{const muted=mute.getAttribute('aria-pressed')!=='true';controller.setAudition({muted:muted?timeline.clips.map(clip=>clip.id):[],solo:null});mute.setAttribute('aria-pressed',String(muted));mute.textContent=muted?'Unmute audio':'Mute audio';};
       seek.oninput=()=>controller.seek(Number(seek.value));
       for(const {node,asset,clip} of controller.media){
-        node.addEventListener('waiting',()=>{if(playRequested){play.textContent='Cancel playback';runtimeStatus('Buffering media. Playback will resume when it is ready.');}});
+        node.addEventListener('waiting',()=>{if(playRequested && !controller.playing){play.textContent='Cancel playback';runtimeStatus('Buffering media. Playback will resume when it is ready.');}});
         node.addEventListener('canplay',()=>{if(playRequested && !controller.playing && !document.hidden){controller.play();if(document.querySelector('#runtime-status').textContent.startsWith('Buffering media.'))runtimeStatus(api?'Connected to LMS tracking.':'Media ready.');}});
         if(asset?.captionsVtt)installCaptionTrack(node,asset.captionsVtt,asset.language||'en');
         if(asset?.transcript){const details=document.createElement('details'),summary=document.createElement('summary'),text=document.createElement('p');summary.textContent=`Transcript: ${clip.name||asset.filename}`;text.textContent=asset.transcript;details.append(summary,text);body.appendChild(details);}
@@ -561,7 +562,8 @@ PLAYER_JS = EXPERIENCE_RUNTIME + TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANC
     const requiredVideoKeys = new Set(requiredVideos().map(item => item.key));
     for(const scene of state.scenes){if(scene.visualLayout?.timeline)requiredVideoKeys.add(`clock:${scene.id}`);for(const clip of scene.visualLayout?.timeline?.clips||[])requiredVideoKeys.add(clipProgressKey(scene.id,clip));}
     state.videoProgress = Object.fromEntries(Object.entries(state.videoProgress).flatMap(([key, value]) => {
-        const progress = requiredVideoKeys.has(key) ? normalizeVideoProgress(value) : null;
+        const clock = state.scenes.find(scene => key === `clock:${scene.id}`)?.visualLayout?.timeline;
+        const progress = clock ? normalizeTimelineClock(clock, value) : requiredVideoKeys.has(key) ? normalizeVideoProgress(value) : null;
         return progress ? [[key, progress]] : [];
     }));
     if (!Number.isInteger(state.current) || state.current < 0 || state.current >= state.scenes.length) state.current = 0;

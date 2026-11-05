@@ -145,6 +145,27 @@ class TimelineCue(BaseModel):
     timeMs: int = Field(ge=0, le=3600000)
 
 
+class VideoPauseChoice(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    id: str = Field(min_length=1, max_length=120)
+    label: str = Field(min_length=1, max_length=200)
+    feedback: str = Field(min_length=1, max_length=1000)
+
+
+class VideoPause(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    id: str = Field(min_length=1, max_length=120)
+    timeMs: int = Field(ge=0, le=3600000)
+    prompt: str = Field(min_length=1, max_length=1000)
+    choices: list[VideoPauseChoice] = Field(min_length=2, max_length=4)
+
+    @model_validator(mode="after")
+    def unique_choices(self):
+        if len({choice.id for choice in self.choices}) != len(self.choices):
+            raise ValueError("Video pause choice identifiers must be unique")
+        return self
+
+
 class SceneTimeline(BaseModel):
     model_config = ConfigDict(extra="forbid")
     version: Literal[1] = 1
@@ -152,11 +173,17 @@ class SceneTimeline(BaseModel):
     printTimeMs: int = Field(default=0, ge=0, le=3600000)
     clips: list[TimelineClip] = Field(default_factory=list, max_length=200)
     cues: list[TimelineCue] = Field(default_factory=list, max_length=200)
+    pauses: list[VideoPause] = Field(default_factory=list, max_length=8)
 
     @model_validator(mode="after")
     def validate_clips(self):
         if len({clip.id for clip in self.clips}) != len(self.clips):
             raise ValueError("Timeline clip identifiers must be unique")
+        if len({pause.id for pause in self.pauses}) != len(self.pauses) or len({pause.timeMs for pause in self.pauses}) != len(self.pauses):
+            raise ValueError("Video pauses must have unique identifiers and times")
+        if any(not any(clip.kind == "video" and clip.startMs <= pause.timeMs < clip.startMs + clip.sourceOutMs - clip.sourceInMs
+                       for clip in self.clips) for pause in self.pauses):
+            raise ValueError("Every video pause must be inside a scheduled video clip")
         if self.printTimeMs > self.durationMs:
             raise ValueError("Print time must fit within the scene")
         if any(cue.timeMs > self.durationMs for cue in self.cues):

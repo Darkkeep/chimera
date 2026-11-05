@@ -20,7 +20,7 @@ Implemented on 2026-10-28 against `main` following the [plan](scene-timeline-lay
 
 ## Data and playback
 
-`SceneLayout.timeline` has version 1, explicit duration, print timestamp, clips, and cues. Elements add optional native geometry, appearance, visibility timing, naming/grouping, aspect locking, and publishing visibility. Existing `SceneLayout.version` remains 1 because the new fields are optional and old representations remain readable. Older application builds must not save newly authored timeline/effect content, because they do not understand these fields.
+`SceneLayout.timeline` has version 1, explicit duration, print timestamp, clips, cues, and optional `pauses` (default empty). Elements add optional native geometry, appearance, visibility timing, naming/grouping, aspect locking, and publishing visibility. Existing `SceneLayout.version` remains 1 because the new fields are optional and old representations remain readable. Older application builds must not save newly authored timeline/effect content, because they do not understand these fields.
 
 The shared JavaScript transport controls media and paused native animations, including seeking before media readiness settles. Source timestamps and scene timestamps are separate. Media errors or buffering pause playback; background tabs pause the clock. Audible playback requires an explicit learner action. Reaching the end retains learner-controlled navigation.
 
@@ -29,6 +29,36 @@ Native `played` ranges determine consumption, intersected with each trimmed inte
 Preview and SCORM retain a shared scene clock and clip coverage within the existing progress structure. Budget estimates include clocks and clips; actual serialized suspend-data size remains checked before saving. Standalone progress remains session-only. Older per-asset progress stays available for unscheduled attachments; scheduling a clip does not turn prior full-asset completion into trimmed-clip completion.
 
 Scheduled assets are included in package resolution, asset usage/deletion checks, validation, and ordinary storyboard persistence/backups. Their independent player is suppressed in scenes where they are scheduled. Unscheduled attachments retain their previous behavior. Templates that replace a composition intentionally replace its timeline as part of that draft, and Undo restores the previous composition.
+
+## Optional interactive-video pauses (November 5, 2026)
+
+The shared transport supports at most eight distinct question/decision pauses
+inside scheduled video intervals (start inclusive, end exclusive). Each pause
+has an ID, scene-clock `timeMs`, prompt and two to four uniquely identified
+responses with feedback. Strict schemas reject grading/gating/route properties;
+there is no branching-video editor. Prompts/feedback are bounded to 1,000
+characters and response labels to 200. No new asset type or endpoint is needed.
+
+Policy: formative, skippable, unlimited retries. Crossing a timestamp in playback
+stops at that exact millisecond. Responses only reveal feedback; explicit
+Continue/Skip resumes at that position. Seeking across a timestamp skips it,
+backward seeking replays it, and an exact seek offers it on Play (immediately
+when already playing). Restart seeks zero without autoplay. A focused heading,
+native keyboard controls, status feedback and an always-available text/replay
+alternative serve the same content without timing.
+
+Only the existing scene clock and watched ranges persist. No learner response
+or handled-pause list is stored or included in suspend-budget estimates.
+Restored clocks require the current timeline duration, finite in-range position
+and empty watched ranges. Continue at a pause timestamp reoffers the question
+on Play; answers are intentionally ephemeral. SCORM Start over clears clocks
+and coverage. No completion, assessment attempt, grade or pass/fail policy
+changes. Legacy timelines/cues remain non-interactive.
+
+Stage, course preview, local-file standalone and both SCORM dialects share this
+implementation. Written Word/SME timeline alternatives contain every prompt,
+response and feedback; screenshots retain the authored print time. See the
+[user procedure](user-guide.md#add-optional-video-reflections).
 
 ## Outputs and accessibility
 

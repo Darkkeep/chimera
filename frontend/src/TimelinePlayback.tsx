@@ -87,6 +87,7 @@ export function TimelinePlayback({
           );
       },
       onError: setError,
+      onInteraction: () => callbacks.current.onPlaying?.(false),
     });
     for (const { node, asset } of controller.media)
       if (asset)
