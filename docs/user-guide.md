@@ -194,6 +194,48 @@ screenshot-based, not an interactive copy or automated test of a third-party
 application. The text/print alternative includes every screenshot, alternative
 text, description, prompt, and image credit.
 
+### Hosted external-experience launch link
+
+In **Design experience**, start or edit an experience and choose **Add external
+launch link**. Enter the **External HTTPS URL**, activity instruction,
+**Destination privacy notice** and **Offline learning alternative**. The
+alternative must provide useful local learning material when internet access,
+sign-in or the service is unavailable. Explain the destination's data collection,
+accessibility, sign-in requirements and any charges in the authored notice.
+Use a stable public URL without learner identifiers or secrets.
+
+This bounded link supports lowercase ASCII HTTPS hostnames and plain paths
+containing letters, numbers, `/`, `_`, `~`, `.` and `-`. Credentials, ports,
+queries, fragments, percent encoding, IP addresses and local hostnames are
+rejected. Chimera does not visit or verify links or their redirects. Review the
+destination and its privacy/accessibility terms for your audience yourself,
+then check **I reviewed this destination, its privacy/accessibility terms and
+the offline alternative for this audience**. Editing the URL, instruction,
+notice or alternative clears that review. Pythia proposals also start
+unreviewed. Inspect the executable preview, acknowledge the overall review and
+save/apply through the normal revision-protected workflow.
+
+Learners see the full destination, network/privacy explanation and local text.
+They check consent to enable **Open external experience** and open a new tab
+with the keyboard or pointer. The service receives their IP/browser information
+and may use cookies, require sign-in, redirect or collect their input. Chimera
+does not append learner identity or send course answers/results and suppresses
+the referrer. Learners should avoid sensitive information and return to the
+course tab afterward. A browser or LMS may block the tab or service; use the
+offline alternative. No remote page is embedded or included in the package.
+
+Consent lasts only for the currently mounted activity. **Reset external
+consent** removes the link and returns focus to the unchecked consent control.
+Reopening preview, reloading standalone, SCORM Continue and Start over require
+fresh consent. No launch history, consent, external completion or scores are
+saved; no grades, pass/fail rules or completion gates change. Opening cannot
+verify participation, availability or learning. The static alternative includes
+the destination, privacy information and authored local material; printing and
+Word/SME snapshots expand it. Standalone and SCORM retain this local material
+offline, while the external service still needs internet access. This is separate
+from imported offline HTML5, whose sandbox remains unchanged and does not
+guarantee network-egress protection. The bundled PDF has not been regenerated.
+
 ### Before/after image comparison
 
 In **Design experience**, start or edit a native experience and choose **Add

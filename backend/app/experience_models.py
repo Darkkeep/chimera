@@ -1,4 +1,5 @@
 """Portable native learning experiences and author-reviewed design proposals."""
+import re
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_serializer, model_validator
@@ -266,8 +267,34 @@ class BeforeAfterActivity(StrictModel):
         return self
 
 
+class ExternalLinkActivity(StrictModel):
+    kind: Literal["external-link"]
+    id: Identifier
+    title: Label
+    url: str = Field(min_length=1, max_length=2000)
+    instruction: Text
+    privacyNotice: Text
+    offlineAlternative: Text
+    authorReviewed: StrictBool = False
+
+    @model_validator(mode="after")
+    def safe_destination(self):
+        # Deliberately bounded public HTTPS links: no credentials, ports, query
+        # strings, fragments, encoded data, IP literals or local hostnames.
+        match = re.fullmatch(r"https://([a-z0-9.-]+)(/[A-Za-z0-9/_~.-]*)?", self.url)
+        if not match:
+            raise ValueError("Use a public HTTPS URL with an optional plain path; no credentials, ports, query, fragment or encoding")
+        host = match[1]
+        labels = host.split(".")
+        if (len(host) > 253 or len(labels) < 2 or not re.fullmatch(r"[a-z]{2,63}", labels[-1])
+                or labels[-1] in {"localhost", "local", "internal", "lan", "home"}
+                or any(not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label) for label in labels)):
+            raise ValueError("Use a public DNS hostname, not an IP address or local hostname")
+        return self
+
+
 Activity = Annotated[
-    BranchingActivity | HotspotActivity | SequencingActivity | GuidedPracticeActivity | SoftwareWalkthroughActivity | BeforeAfterActivity,
+    BranchingActivity | HotspotActivity | SequencingActivity | GuidedPracticeActivity | SoftwareWalkthroughActivity | BeforeAfterActivity | ExternalLinkActivity,
     Field(discriminator="kind"),
 ]
 

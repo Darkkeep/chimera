@@ -9,6 +9,8 @@ const step = () => {
 };
 export function newActivity(kind: Kind, screenshotAssetId = ""): Activity {
   const base = { id: id(), title: "New activity" };
+  if (kind === "external-link") return { ...base, kind, url: "", instruction: "",
+    privacyNotice: "", offlineAlternative: "", authorReviewed: false };
   if (kind === "branching") {
     const nodeId = id();
     return { ...base, kind, startNodeId: nodeId, nodes: [{ id: nodeId, prompt: "What would you do?",
@@ -39,6 +41,17 @@ export function ExperienceActivityEditor({ activity, onChange, imageAssets = [] 
   }
   return <div className="activity-editor">
     {field("Activity title", activity.title, title => onChange({ ...activity, title }), true)}
+    {activity.kind === "external-link" && <>
+      <p>Connected delivery requires internet access. Review the destination and its privacy/accessibility terms yourself; Chimera does not fetch or verify it. Use a public lowercase HTTPS hostname and plain path, without credentials, ports, query strings, fragments or encoding. Do not include learner identifiers or secrets.</p>
+      <label>External HTTPS URL<input type="url" maxLength={2000} value={activity.url}
+        onChange={event => onChange({ ...activity, url: event.target.value, authorReviewed: false })} /></label>
+      {field("External activity instruction", activity.instruction, instruction => onChange({ ...activity, instruction, authorReviewed: false }))}
+      {field("Destination privacy notice", activity.privacyNotice, privacyNotice => onChange({ ...activity, privacyNotice, authorReviewed: false }))}
+      {field("Offline learning alternative", activity.offlineAlternative, offlineAlternative => onChange({ ...activity, offlineAlternative, authorReviewed: false }))}
+      <label><input type="checkbox" checked={activity.authorReviewed}
+        onChange={event => onChange({ ...activity, authorReviewed: event.target.checked })} />I reviewed this destination, its privacy/accessibility terms and the offline alternative for this audience.</label>
+      <p>Learners consent before opening a new tab. No results, scores or completion are returned. Consent resets on remount or reset and is never saved.</p>
+    </>}
     {activity.kind === "before-after" && <>
       <p>Select two distinct project images. Learners inspect each full image and can mark the comparison reviewed; this is formative.</p>
       {field("Comparison instruction", activity.instruction, instruction => onChange({ ...activity, instruction }))}

@@ -1309,6 +1309,9 @@ class Scene(BaseModel):
 
     @model_validator(mode="after")
     def native_experience_components(self):
+        if self.experience and any(activity.kind == "external-link" and not activity.authorReviewed
+                                   for activity in self.experience.activities):
+            raise ValueError("Review each external destination, privacy notice and offline alternative before saving the scene")
         if self.html5Activity and (self.experience or self.assessmentItem or self.visualLayout and self.visualLayout.timeline):
             raise ValueError("An HTML5 activity cannot replace a native experience, assessment or timeline. Remove the existing component explicitly first.")
         if self.experience and (self.assessmentItem or self.visualLayout and self.visualLayout.timeline):

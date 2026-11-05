@@ -23,7 +23,9 @@ export type Activity =
       steps: { id: string; label: string; screenshotAssetId: string; screenshotAltText: string;
         description: string; actionPrompt: string }[] }
   | { kind: "before-after"; id: string; title: string; instruction: string;
-      before: ComparisonImage; after: ComparisonImage; explanation: string };
+      before: ComparisonImage; after: ComparisonImage; explanation: string }
+  | { kind: "external-link"; id: string; title: string; url: string; instruction: string;
+      privacyNotice: string; offlineAlternative: string; authorReviewed: boolean };
 
 type ComparisonImage = { imageAssetId: string; label: string; altText: string; description: string };
 

@@ -146,10 +146,11 @@ export function SceneExperiencePanel({ project, scene, onClose, onProjectUpdated
     setState(await json<State>(url + query(loadedIds)));
   }
   const blocked = treatment?.productionNeeds.some(need => need.requiredBeforeApply);
+  const externalReviewNeeded = treatment?.experience.activities?.some(activity => activity.kind === "external-link" && !activity.authorReviewed);
   const applied = Boolean(scene.experience && (!state?.draft || state.draft.status === "applied"));
   return <EditorDialog className="experience-dialog" labelledBy="experience-title" busy={pending} onClose={close}>
     <header className="modal-head"><div><p className="eyebrow">PYTHIA / SCENE EXPERIENCE</p><h2 id="experience-title">Design the whole scene</h2></div><button type="button" disabled={pending} onClick={close}>Close</button></header>
-    <p>Create concept flows, reveals, branching decisions, hotspots, sequencing, guided practice, screenshot-based software walkthroughs and before/after image comparisons. Walkthroughs display project screenshots and learner-confirmed instructions. Comparisons show two full project images with text alternatives. Activities are formative. Design calls use your configured model and may incur charges. Authoring, preview and save do not call a provider.</p>
+    <p>Create concept flows, reveals, branching decisions, hotspots, sequencing, guided practice, screenshot-based software walkthroughs and before/after image comparisons. Walkthroughs display project screenshots and learner-confirmed instructions. Comparisons show two full project images with text alternatives. External launch links require separate author review and learner consent, internet access and an offline alternative. Activities are formative. Design calls use your configured model and may incur charges. Authoring, preview and save do not call a provider.</p>
     {error && <p role="alert">{error}</p>}
     {state?.operation?.error && <p role="alert">{state.operation.error}</p>}
     {notice && <p role="status">{notice}</p>}
@@ -202,6 +203,7 @@ export function SceneExperiencePanel({ project, scene, onClose, onProjectUpdated
         <section aria-label="Executable experience preview"><h3>Actual learner experience preview</h3><NativeExperience experience={treatment.experience}
           imageAssets={experienceImagesForProject(project.id, project.storyboard.assets)} /></section>
         {blocked && <p role="alert">Required production needs remain. Applying is blocked until you explicitly resolve or defer them.</p>}
+        {externalReviewNeeded && <p role="alert">Review each external destination, its privacy/accessibility terms and offline alternative before saving or applying.</p>}
         <label className="experience-check"><input type="checkbox" checked={acknowledged} disabled={pending} onChange={event => setAcknowledged(event.target.checked)} />I reviewed the actual preview, content, branding and outstanding work. Apply only this native composition.</label>
         <div className="experience-actions">
           {applied || editingApplied ? <>
@@ -210,7 +212,7 @@ export function SceneExperiencePanel({ project, scene, onClose, onProjectUpdated
               edit({ ...treatment, experience: scene.experience! });
               setState({ ...state, context: { ...state.context, revision: project.storyboard.revision } });
             }}>Edit applied scene without Pythia</button>
-            {editingApplied && <button type="button" disabled={pending || !acknowledged} onClick={() => void act(saveApplied)}>Save reviewed native scene edits</button>}
+            {editingApplied && <button type="button" disabled={pending || externalReviewNeeded || !acknowledged} onClick={() => void act(saveApplied)}>Save reviewed native scene edits</button>}
             <button type="button" disabled={pending || !scene.experience} onClick={() => setRestoreConfirm(true)}>Restore underlying canvas</button>
             {restoreConfirm && <div role="alert"><p>Remove the native experience from this scene and restore its retained canvas? Project history and attached media remain.</p>
               <button type="button" disabled={pending} onClick={() => void act(async () => {
@@ -225,7 +227,7 @@ export function SceneExperiencePanel({ project, scene, onClose, onProjectUpdated
             </div>}
           </> : <>
             <button type="button" disabled={pending || Boolean(stale)} onClick={() => void act(() => review(false))}>Save treatment privately</button>
-            <button type="button" disabled={pending || Boolean(stale) || blocked || !acknowledged} onClick={() => void act(() => review(true))}>Apply reviewed experience to scene</button>
+            <button type="button" disabled={pending || Boolean(stale) || blocked || externalReviewNeeded || !acknowledged} onClick={() => void act(() => review(true))}>Apply reviewed experience to scene</button>
           </>}
         </div>
       </>}

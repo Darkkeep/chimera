@@ -320,6 +320,20 @@ class ExperienceTests(unittest.TestCase):
         response = self.client.put(self.url, headers=self.headers, json={"draftId": "f" * 32, "treatment": TREATMENT})
         self.assertEqual(response.status_code, 409)
 
+    def test_external_link_proposals_require_human_review_and_preserve_revision_guards(self):
+        from backend.tests.test_external_links import experience, external_link
+        treatment = {**copy.deepcopy(TREATMENT), "experience": experience(external_link())}
+        draft = self.proposal(treatment)
+        self.assertFalse(draft["treatment"]["experience"]["activities"][0]["authorReviewed"])
+        self.assertEqual(self.review(draft).status_code, 200)
+        self.assertEqual(self.review(draft, apply=True).status_code, 409)
+        treatment = copy.deepcopy(draft["treatment"])
+        treatment["experience"]["activities"][0]["authorReviewed"] = True
+        self.assertEqual(self.review(draft, treatment, apply=True, revision=999).status_code, 412)
+        response = self.review(draft, treatment, apply=True)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(storage.read_project(self.project.id).storyboard.scenes[0].experience.model_dump(), treatment["experience"])
+
 
 if __name__ == "__main__":
     unittest.main()

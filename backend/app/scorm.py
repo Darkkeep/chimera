@@ -799,7 +799,9 @@ def _resume_budget_report(project: ProjectDetail, profile: str) -> dict[str, obj
     for scene in scenes:
         progress = {}
         for activity in scene.experience.activities if scene.experience else []:
-            if activity.kind == "branching":
+            if activity.kind == "external-link":
+                continue  # Consent is ephemeral; external launches report no results.
+            elif activity.kind == "branching":
                 progress[activity.id] = {"path": [5] * len(activity.nodes)}
             elif activity.kind == "hotspots":
                 progress[activity.id] = {"opened": [point.id for point in activity.hotspots]}

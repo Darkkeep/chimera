@@ -98,7 +98,57 @@ export function mountExperience(root, experience, options = {}) {
       }
       status.textContent = value;
     }
-    if (activity.kind === "branching") {
+    if (activity.kind === "external-link") {
+      // Never restore consent or claimed launch results from saved course/LMS state.
+      if (Object.prototype.hasOwnProperty.call(progress, activity.id)) {
+        delete progress[activity.id];
+        options.onProgress?.(progress);
+      }
+      const match = typeof activity.url === "string" && activity.url.length <= 2000
+        && /^https:\/\/([a-z0-9.-]+)(\/[A-Za-z0-9/_~.-]*)?$/.exec(activity.url);
+      const labels = match ? match[1].split(".") : [];
+      const valid = match && match[0] === activity.url && match[1].length <= 253 && labels.length >= 2
+        && /^[a-z]{2,63}$/.test(labels.at(-1))
+        && !["localhost", "local", "internal", "lan", "home"].includes(labels.at(-1))
+        && labels.every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label));
+      for (const parent of [content, staticView]) {
+        text("p", activity.instruction, parent);
+        text("p", `External destination: ${activity.url}`, parent);
+        text("p", "Internet access is required. This service opens outside Chimera in a new tab. Its operator receives your IP address and browser information and may use cookies, request sign-in or collect what you enter. Do not share sensitive information. Chimera sends no learner identity, answers or course results through this link; the destination may redirect under its own policies.", parent);
+        text("p", `Destination privacy notice: ${activity.privacyNotice}`, parent);
+        text("p", "Opening a link does not verify participation or learning and does not change grades or course completion. If offline, blocked or unavailable, use the alternative below. Chimera cannot verify availability or receive results; return to this course tab when finished.", parent);
+        text("h4", "Offline learning alternative", parent);
+        text("p", activity.offlineAlternative, parent);
+      }
+      if (!valid || activity.authorReviewed !== true) {
+        announce("External launch unavailable: the author must review a valid HTTPS destination. The offline alternative remains available.");
+      } else {
+        const label = text("label", "", content);
+        const consent = text("input", "", label);
+        consent.type = "checkbox";
+        label.appendChild(document.createTextNode("I understand the external service's privacy notice and choose to leave Chimera."));
+        const launch = text("div", "", content);
+        function renderLaunch() {
+          launch.replaceChildren();
+          if (consent.checked) {
+            const link = text("a", `Open external experience at ${match[1]} (new tab)`, launch);
+            link.href = activity.url;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.referrerPolicy = "no-referrer";
+          }
+          announce(consent.checked ? "Ready to open the external service. No results will be recorded."
+            : "Consent is required to enable the external launch. Consent is not saved.");
+        }
+        consent.onchange = renderLaunch;
+        renderLaunch();
+        control(content, "Reset external consent", () => {
+          consent.checked = false;
+          renderLaunch();
+          consent.focus();
+        });
+      }
+    } else if (activity.kind === "branching") {
       const variables = Array.isArray(activity.variables) ? activity.variables : [];
       const initialValues = Object.fromEntries(variables.map(variable => [variable.id, variable.initialValue === true]));
       function isVisible(choice, values) {

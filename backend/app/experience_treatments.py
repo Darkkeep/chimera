@@ -17,14 +17,19 @@ CAPABILITIES = {
                "labelled schematic hotspots with an equivalent text list",
                "keyboard sequencing with feedback", "step-by-step guided practice with hints",
                "offline screenshot-based software walkthroughs using project images",
-               "before/after comparison of two distinct project images with text alternatives"],
+               "before/after comparison of two distinct project images with text alternatives",
+               "connected external HTTPS launch links with author review, learner consent and offline text alternatives"],
     "notExecuted": ["media generation", "music licensing", "video rendering", "scored assessments"],
     "activityPolicy": "Activities are formative, not graded assessments. Use stable IDs. "
                       "Sequence items are authored in correct order. Branch routes must be acyclic and reachable. "
                       "Hotspots use a labelled schematic, not generated imagery. Software walkthroughs use ordered "
                       "project screenshots and learner-confirmed actions; they never execute or control software. "
                       "Before/after comparisons use two distinct existing project images with labels, alt text, "
-                      "descriptions and an explanation; review acknowledgements are formative.",
+                      "descriptions and an explanation; review acknowledgements are formative. "
+                      "External links are connected delivery, never embedded frames. Use a public lowercase HTTPS "
+                      "hostname and plain path only: no credentials, ports, query strings, fragments or encoding. "
+                      "Include privacyNotice and offlineAlternative; authorReviewed must be false until human review. "
+                      "No launch results, grades or completion are inferred.",
 }
 
 
@@ -126,6 +131,9 @@ def _finish(path, project_id, scene_id, actor, data, ctx, request, authorize):
     try:
         authorize()
         treatment = ExperienceTreatment.model_validate(talk.local_mcp(experience_request=request))
+        for activity in treatment.experience.activities:
+            if activity.kind == "external-link":
+                activity.authorReviewed = False
         authorize()
         with storage.storyboard_transaction():
             state = _read(path)
@@ -168,6 +176,9 @@ def review(project_id, scene_id, actor, data: ExperienceReview, *, apply=False, 
             raise talk.TalkError("Scene, brief or sources changed. Refine using current context before saving or applying.", 409)
         if apply and any(need.requiredBeforeApply for need in data.treatment.productionNeeds):
             raise talk.TalkError("Resolve required production dependencies before applying the experience.", 409)
+        if apply and any(activity.kind == "external-link" and not activity.authorReviewed
+                         for activity in data.treatment.experience.activities):
+            raise talk.TalkError("Review each external destination, privacy notice and offline alternative before applying.", 409)
         draft["treatment"] = data.treatment.model_dump()
         project = None
         if apply:

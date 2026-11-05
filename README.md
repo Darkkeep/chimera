@@ -100,6 +100,12 @@ project images, a keyboard-accessible selector, complete aspect-ratio-preserving
 images, attribution and static/Word alternatives. Review acknowledgement is
 formative. See the [comparison procedure](docs/user-guide.md#beforeafter-image-comparison).
 
+Authors can also add a reviewed **external launch link** for connected delivery.
+Learners see the HTTPS destination, privacy notice and offline text alternative,
+then consent before opening a separate tab. Consent and launches are never saved
+as learning results and add no grades or completion gates. See the
+[external link procedure](docs/user-guide.md#hosted-external-experience-launch-link).
+
 Scheduled videos also support up to eight optional **Video reflections**:
 question/decision pauses with two to four responses and authored feedback.
 They are skippable, replayable and formative, never grades or completion gates.

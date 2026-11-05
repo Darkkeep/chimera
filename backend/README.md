@@ -1,5 +1,40 @@
 # Chimera backend
 
+## Connected external launch links
+
+Experience version 1 includes `kind: "external-link"`: `id`, `title` (120),
+`url` (2,000), `instruction`, `privacyNotice`, `offlineAlternative` (each 2,000),
+and strict Boolean `authorReviewed` (defaults false). Text is required and
+extra fields, results, scores and iframe options are rejected. URLs accept
+lowercase ASCII DNS hostnames over HTTPS with optional plain ASCII paths
+(`A-Z a-z 0-9 / _ ~ . -`). No ports, credentials, queries, fragments, percent
+encoding, IP literals or local hostname suffixes are supported. Validation is
+syntactic: Chimera never resolves, fetches or verifies the destination, its
+redirects or its operator's policies. Authors must exclude identifiers/secrets
+and review destination, privacy/accessibility terms and the local alternative.
+
+This is a connected activity delivered by the existing experience composition,
+not imported HTML5 content. Applied Scene validation requires author review;
+provider proposals always have review cleared before human review/apply.
+Author edits to URL, instruction, privacy notice or alternative clear review.
+Existing scene patch and proposal endpoints retain revision and local/hosted
+authorization mappings; no routes, permissions or sandbox policies were added.
+The experience remains exclusive with assessments, HTML5 packages and timelines.
+
+The shared runtime creates an HTTPS anchor only after learner consent, with
+`target="_blank"`, `rel="noopener noreferrer"` and no-referrer policy. It never
+prefetches, embeds or receives provider messages/results. It revalidates URLs
+and review flags, discards restored state for this activity and never persists
+consent or launches. Reset/remount, preview reopen, standalone reload, SCORM
+Continue and Start over all require fresh consent. Suspend-budget estimation
+adds no state. Existing grade/completion policy is unchanged; opening is not
+evidence of learning or successful launch. Local text remains available offline
+or if the service is unavailable; print/Word expands the static alternative
+with destination, instruction and privacy information. Full backups and portable
+standalone/SCORM exports retain the configuration, not remote service content.
+No remote iframe, result contract, H5P adapter or network permission is implied.
+The offline HTML5 sandbox is unchanged and is not a network-egress firewall.
+
 ## Before/after image comparisons
 
 Experience version 1 supports `kind: "before-after"` with `id`, `title`,
