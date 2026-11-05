@@ -43,6 +43,11 @@ const experience = {
         screenshotAltText: 'Profile form with the Save button visible.',
         description: 'The profile form is ready to save.',
         actionPrompt: 'Save the updated profile.' }] },
+    { kind: 'learner-conversation', id: 'roleplay', title: 'Practice a coaching conversation',
+      role: 'A supportive coach', scenario: 'Discuss a fictional workplace decision.',
+      opening: 'What would you like to consider first?',
+      responses: ['What else could you try?', 'What would help you decide?'],
+      offlineAlternative: 'Write a response to the scenario, then compare it with these prompts.' },
   ],
 };
 
@@ -164,9 +169,35 @@ async function interact(native) {
   await walkthrough.getByRole('button', { name: 'Mark action complete', exact: true }).click();
   await expect(walkthrough.getByRole('heading', { name: 'Walkthrough complete.', exact: true })).toBeFocused();
   await expect(walkthrough.getByText('You confirmed every action in order. All walkthrough steps are complete.', { exact: true })).toBeVisible();
+  const conversation = native.getByRole('group', { name: 'Practice a coaching conversation', exact: true });
+  const staticAlternative = conversation.locator('.experience-static');
+  await expect(staticAlternative).toContainText('does not use AI');
+  await expect(staticAlternative).toContainText('What would help you decide?');
+  const consent = conversation.getByRole('checkbox', { name: /scripted, in-memory roleplay/ });
+  const start = conversation.getByRole('button', { name: 'Start local roleplay', exact: true });
+  await expect(start).toBeDisabled();
+  await consent.check();
+  await start.focus();
+  await start.press('Enter');
+  await expect(conversation.getByRole('log', { name: 'Roleplay conversation' }))
+    .toContainText('What would you like to consider first?');
+  const response = conversation.getByRole('textbox', { name: 'Your response (up to 1,000 characters)' });
+  await response.fill('I would review a fictional draft.');
+  await conversation.getByRole('button', { name: 'Send response', exact: true }).click();
+  const transcript = conversation.getByRole('log', { name: 'Roleplay conversation' });
+  await expect(transcript).toContainText('I would review a fictional draft.');
+  await expect(transcript).toContainText('What else could you try?');
+  await response.fill('I could ask a colleague to review it.');
+  await conversation.getByRole('button', { name: 'Send response', exact: true }).click();
+  await expect(conversation.getByRole('status')).toContainText('not saved or sent');
+  await expect(conversation.getByRole('button', { name: 'Reset local roleplay', exact: true })).toBeFocused();
+  await conversation.getByRole('button', { name: 'Reset local roleplay', exact: true }).press('Enter');
+  await expect(transcript).toBeEmpty();
+  await expect(consent).not.toBeChecked();
+  await expect(consent).toBeFocused();
 }
 
-test('all five native activities can be authored, saved and reopened without Pythia', async ({ page, request }) => {
+test('all six native activities can be authored, saved and reopened without Pythia', async ({ page, request }) => {
   let project = await course(request, false);
   const uploaded = await addProjectImage(request, project, await imageFixture(page));
   project = uploaded.project;
@@ -209,6 +240,13 @@ test('all five native activities can be authored, saved and reopened without Pyt
   await walkthrough.getByRole('textbox', { name: 'Action prompt', exact: true }).fill('Choose account settings.');
   await walkthrough.getByRole('button', { name: 'Add walkthrough step', exact: true }).click();
   await walkthrough.getByLabel('Step label', { exact: true }).nth(1).fill('Save changes');
+  await dialog.getByRole('button', { name: 'Add learner conversation roleplay', exact: true }).click();
+  const conversation = dialog.getByRole('group', { name: 'Activity 6: learner-conversation', exact: true });
+  await conversation.getByLabel('Conversation role', { exact: true }).fill('A reflective coach');
+  await conversation.locator('textarea').nth(0).fill('Consider a fictional project delay.');
+  await conversation.locator('textarea').nth(1).fill('What would you like to examine first?');
+  await conversation.locator('textarea').nth(2).fill('What information would help?');
+  await conversation.locator('textarea').last().fill('Write down one fictional next step.');
   await dialog.getByLabel('I reviewed the actual preview', { exact: false }).check();
   await dialog.getByRole('button', { name: 'Save reviewed native scene edits', exact: true }).click();
   await expect(dialog.getByRole('status').filter({ hasText: 'Native scene edits saved.' })).toBeVisible();
@@ -217,7 +255,7 @@ test('all five native activities can be authored, saved and reopened without Pyt
   await expect(stage.locator('.experience-asset-credit').first()).toHaveText('Image credit: diagram.png — Synthetic image credit');
   const saved = await (await request.get(`/api/projects/${project.id}`)).json();
   const value = saved.storyboard.scenes[0].experience;
-  expect(value.activities.map(a => a.kind)).toEqual(['branching', 'hotspots', 'sequencing', 'guided-practice', 'software-walkthrough']);
+  expect(value.activities.map(a => a.kind)).toEqual(['branching', 'hotspots', 'sequencing', 'guided-practice', 'software-walkthrough', 'learner-conversation']);
   expect(value.activities[1].imageAssetId).toBe(uploaded.asset.id);
   expect(value.activities[0].nodes).toHaveLength(2);
   expect(value.activities[0].nodes[0].choices[0].nextNodeId).toBe(value.activities[0].nodes[1].id);
@@ -229,6 +267,11 @@ test('all five native activities can be authored, saved and reopened without Pyt
     screenshotAltText: 'Settings window with the account menu expanded.',
     description: 'The account menu is visible.', actionPrompt: 'Choose account settings.',
   });
+  expect(value.activities[5]).toMatchObject({
+    role: 'A reflective coach', scenario: 'Consider a fictional project delay.',
+    opening: 'What would you like to examine first?', responses: ['What information would help?', 'What would help you decide?'],
+    offlineAlternative: 'Write down one fictional next step.',
+  });
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: 'Design experience', exact: true }).click();
   dialog = page.getByRole('dialog').last();
@@ -237,6 +280,7 @@ test('all five native activities can be authored, saved and reopened without Pyt
   await expect(dialog.getByRole('combobox', { name: 'Background image (optional)', exact: true })).toHaveValue(uploaded.asset.id);
   await expect(dialog.getByRole('textbox', { name: 'Screenshot alternative text', exact: true }).first())
     .toHaveValue('Settings window with the account menu expanded.');
+  await expect(dialog.getByLabel('Conversation role', { exact: true })).toHaveValue('A reflective coach');
   await expect(dialog.getByLabel('Variable label', { exact: true })).toHaveValue('Evidence gathered');
   expect(providerCalls).toBe(0);
 });
@@ -249,6 +293,9 @@ test('mobile native preview supports keyboard practice, text alternatives and re
   await page.getByRole('button', { name: 'Preview course', exact: true }).click();
   let native = page.getByRole('dialog').locator('.native-experience');
   await interact(native);
+  const resumeState = await page.evaluate(id => JSON.parse(localStorage.getItem(`chimera.preview.${id}`) || '{}'), project.id);
+  const savedActivityIds = Object.values(resumeState.experienceProgress || {}).flatMap(progress => Object.keys(progress || {}));
+  expect(savedActivityIds).not.toContain('roleplay');
   expect(await native.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   expect((await new AxeBuilder({ page }).include('.native-experience').analyze()).violations).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath('native-practice-mobile.png'), fullPage: true });
@@ -335,6 +382,12 @@ for (const profile of ['standalone', 'scorm-12', 'scorm-2004']) {
       await expect(resumedWalkthrough.getByRole('heading', { name: 'Step 1 of 2: Open settings', exact: true })).toBeVisible();
     }
     await interact(native);
+    const conversation = native.getByRole('group', { name: 'Practice a coaching conversation', exact: true });
+    await conversation.getByRole('checkbox', { name: /scripted, in-memory roleplay/ }).check();
+    await conversation.getByRole('button', { name: 'Start local roleplay', exact: true }).click();
+    await conversation.getByRole('textbox', { name: 'Your response (up to 1,000 characters)' })
+      .fill('A fictional response for this export check.');
+    await conversation.getByRole('button', { name: 'Send response', exact: true }).click();
     if (profile !== 'standalone') {
       const data = await page.evaluate(() => JSON.parse(localStorage.getItem('native-lms')));
       const progress = JSON.parse(data['cmi.suspend_data']).experiences[project.storyboard.scenes[0].id];
@@ -343,9 +396,14 @@ for (const profile of ['standalone', 'scorm-12', 'scorm-2004']) {
       expect(progress.practice.answers).toEqual(['gather', 'report']);
       expect(progress.diagram.opened).toEqual(['sensor']);
       expect(progress.walkthrough.completedSteps).toEqual(['open-settings', 'save-profile']);
+      expect(progress.roleplay).toBeUndefined();
       expect(data[profile === 'scorm-12' ? 'cmi.core.score.raw' : 'cmi.score.raw']).toBe(initialGrade);
       await page.reload();
       await page.getByRole('button', { name: 'Continue', exact: true }).click();
+      native = page.locator('.native-experience');
+      const resumedConversation = native.getByRole('group', { name: 'Practice a coaching conversation', exact: true });
+      await expect(resumedConversation.getByRole('checkbox', { name: /scripted, in-memory roleplay/ })).not.toBeChecked();
+      await expect(resumedConversation.getByRole('log', { name: 'Roleplay conversation' })).toBeEmpty();
       await expect(native.getByRole('heading', { name: 'Practice complete.', exact: true })).toBeVisible();
       await expect(native.getByText('Route complete.', { exact: false })).toBeVisible();
       await expect(native.locator('.experience-hotspot-list details').first()).toHaveAttribute('open', '');
@@ -356,6 +414,12 @@ for (const profile of ['standalone', 'scorm-12', 'scorm-2004']) {
       await page.getByRole('button', { name: 'Start over', exact: true }).click();
       await expect(native.getByRole('button', { name: 'Investigate', exact: true })).toBeVisible();
       await expect(native.getByRole('button', { name: 'Gather facts', exact: true })).toBeVisible();
+    } else {
+      await page.reload();
+      native = page.locator('.native-experience');
+      const restartedConversation = native.getByRole('group', { name: 'Practice a coaching conversation', exact: true });
+      await expect(restartedConversation.getByRole('checkbox', { name: /scripted, in-memory roleplay/ })).not.toBeChecked();
+      await expect(restartedConversation.getByRole('log', { name: 'Roleplay conversation' })).toBeEmpty();
     }
     await native.getByRole('button', { name: 'Reset sequence', exact: true }).click();
     await native.getByRole('button', { name: 'Check sequence', exact: true }).click();

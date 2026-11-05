@@ -32,13 +32,13 @@ export function ExperienceEditor({ value, onChange, disabled = false, imageAsset
         onChange={changed => onChange({ ...value, activities: value.activities!.map(item => item.id === changed.id ? changed : item) })} />
       <button type="button" onClick={() => onChange({ ...value, activities: value.activities!.filter(item => item.id !== activity.id) })}>Remove activity {index + 1}</button>
     </fieldset>)}
-    {(["branching", "hotspots", "sequencing", "guided-practice", "software-walkthrough", "before-after", "external-link"] as const).map(kind => <button type="button" key={kind}
+    {(["branching", "hotspots", "sequencing", "guided-practice", "software-walkthrough", "before-after", "external-link", "learner-conversation"] as const).map(kind => <button type="button" key={kind}
       disabled={(value.activities?.length ?? 0) >= 8} onClick={() => onChange({ ...value, activities: [
         ...value.activities ?? [],
         newActivity(kind, imageAssets.find(asset => asset.kind === "image")?.id ?? ""),
       ] })}>
       Add {({ branching: "branching decisions", hotspots: "hotspots", sequencing: "sequencing",
-        "guided-practice": "guided practice", "software-walkthrough": "software walkthrough", "before-after": "before/after comparison", "external-link": "external launch link" })[kind]}
+        "guided-practice": "guided practice", "software-walkthrough": "software walkthrough", "before-after": "before/after comparison", "external-link": "external launch link", "learner-conversation": "learner conversation roleplay" })[kind]}
     </button>)}
     {text("conclusion", "Conclusion", 2000)}
     <label className="experience-check"><input type="checkbox" checked={value.motion} onChange={event => onChange({ ...value, motion: event.target.checked })} />Offer optional diagram replay</label>

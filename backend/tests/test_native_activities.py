@@ -56,6 +56,11 @@ ACTIVITIES = [
          "screenshotAltText": "Profile form with the Save button visible.",
          "description": "The profile form is ready to save.",
          "actionPrompt": "Save the updated profile."}]},
+    {"kind": "learner-conversation", "id": "roleplay", "title": "Practice a coaching conversation",
+     "role": "A supportive coach", "scenario": "Discuss a fictional workplace decision.",
+     "opening": "What would you like to consider first?",
+     "responses": ["What else could you try?", "What would help you decide?"],
+     "offlineAlternative": "Write a response to the scenario, then compare it with these prompts."},
 ]
 
 
@@ -137,7 +142,8 @@ class NativeActivityTests(unittest.TestCase):
 
     def test_activity_bounds_unknown_content_and_invalid_answer_rejected(self):
         for problem in ("position", "infinity", "duplicate-point", "duplicate-item", "missing-answer", "duplicate-step",
-                        "duplicate-walkthrough-step", "missing-screenshot", "empty-alt", "unknown", "empty", "empty-image"):
+                        "duplicate-walkthrough-step", "missing-screenshot", "empty-alt", "unknown", "empty", "empty-image",
+                        "empty-conversation", "too-many-conversation-turns"):
             data = experience()
             if problem == "position":
                 data["activities"][1]["hotspots"][0]["x"] = 101
@@ -161,6 +167,10 @@ class NativeActivityTests(unittest.TestCase):
                 data["activities"][0]["script"] = "alert(1)"
             elif problem == "empty-image":
                 data["activities"][1]["imageAssetId"] = ""
+            elif problem == "empty-conversation":
+                data["activities"][5]["responses"] = []
+            elif problem == "too-many-conversation-turns":
+                data["activities"][5]["responses"] *= 3
             else:
                 data["activities"][2]["items"] = []
             with self.subTest(problem=problem), self.assertRaises(ValidationError):
@@ -224,6 +234,8 @@ class NativeActivityTests(unittest.TestCase):
                     self.assertIn("Text alternative and worked solution", script)
                     self.assertIn('activity.kind === "guided-practice"', script)
                     self.assertIn('activity.kind === "software-walkthrough"', script)
+                    self.assertIn('activity.kind === "learner-conversation"', script)
+                    self.assertIn('state.experiences[scene.id] = progress; save()', script)
         loaded.storyboard.scenes[0].experience = None
         self.assertGreater(estimate["estimatedMaximumBytes"], _resume_budget_report(loaded, "SCORM 1.2")["estimatedMaximumBytes"])
 

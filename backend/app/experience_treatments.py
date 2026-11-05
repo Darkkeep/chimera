@@ -18,6 +18,7 @@ CAPABILITIES = {
                "keyboard sequencing with feedback", "step-by-step guided practice with hints",
                "offline screenshot-based software walkthroughs using project images",
                "before/after comparison of two distinct project images with text alternatives",
+               "bounded scripted learner roleplay with ephemeral local-only responses",
                "connected external HTTPS launch links with author review, learner consent and offline text alternatives"],
     "notExecuted": ["media generation", "music licensing", "video rendering", "scored assessments"],
     "activityPolicy": "Activities are formative, not graded assessments. Use stable IDs. "
@@ -26,6 +27,8 @@ CAPABILITIES = {
                       "project screenshots and learner-confirmed actions; they never execute or control software. "
                       "Before/after comparisons use two distinct existing project images with labels, alt text, "
                       "descriptions and an explanation; review acknowledgements are formative. "
+                      "Learner conversations are fixed scripted roleplays, never generative. Keep responses "
+                      "fictional, local to the current tab, unsaved and ungraded; provide an offline alternative. "
                       "External links are connected delivery, never embedded frames. Use a public lowercase HTTPS "
                       "hostname and plain path only: no credentials, ports, query strings, fragments or encoding. "
                       "Include privacyNotice and offlineAlternative; authorReviewed must be false until human review. "

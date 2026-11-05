@@ -98,7 +98,92 @@ export function mountExperience(root, experience, options = {}) {
       }
       status.textContent = value;
     }
-    if (activity.kind === "external-link") {
+    if (activity.kind === "learner-conversation") {
+      if (Object.prototype.hasOwnProperty.call(progress, activity.id)) {
+        delete progress[activity.id];
+        options.onProgress?.(progress);
+      }
+      const responses = Array.isArray(activity.responses)
+        ? activity.responses.filter(value => typeof value === "string" && value.trim() && value.length <= 2000).slice(0, 5)
+        : [];
+      text("p", activity.scenario, content);
+      text("p", "This scripted roleplay does not use AI. Your responses stay in this browser tab's memory, are not sent or saved, and do not affect grades or course completion. Use a fictional example; do not enter sensitive personal information.", content);
+      text("h4", `Role: ${activity.role}`, staticView);
+      text("p", activity.scenario, staticView);
+      text("p", `${activity.role}: ${activity.opening}`, staticView);
+      responses.forEach((response, index) => text("p", `${activity.role} (follow-up ${index + 1}): ${response}`, staticView));
+      text("h4", "Offline alternative", staticView);
+      text("p", activity.offlineAlternative, staticView);
+      text("p", "This scripted roleplay does not use AI. Learner responses are not stored.", staticView);
+      const consentLabel = text("label", "", content);
+      const consent = text("input", "", consentLabel);
+      consent.type = "checkbox";
+      consentLabel.appendChild(document.createTextNode(
+        "I understand this is a scripted, in-memory roleplay and will use a fictional example."
+      ));
+      const start = control(content, "Start local roleplay", () => {
+        if (!consent.checked || responses.length === 0) return;
+        transcript.replaceChildren();
+        addMessage(activity.role, activity.opening);
+        turn = 0;
+        start.hidden = true;
+        form.hidden = false;
+        input.focus();
+        announce("Roleplay started. Your response stays in this tab and is not sent or saved.");
+      });
+      start.disabled = true;
+      consent.onchange = () => { start.disabled = !consent.checked || responses.length === 0; };
+      const transcript = text("div", "", content);
+      transcript.className = "experience-conversation-transcript";
+      transcript.setAttribute("role", "log");
+      transcript.setAttribute("aria-label", "Roleplay conversation");
+      transcript.setAttribute("aria-live", "polite");
+      const form = text("form", "", content);
+      form.hidden = true;
+      const inputLabel = text("label", "Your response (up to 1,000 characters)", form);
+      const input = text("textarea", "", inputLabel);
+      input.maxLength = 1000;
+      input.rows = 3;
+      const submit = text("button", "Send response", form);
+      submit.type = "submit";
+      let turn = 0;
+      function addMessage(speaker, message) {
+        const item = text("p", "", transcript);
+        text("strong", `${speaker}: `, item);
+        text("span", message, item);
+      }
+      form.onsubmit = event => {
+        event.preventDefault();
+        const message = input.value.trim();
+        if (!message || message.length > 1000 || turn >= responses.length) return;
+        addMessage("You", message);
+        addMessage(activity.role, responses[turn]);
+        input.value = "";
+        turn += 1;
+        if (turn >= responses.length) {
+          form.hidden = true;
+          announce("The scripted roleplay is complete. It was not saved or sent; reset to start again.");
+          reset.focus();
+        } else {
+          announce(`Follow-up ${turn} of ${responses.length}. Your response was not saved or sent.`);
+          input.focus();
+        }
+      };
+      const reset = control(content, "Reset local roleplay", () => {
+        turn = 0;
+        transcript.replaceChildren();
+        input.value = "";
+        form.hidden = true;
+        start.hidden = false;
+        consent.checked = false;
+        start.disabled = true;
+        announce("Roleplay reset. The transcript was cleared from this tab.");
+        consent.focus();
+      });
+      if (responses.length === 0) {
+        announce("Roleplay unavailable: no valid scripted follow-ups are configured. The offline alternative remains available.");
+      }
+    } else if (activity.kind === "external-link") {
       // Never restore consent or claimed launch results from saved course/LMS state.
       if (Object.prototype.hasOwnProperty.call(progress, activity.id)) {
         delete progress[activity.id];

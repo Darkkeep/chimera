@@ -22,8 +22,10 @@ image or a labelled schematic, sequencing and guided practice. Image-backed
 hotspots use the source image's aspect ratio and percentage coordinates; the
 separate explanation list keeps the author-defined reading order, and the
 project image remains credited and retained in portable delivery. These are
-formative activities with feedback, not graded assessments. Pythia receives
-their schema and capability constraints with each explicit design request.
+formative activities with feedback, not graded assessments. It also supports a
+bounded scripted learner roleplay: authored follow-up messages, no live AI,
+network service, saved transcript, or evaluation. Pythia receives their schema
+and capability constraints with each explicit design request.
 All proposed content remains subject to validation and author review. You can instead start and save an
 experience without a model call using **Start native experience without
 Pythia**. See [native activity authoring](user-guide.md#author-native-activities-without-a-provider)

@@ -21,6 +21,19 @@ Existing scene patch and proposal endpoints retain revision and local/hosted
 authorization mappings; no routes, permissions or sandbox policies were added.
 The experience remains exclusive with assessments, HTML5 packages and timelines.
 
+## Scripted learner conversations
+
+Experience version 1 also includes `kind: "learner-conversation"` with a
+bounded role label, scenario, opening, one to five authored follow-up messages
+(each at most 2,000 characters), and an offline alternative. This is a fixed
+scripted roleplay, not an AI/provider integration. Learner text is limited to
+1,000 characters per turn, held only in the current page's memory, never sent,
+saved, scored, resumed, or included in SCORM/standalone suspend data. The
+learner explicitly consents before starting, can reset to clear the transcript,
+and is told to use fictional examples without sensitive personal information.
+The static/print alternative contains the authored scenario and script, not
+learner-entered text. There is no completion or grade effect.
+
 The shared runtime creates an HTTPS anchor only after learner consent, with
 `target="_blank"`, `rel="noopener noreferrer"` and no-referrer policy. It never
 prefetches, embeds or receives provider messages/results. It revalidates URLs
@@ -109,7 +122,8 @@ storage and LMS APIs; it is not content certification or secure examination.
 Follow the [integration protocol, limits and LMS checks](../docs/user-guide.md#import-an-externally-authored-html5-activity).
 
 Native experiences accept up to eight discriminated `activities`: `branching`,
-`hotspots`, `sequencing`, `guided-practice`, and `software-walkthrough`. The existing version-1 flow/reveal
+`hotspots`, `sequencing`, `guided-practice`, `software-walkthrough`,
+`before-after`, `external-link`, and `learner-conversation`. The existing version-1 flow/reveal
 payload remains readable without `activities`. Branch graphs must be reachable
 and acyclic; branching can use up to five activity-local Boolean variables,
 initial values, choice assignments and one Boolean visibility condition per
@@ -127,6 +141,9 @@ self-attestation, not application automation or action verification. Continue
 restores the confirmed step prefix and returns to the first unconfirmed step;
 restart clears it. Screenshot assets remain in backups and portable exports
 while referenced and cannot be deleted until removed from the walkthrough.
+Learner conversations contain one to five fixed authored follow-ups; they are
+never generative. Learner text remains in tab memory only, is discarded on
+reset/remount, and is omitted from resume state and printed alternatives.
 
 The scene editor's [timeline and appearance implementation](../docs/scene-timeline-implementation.md) extends the existing scene-update `visualLayout` payload. `SceneLayout.timeline` version 1 contains integer-millisecond `durationMs`, `printTimeMs`, independent audio/video `clips`, and named `cues`. Clips reference project assets and separate `startMs` from `sourceInMs`/`sourceOutMs`; source duration, volume/fades, completion threshold, and video geometry/layer order are validated. Elements optionally contain `nativeShape`, `appearance`, `timing`, `name`, `groupId`, `hidden`, and `aspectLocked`. Timeline duration is limited to one hour, with at most 200 clips and 200 cues; all endpoints must fit. Existing scenes with no timeline retain legacy playback. Native effects and transport code under `app/static` are shared with frontend/delivery/Word rendering. Save through the existing revision-guarded scene API so history, asset checks, and authorization remain enforced.
 

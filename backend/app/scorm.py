@@ -801,6 +801,8 @@ def _resume_budget_report(project: ProjectDetail, profile: str) -> dict[str, obj
         for activity in scene.experience.activities if scene.experience else []:
             if activity.kind == "external-link":
                 continue  # Consent is ephemeral; external launches report no results.
+            elif activity.kind == "learner-conversation":
+                continue  # Learner text remains local and is never part of resume data.
             elif activity.kind == "branching":
                 progress[activity.id] = {"path": [5] * len(activity.nodes)}
             elif activity.kind == "hotspots":
@@ -811,7 +813,7 @@ def _resume_budget_report(project: ProjectDetail, profile: str) -> dict[str, obj
                 progress[activity.id] = {"completedSteps": [step.id for step in activity.steps]}
             elif activity.kind == "before-after":
                 progress[activity.id] = {"reviewedImages": [activity.before.imageAssetId, activity.after.imageAssetId]}
-            else:
+            elif activity.kind == "guided-practice":
                 progress[activity.id] = {"answers": [step.correctChoiceId for step in activity.steps]}
         if progress:
             experiences[scene.id] = progress

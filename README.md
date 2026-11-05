@@ -106,6 +106,12 @@ then consent before opening a separate tab. Consent and launches are never saved
 as learning results and add no grades or completion gates. See the
 [external link procedure](docs/user-guide.md#hosted-external-experience-launch-link).
 
+Native experiences also support a **scripted learner conversation**: an
+opt-in, bounded roleplay with authored follow-ups. It uses no AI or network
+service; learner text remains in tab memory only and is cleared by Reset. It is
+formative, not scored or resumed. See the
+[conversation procedure](docs/user-guide.md#scripted-learner-conversation).
+
 Scheduled videos also support up to eight optional **Video reflections**:
 question/decision pauses with two to four responses and authored feedback.
 They are skippable, replayable and formative, never grades or completion gates.

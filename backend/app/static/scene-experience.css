@@ -35,6 +35,9 @@
 .native-experience a { color: inherit; text-decoration: underline; display: inline-block; padding: 10px 0; min-height: 44px; }
 .native-experience :is(a,input):focus-visible { outline: 3px solid var(--experience-fg); outline-offset: 3px; }
 .native-experience .experience-activity label { display: block; }
+.native-experience .experience-conversation-transcript { padding-left: 1.5rem; }
+.native-experience .experience-conversation-transcript li { white-space: pre-wrap; overflow-wrap: anywhere; }
+.native-experience .experience-activity textarea { display: block; width: min(100%, 48rem); min-height: 6rem; padding: 10px; font: inherit; color: var(--experience-fg); background: var(--experience-bg); border: 1px solid currentColor; border-radius: 6px; }
 @media(max-width:600px) {
   .native-experience .experience-flow { flex-direction: column; }
   .native-experience .experience-arrow { right: 50%; top: auto; bottom: -34px; transform: rotate(90deg); }

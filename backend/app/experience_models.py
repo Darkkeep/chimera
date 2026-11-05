@@ -293,8 +293,19 @@ class ExternalLinkActivity(StrictModel):
         return self
 
 
+class LearnerConversationActivity(StrictModel):
+    kind: Literal["learner-conversation"]
+    id: Identifier
+    title: Label
+    role: Label
+    scenario: Text
+    opening: Text
+    responses: list[Text] = Field(min_length=1, max_length=5)
+    offlineAlternative: Text
+
+
 Activity = Annotated[
-    BranchingActivity | HotspotActivity | SequencingActivity | GuidedPracticeActivity | SoftwareWalkthroughActivity | BeforeAfterActivity | ExternalLinkActivity,
+    BranchingActivity | HotspotActivity | SequencingActivity | GuidedPracticeActivity | SoftwareWalkthroughActivity | BeforeAfterActivity | ExternalLinkActivity | LearnerConversationActivity,
     Field(discriminator="kind"),
 ]
 

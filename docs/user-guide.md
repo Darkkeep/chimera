@@ -164,6 +164,7 @@ request. Use the activity controls to add up to eight activities:
 | Sequencing | Write items in their correct order; use **Move authored item up/down** to change the answer key. Add instructions and explanatory feedback. | Start with the reverse order, reorder using labelled Move up/down buttons, check, retry or reset. Dragging is not required. |
 | Guided practice | Write each step's prompt, hint, choices and choice-specific feedback; select its correct choice. | Request a hint, try a response, and advance only after a correct response. Restart is always available. |
 | Software walkthrough | Add an ordered sequence of up to ten screenshots from project images. For each, provide alternative text, a description, and a prompt naming the action learners should perform in the real software. | Inspect each screenshot and confirm the action with the keyboard-operable **Mark action complete** control. Chimera does not open, instrument, or control the software and cannot verify that an action was performed. |
+| Learner conversation | Write a role, fictional scenario, opening, one to five fixed follow-up messages, and an offline alternative. | Opt in, then respond in a bounded scripted roleplay. Nothing is sent to AI or any service; text stays in tab memory only, is not scored/resumed, and Reset clears it. |
 
 You can combine these activities with the existing flow and reveals, or remove
 those sections entirely. At least one flow, reveal or activity must remain.
@@ -193,6 +194,26 @@ image attribution is displayed with it. These instructions are offline and
 screenshot-based, not an interactive copy or automated test of a third-party
 application. The text/print alternative includes every screenshot, alternative
 text, description, prompt, and image credit.
+
+### Scripted learner conversation
+
+Choose **Add learner conversation roleplay** in a native experience. Set a
+role, a scenario that uses fictional examples, an opening message, one to five
+authored follow-ups, and a useful offline alternative. Each authored field is
+limited to 2,000 characters; learner responses are limited to 1,000 characters
+and five turns. The activity does not call an AI or other service. Before the
+roleplay starts, learners explicitly agree that it is scripted, responses stay
+in the current tab's memory and are not sent or saved, and they should not enter
+sensitive personal information. **Reset local roleplay** clears the transcript
+and consent; closing or reloading the activity also discards it.
+
+This prototype does not generate replies from learner input, evaluate
+responses, persist a transcript, resume a session, or add grades/completion
+gates. The authored static text alternative and print/Word output include the
+scenario, opening, scripted follow-ups and offline alternative, but never
+learner-entered text. It works offline in preview, standalone and SCORM because
+no network service is involved. Do not treat it as confidential counseling or
+enter real personal or sensitive information.
 
 ### Hosted external-experience launch link
 

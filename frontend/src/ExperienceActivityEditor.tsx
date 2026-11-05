@@ -11,6 +11,11 @@ export function newActivity(kind: Kind, screenshotAssetId = ""): Activity {
   const base = { id: id(), title: "New activity" };
   if (kind === "external-link") return { ...base, kind, url: "", instruction: "",
     privacyNotice: "", offlineAlternative: "", authorReviewed: false };
+  if (kind === "learner-conversation") return { ...base, kind, role: "A supportive coach",
+    scenario: "Practice explaining a decision using only a fictional example.",
+    opening: "What would you like to consider first?",
+    responses: ["What else could you try?", "What would help you decide?"],
+    offlineAlternative: "Write a brief response to the scenario, then compare it with the roleplay prompts below." };
   if (kind === "branching") {
     const nodeId = id();
     return { ...base, kind, startNodeId: nodeId, nodes: [{ id: nodeId, prompt: "What would you do?",
@@ -51,6 +56,28 @@ export function ExperienceActivityEditor({ activity, onChange, imageAssets = [] 
       <label><input type="checkbox" checked={activity.authorReviewed}
         onChange={event => onChange({ ...activity, authorReviewed: event.target.checked })} />I reviewed this destination, its privacy/accessibility terms and the offline alternative for this audience.</label>
       <p>Learners consent before opening a new tab. No results, scores or completion are returned. Consent resets on remount or reset and is never saved.</p>
+    </>}
+    {activity.kind === "learner-conversation" && <>
+      <p>This is a scripted, formative roleplay. It does not use AI or send, score, or save learner responses. Learners should use fictional examples and can clear the conversation at any time.</p>
+      {field("Conversation role", activity.role, role => onChange({ ...activity, role }), true)}
+      {field("Scenario", activity.scenario, scenario => onChange({ ...activity, scenario }))}
+      {field("Opening message", activity.opening, opening => onChange({ ...activity, opening }))}
+      <fieldset><legend>Scripted follow-up messages</legend>
+        <p>Each learner response receives the next authored message. Add one to five; there is no generated or scored reply.</p>
+        {activity.responses.map((response, index) => <fieldset key={index}><legend>Follow-up {index + 1}</legend>
+          {field("Role response", response, value => onChange({ ...activity, responses: activity.responses.map((item, i) => i === index ? value : item) }))}
+          <button type="button" disabled={activity.responses.length <= 1}
+            onClick={() => onChange({ ...activity, responses: activity.responses.filter((_, i) => i !== index) })}>
+            Remove follow-up {index + 1}
+          </button>
+        </fieldset>)}
+        <button type="button" disabled={activity.responses.length >= 5}
+          onClick={() => onChange({ ...activity, responses: [...activity.responses, "What might you try next?"] })}>
+          Add follow-up
+        </button>
+      </fieldset>
+      {field("Offline alternative", activity.offlineAlternative, offlineAlternative => onChange({ ...activity, offlineAlternative }))}
+      <p>Limit: five turns, 1,000 characters per learner response, and 2,000 characters per authored field. Consent is required to begin; reset clears the in-memory transcript.</p>
     </>}
     {activity.kind === "before-after" && <>
       <p>Select two distinct project images. Learners inspect each full image and can mark the comparison reviewed; this is formative.</p>

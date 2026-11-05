@@ -25,7 +25,9 @@ export type Activity =
   | { kind: "before-after"; id: string; title: string; instruction: string;
       before: ComparisonImage; after: ComparisonImage; explanation: string }
   | { kind: "external-link"; id: string; title: string; url: string; instruction: string;
-      privacyNotice: string; offlineAlternative: string; authorReviewed: boolean };
+      privacyNotice: string; offlineAlternative: string; authorReviewed: boolean }
+  | { kind: "learner-conversation"; id: string; title: string; role: string; scenario: string;
+      opening: string; responses: string[]; offlineAlternative: string };
 
 type ComparisonImage = { imageAssetId: string; label: string; altText: string; description: string };
 
