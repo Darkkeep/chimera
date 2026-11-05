@@ -11,7 +11,7 @@ import type { Appearance, Timing, Timeline } from "./scene-timeline";
 import { TimelinePlayback } from "./TimelinePlayback";
 import type { ClipProgress } from "../../backend/app/static/scene-transport.js";
 import { effectiveBackgroundAsset } from "./background";
-import { NativeExperience } from "./NativeExperience";
+import { NativeExperience, experienceImagesForProject } from "./NativeExperience";
 import { HTML5Player } from "./HTML5Activity";
 
 export type AnimationStep = { effect: string; durationMs: number; delayMs: number; iterations?: number };
@@ -85,7 +85,8 @@ export function SceneSurface({ project, scene, assessment, animate = false, time
   }, [scene.id, scene.experience, animate, animationSignature]);
   const resolved = resolvedSceneBackground(project, scene);
   if (scene.html5Activity) return <HTML5Player projectId={project.id} activity={scene.html5Activity} />;
-  if (scene.experience) return <NativeExperience experience={scene.experience} />;
+  if (scene.experience) return <NativeExperience experience={scene.experience}
+    imageAssets={experienceImagesForProject(project.id, project.storyboard.assets)} />;
   const layout = scene.assessmentItem ? initialLayout(resolved) : resolved.visualLayout;
   if (!layout) return null;
   const region = assessmentRegion(scene.visualLayout || layout, scene.title);

@@ -160,7 +160,7 @@ request. Use the activity controls to add up to eight activities:
 | Activity | Authoring | Learner behavior |
 | --- | --- | --- |
 | Branching decisions | Write prompts, choices and consequence feedback; select each choice's destination or **End of route**. Adding a node connects the previous node's first choice to it. Inspect that connection. Select the starting node. | Choose a route, read its consequences, and restart to explore another path. |
-| Hotspots | Describe a schematic, label its points, write explanations, and place numbered points using horizontal/vertical percentages (5-95). | Activate points by mouse, touch or keyboard, or use the equivalent disclosure list. This is a labelled schematic, not an uploaded image overlay. |
+| Hotspots | Describe the diagram, optionally choose an image already in the project, label its points, write explanations, and place numbered points using horizontal/vertical percentages (5-95) on the image canvas. | Activate points by mouse, touch or keyboard, or use the separate hotspot list in the order authored. The diagram description and image credit remain visible; the image and explanations are included in print/Word alternatives. |
 | Sequencing | Write items in their correct order; use **Move authored item up/down** to change the answer key. Add instructions and explanatory feedback. | Start with the reverse order, reorder using labelled Move up/down buttons, check, retry or reset. Dragging is not required. |
 | Guided practice | Write each step's prompt, hint, choices and choice-specific feedback; select its correct choice. | Request a hint, try a response, and advance only after a correct response. Restart is always available. |
 
@@ -190,6 +190,11 @@ restores them and Start over clears them. Failed practice attempts and transient
 feedback are not stored. The existing tracking-budget guard and export estimate
 include activity progress; SCORM 1.2's 4,096-byte limit may constrain large courses.
 Automated delivery checks are not a new Blackboard acceptance certification.
+An image-backed hotspot keeps its project image reference through full backups
+and portable exports, and prevents that image from being deleted while in use.
+Its coordinates scale with the image's aspect ratio; they do not depend on the
+preview viewport. Hotspots remain formative and do not affect grades or
+completion.
 
 See [Native scene experiences](talk-to-pythia.md#native-scene-experiences)
 for the full review/apply procedure, context/privacy boundaries and current

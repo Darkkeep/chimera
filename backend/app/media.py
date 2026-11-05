@@ -91,6 +91,12 @@ def resolved_project(project: ProjectDetail, published: bool = False) -> Project
         used.update(p.assetId for p in placements)
         if background:
             used.add(background)
+        if scene.experience:
+            used.update(
+                activity.imageAssetId
+                for activity in scene.experience.activities
+                if activity.kind == "hotspots" and activity.imageAssetId
+            )
         if layout:
             used.update(e.assetId for e in layout.elements if e.assetId)
             if layout.timeline:
@@ -181,6 +187,10 @@ def asset_usage(project: ProjectDetail, asset_id: str) -> dict:
     return {"courseWide": project.storyboard.backgroundAsset == asset_id or any(p.assetId == asset_id for p in project.storyboard.courseMedia),
             "scenes": [{"id": s.id, "title": s.title} for s in project.storyboard.scenes
                 if s.html5Activity and s.html5Activity.assetId == asset_id
+                or s.experience and any(
+                    activity.kind == "hotspots" and activity.imageAssetId == asset_id
+                    for activity in s.experience.activities
+                )
                 or asset_id in {p.assetId for p in effective_placements(project, s)} or effective_background_asset(project, s) == asset_id or s.backgroundAsset == asset_id
                 or s.visualLayout and (s.visualLayout.backgroundAsset == asset_id or s.visualLayout.sourceBackgroundAsset == asset_id or any(e.assetId == asset_id for e in s.visualLayout.elements) or s.visualLayout.timeline and any(c.assetId == asset_id for c in s.visualLayout.timeline.clips))]}
 

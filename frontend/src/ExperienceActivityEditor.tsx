@@ -15,14 +15,16 @@ export function newActivity(kind: Kind): Activity {
       choices: [{ label: "First action", feedback: "Explain the outcome.", nextNodeId: null },
         { label: "Second action", feedback: "Explain the alternative outcome.", nextNodeId: null }] }] };
   }
-  if (kind === "hotspots") return { ...base, kind, diagramDescription: "Describe the relationship between these labelled points.",
+  if (kind === "hotspots") return { ...base, kind, diagramDescription: "Describe the image or relationship between these labelled points.", imageAssetId: null,
     hotspots: [{ id: id(), label: "Point of interest", explanation: "Explain this point.", x: 50, y: 50 }] };
   if (kind === "sequencing") return { ...base, kind, instruction: "Put these steps in the correct order.",
     items: [{ id: id(), label: "First step" }, { id: id(), label: "Second step" }], feedback: "Explain why this order matters." };
   return { ...base, kind, steps: [step()] };
 }
 
-export function ExperienceActivityEditor({ activity, onChange }: { activity: Activity; onChange: (value: Activity) => void }) {
+export function ExperienceActivityEditor({ activity, onChange, imageAssets = [] }: {
+  activity: Activity; onChange: (value: Activity) => void; imageAssets?: { id: string; filename: string }[];
+}) {
   function field(label: string, value: string, change: (value: string) => void, short = false) {
     return <label>{label}{short
       ? <input value={value} maxLength={120} onChange={event => change(event.target.value)} />
@@ -69,7 +71,13 @@ export function ExperienceActivityEditor({ activity, onChange }: { activity: Act
     </>}
     {activity.kind === "hotspots" && <>
       {field("Diagram description", activity.diagramDescription, diagramDescription => onChange({ ...activity, diagramDescription }))}
-      <p>Position numbered points on a schematic using percentages. The same explanations are available in a keyboard-accessible list; no image generation is needed.</p>
+      <label>Background image (optional)<select value={activity.imageAssetId ?? ""} onChange={event => onChange({ ...activity, imageAssetId: event.target.value || null })}>
+        <option value="">Use the labelled schematic</option>
+        {activity.imageAssetId && !imageAssets.some(asset => asset.id === activity.imageAssetId)
+          && <option value={activity.imageAssetId}>Unavailable image ({activity.imageAssetId})</option>}
+        {imageAssets.map(asset => <option key={asset.id} value={asset.id}>{asset.filename}</option>)}
+      </select></label>
+      <p>Position numbered points at percentages of the image canvas. The separate hotspot list stays in the order authored below and remains available to keyboard and screen-reader users.</p>
       {activity.hotspots.map((point, index) => {
         const update = (value: typeof point) => onChange({ ...activity, hotspots: activity.hotspots.map(p => p.id === point.id ? value : p) });
         return <fieldset key={point.id}><legend>Hotspot {index + 1}</legend>

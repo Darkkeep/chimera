@@ -6,7 +6,7 @@ type Choice = { id: string; label: string; feedback: string };
 export type Activity =
   | { kind: "branching"; id: string; title: string; startNodeId: string;
       nodes: { id: string; prompt: string; choices: { label: string; feedback: string; nextNodeId: string | null }[] }[] }
-  | { kind: "hotspots"; id: string; title: string; diagramDescription: string;
+  | { kind: "hotspots"; id: string; title: string; diagramDescription: string; imageAssetId?: string | null;
       hotspots: { id: string; label: string; explanation: string; x: number; y: number }[] }
   | { kind: "sequencing"; id: string; title: string; instruction: string;
       items: { id: string; label: string }[]; feedback: string }
@@ -22,17 +22,32 @@ export type Experience = {
   background: string; foreground: string; accent: string; accentText: string; diagramAccent: string;
 };
 
-export function NativeExperience({ experience, progress, onProgress }: {
+export type ExperienceImageAsset = { id: string; kind: string; filename: string; attributionText?: string };
+export type ExperienceImage = { src: string; filename: string; attributionText: string };
+
+export function experienceImagesForProject(projectId: string, assets: readonly ExperienceImageAsset[]) {
+  return Object.fromEntries(assets.filter(asset => asset.kind === "image").map(asset => [asset.id, {
+    src: `/api/projects/${projectId}/assets/${asset.id}`,
+    filename: asset.filename,
+    attributionText: asset.attributionText ?? "",
+  }]));
+}
+
+export function NativeExperience({ experience, progress, onProgress, imageAssets }: {
   experience: Experience; progress?: Record<string, unknown>; onProgress?: (progress: Record<string, unknown>) => void;
+  imageAssets?: Record<string, ExperienceImage>;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const savedProgress = useRef(progress);
   const changed = useRef(onProgress);
+  const savedImages = useRef(imageAssets);
   savedProgress.current = progress;
   changed.current = onProgress;
+  savedImages.current = imageAssets;
   useEffect(() => {
     if (root.current) return mountExperience(root.current, experience, {
       progress: savedProgress.current ? structuredClone(savedProgress.current) : {},
+      imageAssets: savedImages.current,
       onProgress: value => changed.current?.(structuredClone(value)),
     });
   }, [experience]);

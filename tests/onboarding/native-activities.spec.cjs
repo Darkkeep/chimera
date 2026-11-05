@@ -5,7 +5,6 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { execFileSync } = require('node:child_process');
 const python = require('./python.cjs');
-
 const experience = {
   version: 1, heading: 'Practice responding', introduction: 'Explore a response to an incident.',
   flow: [], reveals: [], conclusion: 'Use evidence to guide your actions.', motion: false,
@@ -33,17 +32,49 @@ const experience = {
   ],
 };
 
-async function course(request, authored = true) {
+async function imageFixture(page) {
+  const image = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 120; canvas.height = 80;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#28784a';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  return Buffer.from(image, 'base64');
+}
+
+async function course(request, authored = true, image) {
   let project = await (await request.post('/api/projects', { data: { title: 'Native activity fixture' } })).json();
   project = await (await request.post(`/api/projects/${project.id}/scenes`, {
     headers: { 'If-Match': `"${project.storyboard.revision}"` }, data: { title: 'Response practice' },
   })).json();
   if (!authored) return project;
+  const uploaded = await addProjectImage(request, project, image);
+  project = uploaded.project;
+  const authoredExperience = structuredClone(experience);
+  authoredExperience.activities.find(activity => activity.kind === 'hotspots').imageAssetId = uploaded.asset.id;
   const saved = await request.patch(`/api/projects/${project.id}/scenes/${project.storyboard.scenes[0].id}`, {
-    headers: { 'If-Match': `"${project.storyboard.revision}"` }, data: { experience },
+    headers: { 'If-Match': `"${project.storyboard.revision}"` }, data: { experience: authoredExperience },
   });
   expect(saved.ok(), await saved.text()).toBeTruthy();
   return saved.json();
+}
+
+async function addProjectImage(request, project, image) {
+  let response = await request.post(`/api/projects/${project.id}/assets`, {
+    headers: { 'If-Match': `"${project.storyboard.revision}"` },
+    multipart: { file: { name: 'diagram.png', mimeType: 'image/png', buffer: image } },
+  });
+  expect(response.ok(), await response.text()).toBeTruthy();
+  project = await response.json();
+  const asset = project.storyboard.assets.find(item => item.filename === 'diagram.png');
+  response = await request.patch(`/api/projects/${project.id}/assets/${asset.id}/attribution`, {
+    headers: { 'If-Match': `"${project.storyboard.revision}"` },
+    data: { attributionText: 'Synthetic image credit', attributionStatus: 'complete' },
+  });
+  expect(response.ok(), await response.text()).toBeTruthy();
+  return { project: await response.json(), asset };
 }
 
 async function open(page, project) {
@@ -60,6 +91,27 @@ async function interact(native) {
   await expect(branch.getByText('Investigate: Gather evidence.', { exact: true })).toBeVisible();
   await branch.getByRole('button', { name: 'Report', exact: true }).click();
   await expect(branch.getByText('Route complete.', { exact: false })).toBeVisible();
+  const hotspots = native.getByRole('group', { name: 'Explore hotspots on the image', exact: true });
+  const hotspotImage = hotspots.locator('img');
+  await expect(hotspotImage).toBeVisible();
+  await expect(hotspotImage).toHaveJSProperty('naturalWidth', 120);
+  await expect(hotspotImage).toHaveJSProperty('naturalHeight', 80);
+  await expect(native.locator('.experience-asset-credit').first()).toHaveText('Image credit: diagram.png — Synthetic image credit');
+  await expect(native.locator('.experience-hotspot-list > li').nth(0)).toContainText('Sensor');
+  await expect(native.locator('.experience-hotspot-list > li').nth(1)).toContainText('Controller');
+  const fit = await hotspots.evaluate(board => {
+    const bounds = board.getBoundingClientRect();
+    const image = board.querySelector('img').getBoundingClientRect();
+    const marker = board.querySelector('button').getBoundingClientRect();
+    return {
+      imageAspect: image.width / image.height,
+      markerX: (marker.left + marker.width / 2 - bounds.left) / bounds.width,
+      markerY: (marker.top + marker.height / 2 - bounds.top) / bounds.height,
+    };
+  });
+  expect(fit.imageAspect).toBeCloseTo(1.5, 1);
+  expect(fit.markerX).toBeCloseTo(0.2, 1);
+  expect(fit.markerY).toBeCloseTo(0.5, 1);
   await native.getByRole('button', { name: 'Explore Sensor', exact: true }).focus();
   await native.getByRole('button', { name: 'Explore Sensor', exact: true }).press('Space');
   await expect(native.locator('.experience-hotspot-list').getByText('Measures the input.', { exact: true })).toBeVisible();
@@ -82,7 +134,9 @@ async function interact(native) {
 }
 
 test('all four native activities can be authored, saved and reopened without Pythia', async ({ page, request }) => {
-  const project = await course(request, false);
+  let project = await course(request, false);
+  const uploaded = await addProjectImage(request, project, await imageFixture(page));
+  project = uploaded.project;
   let providerCalls = 0;
   page.on('request', req => {
     if (req.method() === 'POST' && /experience-treatment$|media-generation-jobs$/.test(req.url())) providerCalls++;
@@ -96,8 +150,13 @@ test('all four native activities can be authored, saved and reopened without Pyt
   await branch.getByRole('button', { name: 'Add decision node', exact: true }).click();
   await branch.getByRole('textbox', { name: 'Decision prompt', exact: true }).nth(1).fill('What happens after investigation?');
   await dialog.getByRole('button', { name: 'Add hotspots', exact: true }).click();
-  await dialog.getByLabel('Hotspot label', { exact: true }).fill('Sensor');
-  await dialog.getByLabel('Horizontal position (%)', { exact: true }).fill('20');
+  await dialog.getByRole('textbox', { name: 'Diagram description', exact: true }).fill('Describe the illustrated sensor and controller.');
+  await dialog.getByRole('combobox', { name: 'Background image (optional)', exact: true }).selectOption(uploaded.asset.id);
+  await dialog.getByRole('textbox', { name: 'Hotspot label', exact: true }).fill('Sensor');
+  await dialog.getByRole('spinbutton', { name: 'Horizontal position (%)', exact: true }).fill('20');
+  const preview = dialog.getByRole('region', { name: 'Executable experience preview' });
+  await expect(preview.locator('.experience-hotspot-board img')).toBeVisible();
+  await expect(preview.locator('.experience-asset-credit').first()).toHaveText('Image credit: diagram.png — Synthetic image credit');
   await dialog.getByRole('button', { name: 'Add sequencing', exact: true }).click();
   await dialog.getByLabel('Sequence item', { exact: true }).first().fill('Observe');
   await dialog.getByRole('button', { name: 'Add guided practice', exact: true }).click();
@@ -105,21 +164,26 @@ test('all four native activities can be authored, saved and reopened without Pyt
   await dialog.getByLabel('I reviewed the actual preview', { exact: false }).check();
   await dialog.getByRole('button', { name: 'Save reviewed native scene edits', exact: true }).click();
   await expect(dialog.getByRole('status').filter({ hasText: 'Native scene edits saved.' })).toBeVisible();
+  const stage = page.locator('.visual-authoring-surface .native-experience');
+  await expect(stage.locator('.experience-hotspot-board img')).toBeVisible();
+  await expect(stage.locator('.experience-asset-credit').first()).toHaveText('Image credit: diagram.png — Synthetic image credit');
   const saved = await (await request.get(`/api/projects/${project.id}`)).json();
   const value = saved.storyboard.scenes[0].experience;
   expect(value.activities.map(a => a.kind)).toEqual(['branching', 'hotspots', 'sequencing', 'guided-practice']);
+  expect(value.activities[1].imageAssetId).toBe(uploaded.asset.id);
   expect(value.activities[0].nodes).toHaveLength(2);
   expect(value.activities[0].nodes[0].choices[0].nextNodeId).toBe(value.activities[0].nodes[1].id);
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: 'Design experience', exact: true }).click();
   dialog = page.getByRole('dialog').last();
   await expect(dialog.getByRole('textbox', { name: 'Practice hint', exact: true })).toHaveValue('Look for evidence.');
-  await expect(dialog.getByLabel('Hotspot label', { exact: true })).toHaveValue('Sensor');
+  await expect(dialog.getByRole('textbox', { name: 'Hotspot label', exact: true })).toHaveValue('Sensor');
+  await expect(dialog.getByRole('combobox', { name: 'Background image (optional)', exact: true })).toHaveValue(uploaded.asset.id);
   expect(providerCalls).toBe(0);
 });
 
 test('mobile native preview supports keyboard practice, text alternatives and retained progress', async ({ page, request }, testInfo) => {
-  const project = await course(request);
+  const project = await course(request, true, await imageFixture(page));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await open(page, project);
@@ -143,6 +207,8 @@ test('mobile native preview supports keyboard practice, text alternatives and re
   await expect(native.getByRole('button', { name: 'Investigate', exact: true })).toBeVisible();
   for (const summary of await native.locator('.experience-static > summary').all()) await summary.click();
   await expect(native.locator('.experience-static').getByText('Observe before acting.', { exact: true })).toBeVisible();
+  await expect(native.locator('.experience-static img')).toBeVisible();
+  await expect(native.locator('.experience-static').getByText('Image credit: diagram.png — Synthetic image credit', { exact: true })).toBeVisible();
   await page.emulateMedia({ media: 'print' });
   await page.evaluate(() => dispatchEvent(new Event('beforeprint')));
   await expect(native.locator('.experience-static').first()).toBeVisible();
@@ -151,18 +217,22 @@ test('mobile native preview supports keyboard practice, text alternatives and re
 
 for (const profile of ['standalone', 'scorm-12', 'scorm-2004']) {
   test(`${profile} delivers activities and preserves formative state without changing grades`, async ({ page, request }, testInfo) => {
-    const project = await course(request);
+    const image = await imageFixture(page);
+    const project = await course(request, true, image);
     const response = await request.get(`/api/projects/${project.id}/${profile}.zip`);
     expect(response.ok(), await response.text()).toBeTruthy();
     const archive = testInfo.outputPath('course.zip'), directory = testInfo.outputPath('course');
     await fs.mkdir(directory, { recursive: true }); await fs.writeFile(archive, await response.body());
     execFileSync(python, ['-m', 'zipfile', '-e', archive, directory]);
+    const imageAsset = project.storyboard.assets.find(asset => asset.filename === 'diagram.png');
+    expect(await fs.readFile(path.join(directory, imageAsset.path))).toEqual(image);
     const origin = 'http://native-activities.test';
     await page.route(origin + '/**', async route => {
       const filename = new URL(route.request().url()).pathname.slice(1) || 'index.html';
-      if (!['index.html', 'player.js', 'storyboard.json'].includes(filename)) return route.abort();
+      if (!['index.html', 'player.js', 'storyboard.json', imageAsset.path].includes(filename)) return route.abort();
       return route.fulfill({ body: await fs.readFile(path.join(directory, filename)),
-        contentType: filename.endsWith('.js') ? 'text/javascript' : filename.endsWith('.json') ? 'application/json' : 'text/html' });
+        contentType: filename.endsWith('.js') ? 'text/javascript' : filename.endsWith('.json') ? 'application/json'
+          : filename.endsWith('.png') ? 'image/png' : 'text/html' });
     });
     if (profile !== 'standalone') await page.addInitScript(legacy => {
       const data = JSON.parse(localStorage.getItem('native-lms') || '{}');
@@ -192,6 +262,8 @@ for (const profile of ['standalone', 'scorm-12', 'scorm-2004']) {
       await page.getByRole('button', { name: 'Continue', exact: true }).click();
       await expect(native.getByRole('heading', { name: 'Practice complete.', exact: true })).toBeVisible();
       await expect(native.getByText('Route complete.', { exact: false })).toBeVisible();
+      await expect(native.locator('.experience-hotspot-list details').first()).toHaveAttribute('open', '');
+      await expect(native.locator('.experience-hotspot-board img')).toBeVisible();
       await page.reload();
       await page.getByRole('button', { name: 'Start over', exact: true }).click();
       await expect(native.getByRole('button', { name: 'Investigate', exact: true })).toBeVisible();

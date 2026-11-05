@@ -85,6 +85,7 @@ class HotspotActivity(StrictModel):
     id: Identifier
     title: Label
     diagramDescription: Text
+    imageAssetId: str | None = Field(default=None, min_length=1, max_length=120)
     hotspots: list[Hotspot] = Field(min_length=1, max_length=12)
 
     @model_validator(mode="after")

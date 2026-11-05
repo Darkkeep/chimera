@@ -15,7 +15,7 @@ import { useSession } from "./AuthGate";
 import { PublishedMedia } from "./PublishedMedia";
 import { resolvedProject } from "./media";
 import { SceneSurface } from "./SceneSurface";
-import { NativeExperience } from "./NativeExperience";
+import { NativeExperience, experienceImagesForProject } from "./NativeExperience";
 import { HTML5Player } from "./HTML5Activity";
 import type { HTML5Progress } from "./HTML5Activity";
 import { isHTML5Progress } from "../../backend/app/static/html5-activity.js";
@@ -383,6 +383,7 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
         {!scene.assessmentItem && (scene.html5Activity ? <HTML5Player projectId={project.id} activity={scene.html5Activity}
           progress={html5Progress[scene.id]} onProgress={value => setHTML5Progress(current => ({ ...current, [scene.id]: value }))} />
           : scene.experience ? <NativeExperience experience={scene.experience}
+          imageAssets={experienceImagesForProject(project.id, project.storyboard.assets)}
           progress={experienceProgress[scene.id]} onProgress={value => setExperienceProgress(current => ({ ...current, [scene.id]: value }))} />
           : scene.visualLayout?.enabled ? <SceneSurface key={motionReplay} project={project} scene={scene} animate={motionEnabled} progress={videoProgress} onProgress={updateVideoProgress} /> : scene.previewImage ? <div className="course-preview-slide"><img src={`/api/projects/${project.id}/${scene.previewImage}`} alt={`Slide ${scene.sourceSlide ?? sceneIndex + 1}: ${scene.title}`} /></div> : scene.extractedText.length > 0 ? <div className="course-preview-text">{scene.extractedText.map((text, index) => <p key={`${index}-${text}`}>{text}</p>)}</div> : <p className="course-preview-empty">This scene has no learner-facing content yet.</p>)}
 

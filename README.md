@@ -10,8 +10,8 @@ and [working single-file example](examples/html5-activity.html). This is a bound
 offline HTML/classic-script subset, not arbitrary web-app or full SCORM-package
 support. Target Blackboard acceptance still requires a real LMS check.
 
-Native learning experiences now include branching decisions, labelled schematic
-hotspots, keyboard sequencing and step-by-step guided practice, alongside
+Native learning experiences now include branching decisions, image-backed or
+schematic hotspots, keyboard sequencing and step-by-step guided practice, alongside
 concept flows and reveals. Author directly without a provider or review a
 Pythia proposal; the same runtime serves preview, standalone and SCORM delivery.
 Activities are formative and do not replace graded assessments. See the

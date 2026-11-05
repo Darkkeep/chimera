@@ -3,7 +3,7 @@ import type { Project, Scene } from "./App";
 import { EditorDialog } from "./EditorDialog";
 import { ExperienceEditor } from "./ExperienceEditor";
 import { newActivity } from "./ExperienceActivityEditor";
-import { NativeExperience } from "./NativeExperience";
+import { NativeExperience, experienceImagesForProject } from "./NativeExperience";
 import type { Experience } from "./NativeExperience";
 import "./scene-experience.css";
 
@@ -187,7 +187,8 @@ export function SceneExperiencePanel({ project, scene, onClose, onProjectUpdated
           <label>Learning intent<textarea maxLength={2000} value={treatment.learningIntent} onChange={event => edit({ ...treatment, learningIntent: event.target.value })} /></label>
           <label>Rationale and assumptions<textarea maxLength={2000} value={treatment.rationale} onChange={event => edit({ ...treatment, rationale: event.target.value })} /></label>
         </fieldset>
-        <ExperienceEditor value={treatment.experience} disabled={pending || applied && !editingApplied} onChange={experience => edit({ ...treatment, experience })} />
+        <ExperienceEditor value={treatment.experience} imageAssets={project.storyboard.assets}
+          disabled={pending || applied && !editingApplied} onChange={experience => edit({ ...treatment, experience })} />
         <fieldset disabled={pending || editingApplied || applied}><legend>Outstanding production work</legend>
           {treatment.productionNeeds.length === 0 && <p>No outstanding dependencies proposed. Verify against your direction before applying.</p>}
           {treatment.productionNeeds.map((need, index) => <div key={index}>
@@ -198,7 +199,8 @@ export function SceneExperiencePanel({ project, scene, onClose, onProjectUpdated
           <button type="button" disabled={treatment.productionNeeds.length >= 12} onClick={() => edit({ ...treatment, productionNeeds: [...treatment.productionNeeds, { description: "", requiredBeforeApply: true }] })}>Add production need</button>
         </fieldset>
         {state.draft && <details><summary>Treatment provenance</summary><p>Source revision {state.draft.provenance.revision}. Author direction: {state.draft.provenance.direction}</p><p>{state.draft.provenance.designBrief}</p>{state.draft.provenance.sources.map((source, i) => <p key={i}>{source.title} v{source.version} · SHA256 {source.sha256}</p>)}</details>}
-        <section aria-label="Executable experience preview"><h3>Actual learner experience preview</h3><NativeExperience experience={treatment.experience} /></section>
+        <section aria-label="Executable experience preview"><h3>Actual learner experience preview</h3><NativeExperience experience={treatment.experience}
+          imageAssets={experienceImagesForProject(project.id, project.storyboard.assets)} /></section>
         {blocked && <p role="alert">Required production needs remain. Applying is blocked until you explicitly resolve or defer them.</p>}
         <label className="experience-check"><input type="checkbox" checked={acknowledged} disabled={pending} onChange={event => setAcknowledged(event.target.checked)} />I reviewed the actual preview, content, branding and outstanding work. Apply only this native composition.</label>
         <div className="experience-actions">

@@ -136,11 +136,31 @@ export function mountExperience(root, experience, options = {}) {
       render();
     } else if (activity.kind === "hotspots") {
       text("p", activity.diagramDescription, content);
+      const imageAsset = activity.imageAssetId && (
+        options.imageAssets?.[activity.imageAssetId] || globalThis.__CHIMERA_ASSETS?.[activity.imageAssetId]
+      );
+      const imageSource = imageAsset?.src || imageAsset?.path;
       const board = text("div", "", content);
-      board.className = "experience-hotspot-board";
+      board.className = `experience-hotspot-board${imageSource ? " has-image" : ""}`;
       board.setAttribute("role", "group");
-      board.setAttribute("aria-label", "Explore diagram hotspots");
+      board.setAttribute("aria-label", activity.imageAssetId ? "Explore hotspots on the image" : "Explore diagram hotspots");
       const points = activity.hotspots;
+      if (activity.imageAssetId && imageSource) {
+        const image = text("img", "", board);
+        image.src = imageSource;
+        image.alt = "";
+        image.setAttribute("aria-hidden", "true");
+        image.addEventListener("error", () => announce("Diagram image could not be loaded. The text description and hotspot list remain available."));
+        const printImage = text("img", "", staticView);
+        printImage.src = imageSource;
+        printImage.alt = "";
+        printImage.addEventListener("error", () => printImage.remove());
+        const credit = `Image credit: ${imageAsset.filename || "Project image"} — ${imageAsset.attributionText?.trim() || "Attribution not supplied."}`;
+        text("p", credit, content).className = "experience-asset-credit";
+        text("p", credit, staticView).className = "experience-asset-credit";
+      } else if (activity.imageAssetId) {
+        announce("Diagram image is unavailable. The text description and hotspot list remain available.");
+      }
       text("p", activity.diagramDescription, staticView);
       points.forEach(point => {
         const detail = text("details", "", staticView);
@@ -148,11 +168,13 @@ export function mountExperience(root, experience, options = {}) {
         text("summary", point.label, detail);
         text("p", point.explanation, detail);
       });
-      const list = text("div", "", content);
+      const list = text("ol", "", content);
       list.className = "experience-hotspot-list";
+      list.setAttribute("aria-label", "Hotspot descriptions in author order");
       const opened = new Set(Array.isArray(saved.opened) ? saved.opened.filter(id => points.some(p => p.id === id)) : []);
       points.forEach((point, index) => {
-        const detail = text("details", "", list);
+        const item = text("li", "", list);
+        const detail = text("details", "", item);
         detail.open = opened.has(point.id);
         text("summary", `${index + 1}. ${point.label}`, detail);
         text("p", point.explanation, detail);

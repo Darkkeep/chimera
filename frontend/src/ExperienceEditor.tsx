@@ -1,8 +1,8 @@
-import type { Experience } from "./NativeExperience";
+import type { Experience, ExperienceImageAsset } from "./NativeExperience";
 import { ExperienceActivityEditor, newActivity } from "./ExperienceActivityEditor";
 
-export function ExperienceEditor({ value, onChange, disabled = false }: {
-  value: Experience; onChange: (value: Experience) => void; disabled?: boolean;
+export function ExperienceEditor({ value, onChange, disabled = false, imageAssets = [] }: {
+  value: Experience; onChange: (value: Experience) => void; disabled?: boolean; imageAssets?: ExperienceImageAsset[];
 }) {
   function text(key: "heading" | "introduction" | "conclusion", label: string, limit: number) {
     return <label>{label}<textarea value={value[key]} maxLength={limit} rows={key === "heading" ? 1 : 3}
@@ -28,7 +28,8 @@ export function ExperienceEditor({ value, onChange, disabled = false }: {
     <h3>Native activities</h3>
     <p>Formative practice with feedback, not graded assessments. At least one flow, reveal or activity is required.</p>
     {(value.activities ?? []).map((activity, index) => <fieldset key={activity.id}><legend>Activity {index + 1}: {activity.kind}</legend>
-      <ExperienceActivityEditor activity={activity} onChange={changed => onChange({ ...value, activities: value.activities!.map(item => item.id === changed.id ? changed : item) })} />
+      <ExperienceActivityEditor activity={activity} imageAssets={imageAssets.filter(asset => asset.kind === "image").map(({ id, filename }) => ({ id, filename }))}
+        onChange={changed => onChange({ ...value, activities: value.activities!.map(item => item.id === changed.id ? changed : item) })} />
       <button type="button" onClick={() => onChange({ ...value, activities: value.activities!.filter(item => item.id !== activity.id) })}>Remove activity {index + 1}</button>
     </fieldset>)}
     {(["branching", "hotspots", "sequencing", "guided-practice"] as const).map(kind => <button type="button" key={kind}

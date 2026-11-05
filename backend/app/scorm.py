@@ -422,7 +422,10 @@ PLAYER_JS = EXPERIENCE_RUNTIME + TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANC
     if (returnButton) returnButton.addEventListener("click", () => { state.current = state.scenes.findIndex(item => item.id === state.remediation.assessmentSceneId); state.remediation = null; save(); render(); });
     const media = document.querySelector("#scene-media"); media.innerHTML = "";
     const before = document.querySelector("#scene-media-before"); before.innerHTML = "";
-    const embeddedImages = new Set(visual && !scene.experience ? scene.visualLayout.elements.filter(e => e.kind === "image").map(e => e.assetId) : []);
+    const embeddedImages = new Set([
+        ...(visual && !scene.experience ? scene.visualLayout.elements.filter(e => e.kind === "image").map(e => e.assetId) : []),
+        ...(scene.experience?.activities || []).filter(activity => activity.kind === "hotspots" && activity.imageAssetId).map(activity => activity.imageAssetId),
+    ]);
     const placements = scene.mediaPlacements?.length ? scene.mediaPlacements : [...(scene.imageAssets || []), ...(scene.audioAssets || []), ...(scene.videoAssets || [])].map(assetId => ({ assetId, position: "after" }));
     placements.forEach(placement => {
         const id = placement.assetId, asset = window.__CHIMERA_ASSETS[id];
