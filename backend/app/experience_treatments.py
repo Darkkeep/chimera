@@ -12,8 +12,14 @@ from .models import SceneUpdate
 
 CAPABILITIES = {
     "native": ["responsive concept flow", "click-reveal explanations", "show all explanations",
-               "replayable diagram motion", "reduced motion", "contrast-checked colors"],
+               "replayable diagram motion", "reduced motion", "contrast-checked colors",
+               "branching decisions with feedback and terminating routes",
+               "labelled schematic hotspots with an equivalent text list",
+               "keyboard sequencing with feedback", "step-by-step guided practice with hints"],
     "notExecuted": ["media generation", "music licensing", "video rendering", "scored assessments"],
+    "activityPolicy": "Activities are formative, not graded assessments. Use stable IDs. "
+                      "Sequence items are authored in correct order. Branch routes must be acyclic and reachable. "
+                      "Hotspots use a labelled schematic, not generated imagery.",
 }
 
 
@@ -58,7 +64,7 @@ def context(project_id, scene_id, actor, source_ids=()):
     value = {"revision": project.storyboard.revision, "scene": scene.model_dump(),
              "designBrief": brief, "sources": catalog, "selectedSources": selected, "capabilities": CAPABILITIES}
     value["fingerprint"] = hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
-    value["assemblyBlocked"] = bool(scene.assessmentItem or scene.visualLayout and scene.visualLayout.timeline)
+    value["assemblyBlocked"] = bool(scene.html5Activity or scene.assessmentItem or scene.visualLayout and scene.visualLayout.timeline)
     return value
 
 
@@ -91,7 +97,7 @@ def submit(project_id, scene_id, actor, data: ExperienceDesignRequest, authorize
         if ctx["fingerprint"] != data.contextFingerprint:
             raise talk.TalkError("Scene, brief or sources changed. Reload the context before designing.", 409)
         if ctx["assemblyBlocked"]:
-            raise talk.TalkError("This first native assembly supports content scenes without existing assessment or timeline components. Those components will not be overwritten.", 409)
+            raise talk.TalkError("Native assembly requires a scene without an existing HTML5 activity, assessment or timeline. Those components will not be overwritten.", 409)
         if not talk.CAPACITY.acquire(blocking=False):
             raise talk.TalkError("Two Pythia requests are active. Try again when one finishes.", 429)
         request = {"scene": ctx["scene"], "designBrief": ctx["designBrief"] if data.includeDesignBrief else "",

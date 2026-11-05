@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Escalation practice</title>
+  <style>
+    body { font: 1.1rem/1.6 system-ui, sans-serif; color: #172033; background: #fff; max-width: 46rem; margin: auto; padding: 1.5rem; }
+    button { font: inherit; margin: .5rem; padding: .8rem; cursor: pointer; }
+    button:focus-visible { outline: 3px solid #2444ac; outline-offset: 3px; }
+  </style>
+</head>
+<body>
+  <h1>Escalation practice</h1>
+  <p>A required safety check is missing from a handoff. What should you do?</p>
+  <button type="button" id="proceed">Proceed and fill in the check later</button>
+  <button type="button" id="pause">Pause the handoff and escalate the missing check</button>
+  <p id="feedback" role="status">Choose an action. You can retry either response.</p>
+  <script>
+    const feedback = document.querySelector("#feedback");
+    const activity = window.ChimeraActivity;
+    if (!activity) {
+      feedback.textContent = "Import this HTML file using Chimera's HTML5 activity control to enable tracking.";
+      document.querySelectorAll("button").forEach(button => { button.disabled = true; });
+    } else {
+      const saved = activity.getState();
+      if (saved.completed) feedback.textContent = `Restored your previous result: ${saved.score}%. You can retry.`;
+      function respond(correct) {
+        const accepted = activity.report({
+          completed: true, score: correct ? 100 : 0,
+          suspendData: correct ? "paused-and-escalated" : "proceeded",
+          location: "decision-feedback"
+        });
+        feedback.textContent = !accepted ? "The result could not be reported. Check the activity configuration."
+          : correct ? "Correct. Pause and escalate before continuing. Score: 100%."
+            : "The missing check must be resolved first. Score: 0%. Try the other response.";
+      }
+      document.querySelector("#proceed").addEventListener("click", () => respond(false));
+      document.querySelector("#pause").addEventListener("click", () => respond(true));
+    }
+  </script>
+</body>
+</html>

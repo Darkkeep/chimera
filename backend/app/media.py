@@ -69,6 +69,8 @@ def resolved_project(project: ProjectDetail, published: bool = False) -> Project
     used = set()
     scenes = []
     for scene in project.storyboard.scenes:
+        if scene.html5Activity:
+            used.add(scene.html5Activity.assetId)
         background = effective_background_asset(project, scene)
         layout = scene.visualLayout
         if layout:
@@ -115,8 +117,12 @@ def validate_placements(project: ProjectDetail) -> None:
             raise ValueError("Each asset can be placed only once per scope")
         if any(p.assetId not in assets for p in placements):
             raise ValueError("Media placements must reference assets in this project")
+        if any(assets[p.assetId].kind == "html5" for p in placements):
+            raise ValueError("HTML5 packages must be placed through a scene's HTML5 activity, not media placements")
     course_ids = {p.assetId for p in project.storyboard.courseMedia}
     for scene in project.storyboard.scenes:
+        if scene.html5Activity and (scene.html5Activity.assetId not in assets or assets[scene.html5Activity.assetId].kind != "html5"):
+            raise ValueError("HTML5 activities must reference an imported HTML5 package in this project")
         if set(scene.excludedCourseMedia) - course_ids:
             raise ValueError("Scene exclusions must refer to course-wide media")
         for kind, ids in (("image", scene.imageAssets), ("audio", scene.audioAssets), ("video", scene.videoAssets)):
@@ -164,7 +170,7 @@ def update_metadata(project_id: str, asset_id: str, data: AssetMetadataUpdate, r
         asset = next((a for a in project.storyboard.assets if a.id == asset_id), None)
         if asset is None:
             raise FileNotFoundError("Media not found")
-        if asset.kind == "image" and (data.transcript or data.captionsVtt):
+        if asset.kind in {"image", "html5"} and (data.transcript or data.captionsVtt):
             raise ValueError("Transcripts and captions belong to audio or video")
         assets = [a.model_copy(update=data.model_dump()) if a.id == asset_id else a for a in project.storyboard.assets]
         storage.write_storyboard(storage.project_path(project_id), project.storyboard.model_copy(update={"assets": assets}), revision)
@@ -174,7 +180,8 @@ def update_metadata(project_id: str, asset_id: str, data: AssetMetadataUpdate, r
 def asset_usage(project: ProjectDetail, asset_id: str) -> dict:
     return {"courseWide": project.storyboard.backgroundAsset == asset_id or any(p.assetId == asset_id for p in project.storyboard.courseMedia),
             "scenes": [{"id": s.id, "title": s.title} for s in project.storyboard.scenes
-                if asset_id in {p.assetId for p in effective_placements(project, s)} or effective_background_asset(project, s) == asset_id or s.backgroundAsset == asset_id
+                if s.html5Activity and s.html5Activity.assetId == asset_id
+                or asset_id in {p.assetId for p in effective_placements(project, s)} or effective_background_asset(project, s) == asset_id or s.backgroundAsset == asset_id
                 or s.visualLayout and (s.visualLayout.backgroundAsset == asset_id or s.visualLayout.sourceBackgroundAsset == asset_id or any(e.assetId == asset_id for e in s.visualLayout.elements) or s.visualLayout.timeline and any(c.assetId == asset_id for c in s.visualLayout.timeline.clips))]}
 
 
@@ -218,6 +225,8 @@ def publish_shared(project_id: str, asset_id: str) -> dict:
         asset = next((a for a in project.storyboard.assets if a.id == asset_id), None)
         if asset is None:
             raise FileNotFoundError("Media not found")
+        if asset.kind == "html5":
+            raise ValueError("HTML5 packages cannot be published as shared media; import the original package into the destination project")
         content = _asset_bytes(project_id, asset)
         shared_id = f"shared-{uuid.uuid4().hex}"
         path = shared_root() / shared_id
@@ -247,6 +256,8 @@ def copy_shared(project_id: str, shared_id: str, revision: int) -> ProjectDetail
     with storage.storyboard_transaction():
         path, record = shared_record(shared_id)
         source = ExtractedAsset.model_validate(record["asset"])
+        if source.kind == "html5":
+            raise ValueError("HTML5 packages cannot be copied as shared media; import the original package")
         content = (path / "content").read_bytes()
         if hashlib.sha256(content).hexdigest() != source.sha256:
             raise ValueError("Shared media checksum verification failed")

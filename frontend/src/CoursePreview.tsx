@@ -15,6 +15,10 @@ import { useSession } from "./AuthGate";
 import { PublishedMedia } from "./PublishedMedia";
 import { resolvedProject } from "./media";
 import { SceneSurface } from "./SceneSurface";
+import { NativeExperience } from "./NativeExperience";
+import { HTML5Player } from "./HTML5Activity";
+import type { HTML5Progress } from "./HTML5Activity";
+import { isHTML5Progress } from "../../backend/app/static/html5-activity.js";
 import { AssessmentFeedbackDialog } from "./AssessmentFeedbackDialog";
 import { DragDropQuestion } from "./DragDropQuestion";
 
@@ -26,7 +30,7 @@ type CoursePreviewProps = {
 
 type AssessmentResult = AssessmentOutcome & { response: string[]; matches: Record<string, string>; textResponse: string; assessmentSignature: string };
 type RemediationRoute = { assessmentSceneId: string; remediationSceneId: string };
-type ResumeState = { sceneIndex: number; visitedSceneIds: string[]; completedAudioKeys: string[]; videoProgress: Record<string, VideoProgress>; assessmentResults: Record<string, AssessmentResult>; remediationRoute: RemediationRoute | null };
+type ResumeState = { sceneIndex: number; visitedSceneIds: string[]; completedAudioKeys: string[]; videoProgress: Record<string, VideoProgress>; assessmentResults: Record<string, AssessmentResult>; remediationRoute: RemediationRoute | null; experienceProgress?: Record<string, Record<string, unknown>>; html5Progress?: Record<string, HTML5Progress> };
 type ReviewReply = { id: string; authorLabel: string; body: string; createdAt: string };
 type ReviewComment = { id: string; sceneId: string; sceneTitle: string; revision: number; authorLabel: string; body: string; replies: ReviewReply[]; resolved: boolean; outdated: boolean; sceneDeleted: boolean };
 
@@ -147,7 +151,15 @@ function readResumeState(projectId: string, scenes: Scene[]): ResumeState {
       && route.assessmentSceneId !== route.remediationSceneId
       ? route
       : null;
-    return { sceneIndex, visitedSceneIds, completedAudioKeys, videoProgress, assessmentResults, remediationRoute };
+    const experienceProgress = parsed.experienceProgress && typeof parsed.experienceProgress === "object"
+      ? Object.fromEntries(Object.entries(parsed.experienceProgress).filter(([id, value]) =>
+        scenes.some(scene => scene.id === id && scene.experience) && value && typeof value === "object" && !Array.isArray(value)))
+      : {};
+    const html5Progress = parsed.html5Progress && typeof parsed.html5Progress === "object"
+      ? Object.fromEntries(Object.entries(parsed.html5Progress).filter(([id, value]) =>
+        isHTML5Progress(value) && scenes.some(scene => scene.id === id && scene.html5Activity?.assetId === value.assetId)))
+      : {};
+    return { sceneIndex, visitedSceneIds, completedAudioKeys, videoProgress, assessmentResults, remediationRoute, experienceProgress, html5Progress };
   } catch {
     return { sceneIndex: 0, visitedSceneIds: [], completedAudioKeys: [], videoProgress: {}, assessmentResults: {}, remediationRoute: null };
   }
@@ -169,6 +181,8 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
   const [visitedSceneIds, setVisitedSceneIds] = useState(resumeState.visitedSceneIds);
   const [completedAudioKeys, setCompletedAudioKeys] = useState(resumeState.completedAudioKeys);
   const [videoProgress, setVideoProgress] = useState(resumeState.videoProgress);
+  const [experienceProgress, setExperienceProgress] = useState(resumeState.experienceProgress ?? {});
+  const [html5Progress, setHTML5Progress] = useState(resumeState.html5Progress ?? {});
   const [assessmentResults, setAssessmentResults] = useState(resumeState.assessmentResults);
   const [feedbackSceneId, setFeedbackSceneId] = useState<string | null>(null);
   const [remediationRoute, setRemediationRoute] = useState(resumeState.remediationRoute);
@@ -189,6 +203,7 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
     completedAudioKeys,
     videoProgress,
     assessmentResults,
+    html5Progress,
   );
   const {
     courseComplete,
@@ -242,11 +257,11 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(`chimera.preview.${resumeProjectId}`, JSON.stringify({ sceneIndex, visitedSceneIds, completedAudioKeys, videoProgress, assessmentResults, remediationRoute }));
+      window.localStorage.setItem(`chimera.preview.${resumeProjectId}`, JSON.stringify({ sceneIndex, visitedSceneIds, completedAudioKeys, videoProgress, experienceProgress, html5Progress, assessmentResults, remediationRoute }));
     } catch {
       // Preview remains usable if browser storage is unavailable.
     }
-  }, [resumeProjectId, sceneIndex, visitedSceneIds, completedAudioKeys, videoProgress, assessmentResults, remediationRoute]);
+  }, [resumeProjectId, sceneIndex, visitedSceneIds, completedAudioKeys, videoProgress, experienceProgress, html5Progress, assessmentResults, remediationRoute]);
 
   function updateVideoProgress(key: string, progress: VideoProgress) {
     setVideoProgress((current) => {
@@ -360,12 +375,16 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
     {contentsOpen && <nav id="preview-contents" className="course-preview-contents" aria-label="Table of contents"><div className="course-preview-contents-heading"><strong>Contents</strong><button type="button" className="icon-button" aria-label="Close contents" onClick={() => setContentsOpen(false)}><X size={18} /></button></div>{scenes.map((item, index) => <button type="button" key={item.id} aria-current={index === sceneIndex ? "step" : undefined} onClick={() => { setSceneIndex(index); setRemediationRoute(null); setContentsOpen(false); }}><span>{index + 1}</span><span>{item.title || "Untitled scene"}</span>{visitedSceneIds.includes(item.id) && <Check size={14} aria-label="Visited" />}</button>)}</nav>}
     {scene ? <main className="course-preview-main">
       <div className="course-preview-scene-meta"><span>SCENE {String(sceneIndex + 1).padStart(2, "0")} / {String(scenes.length).padStart(2, "0")}</span><span>{scene.sceneType}</span></div>
-      {!scene.experience && !scene.visualLayout?.timeline && scene.visualLayout?.elements.some(element => element.animations && Object.values(element.animations).some(phase => phase.effect !== "none")) && <div className="course-preview-motion-controls"><button type="button" className="course-preview-nav-button" aria-label={motionEnabled ? "Stop motion" : "Play motion"} onClick={() => setMotionEnabled(!motionEnabled)}>{motionEnabled ? <Square size={16} /> : <Play size={16} />}{motionEnabled ? "Stop motion" : "Play motion"}</button><button type="button" className="course-preview-nav-button" aria-label="Replay motion" onClick={() => { setMotionEnabled(true); setMotionReplay(current => current + 1); }}><RotateCcw size={16} />Replay motion</button></div>}
+      {!scene.html5Activity && !scene.experience && !scene.visualLayout?.timeline && scene.visualLayout?.elements.some(element => element.animations && Object.values(element.animations).some(phase => phase.effect !== "none")) && <div className="course-preview-motion-controls"><button type="button" className="course-preview-nav-button" aria-label={motionEnabled ? "Stop motion" : "Play motion"} onClick={() => setMotionEnabled(!motionEnabled)}>{motionEnabled ? <Square size={16} /> : <Play size={16} />}{motionEnabled ? "Stop motion" : "Play motion"}</button><button type="button" className="course-preview-nav-button" aria-label="Replay motion" onClick={() => { setMotionEnabled(true); setMotionReplay(current => current + 1); }}><RotateCcw size={16} />Replay motion</button></div>}
       <article className="course-preview-content" aria-labelledby="course-preview-scene-title">
         {remediationRoute?.remediationSceneId === scene.id && <button type="button" className="course-preview-nav-button previous" onClick={returnToAssessment}><ArrowLeft size={16} /><span>Return to question</span></button>}
         <h1 id="course-preview-scene-title" className={scene.assessmentItem || scene.visualLayout?.enabled && scene.visualLayout.elements.some(element => element.kind === "text" && element.text.trim() === scene.title.trim()) ? "course-preview-title-on-stage" : undefined}>{scene.title || "Untitled scene"}</h1>
         <PublishedMedia position="before" project={project} scene={scene} completedAudioKeys={completedAudioKeys} onAudioEnded={key => setCompletedAudioKeys(current => current.includes(key) ? current : [...current, key])} videoProgress={videoProgress} onVideoProgress={updateVideoProgress} />
-        {!scene.assessmentItem && (scene.experience || scene.visualLayout?.enabled ? <SceneSurface key={motionReplay} project={project} scene={scene} animate={motionEnabled} progress={videoProgress} onProgress={updateVideoProgress} /> : scene.previewImage ? <div className="course-preview-slide"><img src={`/api/projects/${project.id}/${scene.previewImage}`} alt={`Slide ${scene.sourceSlide ?? sceneIndex + 1}: ${scene.title}`} /></div> : scene.extractedText.length > 0 ? <div className="course-preview-text">{scene.extractedText.map((text, index) => <p key={`${index}-${text}`}>{text}</p>)}</div> : <p className="course-preview-empty">This scene has no learner-facing content yet.</p>)}
+        {!scene.assessmentItem && (scene.html5Activity ? <HTML5Player projectId={project.id} activity={scene.html5Activity}
+          progress={html5Progress[scene.id]} onProgress={value => setHTML5Progress(current => ({ ...current, [scene.id]: value }))} />
+          : scene.experience ? <NativeExperience experience={scene.experience}
+          progress={experienceProgress[scene.id]} onProgress={value => setExperienceProgress(current => ({ ...current, [scene.id]: value }))} />
+          : scene.visualLayout?.enabled ? <SceneSurface key={motionReplay} project={project} scene={scene} animate={motionEnabled} progress={videoProgress} onProgress={updateVideoProgress} /> : scene.previewImage ? <div className="course-preview-slide"><img src={`/api/projects/${project.id}/${scene.previewImage}`} alt={`Slide ${scene.sourceSlide ?? sceneIndex + 1}: ${scene.title}`} /></div> : scene.extractedText.length > 0 ? <div className="course-preview-text">{scene.extractedText.map((text, index) => <p key={`${index}-${text}`}>{text}</p>)}</div> : <p className="course-preview-empty">This scene has no learner-facing content yet.</p>)}
 
         {scene.assessmentItem && <SceneSurface key={motionReplay} project={project} scene={scene} animate={motionEnabled} progress={videoProgress} onProgress={updateVideoProgress} assessment={(() => {
           const item = scene.assessmentItem;

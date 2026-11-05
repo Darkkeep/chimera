@@ -12,6 +12,7 @@ import { TimelinePlayback } from "./TimelinePlayback";
 import type { ClipProgress } from "../../backend/app/static/scene-transport.js";
 import { effectiveBackgroundAsset } from "./background";
 import { NativeExperience } from "./NativeExperience";
+import { HTML5Player } from "./HTML5Activity";
 
 export type AnimationStep = { effect: string; durationMs: number; delayMs: number; iterations?: number };
 export type ElementAnimations = { entrance: AnimationStep; presentation: AnimationStep; exit: AnimationStep };
@@ -83,6 +84,7 @@ export function SceneSurface({ project, scene, assessment, animate = false, time
     return playStageAnimations(animationRoot.current, JSON.parse(animationSignature));
   }, [scene.id, scene.experience, animate, animationSignature]);
   const resolved = resolvedSceneBackground(project, scene);
+  if (scene.html5Activity) return <HTML5Player projectId={project.id} activity={scene.html5Activity} />;
   if (scene.experience) return <NativeExperience experience={scene.experience} />;
   const layout = scene.assessmentItem ? initialLayout(resolved) : resolved.visualLayout;
   if (!layout) return null;

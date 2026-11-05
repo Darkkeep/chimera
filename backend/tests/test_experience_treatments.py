@@ -27,6 +27,7 @@ EXPERIENCE = {
     "conclusion": "Sporting merit is a principle, not a guarantee of every result.", "motion": True,
     "background": "#100818", "foreground": "#E8E5EA", "accent": "#FF32AA", "accentText": "#100818",
     "diagramAccent": "#8542E8",
+    "activities": [],
 }
 TREATMENT = {"learningIntent": "Explain how performance should relate to results.",
              "rationale": "A flow and two learner-controlled explanations; no narration.",
@@ -86,8 +87,8 @@ class ExperienceTests(unittest.TestCase):
         self.assertIsNone(self.scene.experience)
         self.assertEqual(Experience.model_validate(EXPERIENCE).model_dump(), EXPERIENCE)
         for update in ({"foreground": "#8542E8", "background": "#E8E5EA"},
-                       {"accentText": "#FF32AA"}, {"accent": "red;url(x)"}, {"flow": []},
-                       {"reveals": []}, {"heading": "  "}, {"reveals": [{"label": "X", "explanation": " "}]},
+                       {"accentText": "#FF32AA"}, {"accent": "red;url(x)"}, {"flow": [], "reveals": []},
+                       {"flow": [EXPERIENCE["flow"][0]]}, {"heading": "  "}, {"reveals": [{"label": "X", "explanation": " "}]},
                        {"flow": EXPERIENCE["flow"] * 3}, {"script": "alert(1)"}):
             with self.subTest(update=update), self.assertRaises(ValidationError):
                 Experience.model_validate({**EXPERIENCE, **update})

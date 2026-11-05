@@ -138,6 +138,7 @@ ROUTE_ACTIONS = {
     "export_storyboard": "project.export", "export_project_backup": "project.export", "import_project_backup": "project.restore",
     "export_storyboard_docx": "project.export", "export_sme_storyboard_docx": "project.export", "export_full_storyboard_docx": "project.export",
     "import_storyboard": "project.import", "post_project_asset": "media.manage",
+    "post_html5_import": "project.import",
     "get_project_asset": "project.view", "get_slide_render": "project.view", "post_scene": "scene.manage",
     "patch_scene": "scene.manage", "delete_project_scene": "scene.manage", "extract_scene_layout": "scene.manage",
     "prepare_project_authoring": "scene.manage",
@@ -245,6 +246,8 @@ def _hosted_request_action(request: Request) -> str:
         return "enhancement.proposal.create"
     if "/reference-resources" in path:
         return "reference.create"
+    if path.endswith("/html5-import"):
+        return "project.import"
     if "/media-generation-jobs/" in path:
         return "media.job.manage"
     if path.endswith("/media-generation-jobs"):
@@ -2540,6 +2543,27 @@ async def post_project_asset(project_id: str, file: UploadFile = File(...), if_m
         raise _revision_conflict(error) from error
 
 
+@app.post("/api/projects/{project_id}/html5-import", status_code=201)
+async def post_html5_import(project_id: str, file: UploadFile = File(...), entrypoint: str = Form("index.html"),
+                            credit: str = Form("", max_length=2000),
+                            if_match: Annotated[str | None, Header()] = None):
+    from .html5_import import LIMIT, import_activity
+    expected = _expected_revision(if_match)
+    if expected is None:
+        raise HTTPException(428, "An If-Match storyboard revision is required")
+    content = await file.read(LIMIT + 1)
+    if len(content) > LIMIT:
+        raise HTTPException(413, "HTML5 upload exceeds 20 MB")
+    try:
+        return import_activity(project_id, file.filename or "", content, entrypoint, expected, credit)
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+
+
 @app.get("/api/projects/{project_id}/assets/{asset_id}")
 def get_project_asset(project_id: str, asset_id: str) -> FileResponse:
     try:
@@ -2723,6 +2747,8 @@ def preview_scene_template(project_id: str, scene_id: str, data: SceneUpdate, if
 def patch_scene(project_id: str, scene_id: str, data: SceneUpdate, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
     try:
         expected = _expected_revision(if_match)
+        if {"experience", "html5Activity"} & data.model_fields_set and expected is None:
+            raise HTTPException(status_code=428, detail="An If-Match storyboard revision is required for native experience edits")
         current = read_project(project_id)
         scene = next((item for item in current.storyboard.scenes if item.id == scene_id), None)
         if scene is None:

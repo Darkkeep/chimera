@@ -1,5 +1,6 @@
 import { scheduledAssets, requiredTimelineClips, clipProgressKey } from "../../backend/app/static/timeline-policy.js";
 import type { AssessmentSettings, CourseCompletionSettings, Scene } from "./App";
+import type { HTML5Progress } from "./HTML5Activity";
 
 export type AssessmentOutcome = { attempts: number; isCorrect: boolean | null };
 export type VideoProgress = { position: number; duration: number; watchedRanges: [number, number][] };
@@ -41,12 +42,18 @@ export function evaluateCourseCompletion(
   completedAudioKeys: string[],
   videoProgress: Record<string, VideoProgress>,
   assessmentResults: Record<string, AssessmentOutcome | undefined>,
+  html5Progress: Record<string, HTML5Progress | undefined> = {},
 ): CourseEvaluation {
   const visited = new Set(visitedSceneIds);
   const completedAudio = new Set(completedAudioKeys);
   const requiredScenes = scenes.filter((scene) => scene.required);
   const completedRequiredSceneCount = requiredScenes.filter((scene) => {
     if (!visited.has(scene.id)) return false;
+    if (scene.html5Activity && scene.html5Activity.tracking !== "view") {
+      const progress = html5Progress[scene.id];
+      return progress?.assetId === scene.html5Activity.assetId && progress.completed
+        && (scene.html5Activity.tracking !== "scored" || Number.isFinite(progress.score));
+    }
     if (!scene.assessmentItem) return true;
     const result = assessmentResults[scene.id];
     return result !== undefined && result.attempts > 0
@@ -74,12 +81,20 @@ export function evaluateCourseCompletion(
   const scoredAssessments = scenes.filter((scene) => scene.assessmentItem && (
     scene.required || (completionSettings.includeOptionalAssessments && (assessmentResults[scene.id]?.attempts ?? 0) > 0)
   ));
-  const totalWeight = scoredAssessments.reduce((sum, scene) => sum + assessmentSettings(scene).scoreWeight, 0);
-  const weightedScore = totalWeight === 0 ? null : Math.round(scoredAssessments.reduce((sum, scene) => {
+  const external = scenes.filter(scene => scene.html5Activity?.tracking === "scored"
+    && (scene.required || completionSettings.includeOptionalAssessments
+      && html5Progress[scene.id]?.assetId === scene.html5Activity.assetId
+      && html5Progress[scene.id]?.completed && Number.isFinite(html5Progress[scene.id]?.score)));
+  const totalWeight = scoredAssessments.reduce((sum, scene) => sum + assessmentSettings(scene).scoreWeight, 0)
+    + external.reduce((sum, scene) => sum + scene.html5Activity!.scoreWeight, 0);
+  const weightedScore = totalWeight === 0 ? null : Math.round((scoredAssessments.reduce((sum, scene) => {
     const result = assessmentResults[scene.id];
     const percent = result?.isCorrect === true ? 100 : 0;
     return sum + percent * assessmentSettings(scene).scoreWeight;
-  }, 0) / totalWeight);
+  }, 0) + external.reduce((sum, scene) => {
+    const progress = html5Progress[scene.id];
+    return sum + (progress?.assetId === scene.html5Activity!.assetId && progress.completed ? progress.score ?? 0 : 0) * scene.html5Activity!.scoreWeight;
+  }, 0)) / totalWeight);
 
   const courseComplete = scenes.length > 0
     && completedRequiredSceneCount === requiredScenes.length

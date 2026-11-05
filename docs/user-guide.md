@@ -20,6 +20,177 @@ keyboard/touch reveals, a show-all reading alternative, mobile reflow,
 contrast validation and reduced-motion support. Print/document snapshots
 include all explanations.
 
+### Import an externally authored HTML5 activity
+
+Use **HTML5 activity** above the scene preview. This is a dedicated scene
+experience, not an arbitrary HTML object in the Stage layer stack.
+
+1. Prepare an offline single HTML file, or ZIP with one HTML entry point and
+   relative classic-script/style/media dependencies. For a ZIP, set **ZIP entry
+   point** before upload; it defaults to `index.html` and may include a subfolder.
+2. Enter credit and redistribution rights, then upload. Import saves a reusable
+   project asset but does not attach it or imply learner completion. Production
+   export requires complete attribution; **Save activity credit** updates an
+   existing package's credit explicitly.
+3. Choose the imported package, title, meaningful **Accessible text alternative**
+   and tracking mode. The alternative must explain the learning content, not
+   merely say "an activity." It is available outside the iframe and expanded in
+   static Word/print snapshots.
+4. Test the isolated preview, including keyboard use, responsive layout, feedback,
+   result reporting and the text alternative. A score shown inside the imported
+   document is not a reported score unless the integration API sends it.
+5. Acknowledge the review and **Save reviewed HTML5 activity**. Revision conflicts
+   preserve your editor inputs. Unsaved configuration requires confirmation on
+   close. Reopen to edit, or **Remove HTML5 activity** to restore the retained
+   canvas; the package remains available for reuse in this project.
+
+HTML5 cannot be attached over an existing native experience, assessment or
+timeline. Remove that component explicitly first. Other scenes in the course can
+still use native experiences and assessments.
+
+| Tracking mode | Course behavior |
+| --- | --- |
+| View only | A required scene follows ordinary visited-scene rules; no report is needed. It contributes no score. |
+| Require reported completion | A required scene stays incomplete until `completed: true` is reported. It contributes no score. |
+| Require reported completion and include score | A required scene needs both completion and a finite 0-100 score. Its weight joins native assessment weights in the course's rounded weighted average. Zero is a valid score, not a missing score. |
+
+Optional scenes never gate completion. Completed optional scored activities with
+a reported score join grading only when **Include optional assessments** is
+enabled. Required scored activities contribute zero until completed with a score.
+The activity controls its own attempts and retries; Chimera does not impose
+native-assessment attempt limits on it. Scores are self-reported, not secure
+examination evidence. Overall pass/fail follows the course pass mark, not a
+package's internal "passed" flag.
+
+#### Integrate generated HTML with Chimera
+
+The bridge is injected before package scripts. No provider or network service is
+needed. Use the [working single-file example](../examples/html5-activity.html), or
+ask your HTML generator to use this API:
+
+```javascript
+const previous = window.ChimeraActivity.getState();
+const accepted = window.ChimeraActivity.report({
+  completed: true,
+  score: 85,
+  suspendData: "question-3",
+  location: "feedback"
+});
+if (!accepted) {
+  // Show an actionable error inside the activity.
+}
+```
+
+`report` accepts partial updates and returns false for invalid values.
+`completed` is Boolean; `score` is null (not yet reported) or finite 0-100;
+`suspendData` is a string up to **2,000 UTF-8 bytes**; `location` is a string up
+to **200 characters**. `getState()` returns the latest accepted state. Completion
+and score can arrive in either order. The package can report revised results,
+including an incomplete state, on retry.
+
+For compatible generated content, same-frame `window.API` (SCORM 1.2) and
+`window.API_1484_11` (SCORM 2004) provide initialization, GetValue/SetValue,
+commit, finish/terminate and error calls. Supported data includes:
+
+- Suspend data, lesson location/location, and lesson/completion status.
+  Completed/passed/failed lesson statuses indicate completion; SCORM 2004
+  completion status is independent of success status.
+- Raw score and min/max, normalized to 0-100; SCORM 2004 scaled score 0-1.
+  Read-only lesson mode and entry/resume hints are available.
+- Exit and session-time writes are accepted but not used to compute results or
+  forwarded as package-owned LMS tracking.
+
+Unsupported elements return an explicit adapter error; this is **not a complete
+SCORM engine**. Packages that require parent-frame identity, objectives,
+interactions, sequencing, multiple SCOs, nested windows or remote servers need
+adaptation. A root `imsmanifest.xml` is ignored, not interpreted as a full package.
+The host course, not the imported document, owns the real LMS connection.
+
+#### Portability, isolation and acceptance
+
+Uploads and expanded ZIP contents are limited to **20 MB**, ZIPs to **500
+entries**, and compiled documents to **40 MB**. Use UTF-8 HTML/CSS/JavaScript and
+stored/deflate ZIP compression. Local scripts, CSS, images, fonts, audio/video and
+VTT are compiled into the document. Dynamic fetches, external resources, module
+scripts, nested frames, forms, multi-page navigation and srcset are outside the
+supported subset. Bundle modules and resources first; broken dependencies fail
+import or surface an activity runtime error instead of silently reporting success.
+
+Imported scripts run in an opaque sandbox without parent DOM, browser storage,
+popups, forms, top navigation or direct LMS access. CSP blocks fetch/resource
+requests in the imported document and nested content. It is not a network-egress
+firewall: script-driven self-navigation cannot be prevented comprehensively
+across browsers. Navigation away is unsupported and a reloaded frame is removed
+with an error; that does not undo a navigation request already sent.
+Review packages from trusted authors; isolation
+does not prove accessibility, correctness or protection against resource abuse.
+Script failures and blocked requests appear outside the frame.
+
+Course preview retains accepted progress in its browser-local preview record.
+Standalone ZIPs include all content and open from a local file; results last
+only while that page is open. SCORM 1.2/2004 save completion, normalized score,
+suspend data and location in the host's suspend record. **Continue** restores
+them and **Start over** clears them. Navigation away and back retains progress.
+A different package does not inherit the previous package's results.
+SCORM 1.2's **4,096-byte total suspend-data limit** still applies; the export
+estimate includes activity state and escaping, and the runtime reports rejected
+tracking writes. Large courses or state strings can exceed the course budget
+even when each activity is within its individual limit.
+
+Full project backups contain the compiled package; standalone/SCORM ZIPs contain
+the delivery document. A storyboard JSON export contains references, not the
+package bytes, so it is not a portable backup by itself. HTML5 packages are not
+ordinary/shared image/audio/video assets.
+
+Automated browser checks cover offline delivery, both adapter dialects in both
+SCORM export profiles, scoring, completion, isolation and checkpoint restore.
+They do **not** certify the current build in Blackboard. Before production,
+upload the exported ZIP to the target Blackboard version and verify gradebook
+score/pass policy, completion, close/relaunch **Continue**, **Start over**, and
+the platform's browser/security settings. Earlier Blackboard success is valuable
+history, not proof for this implementation. The bundled PDF may lag this
+Markdown guide.
+
+### Author native activities without a provider
+
+For a content scene, choose **Design experience > Start native experience
+without Pythia**. This creates an editable local composition, not a model
+request. Use the activity controls to add up to eight activities:
+
+| Activity | Authoring | Learner behavior |
+| --- | --- | --- |
+| Branching decisions | Write prompts, choices and consequence feedback; select each choice's destination or **End of route**. Adding a node connects the previous node's first choice to it. Inspect that connection. Select the starting node. | Choose a route, read its consequences, and restart to explore another path. |
+| Hotspots | Describe a schematic, label its points, write explanations, and place numbered points using horizontal/vertical percentages (5-95). | Activate points by mouse, touch or keyboard, or use the equivalent disclosure list. This is a labelled schematic, not an uploaded image overlay. |
+| Sequencing | Write items in their correct order; use **Move authored item up/down** to change the answer key. Add instructions and explanatory feedback. | Start with the reverse order, reorder using labelled Move up/down buttons, check, retry or reset. Dragging is not required. |
+| Guided practice | Write each step's prompt, hint, choices and choice-specific feedback; select its correct choice. | Request a hint, try a response, and advance only after a correct response. Restart is always available. |
+
+You can combine these activities with the existing flow and reveals, or remove
+those sections entirely. At least one flow, reveal or activity must remain.
+Branch nodes must have unique identifiers, all nodes must be reachable, and
+routes must end without cycles. Invalid edits produce a validation error rather
+than being silently repaired or applied.
+
+Review the executable preview, acknowledge it, then choose **Save reviewed
+native scene edits**. Reopen to edit without Pythia. Revision conflicts preserve
+your editor contents; close/reopen current context before deliberately retrying.
+Pythia can also propose these activities through the same validated schema and
+review/apply workflow, subject to the installed adapter's capabilities.
+
+These are **formative activities, not graded assessment items**. Their choices
+do not change assessment scores or add completion gates. Course completion
+continues to follow the configured scene/media/assessment rules. Every activity
+offers **Text alternative and worked solution**, also expanded for print/Word
+snapshots. Answer keys ship in the course; do not use these as secure tests.
+
+Author edits persist in the project. Course preview retains activity progress
+in its existing browser-local preview record. Standalone delivery retains it
+only while the page is open. SCORM 1.2/2004 retain branch choices, opened
+hotspots, sequence order and completed practice steps in suspend data; Continue
+restores them and Start over clears them. Failed practice attempts and transient
+feedback are not stored. The existing tracking-budget guard and export estimate
+include activity progress; SCORM 1.2's 4,096-byte limit may constrain large courses.
+Automated delivery checks are not a new Blackboard acceptance certification.
+
 See [Native scene experiences](talk-to-pythia.md#native-scene-experiences)
 for the full review/apply procedure, context/privacy boundaries and current
 production limitations. This new section updates the Markdown guide; the

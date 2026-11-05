@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Project, Scene } from "./App";
 import { EditorDialog } from "./EditorDialog";
 import { ExperienceEditor } from "./ExperienceEditor";
+import { newActivity } from "./ExperienceActivityEditor";
 import { NativeExperience } from "./NativeExperience";
 import type { Experience } from "./NativeExperience";
 import "./scene-experience.css";
@@ -25,7 +26,9 @@ type State = {
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   const value = await response.json();
-  if (!response.ok) throw new Error(typeof value.detail === "string" ? value.detail : `Request failed (${response.status}). Check all required fields and color contrast.`);
+  if (!response.ok) throw new Error(typeof value.detail === "string" ? value.detail : Array.isArray(value.detail)
+    ? value.detail.map((issue: { loc: (string | number)[]; msg: string }) => `${issue.loc.join(".")}: ${issue.msg}`).join("; ")
+    : `Request failed (${response.status}). Check all required fields and color contrast.`);
   return value;
 }
 
@@ -146,7 +149,7 @@ export function SceneExperiencePanel({ project, scene, onClose, onProjectUpdated
   const applied = Boolean(scene.experience && (!state?.draft || state.draft.status === "applied"));
   return <EditorDialog className="experience-dialog" labelledBy="experience-title" busy={pending} onClose={close}>
     <header className="modal-head"><div><p className="eyebrow">PYTHIA / SCENE EXPERIENCE</p><h2 id="experience-title">Design the whole scene</h2></div><button type="button" disabled={pending} onClick={close}>Close</button></header>
-    <p>Native concept flow, learner-controlled explanations and optional replay—not a text-only video. Design calls use your configured model and may incur charges. Save, preview and apply do not call a provider.</p>
+    <p>Native concept flows, reveals, branching decisions, schematic hotspots, sequencing and guided practice—not a text-only video. Activities are formative, not graded assessments. Design calls use your configured model and may incur charges. Authoring, preview and save do not call a provider.</p>
     {error && <p role="alert">{error}</p>}
     {state?.operation?.error && <p role="alert">{state.operation.error}</p>}
     {notice && <p role="status">{notice}</p>}
@@ -167,7 +170,14 @@ export function SceneExperiencePanel({ project, scene, onClose, onProjectUpdated
         {state.context.selectedSources.map(source => <details key={source.id}><summary>{source.title} v{source.version}</summary>{source.passages.map((passage, i) => <p key={i}><strong>{passage.locator}</strong> {passage.text}</p>)}</details>)}
       </details>
       {contextDirty && <p role="status">Source selections changed. Load selected context before requesting a design.</p>}
-      {state.context.assemblyBlocked && <p role="alert">This native slice cannot replace existing assessment or timeline components. Those components are preserved; choose a content scene without them.</p>}
+      {state.context.assemblyBlocked && <p role="alert">Native authoring cannot replace an existing HTML5 activity, assessment or timeline. Remove those components explicitly first, or choose another content scene.</p>}
+      {!treatment && <button type="button" disabled={pending || state.context.assemblyBlocked} onClick={() => {
+        setEditingApplied(true);
+        edit({ learningIntent: "Author a native learning activity.", rationale: "Manually authored without a provider.",
+          productionNeeds: [], experience: { version: 1, heading: scene.title.slice(0, 120), introduction: "Explore and practice the ideas in this scene.",
+            flow: [], reveals: [], activities: [newActivity("branching")], conclusion: "Reflect on what you learned.", motion: false,
+            background: "#100818", foreground: "#E8E5EA", accent: "#FF32AA", accentText: "#100818", diagramAccent: "#8542E8" } });
+      }}>Start native experience without Pythia</button>}
       <label>Direction for Pythia<textarea rows={4} maxLength={4000} value={direction} disabled={pending} onChange={event => setDirection(event.target.value)} placeholder="Describe the learning experience, audience, visual relationship, interactions, branding and what must or must not be produced." /></label>
       <button type="button" disabled={pending || contextDirty || !direction.trim() || state.context.assemblyBlocked} onClick={() => void act(design)}>{running ? "Pythia is designing…" : treatment ? "Refine experience with Pythia" : "Ask Pythia for a scene experience"}</button>
       {stale && <p role="alert">The scene, brief or sources changed. Your edits are preserved; load current context and refine before applying.</p>}
@@ -199,7 +209,7 @@ export function SceneExperiencePanel({ project, scene, onClose, onProjectUpdated
               setState({ ...state, context: { ...state.context, revision: project.storyboard.revision } });
             }}>Edit applied scene without Pythia</button>
             {editingApplied && <button type="button" disabled={pending || !acknowledged} onClick={() => void act(saveApplied)}>Save reviewed native scene edits</button>}
-            <button type="button" disabled={pending} onClick={() => setRestoreConfirm(true)}>Restore underlying canvas</button>
+            <button type="button" disabled={pending || !scene.experience} onClick={() => setRestoreConfirm(true)}>Restore underlying canvas</button>
             {restoreConfirm && <div role="alert"><p>Remove the native experience from this scene and restore its retained canvas? Project history and attached media remain.</p>
               <button type="button" disabled={pending} onClick={() => void act(async () => {
                 if (!state) return;

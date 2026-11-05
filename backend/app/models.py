@@ -2,6 +2,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 from .experience_models import Experience
+from .html5_models import HTML5Activity
 
 
 SceneType = Annotated[
@@ -321,6 +322,7 @@ class AssetMetadataUpdate(BaseModel):
 
 
 class SceneUpdate(BaseModel):
+    html5Activity: HTML5Activity | None = None
     experience: Experience | None = None
     visualLayout: SceneLayout | None = None
     backgroundAsset: str | None = None
@@ -1227,7 +1229,7 @@ SceneUpdate.model_rebuild()
 
 class ExtractedAsset(BaseModel):
     id: str
-    kind: Literal["image", "audio", "video"]
+    kind: Literal["image", "audio", "video", "html5"]
     role: Literal["content", "background"] = "content"
     filename: str
     contentType: str
@@ -1248,6 +1250,7 @@ class AssetAttributionUpdate(BaseModel):
 
 
 class Scene(BaseModel):
+    html5Activity: HTML5Activity | None = None
     experience: Experience | None = None
     id: str
     visualLayout: SceneLayout | None = None
@@ -1279,6 +1282,8 @@ class Scene(BaseModel):
 
     @model_validator(mode="after")
     def native_experience_components(self):
+        if self.html5Activity and (self.experience or self.assessmentItem or self.visualLayout and self.visualLayout.timeline):
+            raise ValueError("An HTML5 activity cannot replace a native experience, assessment or timeline. Remove the existing component explicitly first.")
         if self.experience and (self.assessmentItem or self.visualLayout and self.visualLayout.timeline):
             raise ValueError("Native experience assembly cannot replace an assessment or timeline. Remove the experience first.")
         return self

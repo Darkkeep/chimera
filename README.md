@@ -1,5 +1,22 @@
 # Chimera
 
+**Imported HTML5 activities** can now sit alongside native scene experiences.
+Import an offline HTML file or single-entry ZIP, review its isolated preview and
+accessible text alternative, then choose view-only, completion, or scored tracking.
+The same package ships in standalone and SCORM 1.2/2004 exports, with reported
+scores combined with native assessments and SCORM checkpoint restoration.
+See the [HTML5 authoring and integration guide](docs/user-guide.md#import-an-externally-authored-html5-activity)
+and [working single-file example](examples/html5-activity.html). This is a bounded
+offline HTML/classic-script subset, not arbitrary web-app or full SCORM-package
+support. Target Blackboard acceptance still requires a real LMS check.
+
+Native learning experiences now include branching decisions, labelled schematic
+hotspots, keyboard sequencing and step-by-step guided practice, alongside
+concept flows and reveals. Author directly without a provider or review a
+Pythia proposal; the same runtime serves preview, standalone and SCORM delivery.
+Activities are formative and do not replace graded assessments. See the
+[native activity guide](docs/user-guide.md#author-native-activities-without-a-provider).
+
 The storyboard's **Design experience** connects Pythia's scene-level learning
 direction to an executable native concept flow and accessible click-reveals.
 Authors explicitly select source context, review/edit the actual responsive

@@ -8,14 +8,26 @@
 .native-experience .experience-flow p { margin: 0; }
 .native-experience .experience-arrow { position: absolute; right: -27px; top: 30%; font-size: 24px; color: var(--experience-diagram-accent); }
 .native-experience .experience-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-.native-experience .experience-controls button, .native-experience summary { background: var(--experience-accent); color: var(--experience-accent-text); font: inherit; font-weight: 650; border: 2px solid transparent; border-radius: 6px; padding: 10px 14px; cursor: pointer; min-height: 44px; }
+.native-experience button, .native-experience summary { background: var(--experience-accent); color: var(--experience-accent-text); font: inherit; font-weight: 650; border: 2px solid transparent; border-radius: 6px; padding: 10px 14px; cursor: pointer; min-height: 44px; }
 .native-experience :is(button,summary):focus-visible { outline: 3px solid var(--experience-fg); outline-offset: 3px; }
 .native-experience .experience-reveals { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,240px),1fr)); gap: 16px; }
 .native-experience details { min-width: 0; border: 1px solid currentColor; border-radius: 8px; }
 .native-experience details p { padding: 16px; margin: 0; white-space: pre-wrap; }
 .native-experience .experience-conclusion { margin-top: 24px; }
+.native-experience .experience-activity { border-top: 2px solid var(--experience-diagram-accent); margin-top: 24px; padding-top: 24px; }
+.native-experience .experience-activity button { margin: 4px; max-width: 100%; white-space: normal; }
+.native-experience button:disabled { opacity: .6; cursor: default; }
+.native-experience .experience-activity li { padding: 8px; }
+.native-experience .experience-activity li span { display: block; }
+.native-experience .experience-static { margin-top: 16px; padding: 8px; }
+.native-experience .experience-hotspot-board { position: relative; min-height: 280px; border: 2px solid var(--experience-diagram-accent); margin: 16px 0; border-radius: 12px; }
+.native-experience .experience-hotspot-board button { position: absolute; transform: translate(-50%,-50%); margin: 0; }
+.native-experience .experience-hotspot-list { display: grid; gap: 12px; }
 @media(max-width:600px) {
   .native-experience .experience-flow { flex-direction: column; }
   .native-experience .experience-arrow { right: 50%; top: auto; bottom: -34px; transform: rotate(90deg); }
 }
-@media print { .native-experience .experience-controls { display: none; } }
+@media print {
+  .native-experience .experience-controls, .native-experience .experience-activity > div { display: none; }
+  .native-experience .experience-static { display: block; }
+}

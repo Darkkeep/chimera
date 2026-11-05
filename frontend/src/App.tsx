@@ -50,6 +50,8 @@ import { PythiaCourseReviewView } from "./PythiaCourseReviewView";
 import { PythiaSceneActions } from "./PythiaSceneActions";
 import type { Experience } from "./NativeExperience";
 import { SceneExperiencePanel } from "./SceneExperiencePanel";
+import { HTML5ActivityPanel } from "./HTML5ActivityPanel";
+import type { HTML5Activity } from "./HTML5Activity";
 import { ProjectBackgroundPanel } from "./ProjectBackgroundPanel";
 import userGuideUrl from "../../docs/user-guide.pdf?url";
 
@@ -71,8 +73,8 @@ export type AssessmentType = AssessmentItem["type"];
 export type AssessmentSettings = { maxAttempts: number; passingScore: number; scoreWeight: number; remediationSceneId: string | null };
 export type CourseCompletionSettings = { passingScore: number; includeOptionalAssessments: boolean };
 export type ExportSettings = { packageWarningThresholdMB: number };
-export type Scene = { experience?: Experience | null; videoAssets?: string[]; mediaPlacements?: MediaPlacement[]; excludedCourseMedia?: string[]; visualLayout?: SceneLayout | null; backgroundAsset?: string | null; id: string; sourceSlide: number | null; title: string; sceneType: SceneType; layoutMode: LayoutMode; templateId: string | null; required: boolean; audioRequired: boolean; assessmentItem: AssessmentItem | null; assessmentSettings: AssessmentSettings | null; extractedText: string[]; actionDescription: string; narration: string; imageAssets: string[]; imageAltText: Record<string, string>; decorativeImages: string[]; audioAssets: string[]; previewImage: string | null; renderWarning: string | null; sourceAnimationXml: string | null; sourceTransitionXml: string | null; notes: string };
-export type Asset = { id: string; kind: "image" | "audio" | "video"; transcript?: string; captionsVtt?: string; language?: string; sharedSourceId?: string | null; role?: "content" | "background"; filename: string; contentType: string; sizeBytes: number; sha256: string; path: string; attributionText: string; attributionStatus: "draft" | "complete" };
+export type Scene = { html5Activity?: HTML5Activity | null; experience?: Experience | null; videoAssets?: string[]; mediaPlacements?: MediaPlacement[]; excludedCourseMedia?: string[]; visualLayout?: SceneLayout | null; backgroundAsset?: string | null; id: string; sourceSlide: number | null; title: string; sceneType: SceneType; layoutMode: LayoutMode; templateId: string | null; required: boolean; audioRequired: boolean; assessmentItem: AssessmentItem | null; assessmentSettings: AssessmentSettings | null; extractedText: string[]; actionDescription: string; narration: string; imageAssets: string[]; imageAltText: Record<string, string>; decorativeImages: string[]; audioAssets: string[]; previewImage: string | null; renderWarning: string | null; sourceAnimationXml: string | null; sourceTransitionXml: string | null; notes: string };
+export type Asset = { id: string; kind: "image" | "audio" | "video" | "html5"; transcript?: string; captionsVtt?: string; language?: string; sharedSourceId?: string | null; role?: "content" | "background"; filename: string; contentType: string; sizeBytes: number; sha256: string; path: string; attributionText: string; attributionStatus: "draft" | "complete" };
 export type ProjectSummary = { id: string; title: string; sceneCount: number; updatedAt: string; hasSourceDeck: boolean; parentProjectId?: string | null; siblingOrder?: number; metadataRevision?: number };
 export type Assessment = { id: string; title: string; questionSceneIds: string[] };
 export type Project = ProjectSummary & { storyboard: { backgroundAsset?: string | null; courseMedia?: MediaPlacement[]; revision: number; scenes: Scene[]; assets: Asset[]; assessments?: Assessment[]; completionSettings: CourseCompletionSettings; exportSettings: ExportSettings } };
@@ -127,6 +129,7 @@ export function App() {
   const [showPythiaAnalysis, setShowPythiaAnalysis] = useState(false);
   const [showPythiaTransform, setShowPythiaTransform] = useState(false);
   const [showSceneExperience, setShowSceneExperience] = useState(false);
+  const [showHTML5, setShowHTML5] = useState(false);
   const [showPythiaAssessmentDesign, setShowPythiaAssessmentDesign] = useState(false);
   const [showPythiaCourseReview, setShowPythiaCourseReview] = useState(false);
   const [showReviewTools, setShowReviewTools] = useState(false);
@@ -197,7 +200,7 @@ export function App() {
     showProjectBackground ? "storyboard.background" :
     showAccessibility ? "review.accessibility" : showValidation ? "review.validation" :
     showGoldenPath ? "catalog" : showManagement ? "workspace.management" : activeView;
-  const hasOpenForm = Boolean(showSceneExperience || showPythiaTalk || showSources || visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showProjectBackground || showAccessibility || showValidation);
+  const hasOpenForm = Boolean(showHTML5 || showSceneExperience || showPythiaTalk || showSources || visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showProjectBackground || showAccessibility || showValidation);
   const preparationAttempt = useRef("");
   useEffect(() => {
     if (!project.id || !permissions.canEdit || busy || hasOpenForm || !project.storyboard.scenes.some(item => !item.visualLayout)) return;
@@ -1232,7 +1235,7 @@ export function App() {
   const assessmentItemCount = scenes.filter((item) => item.assessmentItem !== null).length;
   const scene = scenes[selectedScene];
   const previewScene = scene ? resolvedSceneBackground(project, scene) : null;
-  const hasSceneStage = Boolean(previewScene && (previewScene.experience || previewScene.visualLayout?.enabled || previewScene.assessmentItem));
+  const hasSceneStage = Boolean(previewScene && (previewScene.html5Activity || previewScene.experience || previewScene.visualLayout?.enabled || previewScene.assessmentItem));
   const canCreateProject = !session || session.memberships.some(item => ["author", "instructional-designer", "administrator"].includes(item.role));
   const parentProject = projects.find(parent => parent.id === project.parentProjectId);
 
@@ -1352,6 +1355,7 @@ export function App() {
               <button className="button button-accent" onClick={() => beginSceneEdit()} disabled={busy || !permissions.canEdit}><Pencil size={16} /> Edit scene</button>
               <PythiaSceneActions key={`${project.id}-${scene.id}`} projectId={project.id} disabled={busy || !permissions.canEnhance} onAnalyze={() => setShowPythiaAnalysis(true)} onTransform={() => setShowPythiaTransform(true)} onDesignAssessment={() => setShowPythiaAssessmentDesign(true)} />
               <button type="button" className="button button-outline" disabled={busy || !permissions.canEnhance} onClick={() => setShowSceneExperience(true)}><Sparkles size={15} />Design experience</button>
+              <button type="button" className="button button-outline" disabled={busy || !permissions.canEdit} onClick={() => setShowHTML5(true)}>HTML5 activity</button>
             </div>
             <div className="scene-context-title"><h2>{scene.title}</h2><span>Scene {selectedScene + 1} of {scenes.length} · {scene.required ? "Required" : "Optional"}</span></div>
           </div>
@@ -1392,6 +1396,7 @@ export function App() {
     {showPythiaAnalysis && scene && <PythiaAnalysisView key={`${project.id}-${scene.id}`} projectId={project.id} scene={scene} onClose={() => setShowPythiaAnalysis(false)} />}
     {showPythiaTransform && scene && <PythiaTransformView key={`${project.id}-${scene.id}`} projectId={project.id} revision={project.storyboard.revision} scene={scene} scenes={scenes} onClose={() => setShowPythiaTransform(false)} onProjectUpdated={applyProject} />}
     {showSceneExperience && scene && <SceneExperiencePanel key={`${project.id}-${scene.id}`} project={project} scene={scene} onClose={() => setShowSceneExperience(false)} onProjectUpdated={applyProject} />}
+    {showHTML5 && scene && <HTML5ActivityPanel key={`${project.id}-${scene.id}`} project={project} scene={scene} onClose={() => setShowHTML5(false)} onProjectUpdated={applyProject} />}
     {showPythiaAssessmentDesign && scene && <PythiaAssessmentDesignView key={`${project.id}-${scene.id}`} projectId={project.id} scene={scene} scenes={scenes} onClose={() => setShowPythiaAssessmentDesign(false)} />}
     {showPythiaCourseReview && <PythiaCourseReviewView project={project} onClose={() => setShowPythiaCourseReview(false)} onNavigateToObject={reference => openCourseReviewObject(reference.object_type, reference.object_id)} />}
     {showAssessments && permissions.canEdit && <AssessmentsEditor key={project.id} project={project} canExport={permissions.canExport} onClose={() => setShowAssessments(false)} onProjectUpdated={applyProject} onEditQuestion={(sceneId, updatedProject) => {

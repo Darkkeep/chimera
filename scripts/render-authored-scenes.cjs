@@ -45,6 +45,8 @@ async function main() {
       },scene.visualLayout.timeline.printTimeMs);
       await page.evaluate(() => {
         document.querySelectorAll('.native-experience details').forEach(detail => { detail.open = true; });
+        document.querySelectorAll('.html5-activity details').forEach(detail => { detail.open = true; });
+        document.querySelectorAll('.html5-activity iframe').forEach(frame => { frame.hidden = true; });
         const motion = document.querySelector('#motion');
         if (motion && !motion.hidden && motion.textContent.includes('Stop')) motion.click();
       });

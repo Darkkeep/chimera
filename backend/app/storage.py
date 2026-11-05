@@ -754,6 +754,11 @@ def update_scene(project_id: str, scene_id: str, data: SceneUpdate, expected_rev
             if "visualLayout" in updates and updated_scene.visualLayout:
                 updated_scene = updated_scene.model_copy(update={"backgroundAsset": updated_scene.visualLayout.backgroundAsset})
             validate_visual_assets(updated_scene, {asset.id: asset for asset in current.storyboard.assets})
+            if updated_scene.html5Activity and not any(
+                asset.id == updated_scene.html5Activity.assetId and asset.kind == "html5"
+                for asset in current.storyboard.assets
+            ):
+                raise ValueError("HTML5 activity must reference an imported HTML5 asset in this project")
             if "visualLayout" in updates and updated_scene.visualLayout and updated_scene.visualLayout.enabled:
                 visual_image_ids = [element.assetId for element in updated_scene.visualLayout.elements if element.kind == "image"]
                 visual_text = [element.text for element in updated_scene.visualLayout.elements if element.kind == "text" and element.text.strip()]

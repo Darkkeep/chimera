@@ -1,5 +1,48 @@
 # Chimera backend
 
+## Imported HTML5 activities
+
+`POST /api/projects/{project_id}/html5-import` requires `project.import`,
+`If-Match`, multipart `file`, optional `entrypoint` (default `index.html` for ZIP)
+and `credit` (up to 2,000 characters). Returns `201 {project, assetId}` without
+attaching the activity. Missing revisions return 428, stale writes 412, invalid
+packages 422, and oversized uploads 413. SHA-256-addressed imports deduplicate
+without silently replacing existing credit metadata.
+
+The compiler accepts UTF-8 HTML/CSS/JavaScript, classic scripts, local styles,
+images, fonts, media and VTT. ZIPs use stored/deflate compression and are limited
+to 500 entries, 20 MB uploaded/expanded, and 40 MB compiled HTML. Resources become
+data URLs; CSP blocks resource/fetch requests in the imported document. It is
+not a network-egress firewall: script-driven self-navigation cannot be prevented
+comprehensively across browsers. Navigation away is unsupported and the host
+removes a reloaded frame. Entry points are explicit, not
+inferred from a SCORM manifest. Modules must be bundled first. Nested frames,
+forms, external URLs, multi-page links, HTTP-equiv metadata, srcset, unsafe paths,
+duplicate paths, encrypted files and symlinks are rejected.
+
+Attach via revision-guarded scene PATCH with `html5Activity` containing `assetId`,
+`title`, `alternative`, `tracking` (`view|completion|scored`), and `scoreWeight`
+(greater than zero, at most 100; default 1). Explicitly remove native experiences,
+assessments or timelines first. Removal sets `html5Activity: null`, retaining the
+canvas and reusable package. HTML5 packages cannot be ordinary/shared media.
+Project backup includes compiled content; storyboard JSON alone does not.
+
+An opaque `sandbox="allow-scripts"` frame hosts the imported document. The shared
+runtime validates source/token-bound reports and bounds persisted data; author
+preview, course preview and exports use the same bridge. JavaScript errors,
+blocked resources and invalid reports are surfaced. This isolates parent DOM,
+storage and LMS APIs; it is not content certification or secure examination.
+Follow the [integration protocol, limits and LMS checks](../docs/user-guide.md#import-an-externally-authored-html5-activity).
+
+Native experiences accept up to eight discriminated `activities`: `branching`,
+`hotspots`, `sequencing`, and `guided-practice`. The existing version-1 flow/reveal
+payload remains readable without `activities`. Branch graphs must be reachable
+and acyclic; item identifiers, choice references and bounded coordinates are
+validated. Scene PATCH writes that include `experience` require `If-Match`,
+including removing an experience. These activities are formative: they do not
+change assessment scoring or completion policy. Shared rendering and SCORM
+suspend-data tracking are described in the [native activity guide](../docs/user-guide.md#author-native-activities-without-a-provider).
+
 The scene editor's [timeline and appearance implementation](../docs/scene-timeline-implementation.md) extends the existing scene-update `visualLayout` payload. `SceneLayout.timeline` version 1 contains integer-millisecond `durationMs`, `printTimeMs`, independent audio/video `clips`, and named `cues`. Clips reference project assets and separate `startMs` from `sourceInMs`/`sourceOutMs`; source duration, volume/fades, completion threshold, and video geometry/layer order are validated. Elements optionally contain `nativeShape`, `appearance`, `timing`, `name`, `groupId`, `hidden`, and `aspectLocked`. Timeline duration is limited to one hour, with at most 200 clips and 200 cues; all endpoints must fit. Existing scenes with no timeline retain legacy playback. Native effects and transport code under `app/static` are shared with frontend/delivery/Word rendering. Save through the existing revision-guarded scene API so history, asset checks, and authorization remain enforced.
 
 Authentication profiles, hosted sign-in/recovery, project membership, and authenticated review links are documented in the [deployment guide](../docs/authentication-deployments.md). Set `CHIMERA_DEPLOYMENT_PROFILE=networked` for password authentication, or `encarta` for the intentionally disabled integration profile. Unimplemented providers never fall back to local identity. The hosted frontend and local HTTPS qualification are implemented; real Linux/Nginx server qualification awaits the deferred connection details.
