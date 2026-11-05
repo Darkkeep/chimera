@@ -85,7 +85,7 @@ test('opens My Work on launch and refresh, with detailed blockers', async ({ pag
   await mockWorkspace(page);
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'My Work', exact: true })).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Workspace', exact: true }).getByRole('button').first()).toHaveText('My Work');
+  await expect(page.getByRole('navigation', { name: 'Workspace', exact: true }).getByRole('button', { name: 'My Work', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('button', { name: 'Edit Alpha course', exact: true })).toBeVisible();
   await expect(page.getByText('Missing media files: 1; Missing media attribution: 1')).toHaveCount(2);
   await page.locator('.health-blockers summary').first().click();

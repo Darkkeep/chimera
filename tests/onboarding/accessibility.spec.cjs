@@ -154,6 +154,7 @@ test('media library saves scene descriptions with credit and with attachment', a
   expect(stored.storyboard.scenes[1].imageAltText[assetId]).toBeUndefined();
   expect(stored.storyboard.assets[0].attributionText).toBe('Original gauge artwork');
   await item.getByRole('button', { name: 'Detach media', exact: true }).click();
+  await page.locator('.other-project-media > summary').click();
   await expect(item.getByRole('button', { name: 'Attach to scene', exact: true })).toBeVisible();
   await item.getByRole('textbox', { name: 'Alternative text' }).fill('A newly attached gauge.');
   await item.getByRole('textbox', { name: 'Attribution / credit' }).fill('Updated original artwork credit');

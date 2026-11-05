@@ -117,6 +117,8 @@ async function freePort() {
   await page.mouse.move(box.x + 30, box.y + 20); await page.mouse.down(); await page.mouse.move(box.x + 85, box.y + 50, { steps: 8 }); await page.mouse.up();
   await expect.poll(async () => Number(await page.getByLabel('Element x', { exact: true }).inputValue())).toBeGreaterThan(beforeX);
   await page.getByLabel('Element width', { exact: true }).fill('560');
+  await page.locator('.visual-inspector summary').filter({ hasText: /^Appearance$/ }).click();
+  await page.getByRole('checkbox', { name: 'Lock aspect ratio', exact: true }).check();
   const textRatio = Number(await page.getByLabel('Element width', { exact: true }).inputValue()) / Number(await page.getByLabel('Element height', { exact: true }).inputValue());
   const textResizeHandle = text.locator('xpath=..').locator('.visual-resize-handle-se');
   await textResizeHandle.scrollIntoViewIfNeeded();
@@ -137,12 +139,9 @@ async function freePort() {
   const dropPoint = { x: stageBox.x + stageBox.width * 0.7, y: visibleStageTop + (visibleStageBottom - visibleStageTop) * 0.3 };
   assert(await page.locator('.visual-editor .visual-stage-frame').evaluate((element, point) => element.contains(document.elementFromPoint(point.x, point.y)), dropPoint),
     `drag target must hit the visible stage: ${JSON.stringify({ thumbnailBox, stageBox, editorBox, dropPoint })}`);
-  await page.mouse.move(thumbnailBox.x + 3, thumbnailBox.y + 3);
-  await page.mouse.down();
-  await page.mouse.move(thumbnailBox.x + 15, thumbnailBox.y - 15, {steps: 5});
-  await page.mouse.move(dropPoint.x, dropPoint.y, {steps: 12});
-  await page.mouse.move(dropPoint.x + 1, dropPoint.y + 1);
-  await page.mouse.up();
+  await thumbnail.dragTo(page.locator('.visual-editor .visual-stage-frame'), {
+    targetPosition: { x: dropPoint.x - stageBox.x, y: dropPoint.y - stageBox.y },
+  });
   await expect(page.locator('.visual-editable .visual-image')).toHaveCount(beforeImages + 1);
   const addedImage = page.locator('.visual-editable .visual-image').last();
   await addedImage.click();
@@ -167,7 +166,7 @@ async function freePort() {
   await expect(page.locator('.visual-editable .visual-image')).toHaveCount(beforeImages);
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await expect(page.locator('.visual-editable .visual-image')).toHaveCount(beforeImages + 1);
-  await page.getByRole('button', { name: 'Add text', exact: true }).click();
+  await page.getByRole('button', { name: 'Add text layer', exact: true }).click();
   await expandInspector(page, 'Layout');
   await page.getByLabel('Element text', { exact: true }).fill('Added text');
   const addedText = page.locator('.visual-editable').filter({ hasText: 'Added text' });
@@ -178,7 +177,7 @@ async function freePort() {
   await page.getByRole('button', { name: 'Bring forward', exact: true }).click();
   await page.getByRole('button', { name: 'Delete element', exact: true }).click();
   await assert.rejects(() => addedText.waitFor({ state: 'visible', timeout: 1000 }));
-  await page.getByRole('button', { name: 'Add text', exact: true }).click();
+  await page.getByRole('button', { name: 'Add text layer', exact: true }).click();
   await expandInspector(page, 'Layout');
   await page.getByLabel('Element text', { exact: true }).fill('Added text');
   const expectedTextWidth = Number(await text.locator('xpath=..').evaluate(element => element.style.width.replace('px', '')));
@@ -276,11 +275,11 @@ async function freePort() {
     }), `${profile} should load its packaged master background`);
     assert(await exported.locator('.visual-element img').evaluateAll(images => images.every(image => image.complete && image.naturalWidth > 0)));
     await exported.screenshot({ path: path.join(output, `${profile}-desktop.png`), fullPage: true });
+    await exported.setViewportSize({ width: 390, height: 844 });
     await exported.getByLabel('Contents', { exact: true }).selectOption('22');
     await exported.getByLabel('Contents', { exact: true }).selectOption('7');
     assert.equal(await exported.locator('#scene-status').textContent(), '8 / 24');
     await exported.getByLabel('Contents', { exact: true }).selectOption('0');
-    await exported.setViewportSize({ width: 390, height: 844 });
     await exported.screenshot({ path: path.join(output, `${profile}-mobile.png`), fullPage: true });
     assert(await exported.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await exported.close();

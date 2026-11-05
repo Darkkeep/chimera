@@ -118,7 +118,7 @@ class VideoGenerationTests(unittest.TestCase):
         self.assertNotIn("https://", finished.model_dump_json())
 
     def test_reviewed_shots_render_in_order_and_survive_candidates_regeneration_and_retry(self):
-        from .test_video_treatments import TREATMENT
+        from backend.tests.test_video_treatments import TREATMENT
         reviewed = {"sourceRevision": self.project.storyboard.revision, "treatment": TREATMENT}
         job = self.job(videoTreatment=reviewed, prompt=TREATMENT["title"], purpose=TREATMENT["purpose"], durationSeconds=12)
         with self.transport("shotstack") as transport:

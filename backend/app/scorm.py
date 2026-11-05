@@ -637,7 +637,10 @@ PLAYER_HTML = '''<!doctype html>
 PLAYER_HTML = PLAYER_HTML.replace("</head>", "<style>" + (Path(__file__).parent / "static" / "player-shell.css").read_text(encoding="utf-8") + "</style></head>")
 
 
-PLAYER_HTML = PLAYER_HTML.replace("</head>", f"<style>{ASSESSMENT_SURFACE_CSS}\n{EXPERIENCE_CSS}</style></head>")
+PLAYER_HTML = PLAYER_HTML.replace(
+    "</head>",
+    f"<style>{ASSESSMENT_SURFACE_CSS}\n{EXPERIENCE_CSS}\n.mobile-contents{{overflow-x:hidden}}</style></head>",
+)
 
 
 def _scorm_12_player() -> str:

@@ -20,6 +20,7 @@ export function TimelinePlayback({
   playing,
   onPlaying,
   audition,
+  animateStage = false,
 }: {
   root: React.RefObject<HTMLDivElement | null>;
   project: Project;
@@ -31,6 +32,7 @@ export function TimelinePlayback({
   playing?: boolean;
   onPlaying?: (b: boolean) => void;
   audition?: { muted: string[]; solo: string | null };
+  animateStage?: boolean;
 }) {
   const lastSaved = useRef(0);
   const transport = useRef<SceneTransport | null>(null);
@@ -45,7 +47,6 @@ export function TimelinePlayback({
       host = root.current,
       stage = host?.querySelector<HTMLElement>(".visual-stage");
     if (!layout?.timeline || !host || !stage) return;
-    const cancel = playStageAnimations(host, layout.elements);
     const initial =
       controlledTime ?? (progress[`clock:${scene.id}`]?.position || 0) * 1000;
     const controller = createSceneTransport({
@@ -104,7 +105,6 @@ export function TimelinePlayback({
         watchedRanges: [],
       });
       controller.dispose();
-      cancel();
       transport.current = null;
     };
     // Rebuild only when saved composition changes; progress is read when mounted.
@@ -123,6 +123,12 @@ export function TimelinePlayback({
     if (playing) transport.current?.play();
     else transport.current?.pause();
   }, [playing]);
+  useEffect(() => {
+    const layout = scene.visualLayout,
+      host = root.current;
+    if (!layout?.timeline || !host || !(animateStage || active || playing)) return;
+    return playStageAnimations(host, layout.elements);
+  }, [scene.id, signature, animateStage, active, playing]);
   useEffect(() => {
     transport.current?.setAudition(audition || { muted: [], solo: null });
   }, [audition, signature]);

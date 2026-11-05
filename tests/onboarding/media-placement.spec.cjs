@@ -2,9 +2,18 @@ const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const http = require('node:http');
+
+let extractedDirectory;
+test.afterEach(() => {
+  if (extractedDirectory) {
+    fs.rmSync(extractedDirectory, { recursive: true, force: true });
+    extractedDirectory = undefined;
+  }
+});
 
 async function serveDirectory(directory) {
   const server = http.createServer((request, response) => {
@@ -124,7 +133,8 @@ for (const profile of ['scorm-12', 'scorm-2004', 'standalone']) {
     await change('course-media', { placements: [{ assetId: asset.id, position: 'before', order: 0 }] }, 'put');
     const downloaded = await request.get(`${root}/${profile}.zip`);
     expect(downloaded.ok(), await downloaded.text()).toBe(true);
-    const archive = testInfo.outputPath('video.zip'), directory = testInfo.outputPath('portable video');
+    const archive = testInfo.outputPath('video.zip'), directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chimera-video-'));
+    extractedDirectory = directory;
     fs.writeFileSync(archive, await downloaded.body());
     execFileSync(require('./python.cjs'), ['-m', 'zipfile', '-e', archive, directory]);
     const context = await browser.newContext({ offline: profile === 'standalone' && testInfo.project.name !== 'webkit', serviceWorkers: 'block' });

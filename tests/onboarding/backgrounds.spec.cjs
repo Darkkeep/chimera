@@ -81,7 +81,7 @@ test('original comparison never changes the authored previews or survives reopen
   await editor.getByRole('tab', { name: 'Stage', exact: true }).click();
   await editor.getByRole('button', { name: 'Compare with original', exact: true }).click();
   await expect(editor.locator('.visual-source')).toBeVisible();
-  await expect(editor.getByRole('status')).toContainText('Original slide reference');
+  await expect(editor.locator('.field-hint').filter({ hasText: 'Original slide reference' })).toBeVisible();
   await editor.getByRole('button', { name: 'Close scene editor', exact: true }).click();
   await expect(page.locator('.visual-authoring-surface .visual-stage')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
   await page.getByRole('button', { name: 'Preview course', exact: true }).click();

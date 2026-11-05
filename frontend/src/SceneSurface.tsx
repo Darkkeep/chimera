@@ -79,10 +79,11 @@ export function ScaledStage({ layout, projectId, children, assessment }: { layou
 export function SceneSurface({ project, scene, assessment, animate = false, timeMs, playing, onTime, onPlaying, progress, onProgress, audition }: { project: Project; scene: Scene; assessment?: ReactNode; animate?: boolean; timeMs?:number; playing?:boolean; onTime?:(n:number)=>void; onPlaying?:(b:boolean)=>void; progress?:Record<string,ClipProgress>; onProgress?:(id:string,p:ClipProgress)=>void;audition?:{muted:string[];solo:string|null} }) {
   const animationRoot = useRef<HTMLDivElement>(null);
   const animationSignature = JSON.stringify(scene.visualLayout?.elements.map(element => ({ id: element.id, animations: element.animations })) || []);
+  const hasTimeline = Boolean(scene.visualLayout?.timeline);
   useEffect(() => {
-    if (scene.experience || scene.visualLayout?.timeline || !animate || !animationRoot.current) return;
+    if (scene.experience || hasTimeline || !animate || !animationRoot.current) return;
     return playStageAnimations(animationRoot.current, JSON.parse(animationSignature));
-  }, [scene.id, scene.experience, animate, animationSignature]);
+  }, [scene.id, scene.experience, hasTimeline, animate, animationSignature]);
   const resolved = resolvedSceneBackground(project, scene);
   if (scene.html5Activity) return <HTML5Player projectId={project.id} activity={scene.html5Activity} />;
   if (scene.experience) return <NativeExperience experience={scene.experience}
@@ -92,5 +93,5 @@ export function SceneSurface({ project, scene, assessment, animate = false, time
   const region = assessmentRegion(scene.visualLayout || layout, scene.title);
   const question = scene.assessmentItem ? <div className="assessment-stage-region" style={{ left: `${region.x / layout.width * 100}%`, marginTop: `${region.y / layout.width * 100}%`, width: `${region.width / layout.width * 100}%` }}>{assessment ?? <AssessmentStageContent item={scene.assessmentItem} />}</div> : undefined;
   const elements = visibleSceneElements(layout, scene.title, Boolean(scene.assessmentItem));
-  return <div ref={animationRoot}><ScaledStage layout={layout} projectId={project.id} assessment={question}>{() => elements.map(element => <div key={element.id} data-scene-element={element.id} aria-hidden={layout.timeline && element.timing && element.kind==="text" ? true : undefined} className="visual-element" style={{ position: "absolute", left: element.x, top: element.y, width: element.width, height: element.height, transform: `rotate(${element.rotation}deg)`, zIndex:layout.elements.indexOf(element)*2+1 }}><ElementContent element={element} project={project} scene={scene} /></div>)}</ScaledStage>{layout.timeline && <div className="sr-only">{elements.filter(e=>e.kind==="text"&&e.timing).map(e=><p key={e.id}>{e.text}</p>)}</div>}{layout.timeline && <TimelinePlayback root={animationRoot} project={project} scene={{...scene,visualLayout:layout}} controlledTime={timeMs} playing={playing} onTime={onTime} onPlaying={onPlaying} progress={progress} onProgress={onProgress} audition={audition}/>}</div>;
+  return <div ref={animationRoot}><ScaledStage layout={layout} projectId={project.id} assessment={question}>{() => elements.map(element => <div key={element.id} data-scene-element={element.id} aria-hidden={layout.timeline && element.timing && element.kind==="text" ? true : undefined} className="visual-element" style={{ position: "absolute", left: element.x, top: element.y, width: element.width, height: element.height, transform: `rotate(${element.rotation}deg)`, zIndex:layout.elements.indexOf(element)*2+1 }}><ElementContent element={element} project={project} scene={scene} /></div>)}</ScaledStage>{layout.timeline && <div className="sr-only">{elements.filter(e=>e.kind==="text"&&e.timing).map(e=><p key={e.id}>{e.text}</p>)}</div>}{layout.timeline && <TimelinePlayback root={animationRoot} project={project} scene={{...scene,visualLayout:layout}} controlledTime={timeMs} playing={playing} onTime={onTime} onPlaying={onPlaying} progress={progress} onProgress={onProgress} audition={audition} animateStage={animate}/>}</div>;
 }

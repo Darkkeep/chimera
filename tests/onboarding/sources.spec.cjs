@@ -21,9 +21,9 @@ test('source intake persists all four inputs and distinguishes a link from page 
   await dialog.getByLabel('Source title', { exact: true }).fill('Policy bookmark');
   await dialog.getByLabel('Page URL', { exact: true }).fill('https://example.com/policy');
   await dialog.getByRole('button', { name: 'Save source', exact: true }).click();
-  await expect(dialog.getByRole('status')).toContainText('no usable text yet');
+  await expect(dialog.getByRole('status')).toContainText('Link saved only');
   await dialog.getByText('Policy bookmark · web · 0 passages', { exact: true }).click();
-  await expect(dialog.getByText(/Link saved only/)).toBeVisible();
+  await expect(dialog.getByLabel('Saved sources').getByText(/Link saved only/)).toBeVisible();
   await dialog.getByRole('button', { name: /^Pythia conversations and outputs/ }).click();
   await dialog.getByLabel('Source title', { exact: true }).fill('Pythia planning excerpt');
   await dialog.getByLabel('Conversation or output text', { exact: true }).fill('User: Build a lesson.\nPythia: Start with an observable objective.');
