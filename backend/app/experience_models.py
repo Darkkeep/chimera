@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_serializer,
 
 Text = Annotated[str, Field(min_length=1, max_length=2000)]
 Label = Annotated[str, Field(min_length=1, max_length=120)]
+ScreenshotAlt = Annotated[str, Field(min_length=1, max_length=500)]
 
 
 class StrictModel(BaseModel):
@@ -220,8 +221,30 @@ class GuidedPracticeActivity(StrictModel):
         return self
 
 
+class SoftwareWalkthroughStep(StrictModel):
+    id: Identifier
+    label: Label
+    screenshotAssetId: str = Field(min_length=1, max_length=120)
+    screenshotAltText: ScreenshotAlt
+    description: Text
+    actionPrompt: Text
+
+
+class SoftwareWalkthroughActivity(StrictModel):
+    kind: Literal["software-walkthrough"]
+    id: Identifier
+    title: Label
+    steps: list[SoftwareWalkthroughStep] = Field(min_length=1, max_length=10)
+
+    @model_validator(mode="after")
+    def unique_steps(self):
+        if len({step.id for step in self.steps}) != len(self.steps):
+            raise ValueError("Walkthrough step IDs must be unique")
+        return self
+
+
 Activity = Annotated[
-    BranchingActivity | HotspotActivity | SequencingActivity | GuidedPracticeActivity,
+    BranchingActivity | HotspotActivity | SequencingActivity | GuidedPracticeActivity | SoftwareWalkthroughActivity,
     Field(discriminator="kind"),
 ]
 

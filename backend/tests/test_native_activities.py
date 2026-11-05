@@ -47,6 +47,15 @@ ACTIVITIES = [
          "choices": [
              {"id": "report", "label": "Report findings", "feedback": "Others can now act."},
              {"id": "forget", "label": "Forget it", "feedback": "The risk remains."}]}]},
+    {"kind": "software-walkthrough", "id": "walkthrough", "title": "Complete a support request", "steps": [
+        {"id": "open-settings", "label": "Open settings", "screenshotAssetId": "screenshot",
+         "screenshotAltText": "Settings screen with the account menu open.",
+         "description": "The account menu is open in the settings screen.",
+         "actionPrompt": "Open the account settings."},
+        {"id": "save-profile", "label": "Save the profile", "screenshotAssetId": "screenshot",
+         "screenshotAltText": "Profile form with the Save button visible.",
+         "description": "The profile form is ready to save.",
+         "actionPrompt": "Save the updated profile."}]},
 ]
 
 
@@ -127,7 +136,8 @@ class NativeActivityTests(unittest.TestCase):
                 Experience.model_validate(invalid)
 
     def test_activity_bounds_unknown_content_and_invalid_answer_rejected(self):
-        for problem in ("position", "infinity", "duplicate-point", "duplicate-item", "missing-answer", "duplicate-step", "unknown", "empty", "empty-image"):
+        for problem in ("position", "infinity", "duplicate-point", "duplicate-item", "missing-answer", "duplicate-step",
+                        "duplicate-walkthrough-step", "missing-screenshot", "empty-alt", "unknown", "empty", "empty-image"):
             data = experience()
             if problem == "position":
                 data["activities"][1]["hotspots"][0]["x"] = 101
@@ -141,6 +151,12 @@ class NativeActivityTests(unittest.TestCase):
                 data["activities"][3]["steps"][0]["correctChoiceId"] = "missing"
             elif problem == "duplicate-step":
                 data["activities"][3]["steps"][1]["id"] = "identify"
+            elif problem == "duplicate-walkthrough-step":
+                data["activities"][4]["steps"][1]["id"] = "open-settings"
+            elif problem == "missing-screenshot":
+                data["activities"][4]["steps"][0]["screenshotAssetId"] = ""
+            elif problem == "empty-alt":
+                data["activities"][4]["steps"][0]["screenshotAltText"] = ""
             elif problem == "unknown":
                 data["activities"][0]["script"] = "alert(1)"
             elif problem == "empty-image":
@@ -178,29 +194,36 @@ class NativeActivityTests(unittest.TestCase):
         client = self.enterContext(TestClient(main.app))
         project = storage.create_project(ProjectCreate(title="Native activities"))
         project = storage.create_scene(project.id, SceneCreate(title="Practice"))
+        project = storage.add_project_asset(project.id, "screenshot.png", b"\x89PNG\r\n\x1a\nsynthetic screenshot", "image",
+            project.storyboard.revision)
+        screenshot = next(asset for asset in project.storyboard.assets if asset.filename == "screenshot.png")
         scene = project.storyboard.scenes[0]
         url = f"/api/projects/{project.id}/scenes/{scene.id}"
         headers = {"Origin": "http://127.0.0.1:5173", "If-Match": f'"{project.storyboard.revision}"'}
         self.assertEqual(client.patch(url, json={"experience": experience()}, headers={"Origin": headers["Origin"]}).status_code, 428)
-        invalid = experience()
+        data = experience()
+        data["activities"][4]["steps"][0]["screenshotAssetId"] = screenshot.id
+        data["activities"][4]["steps"][1]["screenshotAssetId"] = screenshot.id
+        invalid = copy.deepcopy(data)
         invalid["activities"][0]["startNodeId"] = "missing"
         self.assertEqual(client.patch(url, json={"experience": invalid}, headers=headers).status_code, 422)
-        response = client.patch(url, json={"experience": experience()}, headers=headers)
+        response = client.patch(url, json={"experience": data}, headers=headers)
         self.assertEqual(response.status_code, 200, response.text)
-        self.assertEqual(client.patch(url, json={"experience": experience()}, headers=headers).status_code, 412)
+        self.assertEqual(client.patch(url, json={"experience": data}, headers=headers).status_code, 412)
         loaded = storage.read_project(project.id)
-        self.assertEqual(loaded.storyboard.scenes[0].experience.model_dump(), experience())
-        self.assertEqual(client.get(f"/api/projects/{project.id}").json()["storyboard"]["scenes"][0]["experience"], experience())
+        self.assertEqual(loaded.storyboard.scenes[0].experience.model_dump(), data)
+        self.assertEqual(client.get(f"/api/projects/{project.id}").json()["storyboard"]["scenes"][0]["experience"], data)
         estimate = _resume_budget_report(loaded, "SCORM 1.2")
         for builder in (build_scorm_12, build_scorm_2004, build_standalone_course):
             with self.subTest(builder=builder.__name__):
                 content, _ = builder(loaded)
                 with ZipFile(io.BytesIO(content)) as archive:
-                    self.assertEqual(json.loads(archive.read("storyboard.json"))["scenes"][0]["experience"], experience())
+                    self.assertEqual(json.loads(archive.read("storyboard.json"))["scenes"][0]["experience"], data)
                     script = archive.read("player.js").decode()
                     self.assertIn("state.experiences[scene.id] = progress; save()", script)
                     self.assertIn("Text alternative and worked solution", script)
                     self.assertIn('activity.kind === "guided-practice"', script)
+                    self.assertIn('activity.kind === "software-walkthrough"', script)
         loaded.storyboard.scenes[0].experience = None
         self.assertGreater(estimate["estimatedMaximumBytes"], _resume_budget_report(loaded, "SCORM 1.2")["estimatedMaximumBytes"])
 
@@ -222,13 +245,24 @@ class NativeActivityTests(unittest.TestCase):
         headers = {"Origin": "http://127.0.0.1:5173", "If-Match": f'"{image.storyboard.revision}"'}
         data = experience()
         data["activities"][1]["imageAssetId"] = asset.id
+        data["activities"][4]["steps"][0]["screenshotAssetId"] = asset.id
+        data["activities"][4]["steps"][1]["screenshotAssetId"] = asset.id
 
         invalid = copy.deepcopy(data)
         invalid["activities"][1]["imageAssetId"] = "missing-image"
         self.assertEqual(client.patch(url, json={"experience": invalid}, headers=headers).status_code, 422)
+        invalid = copy.deepcopy(data)
+        invalid["activities"][4]["steps"][0]["screenshotAssetId"] = "missing-image"
+        self.assertEqual(client.patch(url, json={"experience": invalid}, headers=headers).status_code, 422)
         audio_project = storage.add_project_asset(project.id, "sound.wav", b"audio", "audio",
             image.storyboard.revision)
         headers["If-Match"] = f'"{audio_project.storyboard.revision}"'
+        invalid = copy.deepcopy(data)
+        invalid["activities"][4]["steps"][0]["screenshotAssetId"] = next(
+            item.id for item in audio_project.storyboard.assets if item.filename == "sound.wav"
+        )
+        self.assertEqual(client.patch(url, json={"experience": invalid}, headers=headers).status_code, 422)
+        invalid = copy.deepcopy(data)
         invalid["activities"][1]["imageAssetId"] = next(
             item.id for item in audio_project.storyboard.assets if item.filename == "sound.wav"
         )
@@ -250,6 +284,7 @@ class NativeActivityTests(unittest.TestCase):
                     self.assertIn(asset.path, archive.namelist())
                     published = json.loads(archive.read("storyboard.json"))
                     self.assertEqual(published["scenes"][0]["experience"]["activities"][1]["imageAssetId"], asset.id)
+                    self.assertEqual(published["scenes"][0]["experience"]["activities"][4]["steps"][0]["screenshotAssetId"], asset.id)
                     script = archive.read("player.js").decode()
                     self.assertIn("globalThis.__CHIMERA_ASSETS", script)
 

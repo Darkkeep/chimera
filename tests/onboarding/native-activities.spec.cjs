@@ -34,6 +34,15 @@ const experience = {
       { id: 'respond', prompt: 'What comes next?', hint: 'Share your findings.', correctChoiceId: 'report', choices: [
         { id: 'report', label: 'Report findings', feedback: 'Others can now act.' },
         { id: 'forget', label: 'Forget it', feedback: 'The risk remains.' }] }] },
+    { kind: 'software-walkthrough', id: 'walkthrough', title: 'Walk through support request', steps: [
+      { id: 'open-settings', label: 'Open settings', screenshotAssetId: 'screenshot',
+        screenshotAltText: 'Settings screen with the account menu open.',
+        description: 'The account menu is open in the settings screen.',
+        actionPrompt: 'Open the account settings.' },
+      { id: 'save-profile', label: 'Save the profile', screenshotAssetId: 'screenshot',
+        screenshotAltText: 'Profile form with the Save button visible.',
+        description: 'The profile form is ready to save.',
+        actionPrompt: 'Save the updated profile.' }] },
   ],
 };
 
@@ -59,6 +68,8 @@ async function course(request, authored = true, image) {
   project = uploaded.project;
   const authoredExperience = structuredClone(experience);
   authoredExperience.activities.find(activity => activity.kind === 'hotspots').imageAssetId = uploaded.asset.id;
+  authoredExperience.activities.find(activity => activity.kind === 'software-walkthrough')
+    .steps.forEach(step => { step.screenshotAssetId = uploaded.asset.id; });
   const saved = await request.patch(`/api/projects/${project.id}/scenes/${project.storyboard.scenes[0].id}`, {
     headers: { 'If-Match': `"${project.storyboard.revision}"` }, data: { experience: authoredExperience },
   });
@@ -140,9 +151,22 @@ async function interact(native) {
   await expect(practice.getByRole('heading', { name: 'Step 2 of 2: What comes next?', exact: true })).toBeFocused();
   await practice.getByRole('button', { name: 'Report findings', exact: true }).click();
   await expect(practice.getByRole('heading', { name: 'Practice complete.', exact: true })).toBeVisible();
+  const walkthrough = native.getByRole('group', { name: 'Walk through support request', exact: true });
+  const screenshot = walkthrough.locator('.experience-walkthrough-screen').first();
+  await expect(screenshot).toBeVisible();
+  await expect(screenshot).toHaveAttribute('alt', 'Settings screen with the account menu open.');
+  await expect(screenshot).toHaveJSProperty('naturalWidth', 120);
+  await expect(walkthrough.locator('.experience-asset-credit').first())
+    .toHaveText('Image credit: diagram.png — Synthetic image credit');
+  await walkthrough.getByRole('button', { name: 'Mark action complete', exact: true }).focus();
+  await walkthrough.getByRole('button', { name: 'Mark action complete', exact: true }).press('Enter');
+  await expect(walkthrough.getByRole('heading', { name: 'Step 2 of 2: Save the profile', exact: true })).toBeFocused();
+  await walkthrough.getByRole('button', { name: 'Mark action complete', exact: true }).click();
+  await expect(walkthrough.getByRole('heading', { name: 'Walkthrough complete.', exact: true })).toBeFocused();
+  await expect(walkthrough.getByText('You confirmed every action in order. All walkthrough steps are complete.', { exact: true })).toBeVisible();
 }
 
-test('all four native activities can be authored, saved and reopened without Pythia', async ({ page, request }) => {
+test('all five native activities can be authored, saved and reopened without Pythia', async ({ page, request }) => {
   let project = await course(request, false);
   const uploaded = await addProjectImage(request, project, await imageFixture(page));
   project = uploaded.project;
@@ -176,6 +200,15 @@ test('all four native activities can be authored, saved and reopened without Pyt
   await dialog.getByLabel('Sequence item', { exact: true }).first().fill('Observe');
   await dialog.getByRole('button', { name: 'Add guided practice', exact: true }).click();
   await dialog.getByRole('textbox', { name: 'Practice hint', exact: true }).fill('Look for evidence.');
+  await dialog.getByRole('button', { name: 'Add software walkthrough', exact: true }).click();
+  const walkthrough = dialog.getByRole('group', { name: 'Activity 5: software-walkthrough', exact: true });
+  await walkthrough.getByLabel('Step label', { exact: true }).fill('Open account settings');
+  await walkthrough.getByRole('combobox').first().selectOption(uploaded.asset.id);
+  await walkthrough.getByRole('textbox', { name: 'Screenshot alternative text', exact: true }).fill('Settings window with the account menu expanded.');
+  await walkthrough.getByRole('textbox', { name: 'What the screenshot shows', exact: true }).fill('The account menu is visible.');
+  await walkthrough.getByRole('textbox', { name: 'Action prompt', exact: true }).fill('Choose account settings.');
+  await walkthrough.getByRole('button', { name: 'Add walkthrough step', exact: true }).click();
+  await walkthrough.getByLabel('Step label', { exact: true }).nth(1).fill('Save changes');
   await dialog.getByLabel('I reviewed the actual preview', { exact: false }).check();
   await dialog.getByRole('button', { name: 'Save reviewed native scene edits', exact: true }).click();
   await expect(dialog.getByRole('status').filter({ hasText: 'Native scene edits saved.' })).toBeVisible();
@@ -184,19 +217,26 @@ test('all four native activities can be authored, saved and reopened without Pyt
   await expect(stage.locator('.experience-asset-credit').first()).toHaveText('Image credit: diagram.png — Synthetic image credit');
   const saved = await (await request.get(`/api/projects/${project.id}`)).json();
   const value = saved.storyboard.scenes[0].experience;
-  expect(value.activities.map(a => a.kind)).toEqual(['branching', 'hotspots', 'sequencing', 'guided-practice']);
+  expect(value.activities.map(a => a.kind)).toEqual(['branching', 'hotspots', 'sequencing', 'guided-practice', 'software-walkthrough']);
   expect(value.activities[1].imageAssetId).toBe(uploaded.asset.id);
   expect(value.activities[0].nodes).toHaveLength(2);
   expect(value.activities[0].nodes[0].choices[0].nextNodeId).toBe(value.activities[0].nodes[1].id);
   expect(value.activities[0].variables[0]).toMatchObject({ label: 'Evidence gathered', initialValue: false });
   expect(value.activities[0].nodes[0].choices[0].setVariables).toEqual([{ variableId: value.activities[0].variables[0].id, value: true }]);
   expect(value.activities[0].nodes[1].choices[0].visibleWhen).toEqual({ variableId: value.activities[0].variables[0].id, equals: true });
+  expect(value.activities[4].steps[0]).toMatchObject({
+    label: 'Open account settings', screenshotAssetId: uploaded.asset.id,
+    screenshotAltText: 'Settings window with the account menu expanded.',
+    description: 'The account menu is visible.', actionPrompt: 'Choose account settings.',
+  });
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: 'Design experience', exact: true }).click();
   dialog = page.getByRole('dialog').last();
   await expect(dialog.getByRole('textbox', { name: 'Practice hint', exact: true })).toHaveValue('Look for evidence.');
   await expect(dialog.getByRole('textbox', { name: 'Hotspot label', exact: true })).toHaveValue('Sensor');
   await expect(dialog.getByRole('combobox', { name: 'Background image (optional)', exact: true })).toHaveValue(uploaded.asset.id);
+  await expect(dialog.getByRole('textbox', { name: 'Screenshot alternative text', exact: true }).first())
+    .toHaveValue('Settings window with the account menu expanded.');
   await expect(dialog.getByLabel('Variable label', { exact: true })).toHaveValue('Evidence gathered');
   expect(providerCalls).toBe(0);
 });
@@ -224,10 +264,18 @@ test('mobile native preview supports keyboard practice, text alternatives and re
   await expect(native.getByRole('heading', { name: 'Step 1 of 2: How do you begin?', exact: true })).toBeVisible();
   await native.getByRole('button', { name: 'Restart scenario', exact: true }).click();
   await expect(native.getByRole('button', { name: 'Investigate', exact: true })).toBeVisible();
+  const walkthrough = native.getByRole('group', { name: 'Walk through support request', exact: true });
+  await expect(walkthrough.getByRole('heading', { name: 'Walkthrough complete.', exact: true })).toBeVisible();
+  await walkthrough.getByRole('button', { name: 'Restart walkthrough', exact: true }).click();
+  await expect(walkthrough.getByRole('heading', { name: 'Step 1 of 2: Open settings', exact: true })).toBeFocused();
   for (const summary of await native.locator('.experience-static > summary').all()) await summary.click();
   await expect(native.locator('.experience-static').getByText('Observe before acting.', { exact: true })).toBeVisible();
-  await expect(native.locator('.experience-static img')).toBeVisible();
-  await expect(native.locator('.experience-static').getByText('Image credit: diagram.png — Synthetic image credit', { exact: true })).toBeVisible();
+  await expect(native.locator('.experience-static img').first()).toBeVisible();
+  await expect(native.getByRole('group', { name: 'Explore the system', exact: true })
+    .locator('.experience-static').getByText('Image credit: diagram.png — Synthetic image credit', { exact: true })).toBeVisible();
+  await expect(walkthrough.locator('.experience-static img').first())
+    .toHaveAttribute('alt', 'Settings screen with the account menu open.');
+  await expect(walkthrough.locator('.experience-static').getByText('Action: Save the updated profile.', { exact: true })).toBeVisible();
   await page.emulateMedia({ media: 'print' });
   await page.evaluate(() => dispatchEvent(new Event('beforeprint')));
   await expect(native.locator('.experience-static').first()).toBeVisible();
@@ -271,6 +319,8 @@ for (const profile of ['standalone', 'scorm-12', 'scorm-2004']) {
     if (profile !== 'standalone') {
       const branch = native.getByRole('group', { name: 'Handle an incident', exact: true });
       await branch.getByRole('button', { name: 'Investigate', exact: true }).click();
+      const walkthrough = native.getByRole('group', { name: 'Walk through support request', exact: true });
+      await walkthrough.getByRole('button', { name: 'Mark action complete', exact: true }).click();
       await page.reload();
       await page.getByRole('button', { name: 'Continue', exact: true }).click();
       native = page.locator('.native-experience');
@@ -279,6 +329,10 @@ for (const profile of ['standalone', 'scorm-12', 'scorm-2004']) {
       await expect(resumedBranch.getByRole('button', { name: 'Wait', exact: true })).toBeHidden();
       await resumedBranch.getByRole('button', { name: 'Restart scenario', exact: true }).click();
       await expect(resumedBranch.getByRole('button', { name: 'Investigate', exact: true })).toBeVisible();
+      const resumedWalkthrough = native.getByRole('group', { name: 'Walk through support request', exact: true });
+      await expect(resumedWalkthrough.getByRole('heading', { name: 'Step 2 of 2: Save the profile', exact: true })).toBeVisible();
+      await resumedWalkthrough.getByRole('button', { name: 'Restart walkthrough', exact: true }).click();
+      await expect(resumedWalkthrough.getByRole('heading', { name: 'Step 1 of 2: Open settings', exact: true })).toBeVisible();
     }
     await interact(native);
     if (profile !== 'standalone') {
@@ -288,6 +342,7 @@ for (const profile of ['standalone', 'scorm-12', 'scorm-2004']) {
       expect(progress.order.order).toEqual(['observe', 'act']);
       expect(progress.practice.answers).toEqual(['gather', 'report']);
       expect(progress.diagram.opened).toEqual(['sensor']);
+      expect(progress.walkthrough.completedSteps).toEqual(['open-settings', 'save-profile']);
       expect(data[profile === 'scorm-12' ? 'cmi.core.score.raw' : 'cmi.score.raw']).toBe(initialGrade);
       await page.reload();
       await page.getByRole('button', { name: 'Continue', exact: true }).click();
@@ -295,6 +350,8 @@ for (const profile of ['standalone', 'scorm-12', 'scorm-2004']) {
       await expect(native.getByText('Route complete.', { exact: false })).toBeVisible();
       await expect(native.locator('.experience-hotspot-list details').first()).toHaveAttribute('open', '');
       await expect(native.locator('.experience-hotspot-board img')).toBeVisible();
+      await expect(native.getByRole('group', { name: 'Walk through support request', exact: true })
+        .getByRole('heading', { name: 'Walkthrough complete.', exact: true })).toBeVisible();
       await page.reload();
       await page.getByRole('button', { name: 'Start over', exact: true }).click();
       await expect(native.getByRole('button', { name: 'Investigate', exact: true })).toBeVisible();

@@ -92,11 +92,11 @@ def resolved_project(project: ProjectDetail, published: bool = False) -> Project
         if background:
             used.add(background)
         if scene.experience:
-            used.update(
-                activity.imageAssetId
-                for activity in scene.experience.activities
-                if activity.kind == "hotspots" and activity.imageAssetId
-            )
+            for activity in scene.experience.activities:
+                if activity.kind == "hotspots" and activity.imageAssetId:
+                    used.add(activity.imageAssetId)
+                elif activity.kind == "software-walkthrough":
+                    used.update(step.screenshotAssetId for step in activity.steps)
         if layout:
             used.update(e.assetId for e in layout.elements if e.assetId)
             if layout.timeline:
@@ -189,6 +189,8 @@ def asset_usage(project: ProjectDetail, asset_id: str) -> dict:
                 if s.html5Activity and s.html5Activity.assetId == asset_id
                 or s.experience and any(
                     activity.kind == "hotspots" and activity.imageAssetId == asset_id
+                    or activity.kind == "software-walkthrough"
+                    and any(step.screenshotAssetId == asset_id for step in activity.steps)
                     for activity in s.experience.activities
                 )
                 or asset_id in {p.assetId for p in effective_placements(project, s)} or effective_background_asset(project, s) == asset_id or s.backgroundAsset == asset_id

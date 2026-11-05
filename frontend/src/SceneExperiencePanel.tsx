@@ -149,7 +149,7 @@ export function SceneExperiencePanel({ project, scene, onClose, onProjectUpdated
   const applied = Boolean(scene.experience && (!state?.draft || state.draft.status === "applied"));
   return <EditorDialog className="experience-dialog" labelledBy="experience-title" busy={pending} onClose={close}>
     <header className="modal-head"><div><p className="eyebrow">PYTHIA / SCENE EXPERIENCE</p><h2 id="experience-title">Design the whole scene</h2></div><button type="button" disabled={pending} onClick={close}>Close</button></header>
-    <p>Native concept flows, reveals, branching decisions, schematic hotspots, sequencing and guided practice—not a text-only video. Activities are formative, not graded assessments. Design calls use your configured model and may incur charges. Authoring, preview and save do not call a provider.</p>
+    <p>Native concept flows, reveals, branching decisions, schematic hotspots, sequencing, guided practice and offline screenshot-based software walkthroughs—not a text-only video. Walkthroughs display project screenshots and learner-confirmed instructions; they do not execute or control software. Activities are formative, not graded assessments. Design calls use your configured model and may incur charges. Authoring, preview and save do not call a provider.</p>
     {error && <p role="alert">{error}</p>}
     {state?.operation?.error && <p role="alert">{state.operation.error}</p>}
     {notice && <p role="status">{notice}</p>}

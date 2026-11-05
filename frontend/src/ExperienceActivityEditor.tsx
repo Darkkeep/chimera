@@ -7,7 +7,7 @@ const step = () => {
   const choices = [choice(), choice()];
   return { id: id(), prompt: "Choose the best next action.", hint: "Consider the goal.", choices, correctChoiceId: choices[0].id };
 };
-export function newActivity(kind: Kind): Activity {
+export function newActivity(kind: Kind, screenshotAssetId = ""): Activity {
   const base = { id: id(), title: "New activity" };
   if (kind === "branching") {
     const nodeId = id();
@@ -19,7 +19,10 @@ export function newActivity(kind: Kind): Activity {
     hotspots: [{ id: id(), label: "Point of interest", explanation: "Explain this point.", x: 50, y: 50 }] };
   if (kind === "sequencing") return { ...base, kind, instruction: "Put these steps in the correct order.",
     items: [{ id: id(), label: "First step" }, { id: id(), label: "Second step" }], feedback: "Explain why this order matters." };
-  return { ...base, kind, steps: [step()] };
+  if (kind === "guided-practice") return { ...base, kind, steps: [step()] };
+  return { ...base, kind, steps: [{ id: id(), label: "Open the settings",
+    screenshotAssetId, screenshotAltText: "Describe the visible controls and relevant state.",
+    description: "Explain what the screenshot shows.", actionPrompt: "Describe the action to complete." }] };
 }
 
 export function ExperienceActivityEditor({ activity, onChange, imageAssets = [] }: {
@@ -186,6 +189,42 @@ export function ExperienceActivityEditor({ activity, onChange, imageAssets = [] 
         </fieldset>;
       })}
       <button type="button" disabled={activity.steps.length >= 10} onClick={() => onChange({ ...activity, steps: [...activity.steps, step()] })}>Add practice step</button>
+    </>}
+    {activity.kind === "software-walkthrough" && <>
+      <p>Use screenshots from this project to guide a real task. Chimera does not open or control the software; learners confirm each action themselves.</p>
+      {activity.steps.map((item, index) => {
+        const update = (value: typeof item) => onChange({ ...activity, steps: activity.steps.map(current => current.id === item.id ? value : current) });
+        return <fieldset key={item.id}><legend>Walkthrough step {index + 1}</legend>
+          {field("Step label", item.label, label => update({ ...item, label }), true)}
+          <label>Screenshot (project image)<select value={item.screenshotAssetId}
+            onChange={event => update({ ...item, screenshotAssetId: event.target.value })}>
+            <option value="">Choose a project image</option>
+            {item.screenshotAssetId && !imageAssets.some(asset => asset.id === item.screenshotAssetId)
+              && <option value={item.screenshotAssetId}>Unavailable image ({item.screenshotAssetId})</option>}
+            {imageAssets.map(asset => <option key={asset.id} value={asset.id}>{asset.filename}</option>)}
+          </select></label>
+          {field("Screenshot alternative text", item.screenshotAltText, screenshotAltText => update({ ...item, screenshotAltText }))}
+          {field("What the screenshot shows", item.description, description => update({ ...item, description }))}
+          {field("Action prompt", item.actionPrompt, actionPrompt => update({ ...item, actionPrompt }))}
+          <button type="button" disabled={index === 0} onClick={() => {
+            const steps = [...activity.steps]; [steps[index - 1], steps[index]] = [steps[index], steps[index - 1]];
+            onChange({ ...activity, steps });
+          }}>Move walkthrough step {index + 1} up</button>
+          <button type="button" disabled={index === activity.steps.length - 1} onClick={() => {
+            const steps = [...activity.steps]; [steps[index + 1], steps[index]] = [steps[index], steps[index + 1]];
+            onChange({ ...activity, steps });
+          }}>Move walkthrough step {index + 1} down</button>
+          <button type="button" disabled={activity.steps.length <= 1}
+            onClick={() => onChange({ ...activity, steps: activity.steps.filter(step => step.id !== item.id) })}>
+            Remove walkthrough step {index + 1}
+          </button>
+        </fieldset>;
+      })}
+      <button type="button" disabled={activity.steps.length >= 10} onClick={() => onChange({ ...activity, steps: [...activity.steps, {
+        id: id(), label: "New walkthrough step", screenshotAssetId: imageAssets[0]?.id ?? "",
+        screenshotAltText: "Describe the visible controls and relevant state.",
+        description: "Explain what the screenshot shows.", actionPrompt: "Describe the action to complete.",
+      }] })}>Add walkthrough step</button>
     </>}
   </div>;
 }

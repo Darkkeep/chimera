@@ -18,7 +18,10 @@ export type Activity =
   | { kind: "sequencing"; id: string; title: string; instruction: string;
       items: { id: string; label: string }[]; feedback: string }
   | { kind: "guided-practice"; id: string; title: string;
-      steps: { id: string; prompt: string; hint: string; choices: Choice[]; correctChoiceId: string }[] };
+      steps: { id: string; prompt: string; hint: string; choices: Choice[]; correctChoiceId: string }[] }
+  | { kind: "software-walkthrough"; id: string; title: string;
+      steps: { id: string; label: string; screenshotAssetId: string; screenshotAltText: string;
+        description: string; actionPrompt: string }[] };
 
 export type Experience = {
   version: 1; heading: string; introduction: string;

@@ -287,6 +287,92 @@ export function mountExperience(root, experience, options = {}) {
         control(content, "Restart practice", () => { answers = []; update({ answers }); render(true); });
       }
       render();
+    } else if (activity.kind === "software-walkthrough") {
+      function screenshotFor(step) {
+        return step.screenshotAssetId && (
+          options.imageAssets?.[step.screenshotAssetId] || globalThis.__CHIMERA_ASSETS?.[step.screenshotAssetId]
+        );
+      }
+      activity.steps.forEach((step, index) => {
+        const detail = text("section", "", staticView);
+        text("h4", `Step ${index + 1}: ${step.label}`, detail);
+        const imageAsset = screenshotFor(step);
+        const imageSource = imageAsset?.src || imageAsset?.path;
+        if (imageSource) {
+          const image = text("img", "", detail);
+          image.src = imageSource;
+          image.alt = step.screenshotAltText;
+          image.className = "experience-walkthrough-screen";
+          text("p", `Image credit: ${imageAsset.filename || "Project image"} — ${imageAsset.attributionText?.trim() || "Attribution not supplied."}`, detail)
+            .className = "experience-asset-credit";
+        } else {
+          text("p", `Screenshot unavailable. ${step.screenshotAltText}`, detail);
+        }
+        text("p", step.description, detail);
+        text("p", `Action: ${step.actionPrompt}`, detail);
+      });
+      const requested = Array.isArray(saved.completedSteps) ? saved.completedSteps : [];
+      const completedSteps = [];
+      for (let index = 0; index < requested.length && index < activity.steps.length; index++) {
+        if (requested[index] !== activity.steps[index].id) break;
+        completedSteps.push(requested[index]);
+      }
+      if (requested.length !== completedSteps.length
+        || requested.some((stepId, index) => stepId !== completedSteps[index])) {
+        update({ completedSteps });
+      }
+      let currentIndex = completedSteps.length;
+      function render(focus = false) {
+        content.replaceChildren();
+        const step = activity.steps[currentIndex];
+        const heading = text("h4", step
+          ? `Step ${currentIndex + 1} of ${activity.steps.length}: ${step.label}`
+          : "Walkthrough complete.", content);
+        heading.tabIndex = -1;
+        if (step) {
+          const imageAsset = screenshotFor(step);
+          const imageSource = imageAsset?.src || imageAsset?.path;
+          if (imageSource) {
+            const image = text("img", "", content);
+            image.src = imageSource;
+            image.alt = step.screenshotAltText;
+            image.className = "experience-walkthrough-screen";
+            image.addEventListener("error", () => {
+              image.remove();
+              announce("Screenshot could not be loaded. The text description and alternative text remain available.");
+            });
+            text("p", `Image credit: ${imageAsset.filename || "Project image"} — ${imageAsset.attributionText?.trim() || "Attribution not supplied."}`, content)
+              .className = "experience-asset-credit";
+          } else {
+            text("p", `Screenshot unavailable. ${step.screenshotAltText}`, content);
+          }
+          text("p", step.description, content);
+          text("p", `Action: ${step.actionPrompt}`, content);
+        } else {
+          text("p", "You confirmed every action in order. All walkthrough steps are complete.", content)
+            .setAttribute("role", "status");
+        }
+        if (currentIndex > 0) control(content, "Previous step", () => {
+          currentIndex--; render(true);
+        });
+        if (step && currentIndex < completedSteps.length) control(content, "Next step", () => {
+          currentIndex++; render(true);
+        });
+        else if (step) control(content, "Mark action complete", () => {
+          completedSteps.push(step.id);
+          update({ completedSteps });
+          currentIndex++;
+          render(true);
+        });
+        control(content, "Restart walkthrough", () => {
+          completedSteps.splice(0);
+          currentIndex = 0;
+          update({ completedSteps: [] });
+          render(true);
+        });
+        if (focus) heading.focus();
+      }
+      render();
     }
   });
   text("p", experience.conclusion).className = "experience-conclusion";

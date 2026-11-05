@@ -163,6 +163,7 @@ request. Use the activity controls to add up to eight activities:
 | Hotspots | Describe the diagram, optionally choose an image already in the project, label its points, write explanations, and place numbered points using horizontal/vertical percentages (5-95) on the image canvas. | Activate points by mouse, touch or keyboard, or use the separate hotspot list in the order authored. The diagram description and image credit remain visible; the image and explanations are included in print/Word alternatives. |
 | Sequencing | Write items in their correct order; use **Move authored item up/down** to change the answer key. Add instructions and explanatory feedback. | Start with the reverse order, reorder using labelled Move up/down buttons, check, retry or reset. Dragging is not required. |
 | Guided practice | Write each step's prompt, hint, choices and choice-specific feedback; select its correct choice. | Request a hint, try a response, and advance only after a correct response. Restart is always available. |
+| Software walkthrough | Add an ordered sequence of up to ten screenshots from project images. For each, provide alternative text, a description, and a prompt naming the action learners should perform in the real software. | Inspect each screenshot and confirm the action with the keyboard-operable **Mark action complete** control. Chimera does not open, instrument, or control the software and cannot verify that an action was performed. |
 
 You can combine these activities with the existing flow and reveals, or remove
 those sections entirely. At least one flow, reveal or activity must remain.
@@ -185,6 +186,14 @@ continues to follow the configured scene/media/assessment rules. Every activity
 offers **Text alternative and worked solution**, also expanded for print/Word
 snapshots. Answer keys ship in the course; do not use these as secure tests.
 
+A software walkthrough's concrete success criterion is learner confirmation
+of every authored action, in order. Each screenshot must reference an image in
+the current project and include meaningful alternative text; the project's
+image attribution is displayed with it. These instructions are offline and
+screenshot-based, not an interactive copy or automated test of a third-party
+application. The text/print alternative includes every screenshot, alternative
+text, description, prompt, and image credit.
+
 Author edits persist in the project. Course preview retains activity progress
 in its existing browser-local preview record. Standalone delivery retains it
 only while the page is open. SCORM 1.2/2004 retain branch choices, opened
@@ -201,6 +210,12 @@ and portable exports, and prevents that image from being deleted while in use.
 Its coordinates scale with the image's aspect ratio; they do not depend on the
 preview viewport. Hotspots remain formative and do not affect grades or
 completion.
+
+Software walkthrough progress is the ordered prefix of learner-confirmed step
+IDs. Continue restores that prefix and opens the first unconfirmed step; earlier
+completed steps remain available for review. Restart clears the prefix. A full
+backup and portable export retain referenced walkthrough screenshots, and a
+referenced image cannot be deleted until it is removed from the walkthrough.
 
 See [Native scene experiences](talk-to-pythia.md#native-scene-experiences)
 for the full review/apply procedure, context/privacy boundaries and current

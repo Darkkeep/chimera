@@ -24,6 +24,7 @@
 .native-experience .experience-hotspot-board.has-image { min-height: 0; border: 0; overflow: visible; }
 .native-experience .experience-hotspot-board > img { display: block; width: 100%; height: auto; }
 .native-experience .experience-static > img { display: block; max-width: 100%; height: auto; margin: 0 auto 16px; }
+.native-experience .experience-walkthrough-screen { display: block; max-width: 100%; max-height: 520px; width: auto; height: auto; margin: 0 auto 16px; }
 .native-experience .experience-hotspot-board button { position: absolute; transform: translate(-50%,-50%); margin: 0; }
 .native-experience .experience-hotspot-list { display: grid; gap: 12px; }
 .native-experience .experience-hotspot-list li { padding-left: 4px; }

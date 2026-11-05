@@ -52,7 +52,7 @@ storage and LMS APIs; it is not content certification or secure examination.
 Follow the [integration protocol, limits and LMS checks](../docs/user-guide.md#import-an-externally-authored-html5-activity).
 
 Native experiences accept up to eight discriminated `activities`: `branching`,
-`hotspots`, `sequencing`, and `guided-practice`. The existing version-1 flow/reveal
+`hotspots`, `sequencing`, `guided-practice`, and `software-walkthrough`. The existing version-1 flow/reveal
 payload remains readable without `activities`. Branch graphs must be reachable
 and acyclic; branching can use up to five activity-local Boolean variables,
 initial values, choice assignments and one Boolean visibility condition per
@@ -63,6 +63,13 @@ choice references and bounded coordinates are validated. Scene PATCH writes that
 including removing an experience. These activities are formative: they do not
 change assessment scoring or completion policy. Shared rendering and SCORM
 suspend-data tracking are described in the [native activity guide](../docs/user-guide.md#author-native-activities-without-a-provider).
+Software walkthroughs contain up to ten ordered steps, each referencing a
+project image with alternative text, a description and an action prompt.
+Learners explicitly confirm every action in order; this is formative
+self-attestation, not application automation or action verification. Continue
+restores the confirmed step prefix and returns to the first unconfirmed step;
+restart clears it. Screenshot assets remain in backups and portable exports
+while referenced and cannot be deleted until removed from the walkthrough.
 
 The scene editor's [timeline and appearance implementation](../docs/scene-timeline-implementation.md) extends the existing scene-update `visualLayout` payload. `SceneLayout.timeline` version 1 contains integer-millisecond `durationMs`, `printTimeMs`, independent audio/video `clips`, and named `cues`. Clips reference project assets and separate `startMs` from `sourceInMs`/`sourceOutMs`; source duration, volume/fades, completion threshold, and video geometry/layer order are validated. Elements optionally contain `nativeShape`, `appearance`, `timing`, `name`, `groupId`, `hidden`, and `aspectLocked`. Timeline duration is limited to one hour, with at most 200 clips and 200 cues; all endpoints must fit. Existing scenes with no timeline retain legacy playback. Native effects and transport code under `app/static` are shared with frontend/delivery/Word rendering. Save through the existing revision-guarded scene API so history, asset checks, and authorization remain enforced.
 

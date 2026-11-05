@@ -697,11 +697,11 @@ def create_scenes(project_id: str, scenes: list[SceneCreate], expected_revision:
 def validate_visual_assets(scene: Scene, assets: dict[str, ExtractedAsset]) -> None:
     references = {scene.backgroundAsset} if scene.backgroundAsset else set()
     if scene.experience:
-        references.update(
-            activity.imageAssetId
-            for activity in scene.experience.activities
-            if activity.kind == "hotspots" and activity.imageAssetId
-        )
+        for activity in scene.experience.activities:
+            if activity.kind == "hotspots" and activity.imageAssetId:
+                references.add(activity.imageAssetId)
+            elif activity.kind == "software-walkthrough":
+                references.update(step.screenshotAssetId for step in activity.steps)
     if scene.visualLayout:
         references.update(element.assetId for element in scene.visualLayout.elements if element.kind == "image")
         if scene.visualLayout.backgroundAsset:
