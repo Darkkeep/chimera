@@ -54,8 +54,12 @@ Follow the [integration protocol, limits and LMS checks](../docs/user-guide.md#i
 Native experiences accept up to eight discriminated `activities`: `branching`,
 `hotspots`, `sequencing`, and `guided-practice`. The existing version-1 flow/reveal
 payload remains readable without `activities`. Branch graphs must be reachable
-and acyclic; item identifiers, choice references and bounded coordinates are
-validated. Scene PATCH writes that include `experience` require `If-Match`,
+and acyclic; branching can use up to five activity-local Boolean variables,
+initial values, choice assignments and one Boolean visibility condition per
+choice. Every reachable decision must retain at least two visible choices and
+every node must remain reachable through visible routes. Legacy branch payloads
+remain unchanged when those optional fields are unused. Item identifiers,
+choice references and bounded coordinates are validated. Scene PATCH writes that include `experience` require `If-Match`,
 including removing an experience. These activities are formative: they do not
 change assessment scoring or completion policy. Shared rendering and SCORM
 suspend-data tracking are described in the [native activity guide](../docs/user-guide.md#author-native-activities-without-a-provider).

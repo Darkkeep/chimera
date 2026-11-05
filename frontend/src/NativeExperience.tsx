@@ -3,9 +3,16 @@ import { mountExperience } from "../../backend/app/static/scene-experience.js";
 import "../../backend/app/static/scene-experience.css";
 
 type Choice = { id: string; label: string; feedback: string };
+type BranchVariable = { id: string; label: string; initialValue: boolean };
+type VariableAssignment = { variableId: string; value: boolean };
+type VariableCondition = { variableId: string; equals: boolean };
 export type Activity =
   | { kind: "branching"; id: string; title: string; startNodeId: string;
-      nodes: { id: string; prompt: string; choices: { label: string; feedback: string; nextNodeId: string | null }[] }[] }
+      variables?: BranchVariable[];
+      nodes: { id: string; prompt: string; choices: {
+        label: string; feedback: string; nextNodeId: string | null;
+        visibleWhen?: VariableCondition | null; setVariables?: VariableAssignment[];
+      }[] }[] }
   | { kind: "hotspots"; id: string; title: string; diagramDescription: string; imageAssetId?: string | null;
       hotspots: { id: string; label: string; explanation: string; x: number; y: number }[] }
   | { kind: "sequencing"; id: string; title: string; instruction: string;

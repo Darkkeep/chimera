@@ -159,16 +159,19 @@ request. Use the activity controls to add up to eight activities:
 
 | Activity | Authoring | Learner behavior |
 | --- | --- | --- |
-| Branching decisions | Write prompts, choices and consequence feedback; select each choice's destination or **End of route**. Adding a node connects the previous node's first choice to it. Inspect that connection. Select the starting node. | Choose a route, read its consequences, and restart to explore another path. |
+| Branching decisions | Write prompts, choices and consequence feedback; select each choice's destination or **End of route**. Adding a node connects the previous node's first choice to it. Inspect that connection. Select the starting node. Optionally add up to five activity-local Boolean variables, set their initial values, make a choice visible when one variable equals true/false, and assign variables after a choice is selected. | Choose among currently visible options, read their consequences, and restart to explore another path. Visibility is checked before that choice's assignments apply. |
 | Hotspots | Describe the diagram, optionally choose an image already in the project, label its points, write explanations, and place numbered points using horizontal/vertical percentages (5-95) on the image canvas. | Activate points by mouse, touch or keyboard, or use the separate hotspot list in the order authored. The diagram description and image credit remain visible; the image and explanations are included in print/Word alternatives. |
 | Sequencing | Write items in their correct order; use **Move authored item up/down** to change the answer key. Add instructions and explanatory feedback. | Start with the reverse order, reorder using labelled Move up/down buttons, check, retry or reset. Dragging is not required. |
 | Guided practice | Write each step's prompt, hint, choices and choice-specific feedback; select its correct choice. | Request a hint, try a response, and advance only after a correct response. Restart is always available. |
 
 You can combine these activities with the existing flow and reveals, or remove
 those sections entirely. At least one flow, reveal or activity must remain.
-Branch nodes must have unique identifiers, all nodes must be reachable, and
-routes must end without cycles. Invalid edits produce a validation error rather
-than being silently repaired or applied.
+Branch nodes must have unique identifiers, all nodes must be reachable through
+visible choices, every reachable decision must show at least two choices, and
+routes must end without cycles. Variable values are local to one activity;
+assignments take effect after selection and do not persist separately. Restart
+uses the authored initial values. Invalid edits produce a validation error
+rather than being silently repaired or applied.
 
 Review the executable preview, acknowledge it, then choose **Save reviewed
 native scene edits**. Reopen to edit without Pythia. Revision conflicts preserve
@@ -186,8 +189,11 @@ Author edits persist in the project. Course preview retains activity progress
 in its existing browser-local preview record. Standalone delivery retains it
 only while the page is open. SCORM 1.2/2004 retain branch choices, opened
 hotspots, sequence order and completed practice steps in suspend data; Continue
-restores them and Start over clears them. Failed practice attempts and transient
-feedback are not stored. The existing tracking-budget guard and export estimate
+restores branch choices by replaying them from initial variable values and
+discards any path suffix invalid under the current activity; Start over clears
+the path and resets variables. Variable state adds no separate progress data.
+Failed practice attempts and transient feedback are not stored. The existing
+tracking-budget guard and export estimate
 include activity progress; SCORM 1.2's 4,096-byte limit may constrain large courses.
 Automated delivery checks are not a new Blackboard acceptance certification.
 An image-backed hotspot keeps its project image reference through full backups

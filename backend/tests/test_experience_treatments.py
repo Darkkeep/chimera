@@ -136,6 +136,36 @@ class ExperienceTests(unittest.TestCase):
         self.assertIsNone(design.get(self.project.id, self.scene.id, other)["draft"])
         self.assertEqual(storage.list_media_generation_jobs(self.project.id), [])
 
+    def test_conditional_branch_proposal_review_apply_and_revision_guard(self):
+        treatment = copy.deepcopy(TREATMENT)
+        treatment["experience"]["activities"] = [{
+            "kind": "branching", "id": "decision", "title": "Handle an incident", "startNodeId": "start",
+            "variables": [{"id": "evidence", "label": "Evidence gathered", "initialValue": False}],
+            "nodes": [
+                {"id": "start", "prompt": "What is your first action?", "choices": [
+                    {"label": "Investigate", "feedback": "Gather evidence.", "nextNodeId": "review",
+                     "setVariables": [{"variableId": "evidence", "value": True}]},
+                    {"label": "Ignore", "feedback": "The incident continues.", "nextNodeId": None}]},
+                {"id": "review", "prompt": "What follows investigation?", "choices": [
+                    {"label": "Report", "feedback": "Share what you found.", "nextNodeId": None,
+                     "visibleWhen": {"variableId": "evidence", "equals": True}},
+                    {"label": "Ask for guidance", "feedback": "A second perspective can help.", "nextNodeId": None}]}],
+        }]
+        draft = self.proposal(treatment)
+        self.assertEqual(draft["treatment"]["experience"]["activities"][0]["variables"][0]["id"], "evidence")
+        reviewed = copy.deepcopy(draft["treatment"])
+        reviewed["experience"]["activities"][0]["nodes"][0]["choices"][1]["setVariables"] = [
+            {"variableId": "evidence", "value": False},
+        ]
+        response = self.review(draft, reviewed)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.review(draft, reviewed, apply=True, revision=999).status_code, 412)
+        applied = self.review(draft, reviewed, apply=True)
+        self.assertEqual(applied.status_code, 200, applied.text)
+        self.assertEqual(
+            applied.json()["project"]["storyboard"]["scenes"][0]["experience"]["activities"][0]["variables"][0]["initialValue"],
+            False,
+        )
     def test_invalid_or_failed_design_preserves_previous_draft_and_sanitizes_errors(self):
         draft = self.proposal()
         for result in ({}, {**TREATMENT, "experience": {**EXPERIENCE, "foreground": "#100818"}}):

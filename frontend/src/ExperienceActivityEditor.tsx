@@ -33,7 +33,29 @@ export function ExperienceActivityEditor({ activity, onChange, imageAssets = [] 
   return <div className="activity-editor">
     {field("Activity title", activity.title, title => onChange({ ...activity, title }), true)}
     {activity.kind === "branching" && <>
-      <p>Every node must be reachable. Routes must end without cycles. A choice can end the route or continue to another node.</p>
+      <p>Every node must be reachable through visible choices. Routes must end without cycles. A choice can end the route or continue to another node.</p>
+      <fieldset><legend>Activity variables</legend>
+        <p>Optional Boolean variables start at their initial values and reset when the scenario restarts. A selected choice applies its assignments after its visibility condition is checked.</p>
+        {(activity.variables ?? []).map((variable, index) => <fieldset key={variable.id}>
+          <legend>Variable {index + 1}</legend>
+          {field("Variable label", variable.label, label => onChange({ ...activity,
+            variables: activity.variables?.map(item => item.id === variable.id ? { ...item, label } : item) ?? [] }), true)}
+          <label><input type="checkbox" checked={variable.initialValue} onChange={event => onChange({ ...activity,
+            variables: activity.variables?.map(item => item.id === variable.id ? { ...item, initialValue: event.target.checked } : item) ?? [] })} />
+            Initially true</label>
+          <button type="button" onClick={() => onChange({ ...activity,
+            variables: activity.variables?.filter(item => item.id !== variable.id) ?? [],
+            nodes: activity.nodes.map(node => ({ ...node, choices: node.choices.map(item => ({
+              ...item,
+              visibleWhen: item.visibleWhen?.variableId === variable.id ? null : item.visibleWhen,
+              setVariables: item.setVariables?.filter(assignment => assignment.variableId !== variable.id) ?? [],
+            })) })),
+          })}>Remove variable {index + 1}</button>
+        </fieldset>)}
+        <button type="button" disabled={(activity.variables?.length ?? 0) >= 5} onClick={() => onChange({ ...activity,
+          variables: [...(activity.variables ?? []), { id: id(), label: "New variable", initialValue: false }],
+        })}>Add variable</button>
+      </fieldset>
       <label>Starting node<select value={activity.startNodeId} onChange={event => onChange({ ...activity, startNodeId: event.target.value })}>
         {activity.nodes.map((node, i) => <option key={node.id} value={node.id}>Node {i + 1}: {node.prompt}</option>)}
       </select></label>
@@ -46,6 +68,42 @@ export function ExperienceActivityEditor({ activity, onChange, imageAssets = [] 
             return <fieldset key={i}><legend>Decision choice {i + 1}</legend>
               {field("Choice label", item.label, label => change({ ...item, label }), true)}
               {field("Choice feedback", item.feedback, feedback => change({ ...item, feedback }))}
+              <label>Show choice when<select value={item.visibleWhen ? `${item.visibleWhen.variableId}:${item.visibleWhen.equals}` : ""}
+                onChange={event => {
+                  const [variableId, equals] = event.target.value.split(":");
+                  change({ ...item, visibleWhen: variableId ? { variableId, equals: equals === "true" } : null });
+                }}>
+                <option value="">Always visible</option>
+                {(activity.variables ?? []).flatMap(variable => [true, false].map(value =>
+                  <option key={`${variable.id}:${value}`} value={`${variable.id}:${value}`}>{variable.label} is {value ? "true" : "false"}</option>))}
+              </select></label>
+              {(item.setVariables ?? []).map((assignment, assignmentIndex) => <fieldset key={assignment.variableId}>
+                <legend>Set variable {assignmentIndex + 1}</legend>
+                <label>Variable<select value={assignment.variableId} onChange={event => change({ ...item,
+                  setVariables: item.setVariables?.map((value, index) => index === assignmentIndex
+                    ? { ...value, variableId: event.target.value } : value) ?? [],
+                })}>
+                  {(activity.variables ?? []).filter(variable => variable.id === assignment.variableId
+                    || !(item.setVariables ?? []).some((value, index) => index !== assignmentIndex && value.variableId === variable.id))
+                    .map(variable => <option key={variable.id} value={variable.id}>{variable.label}</option>)}
+                </select></label>
+                <label>Set to<select value={String(assignment.value)} onChange={event => change({ ...item,
+                  setVariables: item.setVariables?.map((value, index) => index === assignmentIndex
+                    ? { ...value, value: event.target.value === "true" } : value) ?? [],
+                })}>
+                  <option value="true">True</option><option value="false">False</option>
+                </select></label>
+                <button type="button" onClick={() => change({ ...item,
+                  setVariables: item.setVariables?.filter((_, index) => index !== assignmentIndex) ?? [],
+                })}>Remove variable assignment {assignmentIndex + 1}</button>
+              </fieldset>)}
+              <button type="button" disabled={(activity.variables?.length ?? 0) === 0
+                || (item.setVariables?.length ?? 0) >= (activity.variables?.length ?? 0)}
+                onClick={() => {
+                  const assigned = new Set((item.setVariables ?? []).map(value => value.variableId));
+                  const next = (activity.variables ?? []).find(variable => !assigned.has(variable.id));
+                  if (next) change({ ...item, setVariables: [...(item.setVariables ?? []), { variableId: next.id, value: true }] });
+                }}>Add variable assignment</button>
               <label>Continue to<select value={item.nextNodeId ?? ""} onChange={event => change({ ...item, nextNodeId: event.target.value || null })}>
                 <option value="">End of route</option>
                 {activity.nodes.filter(n => n.id !== node.id).map(n => <option key={n.id} value={n.id}>Node {activity.nodes.indexOf(n) + 1}: {n.prompt}</option>)}

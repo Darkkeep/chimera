@@ -10,13 +10,18 @@ const experience = {
   flow: [], reveals: [], conclusion: 'Use evidence to guide your actions.', motion: false,
   background: '#100818', foreground: '#E8E5EA', accent: '#FF32AA', accentText: '#100818', diagramAccent: '#8542E8',
   activities: [
-    { kind: 'branching', id: 'decision', title: 'Handle an incident', startNodeId: 'start', nodes: [
+    { kind: 'branching', id: 'decision', title: 'Handle an incident', startNodeId: 'start',
+      variables: [{ id: 'evidence', label: 'Evidence gathered', initialValue: false }], nodes: [
       { id: 'start', prompt: 'What is your first action?', choices: [
-        { label: 'Investigate', feedback: 'Gather evidence.', nextNodeId: 'review' },
+        { label: 'Investigate', feedback: 'Gather evidence.', nextNodeId: 'review',
+          setVariables: [{ variableId: 'evidence', value: true }] },
         { label: 'Ignore', feedback: 'The incident continues.', nextNodeId: null }] },
       { id: 'review', prompt: 'What follows investigation?', choices: [
-        { label: 'Report', feedback: 'Share what you found.', nextNodeId: null },
-        { label: 'Wait', feedback: 'Consider the risk of delay.', nextNodeId: null }] }] },
+        { label: 'Report', feedback: 'Share what you found.', nextNodeId: null,
+          visibleWhen: { variableId: 'evidence', equals: true } },
+        { label: 'Wait', feedback: 'Consider the risk of delay.', nextNodeId: null,
+          visibleWhen: { variableId: 'evidence', equals: false } },
+        { label: 'Ask for guidance', feedback: 'A second perspective can help.', nextNodeId: null }] }] },
     { kind: 'hotspots', id: 'diagram', title: 'Explore the system', diagramDescription: 'Sensor on the left; controller on the right.',
       hotspots: [{ id: 'sensor', label: 'Sensor', explanation: 'Measures the input.', x: 20, y: 50 },
         { id: 'controller', label: 'Controller', explanation: 'Responds to the measurement.', x: 80, y: 50 }] },
@@ -89,6 +94,10 @@ async function interact(native) {
   await branch.getByRole('button', { name: 'Investigate', exact: true }).press('Enter');
   await expect(branch.getByRole('heading', { name: 'What follows investigation?', exact: true })).toBeFocused();
   await expect(branch.getByText('Investigate: Gather evidence.', { exact: true })).toBeVisible();
+  await expect(branch.getByRole('button', { name: 'Report', exact: true })).toBeVisible();
+  await expect(branch.getByRole('button', { name: 'Wait', exact: true })).toBeHidden();
+  await expect(branch.locator('.experience-static')).toContainText('Shown when Evidence gathered is true.');
+  await expect(branch.locator('.experience-static')).toContainText('Set Evidence gathered to true.');
   await branch.getByRole('button', { name: 'Report', exact: true }).click();
   await expect(branch.getByText('Route complete.', { exact: false })).toBeVisible();
   const hotspots = native.getByRole('group', { name: 'Explore hotspots on the image', exact: true });
@@ -147,8 +156,14 @@ test('all four native activities can be authored, saved and reopened without Pyt
   await dialog.getByRole('button', { name: 'Start native experience without Pythia', exact: true }).click();
   const branch = dialog.getByRole('group', { name: 'Activity 1: branching', exact: true });
   await branch.getByLabel('Activity title', { exact: true }).fill('Decide what to do');
+  await branch.getByRole('button', { name: 'Add variable', exact: true }).click();
+  await branch.getByLabel('Variable label', { exact: true }).fill('Evidence gathered');
+  await branch.getByRole('button', { name: 'Add variable assignment', exact: true }).first().click();
+  await branch.getByRole('combobox', { name: 'Set to', exact: true }).first().selectOption('true');
   await branch.getByRole('button', { name: 'Add decision node', exact: true }).click();
   await branch.getByRole('textbox', { name: 'Decision prompt', exact: true }).nth(1).fill('What happens after investigation?');
+  await branch.getByRole('combobox', { name: 'Show choice when', exact: true }).nth(2)
+    .selectOption({ label: 'Evidence gathered is true' });
   await dialog.getByRole('button', { name: 'Add hotspots', exact: true }).click();
   await dialog.getByRole('textbox', { name: 'Diagram description', exact: true }).fill('Describe the illustrated sensor and controller.');
   await dialog.getByRole('combobox', { name: 'Background image (optional)', exact: true }).selectOption(uploaded.asset.id);
@@ -173,12 +188,16 @@ test('all four native activities can be authored, saved and reopened without Pyt
   expect(value.activities[1].imageAssetId).toBe(uploaded.asset.id);
   expect(value.activities[0].nodes).toHaveLength(2);
   expect(value.activities[0].nodes[0].choices[0].nextNodeId).toBe(value.activities[0].nodes[1].id);
+  expect(value.activities[0].variables[0]).toMatchObject({ label: 'Evidence gathered', initialValue: false });
+  expect(value.activities[0].nodes[0].choices[0].setVariables).toEqual([{ variableId: value.activities[0].variables[0].id, value: true }]);
+  expect(value.activities[0].nodes[1].choices[0].visibleWhen).toEqual({ variableId: value.activities[0].variables[0].id, equals: true });
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: 'Design experience', exact: true }).click();
   dialog = page.getByRole('dialog').last();
   await expect(dialog.getByRole('textbox', { name: 'Practice hint', exact: true })).toHaveValue('Look for evidence.');
   await expect(dialog.getByRole('textbox', { name: 'Hotspot label', exact: true })).toHaveValue('Sensor');
   await expect(dialog.getByRole('combobox', { name: 'Background image (optional)', exact: true })).toHaveValue(uploaded.asset.id);
+  await expect(dialog.getByLabel('Variable label', { exact: true })).toHaveValue('Evidence gathered');
   expect(providerCalls).toBe(0);
 });
 
@@ -245,10 +264,22 @@ for (const profile of ['standalone', 'scorm-12', 'scorm-2004']) {
       window[legacy ? 'API' : 'API_1484_11'] = api;
     }, profile === 'scorm-12');
     await page.goto(profile === 'standalone' ? pathToFileURL(path.join(directory, 'index.html')).href : origin + '/index.html');
-    const native = page.locator('.native-experience');
+    let native = page.locator('.native-experience');
     await expect(native).toBeVisible();
     const initialGrade = profile === 'standalone' ? null : await page.evaluate(legacy =>
       JSON.parse(localStorage.getItem('native-lms'))[legacy ? 'cmi.core.score.raw' : 'cmi.score.raw'], profile === 'scorm-12');
+    if (profile !== 'standalone') {
+      const branch = native.getByRole('group', { name: 'Handle an incident', exact: true });
+      await branch.getByRole('button', { name: 'Investigate', exact: true }).click();
+      await page.reload();
+      await page.getByRole('button', { name: 'Continue', exact: true }).click();
+      native = page.locator('.native-experience');
+      const resumedBranch = native.getByRole('group', { name: 'Handle an incident', exact: true });
+      await expect(resumedBranch.getByRole('button', { name: 'Report', exact: true })).toBeVisible();
+      await expect(resumedBranch.getByRole('button', { name: 'Wait', exact: true })).toBeHidden();
+      await resumedBranch.getByRole('button', { name: 'Restart scenario', exact: true }).click();
+      await expect(resumedBranch.getByRole('button', { name: 'Investigate', exact: true })).toBeVisible();
+    }
     await interact(native);
     if (profile !== 'standalone') {
       const data = await page.evaluate(() => JSON.parse(localStorage.getItem('native-lms')));

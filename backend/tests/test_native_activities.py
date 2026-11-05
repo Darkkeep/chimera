@@ -89,6 +89,43 @@ class NativeActivityTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             Experience.model_validate(data)
 
+    def test_conditional_branch_variables_are_bounded_and_routes_remain_reachable(self):
+        data = experience()
+        branch = data["activities"][0]
+        branch["variables"] = [{"id": "evidence", "label": "Evidence gathered", "initialValue": False}]
+        branch["nodes"][0]["choices"][0]["setVariables"] = [{"variableId": "evidence", "value": True}]
+        branch["nodes"][1]["choices"][0]["visibleWhen"] = {"variableId": "evidence", "equals": True}
+        branch["nodes"][1]["choices"][1]["visibleWhen"] = {"variableId": "evidence", "equals": False}
+        branch["nodes"][1]["choices"].append({
+            "label": "Ask for guidance", "feedback": "A second perspective can help.", "nextNodeId": None,
+        })
+        validated = Experience.model_validate(data)
+        self.assertEqual(validated.model_dump(), data)
+
+        invalid_cases = []
+        invalid = copy.deepcopy(data)
+        invalid["activities"][0]["variables"].append(copy.deepcopy(invalid["activities"][0]["variables"][0]))
+        invalid_cases.append(invalid)
+        invalid = copy.deepcopy(data)
+        invalid["activities"][0]["nodes"][0]["choices"][0]["setVariables"][0]["value"] = "true"
+        invalid_cases.append(invalid)
+        invalid = copy.deepcopy(data)
+        invalid["activities"][0]["nodes"][1]["choices"][0]["visibleWhen"]["variableId"] = "missing"
+        invalid_cases.append(invalid)
+        invalid = copy.deepcopy(data)
+        invalid["activities"][0]["nodes"][0]["choices"][1]["visibleWhen"] = {
+            "variableId": "evidence", "equals": True,
+        }
+        invalid_cases.append(invalid)
+        invalid = copy.deepcopy(data)
+        invalid["activities"][0]["nodes"][1]["choices"][2]["visibleWhen"] = {
+            "variableId": "evidence", "equals": False,
+        }
+        invalid_cases.append(invalid)
+        for invalid in invalid_cases:
+            with self.subTest(invalid=invalid["activities"][0]["variables"]), self.assertRaises(ValidationError):
+                Experience.model_validate(invalid)
+
     def test_activity_bounds_unknown_content_and_invalid_answer_rejected(self):
         for problem in ("position", "infinity", "duplicate-point", "duplicate-item", "missing-answer", "duplicate-step", "unknown", "empty", "empty-image"):
             data = experience()

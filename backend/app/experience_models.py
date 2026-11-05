@@ -1,7 +1,7 @@
 """Portable native learning experiences and author-reviewed design proposals."""
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_serializer, model_validator
 
 
 Text = Annotated[str, Field(min_length=1, max_length=2000)]
@@ -25,10 +25,37 @@ class Reveal(StrictModel):
 Identifier = Annotated[str, Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$")]
 
 
+class BranchVariable(StrictModel):
+    id: Identifier
+    label: Label
+    initialValue: StrictBool
+
+
+class VariableAssignment(StrictModel):
+    variableId: Identifier
+    value: StrictBool
+
+
+class VariableCondition(StrictModel):
+    variableId: Identifier
+    equals: StrictBool
+
+
 class BranchChoice(StrictModel):
     label: Label
     feedback: Text
     nextNodeId: Identifier | None = None
+    visibleWhen: VariableCondition | None = None
+    setVariables: list[VariableAssignment] = Field(default_factory=list, max_length=5)
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_shape(self, handler):
+        data = handler(self)
+        if "visibleWhen" not in self.model_fields_set:
+            data.pop("visibleWhen", None)
+        if "setVariables" not in self.model_fields_set:
+            data.pop("setVariables", None)
+        return data
 
 
 class BranchNode(StrictModel):
@@ -43,15 +70,32 @@ class BranchingActivity(StrictModel):
     title: Label
     startNodeId: Identifier
     nodes: list[BranchNode] = Field(min_length=1, max_length=20)
+    variables: list[BranchVariable] = Field(default_factory=list, max_length=5)
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_shape(self, handler):
+        data = handler(self)
+        if "variables" not in self.model_fields_set:
+            data.pop("variables", None)
+        return data
 
     @model_validator(mode="after")
     def valid_routes(self):
         nodes = {node.id: node for node in self.nodes}
         if len(nodes) != len(self.nodes) or self.startNodeId not in nodes:
             raise ValueError("Branch nodes need unique IDs and an existing start node")
+        variables = {variable.id: variable for variable in self.variables}
+        if len(variables) != len(self.variables):
+            raise ValueError("Branch variable IDs must be unique")
         for node in self.nodes:
-            if any(choice.nextNodeId is not None and choice.nextNodeId not in nodes for choice in node.choices):
-                raise ValueError("Every branch destination must exist")
+            for choice in node.choices:
+                if choice.nextNodeId is not None and choice.nextNodeId not in nodes:
+                    raise ValueError("Every branch destination must exist")
+                if choice.visibleWhen and choice.visibleWhen.variableId not in variables:
+                    raise ValueError("Choice visibility must reference an existing branch variable")
+                assigned = [item.variableId for item in choice.setVariables]
+                if len(assigned) != len(set(assigned)) or any(identifier not in variables for identifier in assigned):
+                    raise ValueError("Choice assignments must reference unique existing branch variables")
         visited, active = set(), set()
 
         def visit(identifier):
@@ -69,6 +113,33 @@ class BranchingActivity(StrictModel):
         visit(self.startNodeId)
         if visited != set(nodes):
             raise ValueError("Every branch node must be reachable from the start")
+
+        initial = {variable.id: variable.initialValue for variable in self.variables}
+        reachable_nodes, visited_states = set(), set()
+
+        def visit_state(identifier, values):
+            state = (identifier, tuple(values[variable.id] for variable in self.variables))
+            if state in visited_states:
+                return
+            visited_states.add(state)
+            reachable_nodes.add(identifier)
+            node = nodes[identifier]
+            choices = [
+                choice for choice in node.choices
+                if choice.visibleWhen is None or values[choice.visibleWhen.variableId] == choice.visibleWhen.equals
+            ]
+            if len(choices) < 2:
+                raise ValueError("Every reachable decision must show at least two choices")
+            for choice in choices:
+                next_values = values.copy()
+                for assignment in choice.setVariables:
+                    next_values[assignment.variableId] = assignment.value
+                if choice.nextNodeId is not None:
+                    visit_state(choice.nextNodeId, next_values)
+
+        visit_state(self.startNodeId, initial)
+        if reachable_nodes != set(nodes):
+            raise ValueError("Every branch node must be reachable through visible choices")
         return self
 
 

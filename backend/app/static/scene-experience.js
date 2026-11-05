@@ -99,32 +99,61 @@ export function mountExperience(root, experience, options = {}) {
       status.textContent = value;
     }
     if (activity.kind === "branching") {
+      const variables = Array.isArray(activity.variables) ? activity.variables : [];
+      const initialValues = Object.fromEntries(variables.map(variable => [variable.id, variable.initialValue === true]));
+      function isVisible(choice, values) {
+        return !choice.visibleWhen || values[choice.visibleWhen.variableId] === choice.visibleWhen.equals;
+      }
+      function applyAssignments(choice, values) {
+        (Array.isArray(choice.setVariables) ? choice.setVariables : []).forEach(assignment => {
+          if (Object.prototype.hasOwnProperty.call(values, assignment.variableId) && typeof assignment.value === "boolean") {
+            values[assignment.variableId] = assignment.value;
+          }
+        });
+      }
       activity.nodes.forEach(node => {
         text("h4", node.prompt, staticView);
-        node.choices.forEach(choice => text("p", `${choice.label}: ${choice.feedback} ${
-          choice.nextNodeId ? "Continue to: " + (activity.nodes.find(n => n.id === choice.nextNodeId)?.prompt || "Missing destination") : "End of route."
-        }`, staticView));
+        node.choices.forEach(choice => {
+          const condition = choice.visibleWhen
+            ? ` Shown when ${variables.find(variable => variable.id === choice.visibleWhen.variableId)?.label || "a variable"} is ${choice.visibleWhen.equals ? "true" : "false"}.`
+            : "";
+          const assignments = (choice.setVariables || []).map(assignment =>
+            ` Set ${variables.find(variable => variable.id === assignment.variableId)?.label || "a variable"} to ${assignment.value ? "true" : "false"}.`
+          ).join("");
+          text("p", `${choice.label}: ${choice.feedback}${condition}${assignments} ${
+            choice.nextNodeId ? "Continue to: " + (activity.nodes.find(n => n.id === choice.nextNodeId)?.prompt || "Missing destination") : "End of route."
+          }`, staticView);
+        });
       });
       let path = Array.isArray(saved.path) ? saved.path.slice(0, activity.nodes.length) : [];
       function render(focus = false) {
         content.replaceChildren();
         let current = activity.nodes.find(node => node.id === activity.startNodeId);
+        const values = { ...initialValues };
+        const requestedPath = path;
         const valid = [];
         for (const index of path) {
           const choice = Number.isInteger(index) && current?.choices[index];
-          if (!choice) break;
+          if (!choice || !isVisible(choice, values)) break;
           text("p", `${choice.label}: ${choice.feedback}`, content);
           valid.push(index);
+          applyAssignments(choice, values);
           current = activity.nodes.find(node => node.id === choice.nextNodeId);
           if (!current) break;
         }
         path = valid;
+        if (requestedPath.length !== valid.length || requestedPath.some((index, i) => index !== valid[i])) {
+          update({ path });
+        }
         if (current) {
           const prompt = text("h4", current.prompt, content);
           prompt.tabIndex = -1;
-          current.choices.forEach((choice, index) => control(content, choice.label, () => {
-            path.push(index); update({ path }); render(true);
-          }));
+          current.choices.forEach((choice, index) => {
+            if (!isVisible(choice, values)) return;
+            control(content, choice.label, () => {
+              path.push(index); update({ path }); render(true);
+            });
+          });
           if (focus) prompt.focus();
         } else {
           const end = text("p", "Route complete. Review the feedback or try another path.", content);
