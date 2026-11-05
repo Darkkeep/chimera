@@ -204,8 +204,8 @@ async function freePort() {
   assert(layout.elements.some(element => element.text === 'Added text' && element.x === 500 && element.y === 700));
   assert(layout.enabled, `visual layout should be enabled after canvas save: mode=${project.storyboard.scenes[0].layoutMode} enabled=${layout.enabled}`); assert(layout.elements.some(element => element.text === 'Edited directly on canvas' && Math.abs(element.width - expectedTextWidth) < 1));
   await page.reload();
-  await page.getByLabel('Switch project').selectOption(fixture.projectId);
   await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await expect(page.getByLabel('Switch project')).toHaveValue(fixture.projectId);
   await page.locator('.visual-authoring-surface').getByText('Edited directly on canvas', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
   await page.getByRole('tab', { name: 'Stage', exact: true }).click();

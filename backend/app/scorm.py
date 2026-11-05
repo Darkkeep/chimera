@@ -526,7 +526,9 @@ PLAYER_JS = EXPERIENCE_RUNTIME + TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANC
       seek.oninput=()=>controller.seek(Number(seek.value));
       for(const {node,asset,clip} of controller.media){
         node.addEventListener('waiting',()=>{if(playRequested && !controller.playing){play.textContent='Cancel playback';runtimeStatus('Buffering media. Playback will resume when it is ready.');}});
-        node.addEventListener('canplay',()=>{if(playRequested && !controller.playing && !document.hidden){controller.play();if(document.querySelector('#runtime-status').textContent.startsWith('Buffering media.'))runtimeStatus(api?'Connected to LMS tracking.':'Media ready.');}});
+        const resumeReadyMedia=()=>{if(playRequested && !controller.playing && !document.hidden && node.readyState>=3 && !node.seeking){controller.play();if(document.querySelector('#runtime-status').textContent.startsWith('Buffering media.'))runtimeStatus(api?'Connected to LMS tracking.':'Media ready.');}};
+        node.addEventListener('canplay',resumeReadyMedia);
+        node.addEventListener('seeked',resumeReadyMedia);
         if(asset?.captionsVtt)installCaptionTrack(node,asset.captionsVtt,asset.language||'en');
         if(asset?.transcript){const details=document.createElement('details'),summary=document.createElement('summary'),text=document.createElement('p');summary.textContent=`Transcript: ${clip.name||asset.filename}`;text.textContent=asset.transcript;details.append(summary,text);body.appendChild(details);}
       }

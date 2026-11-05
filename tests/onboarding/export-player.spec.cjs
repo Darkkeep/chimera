@@ -58,6 +58,21 @@ for (const profile of ['12', '2004']) test(`exported ${profile} player fits, pla
   await page.getByRole('button', { name: 'Play scene', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__CHIMERA_SCENE_TRANSPORT.currentTime)).toBeGreaterThan(100);
   await expect.poll(() => page.evaluate(() => window.__CHIMERA_SCENE_TRANSPORT.media[0].node.currentTime)).toBeGreaterThan(0.05);
+  await page.evaluate(() => window.__CHIMERA_SCENE_TRANSPORT.pause());
+  await expect.poll(() => page.evaluate(() => {
+    const node = window.__CHIMERA_SCENE_TRANSPORT.media[0].node;
+    return node.readyState >= 3 && !node.seeking;
+  })).toBe(true);
+  const bufferedLabel = await page.evaluate(() => {
+    const node = window.__CHIMERA_SCENE_TRANSPORT.media[0].node;
+    const play = document.querySelector('.scene-playback button');
+    node.dispatchEvent(new Event('waiting'));
+    const bufferedLabel = play.textContent;
+    node.dispatchEvent(new Event('seeked'));
+    return bufferedLabel;
+  });
+  expect(bufferedLabel).toBe('Cancel playback');
+  await expect(page.getByRole('button', { name: 'Pause scene', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Mute audio', exact: true }).click();
   expect(await page.evaluate(() => window.__CHIMERA_SCENE_TRANSPORT.media[0].node.volume)).toBe(0);
   await page.getByRole('button', { name: 'Pause scene', exact: true }).click();
