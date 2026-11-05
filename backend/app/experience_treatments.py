@@ -16,12 +16,15 @@ CAPABILITIES = {
                "branching decisions with feedback and terminating routes",
                "labelled schematic hotspots with an equivalent text list",
                "keyboard sequencing with feedback", "step-by-step guided practice with hints",
-               "offline screenshot-based software walkthroughs using project images"],
+               "offline screenshot-based software walkthroughs using project images",
+               "before/after comparison of two distinct project images with text alternatives"],
     "notExecuted": ["media generation", "music licensing", "video rendering", "scored assessments"],
     "activityPolicy": "Activities are formative, not graded assessments. Use stable IDs. "
                       "Sequence items are authored in correct order. Branch routes must be acyclic and reachable. "
                       "Hotspots use a labelled schematic, not generated imagery. Software walkthroughs use ordered "
-                      "project screenshots and learner-confirmed actions; they never execute or control software.",
+                      "project screenshots and learner-confirmed actions; they never execute or control software. "
+                      "Before/after comparisons use two distinct existing project images with labels, alt text, "
+                      "descriptions and an explanation; review acknowledgements are formative.",
 }
 
 

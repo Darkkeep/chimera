@@ -287,6 +287,65 @@ export function mountExperience(root, experience, options = {}) {
         control(content, "Restart practice", () => { answers = []; update({ answers }); render(true); });
       }
       render();
+    } else if (activity.kind === "before-after") {
+      const imageIds = [activity.before.imageAssetId, activity.after.imageAssetId];
+      let reviewed = Array.isArray(saved.reviewedImages) && saved.reviewedImages.length === 2
+        && saved.reviewedImages.every((id, index) => id === imageIds[index]);
+      if (saved.reviewedImages !== undefined && !reviewed
+        && !(Array.isArray(saved.reviewedImages) && saved.reviewedImages.length === 0)) update({ reviewedImages: [] });
+      function showImage(parent, side) {
+        const value = activity[side];
+        const figure = text("figure", "", parent);
+        text("h4", value.label, figure);
+        const asset = options.imageAssets?.[value.imageAssetId] || globalThis.__CHIMERA_ASSETS?.[value.imageAssetId];
+        const source = asset?.src || asset?.path;
+        if (source) {
+          const image = text("img", "", figure);
+          image.src = source;
+          image.alt = value.altText;
+          image.className = "experience-comparison-image";
+          image.addEventListener("error", () => {
+            image.remove();
+            text("p", `Image could not be loaded. ${value.altText}`, figure).setAttribute("role", "status");
+          });
+        } else text("p", `Image unavailable. ${value.altText}`, figure);
+        text("figcaption", value.description, figure);
+        text("p", `Image credit: ${asset?.filename || "Project image"} — ${asset?.attributionText?.trim() || "Attribution not supplied."}`, figure)
+          .className = "experience-asset-credit";
+      }
+      text("p", activity.instruction, staticView);
+      showImage(staticView, "before");
+      showImage(staticView, "after");
+      text("p", activity.explanation, staticView);
+      text("p", activity.instruction, content);
+      text("p", "Inspect both full images, then confirm your review. This is formative and does not affect grades or course completion.", content);
+      const label = text("label", "Image to inspect ", content);
+      const select = text("select", "", label);
+      for (const side of ["before", "after"]) {
+        const option = text("option", `${side === "before" ? "Before" : "After"}: ${activity[side].label}`, select);
+        option.value = side;
+      }
+      const picture = text("div", "", content);
+      function renderImage() { picture.replaceChildren(); showImage(picture, select.value); }
+      select.onchange = renderImage;
+      renderImage();
+      text("p", activity.explanation, content);
+      const status = text("p", "", content);
+      status.setAttribute("role", "status");
+      const showStatus = () => { status.textContent = reviewed ? "Comparison reviewed." : "Comparison not yet marked reviewed."; };
+      showStatus();
+      control(content, "Mark comparison reviewed", () => {
+        reviewed = true;
+        update({ reviewedImages: imageIds.slice() });
+        showStatus();
+      });
+      control(content, "Restart comparison", () => {
+        reviewed = false;
+        select.value = "before";
+        renderImage();
+        update({ reviewedImages: [] });
+        showStatus();
+      });
     } else if (activity.kind === "software-walkthrough") {
       function screenshotFor(step) {
         return step.screenshotAssetId && (

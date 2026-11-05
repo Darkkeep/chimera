@@ -97,6 +97,8 @@ def resolved_project(project: ProjectDetail, published: bool = False) -> Project
                     used.add(activity.imageAssetId)
                 elif activity.kind == "software-walkthrough":
                     used.update(step.screenshotAssetId for step in activity.steps)
+                elif activity.kind == "before-after":
+                    used.update((activity.before.imageAssetId, activity.after.imageAssetId))
         if layout:
             used.update(e.assetId for e in layout.elements if e.assetId)
             if layout.timeline:
@@ -191,6 +193,8 @@ def asset_usage(project: ProjectDetail, asset_id: str) -> dict:
                     activity.kind == "hotspots" and activity.imageAssetId == asset_id
                     or activity.kind == "software-walkthrough"
                     and any(step.screenshotAssetId == asset_id for step in activity.steps)
+                    or activity.kind == "before-after"
+                    and asset_id in (activity.before.imageAssetId, activity.after.imageAssetId)
                     for activity in s.experience.activities
                 )
                 or asset_id in {p.assetId for p in effective_placements(project, s)} or effective_background_asset(project, s) == asset_id or s.backgroundAsset == asset_id

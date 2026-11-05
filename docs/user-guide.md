@@ -194,6 +194,36 @@ screenshot-based, not an interactive copy or automated test of a third-party
 application. The text/print alternative includes every screenshot, alternative
 text, description, prompt, and image credit.
 
+### Before/after image comparison
+
+In **Design experience**, start or edit a native experience and choose **Add
+before/after comparison**. Choose two distinct project images under **Before
+project image** and **After project image**. Supply clear labels, meaningful
+alternative text, a description of each state, a comparison instruction and
+a change explanation. Image attribution comes from the project's Media library.
+Inspect the executable preview, acknowledge the review checkbox, then choose
+**Save reviewed native scene edits**. Reopen to verify the saved images and text.
+
+Learners use **Image to inspect** to select Before or After with the keyboard
+or pointer. Each image is shown in full at its original aspect ratio, including
+when the two images have different shapes. This is a two-image comparison;
+it has no overlay slider, gallery or timeline. The **Text alternative and
+worked solution** includes both images, their descriptions, explanation and
+credits together. Printing expands it; Word/SME snapshots include both images.
+An unavailable image leaves its alternative text and authored description.
+
+The success criterion is explicit learner acknowledgement after inspecting the
+two states: **Mark comparison reviewed**. Chimera does not assess the learner's
+interpretation. Review is formative and changes no grades, pass/fail rules or
+course-completion gates. **Restart comparison** clears acknowledgement and
+shows Before. Course preview and SCORM Continue retain acknowledgement only
+for the same ordered pair of image references; selection starts on Before.
+Invalid progress or changed references clears acknowledgement. SCORM Start over
+clears progress; standalone progress lasts only while its page is open. Both
+images remain protected from deletion while used and travel in full backups and
+portable standalone/SCORM packages. The bundled PDF was not regenerated for
+this addition; this Markdown procedure is current.
+
 Author edits persist in the project. Course preview retains activity progress
 in its existing browser-local preview record. Standalone delivery retains it
 only while the page is open. SCORM 1.2/2004 retain branch choices, opened

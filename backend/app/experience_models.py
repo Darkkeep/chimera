@@ -243,8 +243,31 @@ class SoftwareWalkthroughActivity(StrictModel):
         return self
 
 
+class ComparisonImage(StrictModel):
+    imageAssetId: str = Field(min_length=1, max_length=120)
+    label: Label
+    altText: ScreenshotAlt
+    description: Text
+
+
+class BeforeAfterActivity(StrictModel):
+    kind: Literal["before-after"]
+    id: Identifier
+    title: Label
+    instruction: Text
+    before: ComparisonImage
+    after: ComparisonImage
+    explanation: Text
+
+    @model_validator(mode="after")
+    def distinct_images(self):
+        if self.before.imageAssetId == self.after.imageAssetId:
+            raise ValueError("Before and after must reference two distinct project images")
+        return self
+
+
 Activity = Annotated[
-    BranchingActivity | HotspotActivity | SequencingActivity | GuidedPracticeActivity | SoftwareWalkthroughActivity,
+    BranchingActivity | HotspotActivity | SequencingActivity | GuidedPracticeActivity | SoftwareWalkthroughActivity | BeforeAfterActivity,
     Field(discriminator="kind"),
 ]
 

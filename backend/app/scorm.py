@@ -426,7 +426,8 @@ PLAYER_JS = EXPERIENCE_RUNTIME + TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANC
         ...(visual && !scene.experience ? scene.visualLayout.elements.filter(e => e.kind === "image").map(e => e.assetId) : []),
         ...(scene.experience?.activities || []).flatMap(activity => activity.kind === "hotspots" && activity.imageAssetId
             ? [activity.imageAssetId] : activity.kind === "software-walkthrough"
-                ? activity.steps.map(step => step.screenshotAssetId) : []),
+                ? activity.steps.map(step => step.screenshotAssetId) : activity.kind === "before-after"
+                  ? [activity.before.imageAssetId, activity.after.imageAssetId] : []),
     ]);
     const placements = scene.mediaPlacements?.length ? scene.mediaPlacements : [...(scene.imageAssets || []), ...(scene.audioAssets || []), ...(scene.videoAssets || [])].map(assetId => ({ assetId, position: "after" }));
     placements.forEach(placement => {
@@ -806,6 +807,8 @@ def _resume_budget_report(project: ProjectDetail, profile: str) -> dict[str, obj
                 progress[activity.id] = {"order": [item.id for item in activity.items]}
             elif activity.kind == "software-walkthrough":
                 progress[activity.id] = {"completedSteps": [step.id for step in activity.steps]}
+            elif activity.kind == "before-after":
+                progress[activity.id] = {"reviewedImages": [activity.before.imageAssetId, activity.after.imageAssetId]}
             else:
                 progress[activity.id] = {"answers": [step.correctChoiceId for step in activity.steps]}
         if progress:

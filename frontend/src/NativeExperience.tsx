@@ -21,7 +21,11 @@ export type Activity =
       steps: { id: string; prompt: string; hint: string; choices: Choice[]; correctChoiceId: string }[] }
   | { kind: "software-walkthrough"; id: string; title: string;
       steps: { id: string; label: string; screenshotAssetId: string; screenshotAltText: string;
-        description: string; actionPrompt: string }[] };
+        description: string; actionPrompt: string }[] }
+  | { kind: "before-after"; id: string; title: string; instruction: string;
+      before: ComparisonImage; after: ComparisonImage; explanation: string };
+
+type ComparisonImage = { imageAssetId: string; label: string; altText: string; description: string };
 
 export type Experience = {
   version: 1; heading: string; introduction: string;

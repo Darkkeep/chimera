@@ -136,6 +136,25 @@ class ExperienceTests(unittest.TestCase):
         self.assertIsNone(design.get(self.project.id, self.scene.id, other)["draft"])
         self.assertEqual(storage.list_media_generation_jobs(self.project.id), [])
 
+    def test_before_after_proposal_review_apply_and_revision_guard(self):
+        from backend.tests.test_before_after import comparison
+        images = []
+        for index in range(2):
+            self.project = storage.add_project_asset(self.project.id, f"state-{index}.png",
+                b"\x89PNG\r\n\x1a\nsynthetic" + bytes([index]), "image", self.project.storyboard.revision)
+            images.append(next(asset.id for asset in self.project.storyboard.assets if asset.filename == f"state-{index}.png"))
+        self.data["contextFingerprint"] = self.client.get(self.url).json()["context"]["fingerprint"]
+        treatment = copy.deepcopy(TREATMENT)
+        treatment["experience"]["activities"] = [comparison(*images)]
+        draft = self.proposal(treatment)
+        reviewed = copy.deepcopy(draft["treatment"])
+        reviewed["experience"]["activities"][0]["explanation"] = "Review the changed state and its consequences."
+        self.assertEqual(self.review(draft, reviewed).status_code, 200)
+        self.assertEqual(self.review(draft, reviewed, apply=True, revision=999).status_code, 412)
+        applied = self.review(draft, reviewed, apply=True)
+        self.assertEqual(applied.status_code, 200, applied.text)
+        self.assertEqual(applied.json()["project"]["storyboard"]["scenes"][0]["experience"], reviewed["experience"])
+
     def test_conditional_branch_proposal_review_apply_and_revision_guard(self):
         treatment = copy.deepcopy(TREATMENT)
         treatment["experience"]["activities"] = [{

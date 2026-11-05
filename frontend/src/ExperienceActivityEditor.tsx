@@ -20,6 +20,10 @@ export function newActivity(kind: Kind, screenshotAssetId = ""): Activity {
   if (kind === "sequencing") return { ...base, kind, instruction: "Put these steps in the correct order.",
     items: [{ id: id(), label: "First step" }, { id: id(), label: "Second step" }], feedback: "Explain why this order matters." };
   if (kind === "guided-practice") return { ...base, kind, steps: [step()] };
+  if (kind === "before-after") return { ...base, kind, instruction: "Inspect both images and identify what changed.",
+    before: { imageAssetId: screenshotAssetId, label: "Before", altText: "Describe the original image.", description: "Explain the original state." },
+    after: { imageAssetId: "", label: "After", altText: "Describe the changed image.", description: "Explain the changed state." },
+    explanation: "Explain the key change and why it matters." };
   return { ...base, kind, steps: [{ id: id(), label: "Open the settings",
     screenshotAssetId, screenshotAltText: "Describe the visible controls and relevant state.",
     description: "Explain what the screenshot shows.", actionPrompt: "Describe the action to complete." }] };
@@ -35,6 +39,24 @@ export function ExperienceActivityEditor({ activity, onChange, imageAssets = [] 
   }
   return <div className="activity-editor">
     {field("Activity title", activity.title, title => onChange({ ...activity, title }), true)}
+    {activity.kind === "before-after" && <>
+      <p>Select two distinct project images. Learners inspect each full image and can mark the comparison reviewed; this is formative.</p>
+      {field("Comparison instruction", activity.instruction, instruction => onChange({ ...activity, instruction }))}
+      {(["before", "after"] as const).map(side => <fieldset key={side}><legend>{side === "before" ? "Before image" : "After image"}</legend>
+        <label>{side === "before" ? "Before" : "After"} project image<select value={activity[side].imageAssetId}
+          onChange={event => onChange({ ...activity, [side]: { ...activity[side], imageAssetId: event.target.value } })}>
+          <option value="">Select a project image</option>
+          {activity[side].imageAssetId && !imageAssets.some(asset => asset.id === activity[side].imageAssetId)
+            && <option value={activity[side].imageAssetId}>Unavailable image ({activity[side].imageAssetId})</option>}
+          {imageAssets.map(asset => <option key={asset.id} value={asset.id}>{asset.filename}</option>)}
+        </select></label>
+        {field(`${side} label`, activity[side].label, label => onChange({ ...activity, [side]: { ...activity[side], label } }), true)}
+        <label>{side} alternative text<textarea maxLength={500} value={activity[side].altText}
+          onChange={event => onChange({ ...activity, [side]: { ...activity[side], altText: event.target.value } })} /></label>
+        {field(`${side} description`, activity[side].description, description => onChange({ ...activity, [side]: { ...activity[side], description } }))}
+      </fieldset>)}
+      {field("Change explanation", activity.explanation, explanation => onChange({ ...activity, explanation }))}
+    </>}
     {activity.kind === "branching" && <>
       <p>Every node must be reachable through visible choices. Routes must end without cycles. A choice can end the route or continue to another node.</p>
       <fieldset><legend>Activity variables</legend>

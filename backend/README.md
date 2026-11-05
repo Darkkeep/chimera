@@ -1,5 +1,27 @@
 # Chimera backend
 
+## Before/after image comparisons
+
+Experience version 1 supports `kind: "before-after"` with `id`, `title`,
+`instruction`, `explanation`, and `before`/`after` objects. Each image object
+requires a project `imageAssetId`, `label` (120 characters), `altText` (500),
+and `description` (2,000). The two image IDs must differ; external URLs, unknown
+fields, missing/non-image assets, and blank alternatives are rejected. Normal
+experience revision guards and provider proposal review/apply apply.
+
+The shared runtime offers a labelled native Before/After selector showing the
+complete image without cropping or stretching, authored descriptions, and
+project credits. The learner explicitly confirms review; no grade or completion
+gate is added. Only `reviewedImages: [beforeAssetId, afterAssetId]` is saved in
+existing activity progress. Restore accepts exactly that ordered pair; invalid
+or changed references lose acknowledgement. Selection resets to Before on mount;
+Restart clears acknowledgement. Standalone state lasts while the page is open.
+Suspend-budget estimates include both IDs. Both project images participate in
+validation, publication pruning, placement filtering, usage/deletion protection,
+backups and portable exports. Static/print and rendered Word alternatives expose
+both images, descriptions, explanation and credits. See the
+[authoring procedure](../docs/user-guide.md#beforeafter-image-comparison).
+
 ## Optional video reflections
 
 `SceneLayout.timeline` version 1 accepts up to eight `pauses` (default empty).

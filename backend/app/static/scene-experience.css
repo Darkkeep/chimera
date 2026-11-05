@@ -9,7 +9,7 @@
 .native-experience .experience-arrow { position: absolute; right: -27px; top: 30%; font-size: 24px; color: var(--experience-diagram-accent); }
 .native-experience .experience-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
 .native-experience button, .native-experience summary { background: var(--experience-accent); color: var(--experience-accent-text); font: inherit; font-weight: 650; border: 2px solid transparent; border-radius: 6px; padding: 10px 14px; cursor: pointer; min-height: 44px; }
-.native-experience :is(button,summary):focus-visible { outline: 3px solid var(--experience-fg); outline-offset: 3px; }
+.native-experience :is(button,summary,select):focus-visible { outline: 3px solid var(--experience-fg); outline-offset: 3px; }
 .native-experience .experience-reveals { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,240px),1fr)); gap: 16px; }
 .native-experience details { min-width: 0; border: 1px solid currentColor; border-radius: 8px; }
 .native-experience details p { padding: 16px; margin: 0; white-space: pre-wrap; }
@@ -25,6 +25,9 @@
 .native-experience .experience-hotspot-board > img { display: block; width: 100%; height: auto; }
 .native-experience .experience-static > img { display: block; max-width: 100%; height: auto; margin: 0 auto 16px; }
 .native-experience .experience-walkthrough-screen { display: block; max-width: 100%; max-height: 520px; width: auto; height: auto; margin: 0 auto 16px; }
+.native-experience .experience-comparison-image { display: block; max-width: 100%; max-height: 520px; width: auto; height: auto; margin: 0 auto 16px; }
+.native-experience .experience-activity figure { margin: 16px 0; }
+.native-experience .experience-activity select { font: inherit; min-height: 44px; max-width: 100%; padding: 8px; border: 1px solid currentColor; border-radius: 6px; color: var(--experience-fg); background: var(--experience-bg); }
 .native-experience .experience-hotspot-board button { position: absolute; transform: translate(-50%,-50%); margin: 0; }
 .native-experience .experience-hotspot-list { display: grid; gap: 12px; }
 .native-experience .experience-hotspot-list li { padding-left: 4px; }

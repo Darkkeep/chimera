@@ -702,6 +702,8 @@ def validate_visual_assets(scene: Scene, assets: dict[str, ExtractedAsset]) -> N
                 references.add(activity.imageAssetId)
             elif activity.kind == "software-walkthrough":
                 references.update(step.screenshotAssetId for step in activity.steps)
+            elif activity.kind == "before-after":
+                references.update((activity.before.imageAssetId, activity.after.imageAssetId))
     if scene.visualLayout:
         references.update(element.assetId for element in scene.visualLayout.elements if element.kind == "image")
         if scene.visualLayout.backgroundAsset:

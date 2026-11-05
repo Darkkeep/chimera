@@ -95,6 +95,11 @@ New media controls support explicit scene/course-wide placement, project copies 
 
 The scene editor now includes native shape insertion, opacity/fill/outline controls, text/shape shadow and bevel/emboss approximations, layer grouping/arrangement, and an optional shared timeline for animations and trimmed audio/video clips. Open **Edit scene > Stage**, then **Appearance** or **Timeline and layers**. See the [timeline procedures](docs/user-guide.md#schedule-scene-objects-audio-and-video) and [implementation plan](docs/scene-timeline-layers-plan.md). Existing scenes retain their playback until a timeline is explicitly enabled.
 
+Native experiences support **before/after image comparisons** using two distinct
+project images, a keyboard-accessible selector, complete aspect-ratio-preserving
+images, attribution and static/Word alternatives. Review acknowledgement is
+formative. See the [comparison procedure](docs/user-guide.md#beforeafter-image-comparison).
+
 Scheduled videos also support up to eight optional **Video reflections**:
 question/decision pauses with two to four responses and authored feedback.
 They are skippable, replayable and formative, never grades or completion gates.
