@@ -17,6 +17,51 @@ test.afterEach(async () => {
     });
 });
 
+test("transport does not repeatedly seek a paused decoder-rounded timestamp", async ({ page }) => {
+  const source = await fs.readFile(path.resolve("backend/app/static/scene-transport.js"), "utf8");
+  const seeks = await page.evaluate(async source => {
+    const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+    const { createSceneTransport } = await import(url);
+    URL.revokeObjectURL(url);
+    const root = document.createElement("div");
+    document.body.appendChild(root);
+    const audio = document.createElement("audio");
+    let position = 0, seeks = 0;
+    // Model a decoder that reports a nearby frame rather than the exact seek target.
+    Object.defineProperties(audio, {
+      src: { set() {} },
+      readyState: { get: () => 3 },
+      currentTime: {
+        get: () => position,
+        set: value => { position = value - 0.02; seeks++; },
+      },
+    });
+    const createElement = document.createElement.bind(document);
+    let controller;
+    document.createElement = (name, options) => name === "audio" ? audio : createElement(name, options);
+    try {
+      controller = createSceneTransport({
+        root, stage: root, initialTimeMs: 1500,
+        layout: { elements: [], timeline: { durationMs: 3000, clips: [{
+          id: "voice", kind: "audio", assetId: "voice", startMs: 0,
+          sourceInMs: 0, sourceOutMs: 3000, volume: 1,
+        }] } },
+        resolveAsset: () => ({ path: "fixture.wav" }),
+      });
+    } finally {
+      document.createElement = createElement;
+    }
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return seeks;
+    } finally {
+      controller.dispose();
+      root.remove();
+    }
+  }, source);
+  expect(seeks).toBe(1);
+});
+
 async function course(request, title) {
   let p = await (
     await request.post("/api/projects", { data: { title } })

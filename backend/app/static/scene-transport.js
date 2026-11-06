@@ -152,7 +152,7 @@ export function createSceneTransport({
     const ranges = (progress[clip.id]?.watchedRanges || []).map((range) => [
       ...range,
     ]);
-    const entry = { clip, node, asset, ranges, previous: null, pending: false };
+    const entry = { clip, node, asset, ranges, previous: null, pending: false, seekTarget: null };
     const reset = () => {
       entry.previous = null;
     };
@@ -236,12 +236,17 @@ export function createSceneTransport({
         node.style.visibility = active ? "visible" : "hidden";
       const wanted =
         (clip.sourceInMs + Math.max(0, Math.min(elapsed, duration))) / 1000;
+      if (playing) entry.seekTarget = null;
       if (!playing) node.pause();
       if (
-        node.readyState >= 1 &&
+        node.readyState >= 1 && !node.seeking &&
+        (playing || entry.seekTarget !== wanted) &&
         Math.abs(node.currentTime - wanted) > (playing ? 0.25 : activePause ? 0.001 : 0.015)
       ) {
         entry.previous = null;
+        // Some decoders round seeks to a frame boundary. Do not seek the same
+        // paused target repeatedly and prevent readiness from settling.
+        entry.seekTarget = wanted;
         node.currentTime = wanted;
       }
       const fade = Math.min(
@@ -337,6 +342,7 @@ export function createSceneTransport({
     time = Math.max(0, Math.min(value, timeline.durationMs));
     media.forEach((entry) => {
       entry.previous = null;
+      entry.seekTarget = null;
     });
     last = performance.now();
     const point = playing && pauses.find(point => point.timeMs === time);
