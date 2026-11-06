@@ -1,6 +1,7 @@
 """Explicit, synthetic live-provider qualification through Chimera's local API."""
 import argparse
 import json
+import os
 from pathlib import Path
 
 import httpx
@@ -12,7 +13,9 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    client = httpx.Client(base_url="http://127.0.0.1:8000", timeout=180)
+    api_port = os.environ.get("CHIMERA_API_PORT", "8000")
+    web_port = os.environ.get("CHIMERA_WEB_PORT", "5173")
+    client = httpx.Client(base_url=f"http://127.0.0.1:{api_port}", timeout=180)
     manifest = {"date": "2026-10-14", "cases": []}
 
     def save(name, value):
@@ -25,7 +28,7 @@ def main():
 
     connection = request("GET", "/api/ai-connection")
     manifest["model"] = connection["textModel"]
-    manifest["connectionTest"] = request("POST", "/api/ai-connection/test", headers={"Origin": "http://127.0.0.1:5173"}, json={"expectedRevision": connection["revision"]})
+    manifest["connectionTest"] = request("POST", "/api/ai-connection/test", headers={"Origin": f"http://127.0.0.1:{web_port}"}, json={"expectedRevision": connection["revision"]})
     project = request("POST", "/api/projects", json={"title": "Live AI qualification - synthetic widget packing"})
     project_id = project["id"]
     manifest["projectId"] = project_id

@@ -4,7 +4,7 @@ Set-Location $PSScriptRoot
 if ($Service -eq 'Backend') {
     if (!(Test-Path backend/.venv/Scripts/python.exe)) { throw 'Run Install-Chimera.ps1 first.' }
     Set-Location backend
-    & ./.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+    & ./.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port $(if ($env:CHIMERA_API_PORT) { $env:CHIMERA_API_PORT } else { 8000 })
 } else {
     npm.cmd run dev --prefix frontend -- --host 127.0.0.1 --strictPort
 }

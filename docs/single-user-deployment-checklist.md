@@ -37,7 +37,7 @@ cd frontend
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173/`.
+Open `http://127.0.0.1:5173/`. To avoid ports used by other projects, set `CHIMERA_WEB_PORT` and `CHIMERA_API_PORT` (and pass the same API port to `--port`); see the [README](../README.md#custom-dev-ports).
 
 The repeatable API/artifact check can be run from the repository root:
 

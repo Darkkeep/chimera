@@ -5,12 +5,13 @@ const path = require('node:path');
 (async () => {
   const out = path.resolve('workspace/qualification-live-2026-10-14');
   const manifest = JSON.parse(await fs.readFile(path.join(out, 'manifest.json')));
+  const webOrigin = `http://127.0.0.1:${process.env.CHIMERA_WEB_PORT || 5173}`;
   const browser = await chromium.launch();
-  const page = await browser.newPage({ baseURL: 'http://127.0.0.1:5173', viewport: { width: 1440, height: 1000 } });
+  const page = await browser.newPage({ baseURL: webOrigin, viewport: { width: 1440, height: 1000 } });
   const results = { responseSource: 'Captured real provider responses replayed into the editor; no additional provider calls', scenes: [] };
   try {
     await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), manifest.projectId);
-    await page.goto('http://127.0.0.1:5173/');
+    await page.goto(`${webOrigin}/`);
     await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
     for (const [name, sceneId, file, sceneTitle] of [
       ['animation', manifest.animationSceneId, 'animation-retest-response.json', 'Packing sequence'],

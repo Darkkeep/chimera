@@ -1,5 +1,5 @@
 param(
-    [string]$ApiUrl = "http://127.0.0.1:8000",
+    [string]$ApiUrl = "http://127.0.0.1:$(if ($env:CHIMERA_API_PORT) { $env:CHIMERA_API_PORT } else { 8000 })",
     [string]$ProjectId = "testframe-565c5da8",
     [string]$OutputDirectory = "$env:TEMP\chimera-single-user-verification"
 )
