@@ -64,7 +64,9 @@ for (const profile of ['12', '2004']) test(`exported ${profile} player fits, pla
     return node.readyState >= 3 && !node.seeking;
   })).toBe(true);
   const bufferedLabel = await page.evaluate(() => {
-    const node = window.__CHIMERA_SCENE_TRANSPORT.media[0].node;
+    const controller = window.__CHIMERA_SCENE_TRANSPORT;
+    controller.pause();
+    const node = controller.media[0].node;
     const play = document.querySelector('.scene-playback button');
     node.dispatchEvent(new Event('waiting'));
     const bufferedLabel = play.textContent;

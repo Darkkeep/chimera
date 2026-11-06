@@ -164,6 +164,14 @@ export function createSceneTransport({
       const endpoint = Math.min(clip.sourceOutMs / 1000, node.duration);
       if (node.ended || (node.currentTime >= endpoint - 0.05 && node.buffered.length &&
           node.buffered.end(node.buffered.length - 1) >= endpoint - 0.001)) return;
+      // WebKit can wait for decoding after a backward seek even with the
+      // entire remaining clip buffered. Pausing here prevents canplay.
+      if (node.readyState >= 2 && !node.seeking && !node.paused) {
+        for (let i = 0; i < node.buffered.length; i++) {
+          if (node.buffered.start(i) <= node.currentTime &&
+              node.buffered.end(i) >= endpoint - 0.001) return;
+        }
+      }
       if (playing) {
         pause();
         onError("Media is buffering. Press Play when it is ready.");
@@ -240,7 +248,7 @@ export function createSceneTransport({
       if (!playing) node.pause();
       if (
         node.readyState >= 1 && !node.seeking &&
-        (playing || entry.seekTarget !== wanted) &&
+        (playing || entry.seekTarget !== wanted || Math.abs(node.currentTime - wanted) > 0.05) &&
         Math.abs(node.currentTime - wanted) > (playing ? 0.25 : activePause ? 0.001 : 0.015)
       ) {
         entry.previous = null;

@@ -46,23 +46,28 @@ test.afterEach(async ({ page }, testInfo) => {
 
 test("transport does not repeatedly seek a paused decoder-rounded timestamp", async ({ page }) => {
   const source = await fs.readFile(path.resolve("backend/app/static/scene-transport.js"), "utf8");
-  const seeks = await page.evaluate(async source => {
+  const result = await page.evaluate(async source => {
     const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
     const { createSceneTransport } = await import(url);
     URL.revokeObjectURL(url);
     const root = document.createElement("div");
     document.body.appendChild(root);
     const audio = document.createElement("audio");
-    let position = 0, seeks = 0;
+    let position = 0, seeks = 0, readyState = 3, bufferEnd = 3, paused = true;
     // Model a decoder that reports a nearby frame rather than the exact seek target.
     Object.defineProperties(audio, {
       src: { set() {} },
-      readyState: { get: () => 3 },
+      readyState: { get: () => readyState },
+      duration: { get: () => 3 },
+      paused: { get: () => paused },
+      buffered: { get: () => ({ length: 1, start: () => 0, end: () => bufferEnd }) },
       currentTime: {
         get: () => position,
         set: value => { position = value - 0.02; seeks++; },
       },
     });
+    audio.play = async () => { paused = false; };
+    audio.pause = () => { paused = true; };
     const createElement = document.createElement.bind(document);
     let controller;
     document.createElement = (name, options) => name === "audio" ? audio : createElement(name, options);
@@ -80,13 +85,24 @@ test("transport does not repeatedly seek a paused decoder-rounded timestamp", as
     }
     try {
       await new Promise(resolve => setTimeout(resolve, 300));
-      return seeks;
+      const pausedSeeks = seeks;
+      position = 0;
+      audio.dispatchEvent(new Event("canplay"));
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const recoveredFailedSeek = seeks === pausedSeeks + 1 && position === 1.48;
+      controller.play();
+      readyState = 2;
+      audio.dispatchEvent(new Event("waiting"));
+      const fullyBufferedKeepsPlaying = controller.playing;
+      bufferEnd = 1.6;
+      audio.dispatchEvent(new Event("waiting"));
+      return { pausedSeeks, recoveredFailedSeek, fullyBufferedKeepsPlaying, partiallyBufferedPauses: !controller.playing };
     } finally {
       controller.dispose();
       root.remove();
     }
   }, source);
-  expect(seeks).toBe(1);
+  expect(result).toEqual({ pausedSeeks: 1, recoveredFailedSeek: true, fullyBufferedKeepsPlaying: true, partiallyBufferedPauses: true });
 });
 
 async function course(request, title) {
