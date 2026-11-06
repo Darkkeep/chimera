@@ -17,6 +17,7 @@ installation, not a standalone executable; runtimes are not bundled.
 3. In another PowerShell window in the same folder, run
    `./Start-Chimera.ps1 -Service Frontend`.
 4. Open <http://localhost:5173>. Keep both terminals running; Ctrl+C stops them.
+   If another project uses these ports, set `CHIMERA_WEB_PORT` (default 5173) and `CHIMERA_API_PORT` (default 8000) in both windows before steps 2 and 3, then open the matching web port.
 
 **Word-renderer setup:** the current `Install-Chimera.ps1` does not yet install the root Node dependency tree or Chromium. Before testing Word exports, run these additional commands from the extracted package root, using the same Windows account that starts the backend:
 

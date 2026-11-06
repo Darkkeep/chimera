@@ -138,6 +138,15 @@ class StoryboardFlowTests(unittest.IsolatedAsyncioTestCase):
             {"http://localhost:5173", "http://127.0.0.1:5173"},
         )
 
+    def test_cors_origins_follow_configured_web_port(self) -> None:
+        from backend.app.deployment import cors_origins
+        with patch.dict(os.environ, {"CHIMERA_WEB_PORT": "5999"}):
+            os.environ.pop("CHIMERA_DEPLOYMENT_PROFILE", None)
+            self.assertEqual(cors_origins(), ["http://localhost:5999", "http://127.0.0.1:5999"])
+            os.environ["CHIMERA_WEB_PORT"] = "abc"
+            with self.assertRaises(RuntimeError):
+                cors_origins()
+
     def test_storyboard_revision_increments_and_defaults_for_legacy_files(self) -> None:
         project = storage.create_project(ProjectCreate(title="Revision course"))
         initial_revision = project.storyboard.revision

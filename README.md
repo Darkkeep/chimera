@@ -148,6 +148,15 @@ npm install
 npm run dev
 ```
 
+#### Custom dev ports
+
+If 5173 or 8000 is used by another project, set `CHIMERA_WEB_PORT` (frontend, default 5173) and `CHIMERA_API_PORT` (API proxy target, default 8000) in both terminals before starting. The backend derives its allowed browser origins from `CHIMERA_WEB_PORT`, and Vite fails instead of picking another port if the web port is busy. Start uvicorn with the same `--port` as `CHIMERA_API_PORT`.
+
+```powershell
+$env:CHIMERA_WEB_PORT = '5180'; $env:CHIMERA_API_PORT = '8010'
+uvicorn app.main:app --reload --port $env:CHIMERA_API_PORT
+```
+
 ### Word scene visuals
 
 From the repository root, run `npm ci --omit=dev` and `npx playwright install chromium` for the backend service account. Word exports use this local browser renderer to capture the authored scene through the delivery player. Motion is stopped and assessments show their initial unanswered state for print; surrounding instructional text and notes remain editable. A missing renderer produces an export error instead of an obsolete source image. LibreOffice still serves source-slide comparison and existing document/PDF conversion tasks.
