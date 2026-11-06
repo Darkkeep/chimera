@@ -37,7 +37,8 @@ class PythiaActionTests(unittest.TestCase):
             SceneElement(id="body", kind="text", text="Original body.", x=40, y=180, width=1000, height=150)])), self.project.storyboard.revision)
         self.path = talk.state_path(self.project.id, LOCAL_ACTOR)
         talk.write_state(self.path, {"sessionId": "session-one", "turns": [{"id": "advice-one", "question": "Improve the lesson", "wireQuestion": "Improve the lesson",
-            "status": "completed", "result": {"content": "Use practical actions first."}, "binding": {"sceneRevision": None, "sources": {}}}]})
+            "status": "completed", "result": {"content": "Use practical actions first."}, "binding": {"sceneRevision": None, "sources": {}}}],
+            "planning": {"stage": "designing", "brief": "New operators need practical actions and a worked example.", "turnId": "advice-one"}})
         self.client = self.enterContext(TestClient(main.app))
         self.base = f"/api/projects/{self.project.id}/pythia-conversation"
         self.headers = {"Origin": "http://127.0.0.1:5173"}
@@ -72,6 +73,7 @@ class PythiaActionTests(unittest.TestCase):
             payload = provider.call_args.kwargs["authoring_request"]
             self.assertIn("preserve narration", payload["direction"])
             self.assertEqual(payload["scene"]["title"], "Original")
+            self.assertEqual(payload["designBrief"], "New operators need practical actions and a worked example.")
         response = self.decide()
         self.assertEqual(response.status_code, 200, response.text)
         project = storage.read_project(self.project.id)
@@ -139,44 +141,49 @@ class PythiaActionTests(unittest.TestCase):
         self.assertEqual(len(storage.read_project(self.project.id).storyboard.scenes), 3)
         self.assertTrue(all(scene.visualLayout is None or scene.visualLayout.timeline is None for scene in project.storyboard.scenes[1:]))
 
-    def test_outline_creates_every_scene_in_order_across_batches(self):
+    def test_outline_topics_can_split_into_multiple_learner_scenes(self):
         titles = [f"Expanded topic {i}" for i in range(1, 14)]
         state = talk.read_state(self.path)
         state["turns"][0]["result"]["content"] = "# Expanded outline\n" + "\n".join(f"{i}. **{title}**\n   - Supporting detail" for i, title in enumerate(titles, 1))
         talk.write_state(self.path, state)
         before = self.project.storyboard.model_dump()
         def producer(*, authoring_request):
-            return {**ADD, "scenes": [{"title": title, "extractedText": [f"Content for {title}"]} for title in authoring_request["outlineTitles"]]}
+            self.assertNotIn("outlineTitles", authoring_request)
+            self.assertEqual(len(authoring_request["outlineTopics"]), 1)
+            topic = authoring_request["outlineTopics"][0]
+            return {**ADD, "scenes": [{"title": f"{topic}: {purpose}", "extractedText": [f"Content for {topic}"]} for purpose in ("Example", "Try it")]}
+        expected = [f"{topic}: {purpose}" for topic in titles for purpose in ("Example", "Try it")]
         with patch.object(talk, "local_mcp", side_effect=producer) as provider:
             self.assertEqual(self.draft("add-scenes", followOutline=True).status_code, 202)
             state = self.finished()
             self.assertEqual(state["actions"][-1]["status"], "pending", state)
-            self.assertEqual(provider.call_count, 4)
-            self.assertEqual([s["title"] for s in state["actions"][-1]["result"]["scenes"]], titles)
+            self.assertEqual(provider.call_count, 13)
+            self.assertEqual([call.kwargs["authoring_request"]["outlineTopics"][0] for call in provider.call_args_list], titles)
+            self.assertEqual([s["title"] for s in state["actions"][-1]["result"]["scenes"]], expected)
         self.assertEqual(storage.read_project(self.project.id).storyboard.model_dump(), before)
         self.assertEqual(self.decide().status_code, 200)
         project = storage.read_project(self.project.id)
-        self.assertEqual([s.title for s in project.storyboard.scenes[1:]], titles)
+        self.assertEqual([s.title for s in project.storyboard.scenes[1:]], expected)
         self.assertEqual(project.storyboard.scenes[0].model_dump(), before["scenes"][0])
         self.assertEqual(self.decide().status_code, 200)
-        self.assertEqual(len(storage.read_project(self.project.id).storyboard.scenes), 14)
+        self.assertEqual(len(storage.read_project(self.project.id).storyboard.scenes), 27)
 
     def test_incomplete_outline_batch_never_publishes_partial_draft(self):
         state = talk.read_state(self.path)
         state["turns"][0]["result"]["content"] = "\n".join(f"{i}. Topic {i}" for i in range(1, 9))
         talk.write_state(self.path, state)
         def producer(*, authoring_request):
-            titles = authoring_request["outlineTitles"]
-            if titles[0] == "Topic 5":
-                titles = titles[:-1]
-            return {**ADD, "scenes": [{"title": title, "extractedText": ["Text."]} for title in titles]}
+            topic = authoring_request["outlineTopics"][0]
+            if topic == "Topic 5":
+                return {**ADD, "scenes": []}
+            return {**ADD, "scenes": [{"title": f"Explore {topic}", "extractedText": ["Text."]}]}
         before = self.project.storyboard.model_dump()
         with patch.object(talk, "local_mcp", side_effect=producer):
             self.assertEqual(self.draft("add-scenes", followOutline=True).status_code, 202)
             action = self.finished()["actions"][-1]
         self.assertEqual(action["status"], "failed")
         self.assertIsNone(action["result"])
-        self.assertIn("every requested outline item", action["error"])
+        self.assertIn("Nothing was applied", action["error"])
         self.assertEqual(storage.read_project(self.project.id).storyboard.model_dump(), before)
 
     def test_outline_headings_do_not_turn_subitems_into_scenes(self):
@@ -193,6 +200,18 @@ class PythiaActionTests(unittest.TestCase):
         self.assertEqual(response.json()["conversation"]["actions"][0]["status"], "discarded")
         self.assertEqual(storage.read_project(self.project.id).storyboard.revision, self.project.storyboard.revision)
         self.assertEqual(self.decide().status_code, 409)
+
+    def test_numbered_advice_does_not_authorize_scene_drafting(self):
+        state = talk.read_state(self.path)
+        state.pop("planning")
+        state["turns"][0]["result"]["content"] = "1. Understand the problem\n2. Explore approaches"
+        talk.write_state(self.path, state)
+        with patch.object(talk, "local_mcp") as provider:
+            response = self.draft("add-scenes", followOutline=True)
+            self.assertEqual(response.status_code, 409)
+            self.assertIn("Agree brief", response.json()["detail"])
+            provider.assert_not_called()
+        self.assertEqual(talk.read_state(self.path).get("actions", []), [])
 
     def test_changed_revision_rejects_apply_without_overwriting_author_edit(self):
         with patch.object(talk, "local_mcp", return_value=copy.deepcopy(UPDATE)):

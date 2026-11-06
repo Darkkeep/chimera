@@ -14,11 +14,21 @@ Configure providers under **Settings > AI connection** using the OpenAI, ElevenL
 
 Choose **Narration** and explicitly select the saved connection; its saved voice/language populate the form and can be overridden for the candidate. **Generate candidate** can incur provider charges and sends the script externally. Listen to the result and inspect captions/transcript/credits before **Approve asset**, which explicitly approves and attaches it to its target scene. Generation alone does not attach it. Inspect the resulting scene and any placement settings before export. Regeneration retains the original connection ID; a missing connection fails instead of falling back. Queued jobs also bind to the saved settings revision.
 
-Synthesia and Shotstack currently support **connection setup and read-only testing only**. They do not submit video/render jobs, download generated videos or enable the media generator. Uploaded MP4/WebM files remain supported independently of those connections. Shotstack's sandbox and production keys are distinct; the sandbox is not a guarantee of free future AI generation. See [provider authentication, tests, request limits and unsupported features](ai-connection.md).
+Synthesia and Shotstack support **video candidates from 4 to 30 seconds**. Synthesia uses a presenter script and authorized avatar ID; Shotstack renders exact title text with fades, not generated footage. Saving/testing a connection remains read-only; **Generate candidate** submits a potentially billable render. Preview and approve the MP4, then accept its placement proposal or attach it normally. Add/review transcripts, captions and credits before publishing. Cancellation/timeouts are local and do not cancel provider billing; check the saved render ID in the provider dashboard before explicitly retrying. Uploaded MP4/WebM files remain supported independently. Shotstack sandbox and production keys are distinct. See [provider authentication, tests, request limits and supported video generation](ai-connection.md#video-connections-and-generation).
 
 ## Timed media and stage video
 
 The optional [scene timeline](user-guide.md#schedule-scene-objects-audio-and-video) schedules audio/video independently of before/after media placement. Add project assets as clips with a scene start and source-in/out interval; originals remain unchanged. Multiple clips may reference one asset. Video clips have stage geometry and layer order; audio clips are nonvisual. Volume/fades are saved; mute/solo audition controls are preview-only. Captions remain aligned to source time, and required coverage is recorded per trimmed clip from actual playback. Seeking alone earns no credit. Scheduling an attached asset suppresses its independent learner player in that scene; unscheduled attachments keep their existing behavior. Existing scenes are not silently converted. See [implementation and acceptance limits](scene-timeline-implementation.md).
+
+New timeline videos automatically fit the scene canvas. For an existing clip,
+open **Edit scene → Timeline and layers**, select its video row and choose **Fit
+video to scene**. This centers the whole video at the largest size that fits,
+preserving proportions without cropping or stretching. Any extra space remains
+around the picture. Preview at the playhead, then **Save scene**. The fit is
+undoable and survives reload, Preview, SCORM and standalone export; source bytes,
+timing, volume and layers are unchanged. Custom geometry remains available.
+After resizing the stage, use Fit again to match its new dimensions. This fits
+on-stage timeline clips, not independent before/after scene players.
 
 ## Local OCR
 

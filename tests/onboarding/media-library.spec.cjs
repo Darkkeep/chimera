@@ -13,6 +13,7 @@ for (const status of ['configured', 'unconfigured', 'unavailable', 'denied']) {
     await page.route('**/media-generation-capability', route => status === 'unavailable' ? route.fulfill({ status: 503, json: { detail: 'Unavailable' } }) : route.fulfill({ json: mediaCapability({ providerConfigured: status !== 'unconfigured', canGenerate: status !== 'denied' }) }));
     let submissions = 0;
     await page.route('**/media-generation-jobs', route => {
+      if (route.request().method() === 'GET') return route.fulfill({ json: [] });
       submissions += 1;
       return route.fulfill({ status: 202, json: { id: 'fixture-job', status: 'queued' } });
     });
@@ -145,6 +146,7 @@ test('media project selector defaults to current project and keeps additions in 
   expect(selected.storyboard.assets.map(asset => asset.filename)).toContain('added.png');
   expect(original.storyboard.assets).toHaveLength(1);
   const added = page.locator('.media-item').filter({ hasText: 'added.png' });
+  await page.locator('.other-project-media > summary').click();
   await added.getByRole('button', { name: 'Attach to scene', exact: true }).click();
   await expect(added.getByRole('button', { name: 'Detach media', exact: true })).toBeVisible();
   const attached = await (await request.get(`/api/projects/${projects[1].id}`)).json();

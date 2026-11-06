@@ -1,5 +1,359 @@
 # Chimera user guide
 
+## Design a native learning experience
+
+On the storyboard, choose **Design experience** beside the Pythia tools.
+Inspect scene context and explicitly select/load reference passages, state
+your learning and brand direction, and request a scene-level proposal.
+Review and edit the actual responsive concept diagram, click-reveal
+explanations, colors and production dependencies before explicitly applying.
+This first native assembly works on content scenes without existing
+timeline or assessment components; it does not overwrite those components
+or submit video, audio or image-generation jobs.
+
+Saving a treatment is private and does not change the scene. Applying it
+retains the original canvas, source text, attachments and revision history.
+Use **Edit applied scene without Pythia** for provider-free edits, or
+**Restore underlying canvas** to return to the retained stage. The native
+experience plays in Chimera preview and standalone/SCORM exports with
+keyboard/touch reveals, a show-all reading alternative, mobile reflow,
+contrast validation and reduced-motion support. Print/document snapshots
+include all explanations.
+
+### Import an externally authored HTML5 activity
+
+Use **HTML5 activity** above the scene preview. This is a dedicated scene
+experience, not an arbitrary HTML object in the Stage layer stack.
+
+1. Prepare an offline single HTML file, or ZIP with one HTML entry point and
+   relative classic-script/style/media dependencies. For a ZIP, set **ZIP entry
+   point** before upload; it defaults to `index.html` and may include a subfolder.
+   For a supported SCORM ZIP, root `imsmanifest.xml` determines the launch path
+   instead, even if the manual entry point conflicts.
+2. Enter credit and redistribution rights, then upload. Import saves a reusable
+   project asset but does not attach it or imply learner completion. Production
+   export requires complete attribution; **Save activity credit** updates an
+   existing package's credit explicitly.
+3. Choose the imported package, title, meaningful **Accessible text alternative**
+   and tracking mode. The alternative must explain the learning content, not
+   merely say "an activity." It is available outside the iframe and expanded in
+   static Word/print snapshots.
+4. Test the isolated preview, including keyboard use, responsive layout, feedback,
+   result reporting and the text alternative. A score shown inside the imported
+   document is not a reported score unless the integration API sends it.
+5. Acknowledge the review and **Save reviewed HTML5 activity**. Revision conflicts
+   preserve your editor inputs. Unsaved configuration requires confirmation on
+   close. Reopen to edit, or **Remove HTML5 activity** to restore the retained
+   canvas; the package remains available for reuse in this project.
+
+HTML5 cannot be attached over an existing native experience, assessment or
+timeline. Remove that component explicitly first. Other scenes in the course can
+still use native experiences and assessments.
+
+#### Bounded SCORM package adapter
+
+The preview displays **Detected format** and **Launch path**, including after
+save/reopen. Supported manifests use SCORM 1.2 content-packaging/ADL namespaces
+and `ADL SCORM` / `1.2` metadata, or SCORM 2004 content-packaging/ADL namespaces
+and `ADL SCORM` / `2004 3rd Edition` or `2004 4th Edition` metadata. The
+UTF-8 manifest must be at the ZIP root, named exactly `imsmanifest.xml`, and no
+larger than 256 KiB. It must contain exactly one organization with one direct
+launch item referencing the only web-content SCO. Any default organization must
+resolve to that organization. The SCO href must resolve to an existing local
+HTML/HTM file; relative classic-script, CSS and media dependencies use the same
+offline compiler as plain ZIP imports. Optional asset resources, file lists
+and dependencies on terminal assets are supported. Titles, identifiers,
+XML language and inert schema-location hints are allowed; schemas are not fetched.
+
+Unsupported elements/attributes produce an error rather than being stripped:
+multiple organizations, nested items/manifests, multiple SCOs or launch targets,
+sequencing/navigation, prerequisites, mastery/time/completion rules, XML base
+and launch queries/fragments. DTD/entity declarations, malformed or unsupported
+schema/version metadata, unresolved references, remote/absolute/traversal paths,
+missing files, non-HTML launch files, and nested/mis-cased manifests are rejected.
+Export a flat single-SCO offline package without those features, or author a
+compatible single HTML activity. A ZIP without any manifest remains a manual
+HTML5 import; Chimera cannot infer that a missing manifest was intended.
+
+The 20 MB compressed/expanded, 500-entry and 40 MB compiled limits, sandbox/CSP,
+resource checks and bounded SCORM API bridge are unchanged. Manifest detection
+does not infer tracking, guarantee result reporting, certify a package, or
+establish Blackboard acceptance. Review rights, alternative text, tracking and
+preview explicitly. Real Blackboard acceptance remains a separate authorized
+target-LMS exercise.
+
+| Tracking mode | Course behavior |
+| --- | --- |
+| View only | A required scene follows ordinary visited-scene rules; no report is needed. It contributes no score. |
+| Require reported completion | A required scene stays incomplete until `completed: true` is reported. It contributes no score. |
+| Require reported completion and include score | A required scene needs both completion and a finite 0-100 score. Its weight joins native assessment weights in the course's rounded weighted average. Zero is a valid score, not a missing score. |
+
+Optional scenes never gate completion. Completed optional scored activities with
+a reported score join grading only when **Include optional assessments** is
+enabled. Required scored activities contribute zero until completed with a score.
+The activity controls its own attempts and retries; Chimera does not impose
+native-assessment attempt limits on it. Scores are self-reported, not secure
+examination evidence. Overall pass/fail follows the course pass mark, not a
+package's internal "passed" flag.
+
+#### Integrate generated HTML with Chimera
+
+The bridge is injected before package scripts. No provider or network service is
+needed. Use the [working single-file example](../examples/html5-activity.html), or
+ask your HTML generator to use this API:
+
+```javascript
+const previous = window.ChimeraActivity.getState();
+const accepted = window.ChimeraActivity.report({
+  completed: true,
+  score: 85,
+  suspendData: "question-3",
+  location: "feedback"
+});
+if (!accepted) {
+  // Show an actionable error inside the activity.
+}
+```
+
+`report` accepts partial updates and returns false for invalid values.
+`completed` is Boolean; `score` is null (not yet reported) or finite 0-100;
+`suspendData` is a string up to **2,000 UTF-8 bytes**; `location` is a string up
+to **200 characters**. `getState()` returns the latest accepted state. Completion
+and score can arrive in either order. The package can report revised results,
+including an incomplete state, on retry.
+
+For compatible generated content, same-frame `window.API` (SCORM 1.2) and
+`window.API_1484_11` (SCORM 2004) provide initialization, GetValue/SetValue,
+commit, finish/terminate and error calls. Supported data includes:
+
+- Suspend data, lesson location/location, and lesson/completion status.
+  Completed/passed/failed lesson statuses indicate completion; SCORM 2004
+  completion status is independent of success status.
+- Raw score and min/max, normalized to 0-100; SCORM 2004 scaled score 0-1.
+  Read-only lesson mode and entry/resume hints are available.
+- Exit and session-time writes are accepted but not used to compute results or
+  forwarded as package-owned LMS tracking.
+
+Unsupported elements return an explicit adapter error; this is **not a complete
+SCORM engine**. Packages that require parent-frame identity, objectives,
+interactions, sequencing, multiple SCOs, nested windows or remote servers need
+adaptation. A root `imsmanifest.xml` is ignored, not interpreted as a full package.
+The host course, not the imported document, owns the real LMS connection.
+
+#### Portability, isolation and acceptance
+
+Uploads and expanded ZIP contents are limited to **20 MB**, ZIPs to **500
+entries**, and compiled documents to **40 MB**. Use UTF-8 HTML/CSS/JavaScript and
+stored/deflate ZIP compression. Local scripts, CSS, images, fonts, audio/video and
+VTT are compiled into the document. Dynamic fetches, external resources, module
+scripts, nested frames, forms, multi-page navigation and srcset are outside the
+supported subset. Bundle modules and resources first; broken dependencies fail
+import or surface an activity runtime error instead of silently reporting success.
+
+Imported scripts run in an opaque sandbox without parent DOM, browser storage,
+popups, forms, top navigation or direct LMS access. CSP blocks fetch/resource
+requests in the imported document and nested content. It is not a network-egress
+firewall: script-driven self-navigation cannot be prevented comprehensively
+across browsers. Navigation away is unsupported and a reloaded frame is removed
+with an error; that does not undo a navigation request already sent.
+Review packages from trusted authors; isolation
+does not prove accessibility, correctness or protection against resource abuse.
+Script failures and blocked requests appear outside the frame.
+
+Course preview retains accepted progress in its browser-local preview record.
+Standalone ZIPs include all content and open from a local file; results last
+only while that page is open. SCORM 1.2/2004 save completion, normalized score,
+suspend data and location in the host's suspend record. **Continue** restores
+them and **Start over** clears them. Navigation away and back retains progress.
+A different package does not inherit the previous package's results.
+SCORM 1.2's **4,096-byte total suspend-data limit** still applies; the export
+estimate includes activity state and escaping, and the runtime reports rejected
+tracking writes. Large courses or state strings can exceed the course budget
+even when each activity is within its individual limit.
+
+Full project backups contain the compiled package; standalone/SCORM ZIPs contain
+the delivery document. A storyboard JSON export contains references, not the
+package bytes, so it is not a portable backup by itself. HTML5 packages are not
+ordinary/shared image/audio/video assets.
+
+Automated browser checks cover offline delivery, both adapter dialects in both
+SCORM export profiles, scoring, completion, isolation and checkpoint restore.
+They do **not** certify the current build in Blackboard. Before production,
+upload the exported ZIP to the target Blackboard version and verify gradebook
+score/pass policy, completion, close/relaunch **Continue**, **Start over**, and
+the platform's browser/security settings. Earlier Blackboard success is valuable
+history, not proof for this implementation. The bundled PDF may lag this
+Markdown guide.
+
+### Author native activities without a provider
+
+For a content scene, choose **Design experience > Start native experience
+without Pythia**. This creates an editable local composition, not a model
+request. Use the activity controls to add up to eight activities:
+
+| Activity | Authoring | Learner behavior |
+| --- | --- | --- |
+| Branching decisions | Write prompts, choices and consequence feedback; select each choice's destination or **End of route**. Adding a node connects the previous node's first choice to it. Inspect that connection. Select the starting node. Optionally add up to five activity-local Boolean variables, set their initial values, make a choice visible when one variable equals true/false, and assign variables after a choice is selected. | Choose among currently visible options, read their consequences, and restart to explore another path. Visibility is checked before that choice's assignments apply. |
+| Hotspots | Describe the diagram, optionally choose an image already in the project, label its points, write explanations, and place numbered points using horizontal/vertical percentages (5-95) on the image canvas. | Activate points by mouse, touch or keyboard, or use the separate hotspot list in the order authored. The diagram description and image credit remain visible; the image and explanations are included in print/Word alternatives. |
+| Sequencing | Write items in their correct order; use **Move authored item up/down** to change the answer key. Add instructions and explanatory feedback. | Start with the reverse order, reorder using labelled Move up/down buttons, check, retry or reset. Dragging is not required. |
+| Guided practice | Write each step's prompt, hint, choices and choice-specific feedback; select its correct choice. | Request a hint, try a response, and advance only after a correct response. Restart is always available. |
+| Software walkthrough | Add an ordered sequence of up to ten screenshots from project images. For each, provide alternative text, a description, and a prompt naming the action learners should perform in the real software. | Inspect each screenshot and confirm the action with the keyboard-operable **Mark action complete** control. Chimera does not open, instrument, or control the software and cannot verify that an action was performed. |
+| Learner conversation | Write a role, fictional scenario, opening, one to five fixed follow-up messages, and an offline alternative. | Opt in, then respond in a bounded scripted roleplay. Nothing is sent to AI or any service; text stays in tab memory only, is not scored/resumed, and Reset clears it. |
+
+You can combine these activities with the existing flow and reveals, or remove
+those sections entirely. At least one flow, reveal or activity must remain.
+Branch nodes must have unique identifiers, all nodes must be reachable through
+visible choices, every reachable decision must show at least two choices, and
+routes must end without cycles. Variable values are local to one activity;
+assignments take effect after selection and do not persist separately. Restart
+uses the authored initial values. Invalid edits produce a validation error
+rather than being silently repaired or applied.
+
+Review the executable preview, acknowledge it, then choose **Save reviewed
+native scene edits**. Reopen to edit without Pythia. Revision conflicts preserve
+your editor contents; close/reopen current context before deliberately retrying.
+Pythia can also propose these activities through the same validated schema and
+review/apply workflow, subject to the installed adapter's capabilities.
+
+These are **formative activities, not graded assessment items**. Their choices
+do not change assessment scores or add completion gates. Course completion
+continues to follow the configured scene/media/assessment rules. Every activity
+offers **Text alternative and worked solution**, also expanded for print/Word
+snapshots. Answer keys ship in the course; do not use these as secure tests.
+
+A software walkthrough's concrete success criterion is learner confirmation
+of every authored action, in order. Each screenshot must reference an image in
+the current project and include meaningful alternative text; the project's
+image attribution is displayed with it. These instructions are offline and
+screenshot-based, not an interactive copy or automated test of a third-party
+application. The text/print alternative includes every screenshot, alternative
+text, description, prompt, and image credit.
+
+### Scripted learner conversation
+
+Choose **Add learner conversation roleplay** in a native experience. Set a
+role, a scenario that uses fictional examples, an opening message, one to five
+authored follow-ups, and a useful offline alternative. Each authored field is
+limited to 2,000 characters; learner responses are limited to 1,000 characters
+and five turns. The activity does not call an AI or other service. Before the
+roleplay starts, learners explicitly agree that it is scripted, responses stay
+in the current tab's memory and are not sent or saved, and they should not enter
+sensitive personal information. **Reset local roleplay** clears the transcript
+and consent; closing or reloading the activity also discards it.
+
+This prototype does not generate replies from learner input, evaluate
+responses, persist a transcript, resume a session, or add grades/completion
+gates. The authored static text alternative and print/Word output include the
+scenario, opening, scripted follow-ups and offline alternative, but never
+learner-entered text. It works offline in preview, standalone and SCORM because
+no network service is involved. Do not treat it as confidential counseling or
+enter real personal or sensitive information.
+
+### Hosted external-experience launch link
+
+In **Design experience**, start or edit an experience and choose **Add external
+launch link**. Enter the **External HTTPS URL**, activity instruction,
+**Destination privacy notice** and **Offline learning alternative**. The
+alternative must provide useful local learning material when internet access,
+sign-in or the service is unavailable. Explain the destination's data collection,
+accessibility, sign-in requirements and any charges in the authored notice.
+Use a stable public URL without learner identifiers or secrets.
+
+This bounded link supports lowercase ASCII HTTPS hostnames and plain paths
+containing letters, numbers, `/`, `_`, `~`, `.` and `-`. Credentials, ports,
+queries, fragments, percent encoding, IP addresses and local hostnames are
+rejected. Chimera does not visit or verify links or their redirects. Review the
+destination and its privacy/accessibility terms for your audience yourself,
+then check **I reviewed this destination, its privacy/accessibility terms and
+the offline alternative for this audience**. Editing the URL, instruction,
+notice or alternative clears that review. Pythia proposals also start
+unreviewed. Inspect the executable preview, acknowledge the overall review and
+save/apply through the normal revision-protected workflow.
+
+Learners see the full destination, network/privacy explanation and local text.
+They check consent to enable **Open external experience** and open a new tab
+with the keyboard or pointer. The service receives their IP/browser information
+and may use cookies, require sign-in, redirect or collect their input. Chimera
+does not append learner identity or send course answers/results and suppresses
+the referrer. Learners should avoid sensitive information and return to the
+course tab afterward. A browser or LMS may block the tab or service; use the
+offline alternative. No remote page is embedded or included in the package.
+
+Consent lasts only for the currently mounted activity. **Reset external
+consent** removes the link and returns focus to the unchecked consent control.
+Reopening preview, reloading standalone, SCORM Continue and Start over require
+fresh consent. No launch history, consent, external completion or scores are
+saved; no grades, pass/fail rules or completion gates change. Opening cannot
+verify participation, availability or learning. The static alternative includes
+the destination, privacy information and authored local material; printing and
+Word/SME snapshots expand it. Standalone and SCORM retain this local material
+offline, while the external service still needs internet access. This is separate
+from imported offline HTML5, whose sandbox remains unchanged and does not
+guarantee network-egress protection. The bundled PDF has not been regenerated.
+
+### Before/after image comparison
+
+In **Design experience**, start or edit a native experience and choose **Add
+before/after comparison**. Choose two distinct project images under **Before
+project image** and **After project image**. Supply clear labels, meaningful
+alternative text, a description of each state, a comparison instruction and
+a change explanation. Image attribution comes from the project's Media library.
+Inspect the executable preview, acknowledge the review checkbox, then choose
+**Save reviewed native scene edits**. Reopen to verify the saved images and text.
+
+Learners use **Image to inspect** to select Before or After with the keyboard
+or pointer. Each image is shown in full at its original aspect ratio, including
+when the two images have different shapes. This is a two-image comparison;
+it has no overlay slider, gallery or timeline. The **Text alternative and
+worked solution** includes both images, their descriptions, explanation and
+credits together. Printing expands it; Word/SME snapshots include both images.
+An unavailable image leaves its alternative text and authored description.
+
+The success criterion is explicit learner acknowledgement after inspecting the
+two states: **Mark comparison reviewed**. Chimera does not assess the learner's
+interpretation. Review is formative and changes no grades, pass/fail rules or
+course-completion gates. **Restart comparison** clears acknowledgement and
+shows Before. Course preview and SCORM Continue retain acknowledgement only
+for the same ordered pair of image references; selection starts on Before.
+Invalid progress or changed references clears acknowledgement. SCORM Start over
+clears progress; standalone progress lasts only while its page is open. Both
+images remain protected from deletion while used and travel in full backups and
+portable standalone/SCORM packages. The bundled PDF was not regenerated for
+this addition; this Markdown procedure is current.
+
+Author edits persist in the project. Course preview retains activity progress
+in its existing browser-local preview record. Standalone delivery retains it
+only while the page is open. SCORM 1.2/2004 retain branch choices, opened
+hotspots, sequence order and completed practice steps in suspend data; Continue
+restores branch choices by replaying them from initial variable values and
+discards any path suffix invalid under the current activity; Start over clears
+the path and resets variables. Variable state adds no separate progress data.
+Failed practice attempts and transient feedback are not stored. The existing
+tracking-budget guard and export estimate
+include activity progress; SCORM 1.2's 4,096-byte limit may constrain large courses.
+Automated delivery checks are not a new Blackboard acceptance certification.
+An image-backed hotspot keeps its project image reference through full backups
+and portable exports, and prevents that image from being deleted while in use.
+Its coordinates scale with the image's aspect ratio; they do not depend on the
+preview viewport. Hotspots remain formative and do not affect grades or
+completion.
+
+Software walkthrough progress is the ordered prefix of learner-confirmed step
+IDs. Continue restores that prefix and opens the first unconfirmed step; earlier
+completed steps remain available for review. Restart clears the prefix. A full
+backup and portable export retain referenced walkthrough screenshots, and a
+referenced image cannot be deleted until it is removed from the walkthrough.
+
+See [Native scene experiences](talk-to-pythia.md#native-scene-experiences)
+for the full review/apply procedure, context/privacy boundaries and current
+production limitations. This new section updates the Markdown guide; the
+bundled illustrated PDF has not been regenerated.
+
+Video-generation and fit-to-scene instructions and the PDF edition were updated
+on 2026-11-03. Synthesia/Shotstack setup images below are historical October 27
+captures; follow the current text for generation. Local verification uses
+synthetic provider replies, not paid renders or live-account qualification.
+
 Process-based instructions for Chimera. Shape/appearance/layer and timeline instructions and the PDF edition were refreshed on 2026-10-28; the [timeline capture manifest](user-guide/refresh-timeline-2026-10-28.json) records the synthetic fixtures and source/image/PDF hashes. Earlier workflow text and the PDF edition were refreshed on 2026-10-27 for one authored scene across Stage, storyboard, preview, and delivery; temporary original comparison; direct template application with Undo/Redo; project background import and inheritance; and presentation-first preview navigation. The [authored-scene manifest](user-guide/refresh-authored-scenes-2026-10-27.json) records the current captures and implementation hashes. Earlier October 27 assessment/navigation and provider captures remain current where their controls are unchanged. Provider images use inert status/capability fixtures, not configured accounts or generated output. Other images retain their earlier provenance in the [maintenance guide](user-guide/support/README.md). No user course or credentials are used for captures. Historical source/recovery context remains in the [recovery record](export-enhancement-recovery.md).
 
 Chimera authors one scene. Edit its content and composition, inherit project defaults unless you deliberately create an exception, and choose a destination when exporting. The [authored-scene workflow](authored-scene-workflow.md) explains migration and output behavior; the steps below show the controls.
@@ -14,7 +368,7 @@ The source has changed since the original capability review: Word export, refere
 
 **Help while authoring:** choose **User guide**, immediately below **Templates** in the left rail. The bundled PDF opens in a new tab without leaving your current workspace or discarding edits. It is available even before you select or create a project and does not require access to GitHub.
 
-**Navigation at a glance:** the left rail's **WORKSPACE** group contains My Work, Storyboard, Assessments, Media library, and Templates. **Assessments** opens the question bank and assessment manager directly. **Project background** is above the scene list in **Storyboard**. Review tools retains guided review, accessibility, validation, completion rules, and suggestion/Pythia review; Settings retains appearance and connection/access controls.
+**Navigation at a glance:** the left rail's **WORKSPACE** group begins with **Consult Pythia**, followed by My Work, Storyboard, Sources, Assessments, Media library, Templates, and User guide. **Consult Pythia** opens the project's consultation without automatically drafting or applying scenes. **Assessments** opens the question bank and assessment manager directly. **Project background** is above the scene list in **Storyboard**. Review tools retains guided review, accessibility, validation, completion rules, and suggestion/Pythia review; Settings retains appearance and connection/access controls.
 
 My Work opens after normal launch/sign-in and refresh. It is first in the workspace menu. Select a project row to open its authoring workspace, choose New Project to create one, or Resume authoring to return to the remembered project. Direct authenticated review links retain their review destination.
 
@@ -121,9 +475,41 @@ Save credentials before discovering voices; Voice can initially be blank. Test t
 
 In **Media library**, choose **Narration** and explicitly select a saved connection with a voice, or **Existing AI connection** for legacy OpenAI. Review its voice and language, then **Generate candidate**. Generation can incur charges; listen to the candidate before **Approve asset**, which approves and attaches it to the target scene. Disconnecting a connection removes only that connection and its owned key, not environment variables or ADC identities. Google input is limited to 5,000 UTF-8 bytes; all three separate narration adapters produce MP3.
 
-**Synthesia** and **Shotstack** currently support secure connection setup and read-only testing only. Their tabs explicitly state that **video generation is not yet available in Chimera**. They never enable image/narration generation. Synthesia uses an API-enabled account key in the OS store or server `SYNTHESIA_API_KEY`; its test checks video-list metadata and discards it. Shotstack has separate **Sandbox (stage)** and **Production (v1)** settings and matching keys. Use the OS store or server `SHOTSTACK_SANDBOX_API_KEY` / `SHOTSTACK_PRODUCTION_API_KEY`; switching environments in secure-store mode requires the matching new key. Its test lists saved templates without submitting a render or generating AI assets. Save, Test and Disconnect are independent for each named connection.
+**Synthesia** and **Shotstack** enable video candidates up to **30 seconds**;
+they never enable image/narration generation. Synthesia uses an API-enabled
+account key in the OS store or server `SYNTHESIA_API_KEY`; its read-only test
+checks video-list metadata and discards it. Shotstack has separate **Sandbox
+(stage)** and **Production (v1)** settings and matching keys. Use the OS store or
+server `SHOTSTACK_SANDBOX_API_KEY` / `SHOTSTACK_PRODUCTION_API_KEY`; switching
+environments in secure-store mode requires the matching new key. Its read-only
+test lists saved templates without submitting a render. Save, Test and Disconnect
+are independent for each named connection.
 
-| Video-provider tab | Available actions, not generation | Current form |
+In **Media library → Create a media candidate**, choose **Video clip**, a saved
+connection, purpose and duration (4–30 seconds, default 30). For Synthesia, supply a
+title, presenter script and authorized avatar ID. The script starts from scene
+narration/notes; aim for about 60 words or fewer for 30 seconds. Actual duration is
+script-driven; renders above the chosen maximum are rejected locally but may
+still be billed. For direct Shotstack connections, the default workflow is
+**Design a scene-aware treatment with Pythia**. Review the disclosed scene text
+and optional agreed design brief, enter your video design direction, and request
+a treatment. Edit/refine its text shots, timing and transitions, then explicitly
+choose **Render reviewed treatment**. Save edits before leaving the form.
+Pythia design and Shotstack rendering are separate potentially billable actions;
+designing never renders or modifies scenes. The result is a silent text sequence,
+not generated footage. Proposed imagery or narration is labelled unimplemented.
+The **Manual single title card** option retains the previous exact-text form.
+Sandbox output is watermarked. See [scene-aware treatments](ai-connection.md#scene-aware-shotstack-treatments).
+
+**Generate candidate** can incur provider charges. Preview the returned MP4,
+approve it, then accept the placement proposal or attach it normally. Add/review
+transcripts and timed captions before publishing. Cancellation/timeouts are local:
+the remote render and billing may continue. Failed/interrupted jobs retain a
+provider operation ID; check that provider's dashboard before explicitly retrying.
+There is no automatic paid retry or alternate-provider fallback.
+See [video connection details](ai-connection.md#video-connections-and-generation).
+
+| Video-provider tab | Connection actions | Setup screenshot (before video generation was added) |
 | --- | --- | --- |
 | Synthesia | Name the connection, choose secure store or server environment, **Save video connection**, then **Test video connection**. A successful read-only check does not prove generation entitlement. | <a href="user-guide/images/ai-provider-synthesia.png"><img src="user-guide/images/ai-provider-synthesia.png" alt="Synthesia connection-only form and video-generation limitation" width="240"></a> |
 | Shotstack | Name the connection, select sandbox or production, supply its matching key/source, save, then test. **Disconnect video connection** removes only that named connection. | <a href="user-guide/images/ai-provider-shotstack.png"><img src="user-guide/images/ai-provider-shotstack.png" alt="Shotstack sandbox and production connection-only settings" width="240"></a> |
@@ -180,8 +566,8 @@ Open **Edit scene**, then choose **Stage**. The authored composition is shared b
 ![Unified scene editor Stage tab](user-guide/images/scene-canvas-editor.png)
 
 1. Older projects prepare missing scene compositions automatically when an editor opens them. This preserves scene IDs, text, notes, questions, review threads, existing assets, and original source files. A missing retained source produces an error rather than a generic replacement slide. Review the listed import limitations before publishing.
-2. Double-click a text box, or focus it and press Enter, to edit its text directly. The **Text** field also edits the selected box. Drag boxes to move them, use resize handles, or enter exact position and size in the properties panel. Text resize handles preserve the box's current aspect ratio; image resize handles allow freeform sizing. Arrow keys move the focused element; Shift changes the step from one to ten slide-space units.
-3. Drag a **Content** thumbnail onto the canvas. Clicking the thumbnail adds it without dragging. The media-library selector can add other project images. Selecting an image exposes replacement and crop-reset controls.
+2. Double-click a text box, or focus it and press Enter, to edit its text directly. The **Text** field also edits the selected box. Drag boxes to move them, use resize handles, or enter exact position and size in the properties panel. Width and height resize independently unless **Appearance > Lock aspect ratio** is enabled. Changing a text box's width rewraps its text without changing the font size. Arrow keys move the focused element; Shift changes the step from one to ten slide-space units.
+3. Drag a **Content** thumbnail onto the canvas. The **Content** tray sits directly below the canvas, before the timeline controls. Clicking the thumbnail adds it without dragging. The media-library selector can add other project images. Selecting an image exposes replacement and crop-reset controls.
 4. Use **Layers** to select overlapping or inherited content. Master and layout artwork starts locked; unlock it before editing. Toolbar controls add text, undo/redo, duplicate/delete elements, and change stacking order. Text properties include size, color, typeface, alignment, bold, and italic.
 5. Expand **Background** in the properties panel to choose a color and open the **Background image** thumbnail picker. Choose **Use project default**, a scene image, or **None** to explicitly opt out of the project image. Imported PowerPoint master backgrounds are labeled in the picker. Set the default using **Storyboard > Project background**, above the scene list; changing it affects only inheriting scenes, not scene-specific images or explicit None choices. Use **Import graphic** in Project background, or choose an existing Media library image. Backgrounds fill the stage and are decorative; check contrast and keep instructional information in accessible text. **Compare with original**, when available, temporarily shows the original flattened slide. **Return to scene** restores the authored composition. Comparison does not change previews or outputs.
 6. Choose **Save scene**, then check **Preview course**. The saved composition is shared by storyboard, course preview, Word visuals, standalone, and both SCORM profiles. **Cancel** discards unsaved canvas changes.
@@ -192,7 +578,31 @@ New imports capture editable text, images, common PowerPoint shapes, line connec
 
 Saving content changes in Details updates the authored scene; use Stage for precise placement and text-box styling. Preview and export use the saved composition, not unsaved dialog edits.
 
+### Request and generate media without leaving the Scene Editor
+
+Open **Edit scene > Media** to use the same candidate workflow as Media Library.
+Choose an image, narration, or video connection, describe its purpose, and submit
+an explicit **Generate candidate** request. Shotstack retains its scene-aware
+Pythia treatment workflow: review and save the proposed treatment before choosing
+to render. Opening the tab alone does not call a generation provider.
+
+If Stage or Details has unsaved changes, choose **Save scene for media** first.
+This saves the scene without closing the editor, so narration and Pythia's
+scene-aware treatment use the current saved context. A failed save keeps the
+draft and blocks new requests until the scene is saved. Media request fields
+remain intact when switching between editor tabs; unsent requests are not
+persisted after closing the editor.
+
+Review the candidate and explicitly approve or reject it. Approval adds an asset
+to the project; it does not attach it. Expand **Placement, captions, and shared
+media**, select the asset, describe its placement, and choose **Save placement**.
+Approved images are also available from Stage's existing image insertion control;
+audio/video can be scheduled with the timeline. Media placement is saved
+immediately, separately from Stage edits. Generation may incur provider charges.
+
 ### Insert shapes and style layers
+
+Use the labeled **Text layer** button alongside **Insert shape** in the **Add layers** controls to insert and select editable text. Text insertion supports Undo/Redo and is persisted with **Save scene**.
 
 On **Edit scene > Stage**, use **Insert shape** for rectangles, rounded rectangles, ellipses, lines, arrows, triangles, and diamonds. Select the object and expand **Appearance**. Give it a layer name, set whole-object opacity, and choose fill/outline colors, their individual opacity, and outline width. Rounded rectangles also have a corner-radius control. Zero fill opacity gives an unfilled shape. **Lock aspect ratio** controls resizing; **Layout** retains exact position, size, rotation, and alignment controls.
 
@@ -208,12 +618,12 @@ Below the stage, expand **Timeline and layers** and choose **Enable scene timeli
 
 | Task | Procedure |
 | --- | --- |
-| Set scene length | Enter **Scene duration (s)**. Objects, clips, animations, cue markers, and the Word snapshot time must fit. Adding or extending content can extend the duration. |
+| Set scene length | Type **Scene duration (s)**, then press Enter or leave the field to commit. Escape restores the current duration. Valid durations range from 0.1 to 3600 seconds. Objects, clips, animations, cue markers, and the Word snapshot time must fit. Adding or extending content can extend the duration. |
 | Place an object in time | Select its named timeline row. Set **Object start/end (s)**, or drag its block; drag the right edge to adjust its end. The stage and row share selection. |
 | Time native animations | Choose the entrance/presentation/exit effects in Animation. Use their blocks or timeline fields to set scene start and duration in seconds. The presentation start is displayed on the scene clock; Chimera handles its relative delay internally. |
 | Add audio or video | Choose a project asset in **Timeline media**, position the playhead, then choose **Add clip at playhead**. Select the clip row to edit it. The same asset can appear in multiple clips. |
 | Trim media | Set **Source in/out (s)** to select the source interval, and **Clip start (s)** to place it in the scene. Trimming preserves the original bytes. A clip starting at scene second 12 with source-in 3 starts at source second 3. |
-| Arrange video | Set its X/Y/width/height and layer order. Visual objects occupy odd-numbered layer positions starting at 1; video order 0 is behind all of them and 4001 is in front. |
+| Arrange video | New clips automatically fit the scene canvas without cropping or stretching. Select an existing clip and choose **Fit video to scene** to fit the current stage size; extra space around mismatched proportions is expected. Fit supports Undo/Redo; **Save scene** retains it. Manual X/Y/width/height and layer order remain available. Existing clips stay unchanged unless you select Fit; use it again after resizing the stage. Visual objects occupy odd-numbered layer positions starting at 1; video order 0 is behind all of them and 4001 is in front. |
 | Adjust sound | Set volume and fade-in/out durations. **Mute preview** and **Solo preview** are temporary audition controls; saved clip volume controls learner playback. |
 | Inspect a waveform | Choose **Generate local waveform**. Sources are limited to 25 MB; decoding stays in this browser. PCM WAV has a fallback decoder; other formats require browser Web Audio support. |
 | Add a cue | Choose **Add cue at playhead**. Cue buttons seek to their time; the adjacent × deletes a marker. Snapping uses 0.1-second steps and nearby cues. |
@@ -225,6 +635,54 @@ Below the stage, expand **Timeline and layers** and choose **Enable scene timeli
 Scheduling an already attached asset replaces its independent player in that scene's learner view. Unscheduled attachments retain their existing controls. **Require viewing/listening** sets required clip coverage; existing required-audio/video rules also apply when their asset is scheduled. Seeking does not count as consumption. Every required clip has independent coverage over its trimmed interval; changing its source interval invalidates that clip's previous coverage. Avoid overlapping required narration that learners cannot follow simultaneously.
 
 Learner preview and SCORM retain the shared scene position and earned media coverage. Standalone progress still lasts only while the page is open. Buffering or browser playback restrictions can pause the clock and show a retry message. Captions follow source time, transcripts remain available, and reduced motion suppresses movement while keeping timed visibility. Always verify the exported course and its completion rules before publishing.
+
+### Add optional video reflections
+
+1. In **Edit scene > Timeline and layers**, schedule a video clip and place the
+   playhead inside it (not at its end).
+2. Under **Video reflections**, choose **Add video pause at playhead**.
+   Author a non-empty prompt, two to four response labels, and feedback for
+   every response. Limits: eight pauses per scene, distinct scene times,
+   1,000 characters per prompt/feedback and 200 per response label.
+3. Use the pause's time field to reposition it, **Add response** to extend the
+   choices, or **Remove video pause** to delete it. Move/remove affected pauses
+   before moving, trimming or deleting the video that contains them.
+4. Choose **Preview reflection**, then **Save scene**. Draft Undo/Redo and the
+   normal revision-conflict guard apply. Verify in course preview and exports.
+
+These are optional, formative questions/decisions, not secure assessment
+questions. No response is marked correct or scored. They do not change course
+completion, pass/fail, required-media coverage or assessment attempts.
+There are no response-driven seeks or branching video paths.
+
+Playback stops on the exact scene-clock millisecond and focuses the reflection
+heading. Learners can try any response repeatedly, read its feedback, and choose
+**Continue video**, or **Skip reflection and continue** without answering.
+Both continue from the same clock position only after learner action. The video
+does not continue merely because a response was selected. All controls work
+with the keyboard; feedback is announced as status text.
+
+Seeking past a pause skips it without media credit. Seeking backward allows the
+pause to be offered again during playback. Seeking exactly to a pause while
+paused offers it on Play; while playing it stops there immediately. **Restart**
+returns to zero without starting playback. **Video reflections: text alternative
+and replay** exposes every prompt, response and feedback without timed playback,
+plus explicit replay buttons.
+
+Course preview and SCORM 1.2/2004 save only the existing validated scene clock
+and media coverage, not responses, attempts, or a pause-completion flag.
+Continue restores the saved millisecond, paused. If it is a reflection
+timestamp, Play offers the reflection again with no saved answer. Invalid or
+changed-duration clocks are discarded. SCORM **Start over** clears progress;
+standalone progress lasts only while that page remains open. Suspend-data
+limits and overflow warnings remain unchanged.
+
+Word storyboard and SME documents include all prompts and response feedback
+alongside the timeline's written timing information; the visual is still the
+authored Word snapshot time. Printing expands the text alternative to expose
+all responses and feedback. Existing cue markers still only seek/snap and do
+not become interactions. The bundled PDF has not been refreshed for this
+addition; this Markdown procedure is current.
 
 ### Compare with the original slide
 
@@ -319,7 +777,7 @@ Media uploads support JPG/PNG/GIF/WebP images, MP3/M4A/AAC/WAV/OGG audio, and MP
 
 ### Create a media candidate
 
-Configure image and narration generation through **Settings > AI connection** before generating candidates. OpenAI images/legacy narration and ElevenLabs/Google Cloud/Cartesia narration have separate provider tabs. Synthesia/Shotstack connection setup does not yet enable video generation. In shared deployments, an installation administrator manages these connections. See [AI connection](ai-connection.md) for credential storage, connection testing, limits, and data handling. These connections are separate from Pythia.
+Configure media generation through **Settings > AI connection** before generating candidates. OpenAI images/legacy narration, ElevenLabs/Google Cloud/Cartesia narration, and Synthesia/Shotstack video have separate provider tabs. In shared deployments, an installation administrator manages these connections. See [AI connection](ai-connection.md) for credential storage, connection testing, limits, and data handling. These connections are separate from Pythia; scene-aware Shotstack treatment design also requires the local Pythia adapter.
 
 Create a media candidate starts collapsed. Select its heading to expand it. When no usable image or narration connection is configured, its heading is greyed and generation controls are disabled. A narration-only connection does not enable image generation. Narration requires explicit connection selection; the saved voice and language populate the form and can be overridden for that candidate. If connection status cannot be loaded or your role does not permit generation, controls also remain disabled. Configuration availability does not guarantee that a provider is reachable or supports a particular model. Existing candidates can still be approved or rejected without a configured connection; regeneration uses the candidate's original connection and fails if it was removed rather than choosing another provider.
 
@@ -365,6 +823,8 @@ A green **Ready for production** check means the media loaded, its attribution i
 ## 5. Author assessments
 
 For an assessment-first workflow, open **Assessments** under **WORKSPACE** in the left rail. The **Question bank** lets you add a question directly or open an existing question and its metadata without creating a slide first. Create a named assessment, select its questions, arrange them, and download its QTI test package.
+
+After **Save question** succeeds, the button changes to a checkmarked **Question saved**, and a bordered **Saved to [project]** confirmation appears in the footer and is announced to assistive technology. Editing the question clears the saved confirmation; a failed save shows an error rather than success.
 
 ![Question bank and spreadsheet export controls](user-guide/images/question-bank-current.png)
 
@@ -504,9 +964,35 @@ Current question scoring is binary: 0% or 100%. Course score weights affect the 
 
 ## 6. Import references and request enhancement
 
-This section describes **New enhancement run**, which uses Pythia's `storyboard.enhance` capability. It is separate from the analysis, transformation, assessment, and course-review dialogs described in [Work with Pythia](#14-work-with-pythia). Only the references selected in this form accompany this enhancement request; they are not automatically included in the other Pythia workflows.
+This section describes **New enhancement run**. In single-user installations it uses the local model-backed `pythia_storyboard_enhancement` tool; shared installations retain the configured Engine's `storyboard.enhance` capability. It is separate from the analysis, transformation, assessment, and course-review dialogs described in [Work with Pythia](#14-work-with-pythia). Only the references selected in this form accompany this enhancement request; they are not automatically included in the other Pythia workflows.
 
-Enhancement submission requires an available Pythia Engine supporting `storyboard.enhance`, managed by an administrator in shared installations. Check **Settings > Pythia**, not **AI connection**. Without it, Preview submission remains useful, but Submit run is disabled. This documentation update made no live AI requests and does not certify provider output.
+Local submission requires the prepared sibling Pythia checkout and its storyboard enhancement tool, using the same installed plugin configuration or saved text-model **AI connection** as Consult Pythia. The separate image/narration/video provider forms do not configure this drafting tool. Shared installations require an available Engine supporting `storyboard.enhance`, managed by an administrator under **Settings > Pythia**. Preview checks capabilities without generating content; submission may incur model charges.
+
+Local expansion drafts new learner-sized scenes immediately after their selected original anchors, preserving originals and media. It can cover one scene or the whole course. File paths never grant file access. `@research` alone does not grant permission to search: use the explicit authoring-tool controls below. The legacy Engine only fills missing action descriptions and cannot fulfill expansion goals. Empty results fail explicitly rather than claiming success; older zero-result runs remain visible and are never automatically retried.
+
+### Connect specialist work and public research
+
+In **Storyboard suggestions**, select **Enable specialist tool orchestration** to let local Pythia plan and execute registered Research, Learning Design, Storyboard, Assessment, Standards/Technology Fit, and Evaluation specialist calls before drafting. Each call uses the registered provider's canonical guidance and payload schema; results are advisory drafts, not accepted kernel artifacts or expert approval. This is actual bounded execution, not a claim that typing a specialist name invokes one.
+
+Select **Search the public web before drafting** separately for current external evidence. This requires a completed search with cited sources as the first tool call, leaving up to two specialist calls. It is not merely permission for the planner to skip search. Failed or uncited searches stop the run without substituting synthesis or automatically retrying. The approved OpenAI connection uses the Responses API's hosted web-search tool. Pythia formulates public queries; do not enable this for confidential research. Search queries can leave the model provider for web search. Account and model eligibility are established only by an actual submitted request, not by capability preview. Research uses provider-cited synthesis, not verbatim downloaded pages or independently verified truth. Other provider endpoints cannot silently substitute a text answer for a search.
+
+**Preview submission** lists the permitted specialists, web permission and a maximum of seven provider requests. **Submit run** authorizes up to three tool calls plus planning and final drafting (at most seven model/search requests). Initial input/cost estimates exclude later tool context and search charges. Saved text-model connections reserve seven daily requests conservatively before starting; unused reservations are not refunded. Installed plugin connections retain their operator-managed billing configuration.
+
+After the run returns, expand **Authoring tool execution records → Tool execution** to inspect actual completed/failed calls, instructions, specialist results and clickable web sources. Completed evidence remains available if final drafting fails. Citations in proposals must match selected source passages or retained web-search synthesis. Nothing changes in the storyboard until proposal acceptance. Failed, timed-out or interrupted runs do not automatically retry; a restart marks unfinished tool runs failed rather than replaying potentially charged work. Cancellation discards returned proposals but cannot retract provider calls already underway.
+
+While a job is queued or running, an **Enhancement in progress** (or **Enhancement queued**) banner stays beneath the review dialog header, visible while the submission form scrolls. It includes a working indicator, elapsed time and the latest server message. Tool steps are not streamed; elapsed time does not imply measurable completion. The indicator respects reduced-motion preferences and disappears when no jobs remain active. A status-refresh error is reported without clearing the last known active job.
+
+Research queries support up to 2,000 characters, matching planner instructions. New failed runs report the failing stage and safe provider/contract reason, rather than only a generic orchestration failure. Older failure records remain unchanged and may have less diagnostic detail.
+
+Local Pythia selects source-passage IDs for proposal citations; the adapter inserts the exact source identity and excerpt instead of asking the model to retype quotations. Unknown IDs and non-verbatim quotations are rejected, not approximately matched or silently repaired. Cited web passages remain provider synthesis, not verbatim downloaded pages.
+
+For the approved OpenAI connection, final storyboard drafting requests a schema-constrained response envelope rather than plain JSON mode. This enforces proposal/conflict array structure and citation selections; Chimera still validates field values, sources and applicability before creating pending proposals. Unsupported-model/schema errors, refusals and truncation fail explicitly without another paid call or silent fallback. Specialist calls still use their existing JSON mode and validation. Structured output is not evidence of factual or instructional quality.
+
+Specialist drafts have a 16,384-token output allowance, like final storyboard drafting, to accommodate structured assessment items with feedback and alignment. Planning calls retain their smaller default allowance. Larger drafts can consume more output tokens; tool-count, time, validation and explicit-retry safeguards still apply. Research synthesis uses supplied context; only an actual completed `research_web` record demonstrates live web research.
+
+Assessment specialists use native scored question formats; polls and subjective reflections remain recommendations for review rather than invented scored items. Invalid assessment drafts stop the run. Execution details identify affected question indices (zero-based), supported types or missing required fields where available, without exposing answer bodies. The job error presents question numbers starting at one.
+
+This first connection is scoped to **Storyboard suggestions**. Consult Pythia, experience/video treatments and the shared Engine are unchanged. Arbitrary installed plugins, shell commands, filesystem tools, media production and publishing are not exposed by these controls.
 
 ### Import a Study Guide or supporting reference
 
@@ -530,7 +1016,7 @@ Failed or incomplete extraction disables selection. The current form does not pr
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
-| 1 | Complete and inspect the submission preview. Resolve any Intelligence Engine unavailable or unsupported-capability message. | You know what will be sent and whether submission is available. | <a href="user-guide/images/submission-preview.png"><img src="user-guide/images/submission-preview.png" alt="submission preview controls" width="240"></a> |
+| 1 | Complete and inspect the submission preview. Resolve any Pythia unavailable or unsupported-capability message. | You know what will be sent and whether submission is available. | <a href="user-guide/images/submission-preview.png"><img src="user-guide/images/submission-preview.png" alt="submission preview controls" width="240"></a> |
 | 2 | Click **Submit run** when enabled. | An enhancement job is created; it produces proposals rather than directly applying changes. | <a href="user-guide/images/submission-actions.png"><img src="user-guide/images/submission-actions.png" alt="submission preview controls" width="240"></a> |
 | 3 | Review the job status and any reported resource conflicts, then review returned suggestions individually. | You can distinguish completion, failure, and suggestions needing a decision. | <a href="user-guide/images/enhancement-jobs.png"><img src="user-guide/images/enhancement-jobs.png" alt="enhancement jobs controls" width="240"></a><br><a href="user-guide/images/proposal.png"><img src="user-guide/images/proposal.png" alt="proposal controls" width="240"></a> |
 
@@ -556,6 +1042,8 @@ A proposal can contain multiple related changes. Accept change applies that disp
 | 3 | Click **Accept change** to apply the proposal, or **Reject** to leave the storyboard unchanged. | The decision is recorded. A stale/conflicting proposal cannot overwrite newer edits. | <a href="user-guide/images/proposal.png"><img src="user-guide/images/proposal.png" alt="proposal controls" width="240"></a> |
 
 ### Edit a suggestion before accepting
+
+Expansion proposals are reviewed as a unit: **Edit values** is unavailable when a proposal adds scenes. Review the displayed titles, learner text, narration and production notes, then accept or reject. Edit accepted new scenes in the Scene Editor. **Undo acceptance** removes them only if they are still unchanged and not referenced by an assessment; human edits are never silently deleted.
 
 | Step | Action | Result | Control image |
 | --- | --- | --- | --- |
@@ -834,9 +1322,9 @@ Use **Review tools > Guided review** for the Golden Path checklist and its task 
 
 1. Select a scene and click **Transform with Pythia**. In **Scenes to transform**, check every source scene to include. At least one is required; selected scenes are submitted in storyboard order.
 2. Click **Propose transformation**. Wait for **Draft saved for review**. Compare **Current** with **Proposed sequence**, including purpose, learner content, interaction recommendations, production notes, media requirements, and assessment opportunities.
-3. Close the dialog and open **Review tools > Review suggestions**. Find **Storyboard transformation**, labeled **Pythia · storyboard.transform**. Verify the selected source scenes and source revision, not just the proposal title.
-4. To revise the sequence before accepting, click **Edit proposal**. This exposes **Proposed scene sequence · JSON**, not a visual scene editor. Preserve the structured fields and valid JSON; use **Cancel edit** to discard form edits. Editing alone does not apply the sequence.
-5. Click **Accept transformation** to replace the selected scenes and save a new storyboard revision, or **Reject** to keep the storyboard unchanged. Acceptance applies the whole proposed sequence, not one displayed scene at a time.
+3. Verify the selected source scenes and source revision, then click **Apply transformation** below the proposed sequence. This replaces the selected scenes with the entire proposed sequence and saves a new storyboard revision. The dialog closes and Storyboard updates immediately; no separate review screen is required.
+4. To edit or reject instead, close the dialog and open **Review tools > Review suggestions**. Find **Storyboard transformation**, labeled **Pythia · storyboard.transform**. Click **Edit proposal** to expose **Proposed scene sequence · JSON**, not a visual scene editor. Preserve the structured fields and valid JSON; use **Cancel edit** to discard form edits. Editing alone does not apply the sequence.
+5. In Review suggestions, **Accept transformation** applies the whole proposed sequence, or **Reject** keeps the storyboard unchanged. Both acceptance controls use the same revision checks; neither applies only one displayed scene at a time.
 6. Return to **Storyboard** and inspect the actual saved order, learner text, layouts, media, and any assessment or navigation dependencies. Implement and verify suggested interactions and media separately; a production note is not a finished interaction.
 
 If the proposal becomes **stale** or acceptance reports that the storyboard changed, reload the current project and run a new transformation. Do not repeatedly accept the old proposal to overwrite newer work. Decide a transformation before submitting downstream assessment/review work that depends on the resulting scenes.

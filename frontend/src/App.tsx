@@ -48,6 +48,10 @@ import { PythiaTransformView } from "./PythiaTransformView";
 import { PythiaAssessmentDesignView } from "./PythiaAssessmentDesignView";
 import { PythiaCourseReviewView } from "./PythiaCourseReviewView";
 import { PythiaSceneActions } from "./PythiaSceneActions";
+import type { Experience } from "./NativeExperience";
+import { SceneExperiencePanel } from "./SceneExperiencePanel";
+import { HTML5ActivityPanel } from "./HTML5ActivityPanel";
+import type { HTML5Activity } from "./HTML5Activity";
 import { ProjectBackgroundPanel } from "./ProjectBackgroundPanel";
 import userGuideUrl from "../../docs/user-guide.pdf?url";
 
@@ -69,8 +73,8 @@ export type AssessmentType = AssessmentItem["type"];
 export type AssessmentSettings = { maxAttempts: number; passingScore: number; scoreWeight: number; remediationSceneId: string | null };
 export type CourseCompletionSettings = { passingScore: number; includeOptionalAssessments: boolean };
 export type ExportSettings = { packageWarningThresholdMB: number };
-export type Scene = { videoAssets?: string[]; mediaPlacements?: MediaPlacement[]; excludedCourseMedia?: string[]; visualLayout?: SceneLayout | null; backgroundAsset?: string | null; id: string; sourceSlide: number | null; title: string; sceneType: SceneType; layoutMode: LayoutMode; templateId: string | null; required: boolean; audioRequired: boolean; assessmentItem: AssessmentItem | null; assessmentSettings: AssessmentSettings | null; extractedText: string[]; actionDescription: string; narration: string; imageAssets: string[]; imageAltText: Record<string, string>; decorativeImages: string[]; audioAssets: string[]; previewImage: string | null; renderWarning: string | null; sourceAnimationXml: string | null; sourceTransitionXml: string | null; notes: string };
-export type Asset = { id: string; kind: "image" | "audio" | "video"; transcript?: string; captionsVtt?: string; language?: string; sharedSourceId?: string | null; role?: "content" | "background"; filename: string; contentType: string; sizeBytes: number; sha256: string; path: string; attributionText: string; attributionStatus: "draft" | "complete" };
+export type Scene = { html5Activity?: HTML5Activity | null; experience?: Experience | null; videoAssets?: string[]; mediaPlacements?: MediaPlacement[]; excludedCourseMedia?: string[]; visualLayout?: SceneLayout | null; backgroundAsset?: string | null; id: string; sourceSlide: number | null; title: string; sceneType: SceneType; layoutMode: LayoutMode; templateId: string | null; required: boolean; audioRequired: boolean; assessmentItem: AssessmentItem | null; assessmentSettings: AssessmentSettings | null; extractedText: string[]; actionDescription: string; narration: string; imageAssets: string[]; imageAltText: Record<string, string>; decorativeImages: string[]; audioAssets: string[]; previewImage: string | null; renderWarning: string | null; sourceAnimationXml: string | null; sourceTransitionXml: string | null; notes: string };
+export type Asset = { id: string; kind: "image" | "audio" | "video" | "html5"; transcript?: string; captionsVtt?: string; language?: string; sharedSourceId?: string | null; role?: "content" | "background"; filename: string; contentType: string; sizeBytes: number; sha256: string; path: string; attributionText: string; attributionStatus: "draft" | "complete" };
 export type ProjectSummary = { id: string; title: string; sceneCount: number; updatedAt: string; hasSourceDeck: boolean; parentProjectId?: string | null; siblingOrder?: number; metadataRevision?: number };
 export type Assessment = { id: string; title: string; questionSceneIds: string[] };
 export type Project = ProjectSummary & { storyboard: { backgroundAsset?: string | null; courseMedia?: MediaPlacement[]; revision: number; scenes: Scene[]; assets: Asset[]; assessments?: Assessment[]; completionSettings: CourseCompletionSettings; exportSettings: ExportSettings } };
@@ -124,6 +128,8 @@ export function App() {
   const [showEnhancementReview, setShowEnhancementReview] = useState(false);
   const [showPythiaAnalysis, setShowPythiaAnalysis] = useState(false);
   const [showPythiaTransform, setShowPythiaTransform] = useState(false);
+  const [showSceneExperience, setShowSceneExperience] = useState(false);
+  const [showHTML5, setShowHTML5] = useState(false);
   const [showPythiaAssessmentDesign, setShowPythiaAssessmentDesign] = useState(false);
   const [showPythiaCourseReview, setShowPythiaCourseReview] = useState(false);
   const [showReviewTools, setShowReviewTools] = useState(false);
@@ -194,7 +200,7 @@ export function App() {
     showProjectBackground ? "storyboard.background" :
     showAccessibility ? "review.accessibility" : showValidation ? "review.validation" :
     showGoldenPath ? "catalog" : showManagement ? "workspace.management" : activeView;
-  const hasOpenForm = Boolean(showPythiaTalk || showSources || visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showProjectBackground || showAccessibility || showValidation);
+  const hasOpenForm = Boolean(showHTML5 || showSceneExperience || showPythiaTalk || showSources || visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showProjectBackground || showAccessibility || showValidation);
   const preparationAttempt = useRef("");
   useEffect(() => {
     if (!project.id || !permissions.canEdit || busy || hasOpenForm || !project.storyboard.scenes.some(item => !item.visualLayout)) return;
@@ -1229,7 +1235,7 @@ export function App() {
   const assessmentItemCount = scenes.filter((item) => item.assessmentItem !== null).length;
   const scene = scenes[selectedScene];
   const previewScene = scene ? resolvedSceneBackground(project, scene) : null;
-  const hasSceneStage = Boolean(previewScene && (previewScene.visualLayout?.enabled || previewScene.assessmentItem));
+  const hasSceneStage = Boolean(previewScene && (previewScene.html5Activity || previewScene.experience || previewScene.visualLayout?.enabled || previewScene.assessmentItem));
   const canCreateProject = !session || session.memberships.some(item => ["author", "instructional-designer", "administrator"].includes(item.role));
   const parentProject = projects.find(parent => parent.id === project.parentProjectId);
 
@@ -1271,10 +1277,10 @@ export function App() {
       </div>
       <div className="workspace-label">WORKSPACE</div>
       <nav aria-label="Workspace">
+        <button className={`nav-item ${showPythiaTalk ? "active" : ""}`} onClick={() => setShowPythiaTalk(true)} disabled={!project.id || busy || hasOpenForm || !permissions.canEnhance}><Sparkles size={18} /><span>Consult Pythia</span></button>
         <button ref={managementButtonRef} className={`nav-item management-nav-item ${showManagement ? "active" : ""}`} aria-current={showManagement ? "page" : undefined} onClick={() => setShowManagement(true)}><ClipboardList size={18} /><span>My Work</span></button>
         <button className={`nav-item ${!showManagement && activeView === "storyboard" ? "active" : ""}`} aria-current={!showManagement && activeView === "storyboard" ? "page" : undefined} onClick={() => { setShowManagement(false); setActiveView("storyboard"); }}><Layers3 size={18} /><span>Storyboard</span></button>
         <button className={`nav-item ${showSources ? "active" : ""}`} onClick={() => setShowSources(true)} disabled={!project.id || busy || hasOpenForm}><FileText size={18} /><span>Sources</span></button>
-        <button className={`nav-item ${showPythiaTalk ? "active" : ""}`} onClick={() => setShowPythiaTalk(true)} disabled={!project.id || busy || hasOpenForm || !permissions.canEnhance}><Sparkles size={18} /><span>Talk to Pythia</span></button>
         <button className={`nav-item ${showAssessments ? "active" : ""}`} onClick={() => setShowAssessments(true)} disabled={!project.id || busy || !permissions.canEdit}><ClipboardList size={18} /><span>Assessments</span></button>
         <button className={`nav-item ${!showManagement && activeView === "media" ? "active" : ""}`} aria-current={!showManagement && activeView === "media" ? "page" : undefined} onClick={() => { setShowManagement(false); setActiveView("media"); }}><FileUp size={18} /><span>Media library</span></button>
         <button className={`nav-item ${!showManagement && activeView === "templates" ? "active" : ""}`} aria-current={!showManagement && activeView === "templates" ? "page" : undefined} onClick={() => { setShowManagement(false); setActiveView("templates"); }}><BookOpen size={18} /><span>Templates</span></button>
@@ -1348,6 +1354,8 @@ export function App() {
             <div className="scene-context-actions">
               <button className="button button-accent" onClick={() => beginSceneEdit()} disabled={busy || !permissions.canEdit}><Pencil size={16} /> Edit scene</button>
               <PythiaSceneActions key={`${project.id}-${scene.id}`} projectId={project.id} disabled={busy || !permissions.canEnhance} onAnalyze={() => setShowPythiaAnalysis(true)} onTransform={() => setShowPythiaTransform(true)} onDesignAssessment={() => setShowPythiaAssessmentDesign(true)} />
+              <button type="button" className="button button-outline" disabled={busy || !permissions.canEnhance} onClick={() => setShowSceneExperience(true)}><Sparkles size={15} />Design experience</button>
+              <button type="button" className="button button-outline" disabled={busy || !permissions.canEdit} onClick={() => setShowHTML5(true)}>HTML5 activity</button>
             </div>
             <div className="scene-context-title"><h2>{scene.title}</h2><span>Scene {selectedScene + 1} of {scenes.length} · {scene.required ? "Required" : "Optional"}</span></div>
           </div>
@@ -1386,7 +1394,9 @@ export function App() {
     </EditorDialog>}
     {showCompletionSettings && <CompletionSettingsEditor project={project} onClose={() => setShowCompletionSettings(false)} onProjectUpdated={applyProject} />}
     {showPythiaAnalysis && scene && <PythiaAnalysisView key={`${project.id}-${scene.id}`} projectId={project.id} scene={scene} onClose={() => setShowPythiaAnalysis(false)} />}
-    {showPythiaTransform && scene && <PythiaTransformView key={`${project.id}-${scene.id}`} projectId={project.id} scene={scene} scenes={scenes} onClose={() => setShowPythiaTransform(false)} />}
+    {showPythiaTransform && scene && <PythiaTransformView key={`${project.id}-${scene.id}`} projectId={project.id} revision={project.storyboard.revision} scene={scene} scenes={scenes} onClose={() => setShowPythiaTransform(false)} onProjectUpdated={applyProject} />}
+    {showSceneExperience && scene && <SceneExperiencePanel key={`${project.id}-${scene.id}`} project={project} scene={scene} onClose={() => setShowSceneExperience(false)} onProjectUpdated={applyProject} />}
+    {showHTML5 && scene && <HTML5ActivityPanel key={`${project.id}-${scene.id}`} project={project} scene={scene} onClose={() => setShowHTML5(false)} onProjectUpdated={applyProject} />}
     {showPythiaAssessmentDesign && scene && <PythiaAssessmentDesignView key={`${project.id}-${scene.id}`} projectId={project.id} scene={scene} scenes={scenes} onClose={() => setShowPythiaAssessmentDesign(false)} />}
     {showPythiaCourseReview && <PythiaCourseReviewView project={project} onClose={() => setShowPythiaCourseReview(false)} onNavigateToObject={reference => openCourseReviewObject(reference.object_type, reference.object_id)} />}
     {showAssessments && permissions.canEdit && <AssessmentsEditor key={project.id} project={project} canExport={permissions.canExport} onClose={() => setShowAssessments(false)} onProjectUpdated={applyProject} onEditQuestion={(sceneId, updatedProject) => {
@@ -1398,7 +1408,7 @@ export function App() {
     {showAccessibility && <AccessibilityView projectId={project.id} revision={project.storyboard.revision} scenes={scenes} assets={project.storyboard.assets} onClose={() => setShowAccessibility(false)} onProjectUpdated={applyProject} />}
     {showGoldenPath && <GoldenPathView walkthroughStatuses={Object.fromEntries(Object.entries(guides).map(([id, guide]) => [id, guide.controller.snapshot().status]))} onStartWalkthrough={() => startOnboarding()} onSelectWalkthrough={id => startOnboarding(id)} project={project} onClose={() => setShowGoldenPath(false)} onCreateProject={() => { setShowGoldenPath(false); beginProjectCreate(); }} onOpenStoryboard={() => { setShowGoldenPath(false); setActiveView("storyboard"); }} onOpenMedia={() => { setShowGoldenPath(false); setActiveView("media"); }} onOpenAccessibility={() => { setShowGoldenPath(false); setShowAccessibility(true); }} onOpenPreview={() => { setShowGoldenPath(false); if (project.id) setShowPreview(true); }} onRunValidation={() => { setShowGoldenPath(false); setShowValidation(true); }} onOpenPythiaAnalysis={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaAnalysis(true); }} onOpenPythiaTransform={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaTransform(true); }} onOpenPythiaAssessment={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaAssessmentDesign(true); }} onOpenSuggestions={() => { setShowGoldenPath(false); setShowManagement(false); setShowEnhancementReview(true); }} onOpenCourseReview={() => { setShowGoldenPath(false); setShowManagement(false); setShowPythiaCourseReview(true); }} onOpenManagement={() => { setShowGoldenPath(false); setShowManagement(true); }} onOpenExport={() => { setShowGoldenPath(false); setShowManagement(false); setShowExport(true); }} />}
     {showPreview && project.id && <CoursePreview project={project} onClose={() => setShowPreview(false)} canEnhance={permissions.canEnhance} />}
-    {visualSceneId && scenes.find(item => item.id === visualSceneId) && <SceneVisualEditor key={`${project.id}:${visualSceneId}`} initialPanel={sceneEditorPanel} project={project} scene={scenes.find(item => item.id === visualSceneId)!} templates={templates} onClose={() => setVisualSceneId(null)} onSave={saveVisualScene} onExtract={extractVisualScene} onApplyTemplate={previewSceneTemplate} onGenerate={generateSceneContentDraft} canGenerate={permissions.canEnhance} />}
+    {visualSceneId && scenes.find(item => item.id === visualSceneId) && <SceneVisualEditor key={`${project.id}:${visualSceneId}`} initialPanel={sceneEditorPanel} project={project} scene={scenes.find(item => item.id === visualSceneId)!} templates={templates} onClose={() => setVisualSceneId(null)} onSave={saveVisualScene} onExtract={extractVisualScene} onApplyTemplate={previewSceneTemplate} onGenerate={generateSceneContentDraft} onProjectUpdated={applyProject} canGenerate={permissions.canEnhance} />}
     {showAssessmentEditor && project.id && scene?.sceneType === "question" && <AssessmentEditor projectId={project.id} projectTitle={project.title} revision={project.storyboard.revision} scene={scene} scenes={scenes}
       onClose={() => setShowAssessmentEditor(false)}
       onProjectUpdated={applyProject}
@@ -1416,10 +1426,10 @@ export function App() {
         </section>
         <details className="new-project-extra-sources"><summary>Add pasted text, web links, or Pythia excerpts</summary><SourcesPanel projectId="" projectTitle={title} canAdd embedded onClose={() => {}} allowedKinds={["text", "web", "pythia"]} queued={queuedProjectSources} onStage={source => setQueuedProjectSources(current => [...current, source])} onRemoveQueued={id => setQueuedProjectSources(current => current.filter(source => source.id !== id))} locked={busy} onBusyChange={setPlannerSourceBusy} /></details>
         <label className="course-draft-prompt">Course prompt<textarea aria-label="Course prompt" rows={4} maxLength={4000} value={coursePrompt} disabled={busy} onChange={event => setCoursePrompt(event.target.value)} placeholder="Tell Pythia about the audience, the problem, and what you want to explore before drafting scenes." /></label>
-        <p className="field-hint">Sources are saved when the project is created. Create &amp; plan with Pythia keeps this modal open with your prompt ready to send. Select source text before sharing it with Pythia.</p>
+        <p className="field-hint">Sources are saved when the project is created. Create &amp; plan with Pythia opens a consultation, not scene generation. Your prompt is ready to send; select source text before sharing it. Discuss the brief and learning approach before deciding to draft scenes.</p>
         <div className="modal-actions"><button data-onboarding="project.create" type="button" className="button button-outline" onClick={() => void createProject()} disabled={!title.trim() || busy || plannerSourceBusy}><Plus size={15} /> Create project</button><button type="button" className="button button-accent" onClick={() => void createProject(true)} disabled={!title.trim() || busy || plannerSourceBusy}><Sparkles size={15} /> Create &amp; plan with Pythia</button></div>
       </> : <>
-        <p className="field-hint">Project saved: <strong>{project.title}</strong>. {courseResourceIds.length} source{courseResourceIds.length === 1 ? "" : "s"} attached. Sent messages and scene drafts stay with this project, so you can finish planning later from Talk to Pythia.</p>
+        <p className="field-hint">Project saved: <strong>{project.title}</strong>. {courseResourceIds.length} source{courseResourceIds.length === 1 ? "" : "s"} attached. Sent messages and scene drafts stay with this project, so you can finish planning later from Consult Pythia.</p>
         <div className="new-project-tabs" role="tablist" aria-label="Project planning sections">{([{ id: "pythia", label: "Plan with Pythia" }, { id: "sources", label: "Sources" }, ...(aiConfiguredForProject ? [{ id: "prompt", label: "Prompt to scenes" }] : [])] as { id: "pythia" | "sources" | "prompt"; label: string }[]).map((tab, index, tabs) => <button key={tab.id} id={`new-project-tab-${tab.id}`} type="button" role="tab" aria-selected={courseSetupTab === tab.id} aria-controls={`new-project-panel-${tab.id}`} tabIndex={courseSetupTab === tab.id ? 0 : -1} disabled={busy || plannerSourceBusy || plannerTalkBusy} onClick={() => selectCourseSetupTab(tab.id)} onKeyDown={event => { const offset = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0; if (offset || event.key === "Home" || event.key === "End") { event.preventDefault(); selectCourseSetupTab(tabs[event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + offset + tabs.length) % tabs.length].id, true); } }}>{tab.label}</button>)}</div>
         <section id="new-project-panel-pythia" role="tabpanel" aria-labelledby="new-project-tab-pythia" hidden={courseSetupTab !== "pythia"}>
           <PythiaTalkPanel project={project} onClose={closeProjectCreation} onProjectUpdated={applyProject} embedded planning initialMessage={coursePrompt} sourcesVersion={plannerSourcesVersion} locked={busy || plannerSourceBusy} onBusyChange={setPlannerTalkBusy} onManageSources={() => selectCourseSetupTab("sources")} />
@@ -1429,7 +1439,7 @@ export function App() {
           <SourcesPanel key={project.id} projectId={project.id} projectTitle={project.title} canAdd={permissions.canEdit} onClose={closeProjectCreation} embedded queued={queuedProjectSources} onRemoveQueued={id => setQueuedProjectSources(current => current.filter(source => source.id !== id))} locked={busy || plannerTalkBusy} refreshVersion={plannerSourcesVersion} onBusyChange={setPlannerSourceBusy} onResourceSaved={source => { setCourseResourceIds(current => [...new Set([...current, source.id])]); setPlannerSourcesVersion(value => value + 1); }} />
         </section>
         {aiConfiguredForProject && <section id="new-project-panel-prompt" role="tabpanel" aria-labelledby="new-project-tab-prompt" hidden={courseSetupTab !== "prompt"} aria-label="Course scene drafting">
-          <p>{courseResourceIds.length} reference{courseResourceIds.length === 1 ? "" : "s"} available for grounding.</p>
+          <p>This separate quick-draft tool skips the consultation and agreed design brief. Use it only when you already know the learning design; it does not mark the consultation brief agreed. {courseResourceIds.length} reference{courseResourceIds.length === 1 ? "" : "s"} available for grounding.</p>
         <label className="course-draft-prompt">Course prompt<textarea aria-label="Course prompt" rows={4} maxLength={4000} value={coursePrompt} onChange={event => setCoursePrompt(event.target.value)} /></label>
         {permissions.canEnhance ? <button type="button" className="button button-outline" disabled={busy || !coursePrompt.trim()} onClick={() => void generateCourseContentDraft()}><Sparkles size={15} />{busy ? "Generating…" : "Generate course draft"}</button> : <p className="project-design-documents-status">Your project role does not allow AI draft generation.</p>}
         {courseDraftError && <p className="visual-editor-error" role="alert">{courseDraftError}</p>}

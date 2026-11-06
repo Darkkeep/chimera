@@ -9,18 +9,56 @@ Implemented on 2026-10-28 against `main` following the [plan](scene-timeline-lay
 - Named layers, drag reordering and keyboard/button alternatives, lock/hide, grouping and joint stage movement, alignment/distribution, and existing draft Undo/Redo.
 - Optional resizable/collapsible timeline with seconds, shared playhead, playback transport, zoom, snapping, object lifetimes, entrance/presentation/exit blocks, dragging and right-edge resizing, and exact timing inputs.
 - Scheduled audio/video clips with distinct clip IDs, source in/out trimming, overlaps, volume/fades, preview-only mute/solo, video position/size/layer order, cue markers, and local waveforms. PCM WAV decoding works without Web Audio; other waveform codecs depend on the browser. Waveforms are limited to 25 MB sources.
+- New video clips automatically use the scene's full canvas. Select an existing
+  video clip and choose **Fit video to scene** to reset its position to the scene
+  origin and size its playback box to the current stage dimensions. Playback
+  centers the whole picture with its original proportions, without stretching or
+  cropping; mismatched proportions leave letterboxing/pillarboxing. Manual
+  geometry stays available. Fitting is a draft edit with Undo/Redo and is retained
+  by **Save scene**. Existing clips and later stage-size edits do not silently
+  replace custom video geometry; use Fit again after changing the stage size.
 
 ## Data and playback
 
-`SceneLayout.timeline` has version 1, explicit duration, print timestamp, clips, and cues. Elements add optional native geometry, appearance, visibility timing, naming/grouping, aspect locking, and publishing visibility. Existing `SceneLayout.version` remains 1 because the new fields are optional and old representations remain readable. Older application builds must not save newly authored timeline/effect content, because they do not understand these fields.
+`SceneLayout.timeline` has version 1, explicit duration, print timestamp, clips, cues, and optional `pauses` (default empty). Elements add optional native geometry, appearance, visibility timing, naming/grouping, aspect locking, and publishing visibility. Existing `SceneLayout.version` remains 1 because the new fields are optional and old representations remain readable. Older application builds must not save newly authored timeline/effect content, because they do not understand these fields.
 
-The shared JavaScript transport controls media and paused native animations, including seeking before media readiness settles. Source timestamps and scene timestamps are separate. Media errors or buffering pause playback; background tabs pause the clock. Audible playback requires an explicit learner action. Reaching the end retains learner-controlled navigation.
+The shared JavaScript transport controls media and paused native animations, including seeking before media readiness settles. Source timestamps and scene timestamps are separate. A paused seek target is issued once, allowing decoders that round to frame boundaries to settle instead of repeatedly seeking the same timestamp. Seeks that land more than 50 ms away are retried by the bounded settling loop. Media errors or network buffering pause playback; background tabs pause the clock. Decoder-only waits after a seek do not pause media when the remaining clip is already buffered, so decoding can become ready. Exported players retain an explicit playback request while buffering and resume on either `canplay` or a completed seek with ready media. Cancelling playback clears that request. Audible playback requires an explicit learner action. Reaching the end retains learner-controlled navigation.
 
 Native `played` ranges determine consumption, intersected with each trimmed interval. Seek holes remain holes; coverage is merged per clip, and the progress key includes source asset and in/out points so retrimming does not inherit stale coverage. Existing required-audio/video rules are inherited when scheduling their media. Required overlapping narration should be reviewed for instructional usability.
 
 Preview and SCORM retain a shared scene clock and clip coverage within the existing progress structure. Budget estimates include clocks and clips; actual serialized suspend-data size remains checked before saving. Standalone progress remains session-only. Older per-asset progress stays available for unscheduled attachments; scheduling a clip does not turn prior full-asset completion into trimmed-clip completion.
 
 Scheduled assets are included in package resolution, asset usage/deletion checks, validation, and ordinary storyboard persistence/backups. Their independent player is suppressed in scenes where they are scheduled. Unscheduled attachments retain their previous behavior. Templates that replace a composition intentionally replace its timeline as part of that draft, and Undo restores the previous composition.
+
+## Optional interactive-video pauses (November 5, 2026)
+
+The shared transport supports at most eight distinct question/decision pauses
+inside scheduled video intervals (start inclusive, end exclusive). Each pause
+has an ID, scene-clock `timeMs`, prompt and two to four uniquely identified
+responses with feedback. Strict schemas reject grading/gating/route properties;
+there is no branching-video editor. Prompts/feedback are bounded to 1,000
+characters and response labels to 200. No new asset type or endpoint is needed.
+
+Policy: formative, skippable, unlimited retries. Crossing a timestamp in playback
+stops at that exact millisecond. Responses only reveal feedback; explicit
+Continue/Skip resumes at that position. Seeking across a timestamp skips it,
+backward seeking replays it, and an exact seek offers it on Play (immediately
+when already playing). Restart seeks zero without autoplay. A focused heading,
+native keyboard controls, status feedback and an always-available text/replay
+alternative serve the same content without timing.
+
+Only the existing scene clock and watched ranges persist. No learner response
+or handled-pause list is stored or included in suspend-budget estimates.
+Restored clocks require the current timeline duration, finite in-range position
+and empty watched ranges. Continue at a pause timestamp reoffers the question
+on Play; answers are intentionally ephemeral. SCORM Start over clears clocks
+and coverage. No completion, assessment attempt, grade or pass/fail policy
+changes. Legacy timelines/cues remain non-interactive.
+
+Stage, course preview, local-file standalone and both SCORM dialects share this
+implementation. Written Word/SME timeline alternatives contain every prompt,
+response and feedback; screenshots retain the authored print time. See the
+[user procedure](user-guide.md#add-optional-video-reflections).
 
 ## Outputs and accessibility
 

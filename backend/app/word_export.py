@@ -201,6 +201,9 @@ def _timeline_description(scene: Scene) -> str:
         lines.append(f"{clip.name or clip.assetId}: {clip.kind}, scene {clip.startMs / 1000:g} to {end / 1000:g} s; source {clip.sourceInMs / 1000:g} to {clip.sourceOutMs / 1000:g} s; volume {clip.volume * 100:g}%" + ("; required" if clip.required else ""))
     for cue in timeline.cues:
         lines.append(f"Cue {cue.name}: {cue.timeMs / 1000:g} s")
+    for pause in timeline.pauses:
+        lines.append(f"Optional video reflection at {pause.timeMs / 1000:g} s (formative; skippable): {pause.prompt}")
+        lines.extend(f"  {choice.label}: {choice.feedback}" for choice in pause.choices)
     return "\n".join(lines)
 
 

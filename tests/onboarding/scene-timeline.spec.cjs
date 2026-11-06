@@ -8,13 +8,101 @@ const servers = [];
 test.beforeEach(async({page})=>{
   // Font fitting must not wait on unrelated internet font downloads in local fixtures.
   await page.route(/^https:\/\/fonts\.(?:googleapis|gstatic)\.com\//,route=>route.abort());
+  await page.addInitScript(() => {
+    window.__mediaReadiness = [];
+    for (const event of ["waiting", "seeking", "seeked", "canplay", "playing", "pause", "error"]) {
+      document.addEventListener(event, ({ target, type }) => {
+        if (!(target instanceof HTMLMediaElement)) return;
+        window.__mediaReadiness.push({
+          event: type, time: target.currentTime, readyState: target.readyState,
+          seeking: target.seeking, paused: target.paused,
+          clock: window.__CHIMERA_SCENE_TRANSPORT?.currentTime,
+        });
+        if (window.__mediaReadiness.length > 100) window.__mediaReadiness.shift();
+      }, true);
+    }
+  });
 });
-test.afterEach(async () => {
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status !== testInfo.expectedStatus && !page.isClosed()) {
+    const snapshot = await page.evaluate(() => ({
+      events: window.__mediaReadiness,
+      clock: window.__CHIMERA_SCENE_TRANSPORT?.currentTime,
+      playing: window.__CHIMERA_SCENE_TRANSPORT?.playing,
+      media: window.__CHIMERA_SCENE_TRANSPORT?.media.map(({ node, seekTarget }) => ({
+        time: node.currentTime, readyState: node.readyState, seeking: node.seeking,
+        paused: node.paused, seekTarget,
+        buffered: Array.from({ length: node.buffered.length }, (_, i) => [node.buffered.start(i), node.buffered.end(i)]),
+      })),
+    }));
+    await testInfo.attach("media-readiness", { body: JSON.stringify(snapshot, null, 2), contentType: "application/json" });
+  }
   for (const server of servers.splice(0))
     await new Promise((resolve) => {
       server.closeAllConnections();
       server.close(resolve);
     });
+});
+
+test("transport does not repeatedly seek a paused decoder-rounded timestamp", async ({ page }) => {
+  const source = await fs.readFile(path.resolve("backend/app/static/scene-transport.js"), "utf8");
+  const result = await page.evaluate(async source => {
+    const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+    const { createSceneTransport } = await import(url);
+    URL.revokeObjectURL(url);
+    const root = document.createElement("div");
+    document.body.appendChild(root);
+    const audio = document.createElement("audio");
+    let position = 0, seeks = 0, readyState = 3, bufferEnd = 3, paused = true;
+    // Model a decoder that reports a nearby frame rather than the exact seek target.
+    Object.defineProperties(audio, {
+      src: { set() {} },
+      readyState: { get: () => readyState },
+      duration: { get: () => 3 },
+      paused: { get: () => paused },
+      buffered: { get: () => ({ length: 1, start: () => 0, end: () => bufferEnd }) },
+      currentTime: {
+        get: () => position,
+        set: value => { position = value - 0.02; seeks++; },
+      },
+    });
+    audio.play = async () => { paused = false; };
+    audio.pause = () => { paused = true; };
+    const createElement = document.createElement.bind(document);
+    let controller;
+    document.createElement = (name, options) => name === "audio" ? audio : createElement(name, options);
+    try {
+      controller = createSceneTransport({
+        root, stage: root, initialTimeMs: 1500,
+        layout: { elements: [], timeline: { durationMs: 3000, clips: [{
+          id: "voice", kind: "audio", assetId: "voice", startMs: 0,
+          sourceInMs: 0, sourceOutMs: 3000, volume: 1,
+        }] } },
+        resolveAsset: () => ({ path: "fixture.wav" }),
+      });
+    } finally {
+      document.createElement = createElement;
+    }
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const pausedSeeks = seeks;
+      position = 0;
+      audio.dispatchEvent(new Event("canplay"));
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const recoveredFailedSeek = seeks === pausedSeeks + 1 && position === 1.48;
+      controller.play();
+      readyState = 2;
+      audio.dispatchEvent(new Event("waiting"));
+      const fullyBufferedKeepsPlaying = controller.playing;
+      bufferEnd = 1.6;
+      audio.dispatchEvent(new Event("waiting"));
+      return { pausedSeeks, recoveredFailedSeek, fullyBufferedKeepsPlaying, partiallyBufferedPauses: !controller.playing };
+    } finally {
+      controller.dispose();
+      root.remove();
+    }
+  }, source);
+  expect(result).toEqual({ pausedSeeks: 1, recoveredFailedSeek: true, fullyBufferedKeepsPlaying: true, partiallyBufferedPauses: true });
 });
 
 async function course(request, title) {
@@ -27,6 +115,82 @@ async function course(request, title) {
   });
   expect(response.ok()).toBeTruthy();
   return response.json();
+}
+
+async function expectFittedVideo(video, width, height) {
+  await expect(video).toHaveCSS("left", "0px");
+  await expect(video).toHaveCSS("top", "0px");
+  await expect(video).toHaveCSS("width", `${width}px`);
+  await expect(video).toHaveCSS("height", `${height}px`);
+  await expect(video).toHaveCSS("object-fit", "contain");
+  await expect(video).toHaveCSS("object-position", "50% 50%");
+  await expect.poll(() => video.evaluate(node => node.videoWidth)).toBeGreaterThan(0);
+  const picture = await video.evaluate(node => {
+    const box = node.getBoundingClientRect();
+    const scale = Math.min(box.width / node.videoWidth, box.height / node.videoHeight);
+    return { width: node.videoWidth * scale, height: node.videoHeight * scale, boxWidth: box.width, boxHeight: box.height,
+      ratio: node.videoWidth / node.videoHeight, fit: getComputedStyle(node).objectFit };
+  });
+  expect(picture.width).toBeLessThanOrEqual(picture.boxWidth + 0.01);
+  expect(picture.height).toBeLessThanOrEqual(picture.boxHeight + 0.01);
+  expect(picture.width / picture.height).toBeCloseTo(picture.ratio, 5);
+  expect(Math.min(picture.boxWidth - picture.width, picture.boxHeight - picture.height)).toBeCloseTo(0, 5);
+}
+
+for (const [width, height] of [[1280, 720], [720, 720], [720, 1280]]) {
+  test(`new video automatically fits a ${width} by ${height} scene and survives save/reopen`, async ({ page, request }) => {
+    let p = await course(request, `Video fit ${width}x${height}`);
+    const upload = await request.post(`/api/projects/${p.id}/assets`, {
+      multipart: { file: { name: "auto-fit.mp4", mimeType: "video/mp4", buffer: await fs.readFile("tests/fixtures/timeline-qualification.mp4") } },
+      headers: { "If-Match": `"${p.storyboard.revision}"` },
+    });
+    expect(upload.ok(), await upload.text()).toBeTruthy();
+    p = await upload.json();
+    const asset = p.storyboard.assets.find(item => item.kind === "video");
+    const changed = await request.patch(`/api/projects/${p.id}/scenes/${p.storyboard.scenes[0].id}`, {
+      headers: { "If-Match": `"${p.storyboard.revision}"` },
+      data: { visualLayout: { enabled: true, width, height, elements: [] } },
+    });
+    expect(changed.ok(), await changed.text()).toBeTruthy();
+    p = await changed.json();
+    await page.addInitScript(id => localStorage.setItem("chimera.activeProjectId", id), p.id);
+    await page.route("**/api/projects", route => route.fulfill({ json: [p] }));
+    await page.goto("/");
+    await page.getByRole("button", { name: "Resume authoring", exact: true }).click();
+    await page.getByRole("button", { name: "Edit scene", exact: true }).click();
+    const editor = page.getByRole("dialog").last();
+    await editor.getByRole("combobox", { name: "Timeline media", exact: true }).selectOption(asset.id);
+    await editor.getByRole("button", { name: "Add clip at playhead", exact: true }).click();
+    for (const [field, value] of Object.entries({ x: 0, y: 0, width, height })) {
+      await expect(editor.getByRole("spinbutton", { name: `Video ${field}`, exact: true })).toHaveValue(String(value));
+    }
+    await editor.getByRole("button", { name: "Preview at playhead", exact: true }).click();
+    await expectFittedVideo(editor.locator(".visual-stage video"), width, height);
+    await editor.getByRole("button", { name: "Add video pause at playhead", exact: true }).click();
+    await editor.getByRole("textbox", { name: "Pause 1 prompt", exact: true }).fill("What should you inspect?");
+    await editor.getByRole("button", { name: "Preview reflection", exact: true }).click();
+    await expect(editor.getByRole("region", { name: "Video reflection", exact: true })).toBeVisible();
+    await editor.getByRole("button", { name: "Save scene", exact: true }).click();
+    await expect(editor).toHaveCount(0);
+    const saved = await (await request.get(`/api/projects/${p.id}`)).json();
+    const clip = saved.storyboard.scenes[0].visualLayout.timeline.clips[0];
+    expect(clip).toMatchObject({ assetId: asset.id, kind: "video", x: 0, y: 0, width, height, startMs: 0, sourceInMs: 0, volume: 1 });
+    await page.reload();
+    await page.getByRole("button", { name: "Resume authoring", exact: true }).click();
+    await page.getByRole("button", { name: "Edit scene", exact: true }).click();
+    const reopened = page.getByRole("dialog").last();
+    await expect(reopened.getByRole("textbox", { name: "Pause 1 prompt", exact: true })).toHaveValue("What should you inspect?");
+    await reopened.locator(".timeline-label").filter({ hasText: asset.filename }).click();
+    await expect(reopened.getByRole("spinbutton", { name: "Video width", exact: true })).toHaveValue(String(width));
+    await expect(reopened.getByRole("spinbutton", { name: "Video height", exact: true })).toHaveValue(String(height));
+    await reopened.getByRole("button", { name: "Close scene editor", exact: true }).click();
+    await page.getByRole("button", { name: "Preview course", exact: true }).click();
+    await expectFittedVideo(page.getByRole("dialog").last().locator(".visual-stage video"), width, height);
+    await page.getByRole("dialog").last().getByRole("button", { name: "Play scene", exact: true }).click();
+    const reflection = page.getByRole("region", { name: "Video reflection", exact: true });
+    await expect(reflection).toContainText("What should you inspect?");
+    await expect(reflection.getByRole("heading")).toBeFocused();
+  });
 }
 
 test("grouped layers move together and Undo/Redo preserves the group", async ({
@@ -194,6 +358,7 @@ test("native shapes, alpha, effects, timeline seconds and layer edits survive sa
     await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
   await page.evaluate(()=>{document.documentElement.dataset.theme='light';document.documentElement.style.colorScheme='light';});
+  await expect(reopened.getByRole("button", { name: "Play", exact: true })).toHaveCSS("background-color", "rgb(255, 255, 255)");
   expect((await new AxeBuilder({page}).include('.visual-editor').analyze()).violations).toEqual([]);
   await reopened.screenshot({path:testInfo.outputPath('timeline-editor-light.png')});
   expect(errors).toEqual([]);
@@ -305,6 +470,7 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
     page,
     request,
   }, testInfo) => {
+    test.setTimeout(60000);
     let p = await course(request, `Timed ${profile}`);
     const upload = await request.post(`/api/projects/${p.id}/assets`, {
       multipart: {
@@ -368,10 +534,15 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
             ],
             timeline: {
               durationMs: 20000,
+              pauses: [{ id: "reflection", timeMs: 12500, prompt: "Which approach would you consider?", choices: [
+                { id: "inspect", label: "Inspect first", feedback: "Observe the situation before acting." },
+                { id: "proceed", label: "Proceed carefully", feedback: "Consider the consequences." },
+              ] }],
               clips: [
                 {
                   id: "v",
                   assetId: asset.id,
+                  name: asset.filename,
                   kind: "video",
                   startMs: 12000,
                   sourceInMs: 500,
@@ -386,6 +557,27 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
     );
     expect(patch.ok(), await patch.text()).toBeTruthy();
     p = await patch.json();
+    const originalClip = p.storyboard.scenes[0].visualLayout.timeline.clips[0];
+    await page.addInitScript(id => localStorage.setItem("chimera.activeProjectId", id), p.id);
+    await page.route("**/api/projects", route => route.fulfill({ json: [p] }));
+    await page.goto("/");
+    await page.getByRole("button", { name: "Resume authoring", exact: true }).click();
+    await page.getByRole("button", { name: "Edit scene", exact: true }).click();
+    const editor = page.getByRole("dialog").last();
+    await editor.locator(".timeline-label").filter({ hasText: asset.filename }).click();
+    await expect(editor.getByRole("spinbutton", { name: "Video x", exact: true })).toHaveValue("40");
+    await expect(editor.getByRole("spinbutton", { name: "Video width", exact: true })).toHaveValue("480");
+    await editor.getByRole("button", { name: "Fit video to scene", exact: true }).click();
+    await expect(editor.getByRole("spinbutton", { name: "Video x", exact: true })).toHaveValue("0");
+    await expect(editor.getByRole("spinbutton", { name: "Video width", exact: true })).toHaveValue("1280");
+    await editor.getByRole("button", { name: "Undo", exact: true }).click();
+    await expect(editor.getByRole("spinbutton", { name: "Video width", exact: true })).toHaveValue("480");
+    await editor.getByRole("button", { name: "Redo", exact: true }).click();
+    await expect(editor.getByRole("spinbutton", { name: "Video width", exact: true })).toHaveValue("1280");
+    await editor.getByRole("button", { name: "Save scene", exact: true }).click();
+    await expect(editor).toHaveCount(0);
+    p = await (await request.get(`/api/projects/${p.id}`)).json();
+    expect(p.storyboard.scenes[0].visualLayout.timeline.clips[0]).toEqual({ ...originalClip, x: 0, y: 0, width: 1280, height: 720 });
     const zip = await request.get(`/api/projects/${p.id}/${profile}.zip`);
     expect(zip.ok(), await zip.text()).toBeTruthy();
     const archive = testInfo.outputPath("course.zip"),
@@ -445,10 +637,13 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
         "LMSFinish",
       ])
         api[name] = () => "true";
-      for (const name of ["GetValue", "LMSGetValue"]) api[name] = () => "";
+      for (const name of ["GetValue", "LMSGetValue"]) api[name] = key => JSON.parse(localStorage.getItem("timeline-lms") || "{}")[key] || "";
       for (const name of ["SetValue", "LMSSetValue"])
         api[name] = (key, value) => {
           window.__writes.push([key, value]);
+          const saved = JSON.parse(localStorage.getItem("timeline-lms") || "{}");
+          saved[key] = value;
+          localStorage.setItem("timeline-lms", JSON.stringify(saved));
           return "true";
         };
       window[profile === "scorm-2004" ? "API_1484_11" : "API"] = api;
@@ -480,6 +675,7 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
         page.locator(".visual-stage video").evaluate((n) => n.currentTime),
       )
       .toBeCloseTo(1, 1);
+    await expectFittedVideo(page.locator(".visual-stage video"), 1280, 720);
     await expect(page.locator(".visual-stage video")).toHaveJSProperty(
       "paused",
       true,
@@ -487,6 +683,13 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
     await page
       .getByRole("slider", { name: "Scene playback time" })
       .fill("18000");
+    const alternative = page.locator("details").filter({ hasText: "Video reflections: text alternative and replay" });
+    await expect(alternative).toHaveJSProperty("open", false);
+    await page.evaluate(() => window.dispatchEvent(new Event("beforeprint")));
+    await expect(alternative).toHaveJSProperty("open", true);
+    await expect(alternative).toContainText("Observe the situation before acting.");
+    await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+    await expect(alternative).toHaveJSProperty("open", false);
     await expect(page.locator('[data-scene-element="shape"]')).toHaveCSS(
       "visibility",
       "hidden",
@@ -509,6 +712,36 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
     await expect
       .poll(() => page.locator("video").evaluate((n) => n.played.length))
       .toBeGreaterThan(0);
+    const reflection = page.getByRole("region", { name: "Video reflection", exact: true });
+    await expect(reflection).toBeVisible();
+    await expect(reflection.getByRole("heading")).toBeFocused();
+    await expect(page.getByRole("slider", { name: "Scene playback time" })).toHaveValue("12500");
+    await expect(page.locator(".visual-stage video")).toHaveJSProperty("paused", true);
+    await reflection.getByRole("button", { name: "Inspect first", exact: true }).focus();
+    await page.keyboard.press("Enter");
+    await expect(reflection.getByRole("status")).toHaveText("Observe the situation before acting.");
+    await reflection.getByRole("button", { name: "Proceed carefully", exact: true }).click();
+    await expect(reflection.getByRole("status")).toHaveText("Consider the consequences.");
+    if (profile !== "standalone") {
+      const saved = await page.evaluate(() => JSON.parse(JSON.parse(localStorage.getItem("timeline-lms"))["cmi.suspend_data"]));
+      expect(Object.values(saved.videoProgress).some(value => value.position === 12.5 && value.watchedRanges.length === 0)).toBe(true);
+      expect(JSON.stringify(saved)).not.toContain("Inspect first");
+      await page.reload();
+      await page.getByRole("dialog", { name: "Continue your course?", exact: true }).getByRole("button", { name: "Continue", exact: true }).click();
+      await expect(page.getByRole("slider", { name: "Scene playback time" })).toHaveValue("12500");
+      await page.getByRole("button", { name: "Play scene", exact: true }).click();
+      await expect(reflection).toBeVisible();
+      await expect(reflection.getByRole("status")).toBeEmpty();
+    }
+    await reflection.getByRole("button", { name: /continue/i }).click();
+    await expect(reflection).toBeHidden();
+    // Continue resumes playback, and the main playback control must pause on its first click.
+    await page.getByRole("button", { name: "Pause scene", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Play scene", exact: true })).toBeVisible();
+    await page.getByRole("slider", { name: "Scene playback time" }).fill("12000");
+    await page.getByRole("button", { name: "Play scene", exact: true }).click();
+    await expect(reflection).toBeVisible();
+    await reflection.getByRole("button", { name: "Skip reflection and continue", exact: true }).click();
     if (profile !== "standalone")
       await expect
         .poll(() =>
@@ -522,5 +755,10 @@ for (const profile of ["scorm-2004", "scorm-12", "standalone"])
           ),
         )
         .toBe(true);
+    if (profile !== "standalone") {
+      await page.reload();
+      await page.getByRole("dialog", { name: "Continue your course?", exact: true }).getByRole("button", { name: "Start over", exact: true }).click();
+      await expect(page.getByRole("slider", { name: "Scene playback time" })).toHaveValue("0");
+    }
     expect(errors).toEqual([]);
   });

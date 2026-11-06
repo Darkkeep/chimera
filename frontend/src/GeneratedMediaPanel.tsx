@@ -1,11 +1,12 @@
 import { reportOnboardingOutcome } from "./onboarding-journeys";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Check, ChevronRight, ImagePlus, Mic, Video, RefreshCw, Sparkles, X } from "lucide-react";
 import type { Project, Scene } from "./App";
 import type { MediaConnectionOption, MediaKind } from "./media-connections";
 import "./generated-media.css";
 import { PythiaProcessing } from "./PythiaProcessing";
 import "./pythia-talk.css";
+import { VideoTreatmentPanel } from "./VideoTreatmentPanel";
 
 type Candidate = {
   id: string;
@@ -22,13 +23,14 @@ type Candidate = {
   model: string | null;
 };
 
-type GenerationJob = { id: string; sceneId: string; kind: string; status: "queued" | "running" | "completed" | "failed" | "cancelled"; message?: string; error?: string | null; createdAt?: string };
+type GenerationJob = { id: string; sceneId: string; kind: string; status: "queued" | "running" | "completed" | "failed" | "cancelled"; message?: string; error?: string | null; createdAt?: string; provider?: string | null; providerOperationId?: string | null };
 
-type Props = { project: Project; scene: Scene | undefined; busy: boolean; onProjectUpdated: (project: Project) => void; onEditScene: (scene: Scene) => void };
+type Props = { project: Project; scene: Scene | undefined; busy: boolean; onProjectUpdated: (project: Project) => void; onEditScene: (scene: Scene) => void; onBusyChange?: (busy: boolean) => void };
 type NarrationConnection = { id: string; name: string; provider: string; voice: string; model: string; language: string };
 type Capability = { providerConfigured: boolean; canGenerate: boolean; imageConfigured?: boolean; videoConfigured?: boolean; videoUnavailableReason?: string; connectionOptions?: MediaConnectionOption[]; defaultConnections?: Partial<Record<MediaKind, string | null>>; narrationConnections?: NarrationConnection[] };
 
-export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated, onEditScene }: Props) {
+export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated, onEditScene, onBusyChange }: Props) {
+  const headingId = useId();
   const [kind, setKind] = useState<"image" | "narration" | "video">("image");
   const [connectionId, setConnectionId] = useState("");
   const [purpose, setPurpose] = useState("");
@@ -36,6 +38,8 @@ export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated, on
   const [style, setStyle] = useState("");
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
+  const [durationSeconds, setDurationSeconds] = useState(30);
+  const [avatar, setAvatar] = useState("");
   const scriptKey = `${project.id}:${scene?.id || ""}`;
   const sceneScript = scene?.narration?.trim() ? scene.narration : scene?.notes || "";
   const [scriptDrafts, setScriptDrafts] = useState<Record<string, string>>({});
@@ -47,6 +51,7 @@ export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated, on
   const [altText, setAltText] = useState("");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [working, setWorking] = useState(false);
+  useEffect(() => { onBusyChange?.(working); return () => onBusyChange?.(false); }, [working, onBusyChange]);
   const [submittingGeneration, setSubmittingGeneration] = useState(false);
   const [jobs, setJobs] = useState<GenerationJob[]>([]);
   const [jobStatusError, setJobStatusError] = useState("");
@@ -77,9 +82,14 @@ export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated, on
   const narrationConnections = capability?.narrationConnections ?? (capability?.providerConfigured ? [{ id: "legacy-openai", name: "Legacy OpenAI narration", provider: "openai", voice: "alloy", model: "", language: "en-US" }] : []);
   const connectionOptions = (capability?.connectionOptions ?? []).filter(item => item.readyFor.includes(kind));
   const selectedConnection = connectionOptions.find(item => item.id === connectionId);
+  const presenterVideo = kind === "video" && selectedConnection?.provider === "synthesia";
+  const [videoWorkflow, setVideoWorkflow] = useState("design");
+  const shotstackVideo = kind === "video" && selectedConnection?.provider === "shotstack" && selectedConnection.executor === "chimera";
+  const designingVideo = shotstackVideo && videoWorkflow === "design";
   const selectedNarration = narrationConnections.find(connection => connection.id === narrationConnectionId);
   const canCreate = generationEnabled && !busy && !working && scene && purpose.trim() &&
-    selectedConnection && (kind !== "narration" ? prompt.trim() : script.trim() && voice.trim() && language.trim());
+    selectedConnection && (kind !== "narration" ? prompt.trim() : script.trim() && voice.trim() && language.trim()) &&
+    (kind !== "video" || (Number.isInteger(durationSeconds) && durationSeconds >= 4 && durationSeconds <= 30 && (!presenterVideo || script.trim() && /^[A-Za-z0-9_.-]{1,200}$/.test(avatar))));
 
   useEffect(() => {
     if (!capability) return;
@@ -89,7 +99,7 @@ export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated, on
       const option = capability.connectionOptions?.find(item => item.id === preferred);
       if (kind === "narration" && option) { setNarrationConnectionId(preferred); setVoice(option.voice); setLanguage(option.language); }
     }
-    if (!imageConfigured) setKind("narration");
+    if (kind === "image" && !imageConfigured) setKind(narrationConnections.length ? "narration" : capability.videoConfigured ? "video" : "image");
     if (narrationConnectionId && !narrationConnections.some(connection => connection.id === narrationConnectionId)) {
       setNarrationConnectionId(""); setVoice("");
     }
@@ -137,7 +147,7 @@ export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated, on
     try {
       const response = await fetch(`/api/projects/${project.id}/media-generation-jobs`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, connectionId, sceneId: scene.id, purpose, style, width: kind !== "narration" ? width : null, height: kind !== "narration" ? height : null, prompt: kind !== "narration" ? prompt : "", ...(kind === "video" ? { durationSeconds: 4 } : {}), script, voice: kind === "narration" ? voice : null, altText, ...(kind === "narration" ? { narrationConnectionId, language } : {}) }),
+        body: JSON.stringify({ kind, connectionId, sceneId: scene.id, purpose, style: kind === "image" ? style : "", width: kind !== "narration" ? kind === "video" ? 1280 : width : null, height: kind !== "narration" ? kind === "video" ? 720 : height : null, prompt: kind !== "narration" ? prompt : "", ...(kind === "video" ? { durationSeconds, avatar: presenterVideo ? avatar : "" } : {}), script: kind === "video" && !presenterVideo ? "" : script, voice: kind === "narration" ? voice : null, altText, ...(kind === "narration" ? { narrationConnectionId, language } : {}) }),
       });
       if (!response.ok) throw new Error((await response.json().catch(() => null) as { detail?: string } | null)?.detail || "Media generation could not be started.");
       rememberJob(await response.json() as GenerationJob);
@@ -180,24 +190,41 @@ export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated, on
   const visibleCandidates = candidates.filter((candidate) => candidate.status === "pending" && (!scene || candidate.sceneId === scene.id));
   const activeJobs = jobs.filter(job => job.status === "queued" || job.status === "running");
   const latestSceneJob = jobs.filter(job => job.sceneId === scene?.id).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))[0];
-  return <section data-onboarding="media.generated" className="generated-media-panel" aria-labelledby="generated-media-title">
+  return <section data-onboarding="media.generated" className="generated-media-panel" aria-labelledby={headingId}>
     <details className={`generation-creator${generationEnabled ? "" : " is-unavailable"}`} open={creatorOpen && generationEnabled} onToggle={event => setCreatorOpen(event.currentTarget.open && generationEnabled)}>
     <summary className="generated-media-heading" aria-disabled={!generationEnabled} onClick={event => {
       if (!generationEnabled) event.preventDefault();
     }} onKeyDown={event => {
       if (!generationEnabled && (event.key === "Enter" || event.key === " ")) event.preventDefault();
-    }}><Sparkles size={18} /><h2 id="generated-media-title">Create a media candidate</h2>{!generationEnabled && <span className="generation-availability">{capabilityError ? "AI status unavailable" : !project.id ? "No project selected" : !capability ? "Checking media provider..." : !capability.providerConfigured ? "AI not configured" : "Generation access unavailable"}</span>}<ChevronRight size={18} className="generation-chevron" /></summary>
+    }}><Sparkles size={18} /><h2 id={headingId}>Create a media candidate</h2>{!generationEnabled && <span className="generation-availability">{capabilityError ? "AI status unavailable" : !project.id ? "No project selected" : !capability ? "Checking media provider..." : !capability.providerConfigured ? "AI not configured" : "Generation access unavailable"}</span>}<ChevronRight size={18} className="generation-chevron" /></summary>
     <fieldset className="generated-media-form" disabled={!generationEnabled || busy || working} aria-label="Media candidate settings">
       <label>Scene<select value={scene?.id || ""} disabled><option>{scene?.title || "Select a scene first"}</option></select></label>
-      <label>Media type<select value={kind} onChange={(event) => { const value = event.target.value as typeof kind; setKind(value); setConnectionId(""); setNarrationConnectionId(""); if (value === "video") { setWidth(1280); setHeight(720); } else if (value === "image") { setWidth(1024); setHeight(1024); } }}><option value="image" disabled={!imageConfigured}>Image</option><option value="narration" disabled={narrationConnections.length === 0}>Narration</option><option value="video" disabled={!capability?.videoConfigured}>Video clip · 4 seconds</option></select></label>
+      <label>Media type<select value={kind} onChange={(event) => { const value = event.target.value as typeof kind; setKind(value); setConnectionId(""); setNarrationConnectionId(""); if (value === "video") { setWidth(1280); setHeight(720); } else if (value === "image") { setWidth(1024); setHeight(1024); } }}><option value="image" disabled={!imageConfigured}>Image</option><option value="narration" disabled={narrationConnections.length === 0}>Narration</option><option value="video" disabled={!capability?.videoConfigured}>Video clip · up to 30 seconds</option></select></label>
       {kind !== "narration" && <label>AI connection<select value={selectedConnection ? connectionId : ""} onChange={event => setConnectionId(event.target.value)}><option value="">Select a configured connection</option>{connectionOptions.map(item => <option key={item.id} value={item.id}>{item.name} · {item.models[kind] || item.provider}</option>)}</select></label>}
+      {shotstackVideo && <label>Video workflow<select value={videoWorkflow} onChange={event => setVideoWorkflow(event.target.value)}><option value="design">Design a scene-aware treatment with Pythia</option><option value="manual">Manual single title card (no Pythia design)</option></select></label>}
+      {designingVideo && scene ? <VideoTreatmentPanel key={`${project.id}:${scene.id}:${project.storyboard.revision}`} project={project} scene={scene} connectionId={connectionId} onRender={async draft => {
+        const response = await fetch(`/api/projects/${project.id}/media-generation-jobs`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "video", connectionId, sceneId: scene.id, purpose: draft.treatment.purpose,
+            prompt: draft.treatment.title, width: 1280, height: 720,
+            durationSeconds: draft.treatment.shots.reduce((sum, shot) => sum + shot.durationSeconds, 0), videoTreatment: draft }),
+        });
+        if (!response.ok) throw new Error((await response.json() as { detail?: string }).detail || "Render could not be started. Check status before retrying.");
+        rememberJob(await response.json() as GenerationJob);
+      }} /> : !designingVideo && <>
       <label>Purpose<input value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="What should this support?" /></label>
-      {kind !== "narration" ? <><label>Prompt<textarea rows={3} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder={kind === "video" ? "Describe a short video clip" : "Describe the proposed image"} /></label><label>Style<input value={style} onChange={(event) => setStyle(event.target.value)} placeholder="e.g. clean technical illustration" /></label><div className="generated-media-dimensions"><span>{kind === "video" ? "4 seconds · MP4 · AI-generated" : "Dimensions"}</span><span><input aria-label="Media width" disabled={kind === "video"} type="number" min="64" max="4096" value={width} onChange={(event) => setWidth(Number(event.target.value))} /><input aria-label="Media height" disabled={kind === "video"} type="number" min="64" max="4096" value={height} onChange={(event) => setHeight(Number(event.target.value))} /></span></div></> : <><label>Narration connection<select value={selectedNarration ? narrationConnectionId : ""} onChange={event => {
+      {kind !== "narration" ? <><label>{kind === "video" ? presenterVideo ? "Video title" : "Title text" : "Prompt"}<textarea rows={3} maxLength={kind === "video" ? presenterVideo ? 200 : 2000 : 10000} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder={kind === "video" ? presenterVideo ? "Name this presenter video" : "Exact text to display in the clip" : "Describe the proposed image"} /></label>
+      {kind === "video" ? <>
+        <label>{presenterVideo ? "Maximum duration (seconds)" : "Duration (seconds)"}<input type="number" min={4} max={30} step={1} value={durationSeconds} onChange={event => setDurationSeconds(Number(event.target.value))} /></label>
+        {presenterVideo && <><label>Presenter script<textarea rows={4} maxLength={10000} value={script} onChange={event => setScript(event.target.value)} /></label><label>Synthesia avatar ID<input maxLength={200} value={avatar} onChange={event => setAvatar(event.target.value)} placeholder="Authorized stock or custom avatar ID" /></label></>}
+        <p className="field-hint">{presenterVideo ? "AI presenter. Script length determines duration; aim for about 60 words or fewer for 30 seconds. Longer renders are rejected locally but may still be billed." : "Text/title clip with fades, not a generative footage prompt. Shotstack sandbox renders are watermarked."} MP4, landscape. Generate submits a potentially billable render; cancelling locally does not cancel provider billing.</p>
+      </> : <><label>Style<input value={style} onChange={(event) => setStyle(event.target.value)} placeholder="e.g. clean technical illustration" /></label><div className="generated-media-dimensions"><span>Dimensions</span><span><input aria-label="Media width" type="number" min="64" max="4096" value={width} onChange={(event) => setWidth(Number(event.target.value))} /><input aria-label="Media height" type="number" min="64" max="4096" value={height} onChange={(event) => setHeight(Number(event.target.value))} /></span></div></>}</> : <><label>Narration connection<select value={selectedNarration ? narrationConnectionId : ""} onChange={event => {
         const connection = narrationConnections.find(item => item.id === event.target.value);
         setConnectionId(connection?.id || ""); setNarrationConnectionId(connection?.id || ""); setVoice(connection?.voice || ""); setLanguage(connection?.language || "en-US");
       }}><option value="">Select a narration connection</option>{narrationConnections.map(connection => <option value={connection.id} key={connection.id}>{connection.name} · {connection.provider}</option>)}</select></label><label>Narration script<textarea rows={3} value={script} onChange={(event) => setScript(event.target.value)} placeholder="Write the narration to generate" /></label><p className="field-hint">Starts with this scene's Narration text, or its speaker notes when Narration is empty. Edits here apply only to this audio request.</p><button type="button" className="button button-outline" disabled={busy || working || !sceneScript || script === sceneScript} onClick={() => setScriptDrafts(current => { const next = { ...current }; delete next[scriptKey]; return next; })}>Use scene narration</button><label>Voice<input value={voice} onChange={(event) => setVoice(event.target.value)} placeholder="Provider voice" disabled={!selectedNarration} /></label><label>Language<input value={language} onChange={event => setLanguage(event.target.value)} disabled={!selectedNarration} /></label><p className="field-hint">AI-generated voice · MP3. Select a connection to use its default voice, or override the voice for this request.</p></>}
       {kind === "image" && <label>Alt text<input value={altText} onChange={(event) => setAltText(event.target.value)} placeholder="Describe the image for learners" /></label>}
       <button className="button button-accent" onClick={() => void generate()} disabled={!canCreate}>{kind === "image" ? <ImagePlus size={15} /> : kind === "video" ? <Video size={15} /> : <Mic size={15} />} Generate candidate</button>
+      </>}
     </fieldset>
     </details>
     {capability?.videoUnavailableReason && !capability.videoConfigured && <p className="field-hint">Video generation: {capability.videoUnavailableReason}</p>}
@@ -205,6 +232,7 @@ export function GeneratedMediaPanel({ project, scene, busy, onProjectUpdated, on
     {activeJobs.map(job => <PythiaProcessing key={job.id} title={job.status === "queued" ? "Media generation queued" : `Generating ${job.kind === "narration" ? "narration" : job.kind}`} detail={`${project.storyboard.scenes.find(item => item.id === job.sceneId)?.title || "Scene"} ? ${job.message || "Waiting for the provider"}. Your candidate will appear here when ready.`} />)}
     {jobStatusError && <p role="alert">{jobStatusError}</p>}
     {latestSceneJob?.status === "failed" && <p role="alert">Generation failed: {latestSceneJob.error || latestSceneJob.message || "The provider could not create this asset."}</p>}
+    {latestSceneJob?.providerOperationId && <p className="field-hint">Provider render ID ({latestSceneJob.provider}): <code>{latestSceneJob.providerOperationId}</code>. Check the provider dashboard before retrying; remote renders may still incur charges.</p>}
     {latestSceneJob?.status === "completed" && visibleCandidates.some(candidate => candidate.jobId === latestSceneJob.id) && <p role="status">Your media candidate is ready to preview below.</p>}
     {error && <p className="export-error" role="alert">{error}</p>}
     {decisionNotice && decisionNotice.sceneId === scene?.id && <div><p role="status">{decisionNotice.text}</p><button type="button" className="button button-outline" disabled={busy || working} onClick={() => onEditScene(scene)}>Edit scene</button></div>}

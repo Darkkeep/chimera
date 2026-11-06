@@ -56,6 +56,18 @@ async def exchange(payload):
                     if "pythia_draft_changes" not in {tool.name for tool in tools.tools}:
                         raise ValueError("Update the local Pythia adapter to enable authoring drafts")
                     result = await session.call_tool("pythia_draft_changes", {"request": payload["request"]})
+                elif payload["action"] == "video-treatment":
+                    if "pythia_video_treatment" not in {tool.name for tool in tools.tools}:
+                        raise ValueError("Update the local Pythia adapter to enable video treatments")
+                    result = await session.call_tool("pythia_video_treatment", {"request": payload["request"]})
+                elif payload["action"] == "experience-treatment":
+                    if "pythia_experience_treatment" not in {tool.name for tool in tools.tools}:
+                        raise ValueError("Update the local Pythia adapter to enable scene experiences")
+                    result = await session.call_tool("pythia_experience_treatment", {"request": payload["request"]})
+                elif payload["action"] == "storyboard-enhancement":
+                    if "pythia_storyboard_enhancement" not in {tool.name for tool in tools.tools}:
+                        raise ValueError("Update the local Pythia adapter to enable live storyboard suggestions")
+                    result = await session.call_tool("pythia_storyboard_enhancement", {"request": payload["request"]})
                 else:
                     result = await session.call_tool("pythia_consult", {"question": payload["question"], "history": payload["history"]})
                 if result.isError:

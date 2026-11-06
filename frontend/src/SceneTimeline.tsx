@@ -3,7 +3,7 @@ import type { PointerEvent } from "react";
 import type { Project } from "./App";
 import type { SceneLayout, SceneElement } from "./SceneSurface";
 import { animationEndMs, withSceneTimeline } from "./scene-timeline";
-import type { TimelineClip } from "./scene-timeline";
+import type { TimelineClip, VideoPause } from "./scene-timeline";
 import { defaultAnimations, alignExitTiming } from "./AnimationControls";
 import "./scene-timeline.css";
 import { decodeWaveform } from "./waveform";
@@ -15,13 +15,32 @@ function Seconds({
   onChange,
   min = 0,
   max = 3600000,
+  commitOnBlur = false,
+  onValidityChange,
 }: {
   label: string;
   value: number;
   onChange: (n: number) => void;
   min?: number;
   max?: number;
+  commitOnBlur?: boolean;
+  onValidityChange?: (valid: boolean) => void;
 }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState(false);
+  function finish() {
+    if (draft === null) return;
+    const n = Math.round(Number(draft) * 1000);
+    if (!draft.trim() || !Number.isFinite(n) || n < min || n > max) {
+      setInvalid(true);
+      onValidityChange?.(false);
+      return;
+    }
+    onChange(n);
+    setDraft(null);
+    setInvalid(false);
+    onValidityChange?.(true);
+  }
   return (
     <label>
       {label} (s)
@@ -31,12 +50,36 @@ function Seconds({
         min={min / 1000}
         max={max / 1000}
         step={0.05}
-        value={Math.round(value) / 1000}
+        value={draft ?? Math.round(value) / 1000}
+        aria-invalid={invalid || undefined}
+        onBlur={commitOnBlur ? finish : undefined}
+        onKeyDown={event => {
+          if (!commitOnBlur) return;
+          if (event.key === "Enter") {
+            event.preventDefault();
+            finish();
+          }
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            setDraft(null);
+            setInvalid(false);
+            onValidityChange?.(true);
+          }
+        }}
         onChange={(event) => {
+          if (commitOnBlur) {
+            const raw = event.target.value;
+            const n = Math.round(Number(raw) * 1000);
+            setDraft(raw);
+            setInvalid(false);
+            onValidityChange?.(Boolean(raw.trim()) && Number.isFinite(n) && n >= min && n <= max);
+            return;
+          }
           const n = Math.round(event.target.valueAsNumber * 1000);
           if (Number.isFinite(n) && n >= min && n <= max) onChange(n);
         }}
       />
+      {invalid && <span role="alert">Enter a duration between {min / 1000} and {max / 1000} seconds.</span>}
     </label>
   );
 }
@@ -56,6 +99,7 @@ export function SceneTimeline({
   disabled,
   audition,
   onAudition,
+  onDurationValidityChange,
 }: {
   layout: SceneLayout;
   project: Project;
@@ -71,6 +115,7 @@ export function SceneTimeline({
   disabled: boolean;
   audition: { muted: string[]; solo: string | null };
   onAudition: (a: { muted: string[]; solo: string | null }) => void;
+  onDurationValidityChange: (valid: boolean) => void;
 }) {
   const [zoom, setZoom] = useState(1),
     [snap, setSnap] = useState(true),
@@ -86,6 +131,12 @@ export function SceneTimeline({
   const clip = timeline?.clips.find((c) => c.id === clipId);
   const selected = layout.elements.find((e) => e.id === selection);
   function save(next: NonNullable<SceneLayout["timeline"]>) {
+    const pauses = next.pauses || [];
+    if (new Set(pauses.map(point => point.timeMs)).size !== pauses.length ||
+      pauses.some(point => !next.clips.some(c => c.kind === "video" && c.startMs <= point.timeMs && point.timeMs < c.startMs + c.sourceOutMs - c.sourceInMs))) {
+      setMessage("Video pauses need distinct times inside scheduled video clips. Move or remove affected pauses before changing a clip.");
+      return;
+    }
     const endpoint = Math.max(
       100,
       ...next.clips.map((c) => c.startMs + c.sourceOutMs - c.sourceInMs),
@@ -103,6 +154,9 @@ export function SceneTimeline({
     }
     setMessage("");
     commit({ ...layout, timeline: next });
+  }
+  function updatePause(id: string, patch: Partial<VideoPause>) {
+    save({ ...timeline, pauses: (timeline.pauses || []).map(point => point.id === id ? { ...point, ...patch } : point) });
   }
   function updateClip(patch: Partial<TimelineClip>) {
     if (!clip || !timeline) return;
@@ -250,10 +304,10 @@ export function SceneTimeline({
             volume: 1,
             required: false,
             thresholdPercent: 90,
-            x: 40,
-            y: 40,
-            width: 480,
-            height: 270,
+            x: asset.kind === "video" ? 0 : 40,
+            y: asset.kind === "video" ? 0 : 40,
+            width: asset.kind === "video" ? layout.width : 480,
+            height: asset.kind === "video" ? layout.height : 270,
             fadeInMs: 0,
             fadeOutMs: 0,
           },
@@ -355,6 +409,8 @@ export function SceneTimeline({
         <div className="timeline-tools">
           <Seconds
             label="Scene duration"
+            commitOnBlur
+            onValidityChange={onDurationValidityChange}
             value={timeline.durationMs}
             min={100}
             onChange={(n) => save({ ...timeline, durationMs: n })}
@@ -891,6 +947,15 @@ export function SceneTimeline({
               />
             </label>
             {clip.kind === "video" &&
+              <button
+                type="button"
+                className="button button-outline"
+                onClick={() => updateClip({ x: 0, y: 0, width: layout.width, height: layout.height })}
+              >
+                Fit video to scene
+              </button>}
+            {clip.kind === "video" && <p className="field-hint">Fit uses the full scene canvas and keeps the whole video visible without stretching or cropping. Different proportions leave space around the video. Use Preview at playhead to inspect it.</p>}
+            {clip.kind === "video" &&
               (["x", "y", "width", "height", "layerOrder"] as const).map(
                 (field) => (
                   <label key={field}>
@@ -989,6 +1054,54 @@ export function SceneTimeline({
             </span>
           ))}
         </div>
+        <section aria-label="Interactive video authoring">
+          <h3>Video reflections</h3>
+          <p>Optional, formative pauses (up to 8). Seeking past a pause skips it; replay allows unlimited retries. No grades or completion gates. Responses are not saved.</p>
+          <button type="button" className="button button-outline"
+            disabled={(timeline.pauses || []).length >= 8}
+            onClick={() => save({ ...timeline, pauses: [...(timeline.pauses || []), {
+              id: crypto.randomUUID(), timeMs: Math.round(time), prompt: "What would you do next?",
+              choices: [
+                { id: crypto.randomUUID(), label: "Consider the first approach", feedback: "Reflect on the consequences of this approach." },
+                { id: crypto.randomUUID(), label: "Consider another approach", feedback: "Compare this approach with the first." },
+              ],
+            }] })}>
+            Add video pause at playhead
+          </button>
+          {(timeline.pauses || []).map((point, index) => (
+            <fieldset key={point.id} aria-label={`Video pause ${index + 1}`}>
+              <legend>Video pause {index + 1}</legend>
+              <Seconds label={`Pause ${index + 1} time`} value={point.timeMs} max={timeline.durationMs}
+                onChange={timeMs => updatePause(point.id, { timeMs })} />
+              <label>Reflection prompt
+                <textarea aria-label={`Pause ${index + 1} prompt`} maxLength={1000} value={point.prompt}
+                  onChange={e => updatePause(point.id, { prompt: e.target.value })} />
+              </label>
+              {point.choices.map((choice, choiceIndex) => (
+                <div key={choice.id}>
+                  <label>Response {choiceIndex + 1}
+                    <input aria-label={`Pause ${index + 1} response ${choiceIndex + 1}`} maxLength={200} value={choice.label}
+                      onChange={e => updatePause(point.id, { choices: point.choices.map(c => c.id === choice.id ? { ...c, label: e.target.value } : c) })} />
+                  </label>
+                  <label>Feedback {choiceIndex + 1}
+                    <textarea aria-label={`Pause ${index + 1} feedback ${choiceIndex + 1}`} maxLength={1000} value={choice.feedback}
+                      onChange={e => updatePause(point.id, { choices: point.choices.map(c => c.id === choice.id ? { ...c, feedback: e.target.value } : c) })} />
+                  </label>
+                  <button type="button" disabled={point.choices.length <= 2}
+                    onClick={() => updatePause(point.id, { choices: point.choices.filter(c => c.id !== choice.id) })}>
+                    Remove response {choiceIndex + 1}
+                  </button>
+                </div>
+              ))}
+              <button type="button" disabled={point.choices.length >= 4}
+                onClick={() => updatePause(point.id, { choices: [...point.choices, { id: crypto.randomUUID(), label: "Another approach", feedback: "Consider this alternative." }] })}>
+                Add response
+              </button>
+              <button type="button" onClick={() => { setTime(point.timeMs); setPreview(true); setPlaying(true); }}>Preview reflection</button>
+              <button type="button" onClick={() => save({ ...timeline, pauses: (timeline.pauses || []).filter(p => p.id !== point.id) })}>Remove video pause {index + 1}</button>
+            </fieldset>
+          ))}
+        </section>
         <p className="field-hint">
           Drag blocks to move them; use the time fields to resize precisely.
           Source media is preserved. Required clips earn credit only from

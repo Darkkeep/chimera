@@ -115,7 +115,7 @@ test('Cartesia saves and discovers without retaining its key', async ({ page }) 
 for (const provider of ['Synthesia', 'Shotstack']) {
   test(`${provider} connection setup is explicitly video-only and uses safe credentials`, async ({ page }) => {
     const { section, actions } = await openConnections(page, {}, provider);
-    await expect(section.getByText(/Video generation is not yet available/)).toBeVisible();
+    await expect(section.getByText(/30 seconds/)).toBeVisible();
     await expect(section.getByLabel('Narration voice', { exact: true })).toHaveCount(0);
     await section.getByLabel('Connection name', { exact: true }).fill(`${provider} video`);
     await section.getByRole('combobox', { name: 'Credential source', exact: true }).selectOption('environment');
@@ -225,6 +225,7 @@ async function openCreator(page, request, capability, sceneText = {}) {
   await page.route('**/generated-candidates', route => route.fulfill({ json: [] }));
   const submissions = [];
   await page.route('**/media-generation-jobs', route => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: [] });
     submissions.push(route.request().postDataJSON());
     return route.fulfill({ status: 202, json: { id: 'narration-job', status: 'queued' } });
   });

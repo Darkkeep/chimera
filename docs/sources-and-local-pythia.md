@@ -56,6 +56,20 @@ Engine registry supplies deterministic implementations of storyboard analysis,
 transformation, enhancement, assessment design and course review. Its configured
 analysis model supports `analysis.need`, a separate capability. Chimera's existing
 authoring operations do not automatically become model-backed by connecting.
+**New enhancement run** now has a distinct single-user route through the local
+MCP `pythia_storyboard_enhancement` tool. It drafts goal-driven edits and additional
+scenes from the selected content and readable sources, using the installed live
+provider. Shared installations retain the Engine route. Single-user Storyboard
+suggestions can explicitly enable specialist orchestration and separately select
+**Search the public web before drafting** through the approved OpenAI connection.
+When selected, a completed search with cited sources must precede specialist
+drafting; synthesis alone cannot satisfy it. Typing `@research`
+alone grants neither permission nor proof of execution. Inspect actual tool
+receipts, provider-cited synthesis and source links in the run's execution records.
+Arbitrary plugins, file access and general agent tools are not loaded.
+Preview checks capability only;
+explicit submission can incur charges, and explicit proposal acceptance is still
+required to change scenes. Historical zero-result runs are not retried.
 The authenticated Manteion conversation demo on port 8010 has its own identity
 and access callback; this work does not grant Chimera access to it.
 
@@ -73,7 +87,7 @@ Chimera project storage. It is not a real model or owner-acceptance test.
 Restart a previously running Chimera backend to load these new routes and the new
 default endpoint; the Vite development frontend updates automatically. Existing
 source files, projects and unrelated worktree edits are preserved. Direct live
-conversation invocation is now available through the separate [Talk to Pythia](talk-to-pythia.md)
+conversation invocation is now available through the separate [Consult Pythia](talk-to-pythia.md)
 local MCP connection. That connection uses the installed plugin's live producer;
 it does not change the Engine's deterministic authoring task implementations.
 

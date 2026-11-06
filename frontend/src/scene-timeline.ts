@@ -72,6 +72,13 @@ export type Timeline = {
   printTimeMs: number;
   clips: TimelineClip[];
   cues: { name: string; timeMs: number }[];
+  pauses?: VideoPause[];
+};
+export type VideoPause = {
+  id: string;
+  timeMs: number;
+  prompt: string;
+  choices: { id: string; label: string; feedback: string }[];
 };
 export const defaultAppearance = (): Appearance => ({
   opacity: 1,

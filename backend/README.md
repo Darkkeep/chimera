@@ -1,5 +1,178 @@
 # Chimera backend
 
+## Connected external launch links
+
+Experience version 1 includes `kind: "external-link"`: `id`, `title` (120),
+`url` (2,000), `instruction`, `privacyNotice`, `offlineAlternative` (each 2,000),
+and strict Boolean `authorReviewed` (defaults false). Text is required and
+extra fields, results, scores and iframe options are rejected. URLs accept
+lowercase ASCII DNS hostnames over HTTPS with optional plain ASCII paths
+(`A-Z a-z 0-9 / _ ~ . -`). No ports, credentials, queries, fragments, percent
+encoding, IP literals or local hostname suffixes are supported. Validation is
+syntactic: Chimera never resolves, fetches or verifies the destination, its
+redirects or its operator's policies. Authors must exclude identifiers/secrets
+and review destination, privacy/accessibility terms and the local alternative.
+
+This is a connected activity delivered by the existing experience composition,
+not imported HTML5 content. Applied Scene validation requires author review;
+provider proposals always have review cleared before human review/apply.
+Author edits to URL, instruction, privacy notice or alternative clear review.
+Existing scene patch and proposal endpoints retain revision and local/hosted
+authorization mappings; no routes, permissions or sandbox policies were added.
+The experience remains exclusive with assessments, HTML5 packages and timelines.
+
+## Scripted learner conversations
+
+Experience version 1 also includes `kind: "learner-conversation"` with a
+bounded role label, scenario, opening, one to five authored follow-up messages
+(each at most 2,000 characters), and an offline alternative. This is a fixed
+scripted roleplay, not an AI/provider integration. Learner text is limited to
+1,000 characters per turn, held only in the current page's memory, never sent,
+saved, scored, resumed, or included in SCORM/standalone suspend data. The
+learner explicitly consents before starting, can reset to clear the transcript,
+and is told to use fictional examples without sensitive personal information.
+The static/print alternative contains the authored scenario and script, not
+learner-entered text. There is no completion or grade effect.
+
+The shared runtime creates an HTTPS anchor only after learner consent, with
+`target="_blank"`, `rel="noopener noreferrer"` and no-referrer policy. It never
+prefetches, embeds or receives provider messages/results. It revalidates URLs
+and review flags, discards restored state for this activity and never persists
+consent or launches. Reset/remount, preview reopen, standalone reload, SCORM
+Continue and Start over all require fresh consent. Suspend-budget estimation
+adds no state. Existing grade/completion policy is unchanged; opening is not
+evidence of learning or successful launch. Local text remains available offline
+or if the service is unavailable; print/Word expands the static alternative
+with destination, instruction and privacy information. Full backups and portable
+standalone/SCORM exports retain the configuration, not remote service content.
+No remote iframe, result contract, H5P adapter or network permission is implied.
+The offline HTML5 sandbox is unchanged and is not a network-egress firewall.
+
+## Before/after image comparisons
+
+Experience version 1 supports `kind: "before-after"` with `id`, `title`,
+`instruction`, `explanation`, and `before`/`after` objects. Each image object
+requires a project `imageAssetId`, `label` (120 characters), `altText` (500),
+and `description` (2,000). The two image IDs must differ; external URLs, unknown
+fields, missing/non-image assets, and blank alternatives are rejected. Normal
+experience revision guards and provider proposal review/apply apply.
+
+The shared runtime offers a labelled native Before/After selector showing the
+complete image without cropping or stretching, authored descriptions, and
+project credits. The learner explicitly confirms review; no grade or completion
+gate is added. Only `reviewedImages: [beforeAssetId, afterAssetId]` is saved in
+existing activity progress. Restore accepts exactly that ordered pair; invalid
+or changed references lose acknowledgement. Selection resets to Before on mount;
+Restart clears acknowledgement. Standalone state lasts while the page is open.
+Suspend-budget estimates include both IDs. Both project images participate in
+validation, publication pruning, placement filtering, usage/deletion protection,
+backups and portable exports. Static/print and rendered Word alternatives expose
+both images, descriptions, explanation and credits. See the
+[authoring procedure](../docs/user-guide.md#beforeafter-image-comparison).
+
+## Optional video reflections
+
+`SceneLayout.timeline` version 1 accepts up to eight `pauses` (default empty).
+Each has a unique `id` and integer `timeMs` inside a scheduled video interval
+(start inclusive, end exclusive), a `prompt`, and two to four uniquely identified
+choices with `label` and `feedback`. Pause timestamps must be distinct. Prompts
+and feedback are limited to 1,000 characters; labels to 200. Extra fields,
+including grading and required flags, are rejected.
+
+The shared transport keeps reflections formative and skippable. Forward seeks
+skip them; backward playback and explicit replay permit unlimited retries.
+Only the existing validated scene clock and media coverage persist. Responses
+are ephemeral, with no additional suspend-data budget. Continue at a pause
+offers it again on Play. Word and print alternatives expose all feedback.
+Use the existing revision-guarded scene API; no new endpoint is needed. See
+the [authoring procedure](../docs/user-guide.md#add-optional-video-reflections).
+
+## Imported HTML5 activities
+
+`POST /api/projects/{project_id}/html5-import` requires `project.import`,
+`If-Match`, multipart `file`, optional `entrypoint` (default `index.html` for ZIP)
+and `credit` (up to 2,000 characters). Returns `201 {project, assetId, format,
+entrypoint}` without
+attaching the activity. Missing revisions return 428, stale writes 412, invalid
+packages 422, and oversized uploads 413. SHA-256-addressed imports deduplicate
+without silently replacing existing credit metadata.
+
+The compiler accepts UTF-8 HTML/CSS/JavaScript, classic scripts, local styles,
+images, fonts, media and VTT. ZIPs use stored/deflate compression and are limited
+to 500 entries, 20 MB uploaded/expanded, and 40 MB compiled HTML. Resources become
+data URLs; CSP blocks resource/fetch requests in the imported document. It is
+not a network-egress firewall: script-driven self-navigation cannot be prevented
+comprehensively across browsers. Navigation away is unsupported and the host
+removes a reloaded frame. Plain ZIP entry points remain explicit. A root
+`imsmanifest.xml` instead selects the launch path, overriding the submitted
+entrypoint. `format` is `html`, `html5-zip`, `scorm-1.2` or `scorm-2004`; format
+and entrypoint are persisted in the compiled asset for later author review.
+Modules must be bundled first. Nested frames,
+forms, external URLs, multi-page links, HTTP-equiv metadata, srcset, unsafe paths,
+duplicate paths, encrypted files and symlinks are rejected.
+
+The manifest adapter accepts UTF-8 XML up to 256 KiB with SCORM 1.2
+(`imscp_rootv1p1p2`, `adlcp_rootv1p2`, schema version `1.2`) or SCORM 2004
+(`imscp_v1p1`, `adlcp_v1p3`, schema version `2004 3rd Edition` or
+`2004 4th Edition`) namespaces under `http://www.imsproject.org/` (1.2
+content packaging), `http://www.imsglobal.org/` (2004 content packaging), and
+`http://www.adlnet.org/` (SCORM attributes). Metadata must name `ADL SCORM`.
+Exactly one organization contains one direct item referencing the only
+`webcontent` SCO; a supplied default must identify that organization. Optional
+asset resources and file declarations must resolve to existing package files;
+dependencies may reference only terminal asset resources. Titles, identifiers,
+XML language and inert XSI schema-location hints are supported. Schema hints
+are never fetched.
+
+Other manifest elements/attributes are rejected, including nested items or
+manifests, multiple organizations/SCOs/launch items, sequencing/navigation,
+prerequisites, mastery/time/completion rules, launch parameters and XML base.
+DTDs/entities, malformed/mismatched schema metadata, unresolved references,
+missing or non-HTML launch files, remote/absolute/traversal paths and non-root
+or mis-cased manifests are explicit errors. ZIPs with no manifest keep the
+manual-entrypoint contract (the adapter does not guess whether one is missing).
+This is manifest-to-entrypoint adaptation, not full SCORM runtime support or
+Blackboard acceptance. Tracking, alternative text, rights and preview still
+require explicit author review.
+
+Attach via revision-guarded scene PATCH with `html5Activity` containing `assetId`,
+`title`, `alternative`, `tracking` (`view|completion|scored`), and `scoreWeight`
+(greater than zero, at most 100; default 1). Explicitly remove native experiences,
+assessments or timelines first. Removal sets `html5Activity: null`, retaining the
+canvas and reusable package. HTML5 packages cannot be ordinary/shared media.
+Project backup includes compiled content; storyboard JSON alone does not.
+
+An opaque `sandbox="allow-scripts"` frame hosts the imported document. The shared
+runtime validates source/token-bound reports and bounds persisted data; author
+preview, course preview and exports use the same bridge. JavaScript errors,
+blocked resources and invalid reports are surfaced. This isolates parent DOM,
+storage and LMS APIs; it is not content certification or secure examination.
+Follow the [integration protocol, limits and LMS checks](../docs/user-guide.md#import-an-externally-authored-html5-activity).
+
+Native experiences accept up to eight discriminated `activities`: `branching`,
+`hotspots`, `sequencing`, `guided-practice`, `software-walkthrough`,
+`before-after`, `external-link`, and `learner-conversation`. The existing version-1 flow/reveal
+payload remains readable without `activities`. Branch graphs must be reachable
+and acyclic; branching can use up to five activity-local Boolean variables,
+initial values, choice assignments and one Boolean visibility condition per
+choice. Every reachable decision must retain at least two visible choices and
+every node must remain reachable through visible routes. Legacy branch payloads
+remain unchanged when those optional fields are unused. Item identifiers,
+choice references and bounded coordinates are validated. Scene PATCH writes that include `experience` require `If-Match`,
+including removing an experience. These activities are formative: they do not
+change assessment scoring or completion policy. Shared rendering and SCORM
+suspend-data tracking are described in the [native activity guide](../docs/user-guide.md#author-native-activities-without-a-provider).
+Software walkthroughs contain up to ten ordered steps, each referencing a
+project image with alternative text, a description and an action prompt.
+Learners explicitly confirm every action in order; this is formative
+self-attestation, not application automation or action verification. Continue
+restores the confirmed step prefix and returns to the first unconfirmed step;
+restart clears it. Screenshot assets remain in backups and portable exports
+while referenced and cannot be deleted until removed from the walkthrough.
+Learner conversations contain one to five fixed authored follow-ups; they are
+never generative. Learner text remains in tab memory only, is discarded on
+reset/remount, and is omitted from resume state and printed alternatives.
+
 The scene editor's [timeline and appearance implementation](../docs/scene-timeline-implementation.md) extends the existing scene-update `visualLayout` payload. `SceneLayout.timeline` version 1 contains integer-millisecond `durationMs`, `printTimeMs`, independent audio/video `clips`, and named `cues`. Clips reference project assets and separate `startMs` from `sourceInMs`/`sourceOutMs`; source duration, volume/fades, completion threshold, and video geometry/layer order are validated. Elements optionally contain `nativeShape`, `appearance`, `timing`, `name`, `groupId`, `hidden`, and `aspectLocked`. Timeline duration is limited to one hour, with at most 200 clips and 200 cues; all endpoints must fit. Existing scenes with no timeline retain legacy playback. Native effects and transport code under `app/static` are shared with frontend/delivery/Word rendering. Save through the existing revision-guarded scene API so history, asset checks, and authorization remain enforced.
 
 Authentication profiles, hosted sign-in/recovery, project membership, and authenticated review links are documented in the [deployment guide](../docs/authentication-deployments.md). Set `CHIMERA_DEPLOYMENT_PROFILE=networked` for password authentication, or `encarta` for the intentionally disabled integration profile. Unimplemented providers never fall back to local identity. The hosted frontend and local HTTPS qualification are implemented; real Linux/Nginx server qualification awaits the deferred connection details.
@@ -54,7 +227,7 @@ Enhancement references accept PDF, DOCX, PPTX, TXT, and Markdown files up to 25 
 
 Enhancement jobs are persisted under each project and resume queued or interrupted work when the API starts. Jobs snapshot the storyboard revision and exact reference versions; a changed storyboard prevents proposal creation. Jobs can be cancelled and retried. They create pending proposals only; only the existing author decision endpoint can apply a proposal.
 
-**Settings > AI connection** has tabs for OpenAI images/legacy narration, ElevenLabs/Google Cloud/Cartesia speech, and Synthesia/Shotstack connection setup/testing (not video generation yet). It is not used for text reasoning. Non-OpenAI metadata and administrator-only save/test/disconnect endpoints retain `/api/narration-connections` for compatibility; video connections are excluded from generation capabilities. Credentials remain in the OS store, Google ADC, or fixed server environment variables (`ELEVENLABS_API_KEY`, `CARTESIA_API_KEY`, `SYNTHESIA_API_KEY`, `SHOTSTACK_SANDBOX_API_KEY`, `SHOTSTACK_PRODUCTION_API_KEY`). Enhancement and other learning-intelligence work is submitted to Pythia. Configure `CHIMERA_PYTHIA_BASE_URL` on the backend and, when Engine authentication is enabled, set the matching `CHIMERA_PYTHIA_API_KEY` server-side. The browser never receives this credential. See [AI connection](../docs/ai-connection.md) for provider setup and deployment restrictions.
+**Settings > AI connection** has tabs for OpenAI images/legacy narration, ElevenLabs/Google Cloud/Cartesia speech, and Synthesia/Shotstack video (up to 30 seconds). Synthesia uses a presenter script and authorized avatar; Shotstack renders text/title clips. Saves/tests never render. Jobs retain provider operation IDs, poll with a bounded timeout, and download MP4 candidates for normal approval and placement. Local cancellation does not cancel remote billing; interrupted jobs never automatically resubmit. It is not used for text reasoning. Non-OpenAI metadata and administrator-only save/test/disconnect endpoints retain `/api/narration-connections` for compatibility; video connections cannot generate narration/images. Credentials remain in the OS store, Google ADC, or fixed server environment variables (`ELEVENLABS_API_KEY`, `CARTESIA_API_KEY`, `SYNTHESIA_API_KEY`, `SHOTSTACK_SANDBOX_API_KEY`, `SHOTSTACK_PRODUCTION_API_KEY`). Enhancement and other learning-intelligence work is submitted to Pythia. Configure `CHIMERA_PYTHIA_BASE_URL` on the backend and, when Engine authentication is enabled, set the matching `CHIMERA_PYTHIA_API_KEY` server-side. The browser never receives this credential. See [AI connection](../docs/ai-connection.md) for provider setup and deployment restrictions.
 
 For the temporary media adapters only, configure these environment variables on the API server. Do not put credentials in frontend source or browser storage:
 

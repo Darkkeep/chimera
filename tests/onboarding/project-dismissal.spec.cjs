@@ -18,7 +18,7 @@ test('project planning resists accidental dismissal and isolates new project con
   await page.keyboard.press('Escape');
   await expect(dialog.getByLabel('Your message', { exact: true })).toHaveValue('Unsent expanded outline');
   await dialog.getByRole('button', { name: 'Open storyboard', exact: true }).click();
-  await page.getByRole('button', { name: 'Talk to Pythia', exact: true }).click();
+  await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
   await expect(page.getByLabel('Your message', { exact: true })).toHaveValue('Unsent expanded outline');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Create project', exact: true }).click();

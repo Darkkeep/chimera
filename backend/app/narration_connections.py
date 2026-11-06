@@ -1,4 +1,5 @@
 import base64
+from contextlib import nullcontext
 import hashlib
 import json
 import os
@@ -224,7 +225,7 @@ def disconnect_narration_connection(root: Path, identifier: str, expected: str) 
     _write_connections(root, [item for item in metadata["connections"] if item["id"] != identifier], previous)
 
 
-def _request(connection: NarrationConnection, path: str, body: dict | None = None, limit: int = 2 * 1024 * 1024) -> bytes:
+def _request(connection: NarrationConnection, path: str, body: dict | None = None, limit: int = 2 * 1024 * 1024, *, metered: bool = True) -> bytes:
     settings = connection.settings
     headers = {"Accept": "application/json", "Content-Type": "application/json"}
     if settings["provider"] == "elevenlabs":
@@ -250,7 +251,7 @@ def _request(connection: NarrationConnection, path: str, body: dict | None = Non
         headers["Accept"] = "audio/mpeg"
     request = urllib.request.Request(url, data=json.dumps(body).encode() if body is not None else None, headers=headers)
     try:
-        with ai_connection.request_budget(connection.budget), ai_connection.open_provider_request(connection.budget, request, 180 if body else 15) as response:
+        with ai_connection.request_budget(connection.budget) if metered else nullcontext(), ai_connection.open_provider_request(connection.budget, request, 180 if body else 15) as response:
             content = response.read(limit + 1)
             if len(content) > limit:
                 raise RuntimeError("The provider response exceeds the supported size.")
@@ -280,7 +281,7 @@ def test_narration_connection(root: Path, identifier: str, expected: str) -> dic
             valid = isinstance(metadata, dict) and (isinstance(metadata.get("videos"), list) if synthesia else metadata.get("success") is True and isinstance(metadata.get("response"), dict))
             if not valid:
                 raise ValueError("Invalid metadata")
-            return {"connected": True, "message": "Read-only connection test succeeded; no video was generated. Video generation is not yet available in Chimera.", "voices": [], "models": []}
+            return {"connected": True, "message": "Read-only connection test succeeded; no video was generated. Render permissions still require an explicit generation.", "voices": [], "models": []}
         else:
             voices_data = json.loads(_request(connection, "/voices?languageCode=" + urllib.parse.quote(connection.settings["language"])))
             voices = [{"id": item["name"], "name": item["name"], "language": ", ".join(item["languageCodes"])} for item in voices_data.get("voices", [])]
@@ -293,7 +294,7 @@ def test_narration_connection(root: Path, identifier: str, expected: str) -> dic
 def synthesize_narration(connection: NarrationConnection, script: str, voice: str | None, language: str | None) -> tuple[bytes, str, str]:
     settings = connection.settings
     if settings["provider"] not in SPEECH_PROVIDERS:
-        raise ValueError("Video connection setup does not enable narration or video generation.")
+        raise ValueError("A video connection does not enable narration generation.")
     selected_voice = voice or settings["voice"]
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,200}", selected_voice):
         raise ValueError("Select a valid provider voice identifier.")

@@ -9,6 +9,199 @@ Cross-repository records below use `repository:path` locators rather than links 
 
 ## Start Here
 
+Constrained final-envelope follow-up: latest run completed search, learning
+design and assessment before malformed final proposal/conflict structure failed.
+Pythia final drafting now requests strict OpenAI JSON Schema output, not merely
+another prompt adjustment. Field values decode from JSON strings to unchanged
+native proposal values; Chimera's validation and explicit review are unchanged.
+Unsupported model/schema or refusal fails without silent downgrade/paid retry.
+48 focused Pythia tests and contracts pass; live final-call completion is unverified.
+
+Assessment-format follow-up: latest retry failed assessment item validation
+before final drafting (search and learning design completed). Pythia's planner
+had requested polls alongside native scored formats. Guidance now explicitly
+constrains scored items to registered native types, derives required fields
+from the schema, and leaves polls/reflections as review recommendations.
+Future invalid drafts report item numbers and matching-branch field errors,
+without exposing prompts/answers. 43 focused Pythia cases and contracts pass;
+no paid retry or user-course edit, and no claim that historical failing items
+were recovered or that live end-to-end generation is qualified.
+
+Citation handoff follow-up: latest live run completed research_web,
+learning.design-brief and assessment.blueprint, retaining three cited sources;
+final proposals failed exact excerpt validation. Local drafting now selects
+server-owned source-passage IDs and the adapter supplies exact source identity
+and excerpt (chunks bounded below the 2,000-character citation limit). Backend
+validation remains unchanged. Historical failed output cannot be reconstructed;
+no paid rerun or automatic quote repair was performed.
+Verification: 41 focused Pythia cases and 17 Chimera expansion/job cases pass,
+plus contract validation. All 12 passage selections derived from the failed
+run's three retained sources resolve to exact, bounded substrings. Live final
+drafting with this selection contract remains unverified.
+
+Live search now observed: enhancement-96987a1a22d0 completed research_web with
+nine cited sources (25 search sources), one 7,251-character answer and no refusal.
+The following research.synthesize failed schema validation; its invalid draft
+was not retained, so exact failing fields are unknown. The research adapter now
+supplies the canonical research_sources input required by its guide, preserves
+unknown/unverified metadata, and enforces exact source-list preservation.
+Failures retain bounded schema-path/rule diagnostics. No paid retry was made.
+Review now has a pinned active-job banner with spinner, elapsed time, latest
+server message and reduced-motion support. Status polling errors retain the last
+known active state rather than silently clearing it.
+Verification: 38 focused Pythia tests plus contract validation, 18 desktop/mobile
+browser cases across Chromium/Firefox/WebKit, and frontend type-check/build pass.
+The six Chromium cases were rerun after final initial-load state isolation.
+Frontend/backend health checks pass. No paid call or course edit was performed.
+
+Required-search slice: the separate opt-in is now **Search the public web before
+drafting**, not discretionary permission. Selected runs restrict the first planner
+action to research_web (catalog, schema and runtime guard), require cited
+evidence, then permit up to two specialists within the existing three-tool/seven-
+request budget. Chimera independently rejects missing, uncited or late searches.
+No automatic retries, new permissions or course mutations were introduced.
+Verification: 35 focused Pythia tests, 17 Chimera expansion/job tests, nine
+desktop/mobile browser cases across Chromium/Firefox/WebKit, type-check and
+production build pass. Live account/model search eligibility is not claimed.
+
+Second live-run follow-up: research synthesis and learning design completed,
+but assessment.blueprint reported output truncation while drafting 8-10 items.
+Specialist calls had inherited the generic 4,096-token allowance. They now
+explicitly request 16,384 tokens (matching final drafting), with concise
+64,000-character guidance and unchanged validation/time/request limits. Thirty-three
+focused Pythia tests and contract validation pass, including the actual HTTP
+request allowance, a schema-valid ten-item blueprint, and retained completed
+receipts/sources on truncation without retry. No paid call or course edit was
+performed. Fresh per-request bridge processes load the change without restarting
+Chimera. The failed run had no completed live web-search execution.
+
+Live-run follow-up: the first public-research attempt produced a 525-character
+query, accepted by the 2,000-character planner but rejected by the search tool's
+500-character guard before any search HTTP request. The catalog, planner and
+search now share the 2,000-character bound; no query truncation or paid retry.
+Safe failure reasons/stages now reach both execution receipts and the job error,
+without exposing raw provider bodies. The actual saved query forwards intact to
+mocked transport. Thirty focused Pythia tests plus contract validation and sixteen
+Chimera expansion/job tests pass. No live search/model call was made for this fix,
+and the original failed job/course remain unchanged.
+
+Local authoring orchestration connection (Storyboard suggestions only):
+
+- Explicit **Enable specialist tool orchestration** executes registered
+  Research, Learning Design, Storyboard Analysis, Assessment, Technology Fit and
+  Evaluation specialist calls using canonical guidance and payload validation.
+  A model-selected plan is executed and its actual results feed final drafting.
+  Optional **Allow public web research** invokes the configured OpenAI Responses
+  hosted search tool; a completed search receipt and cited sources are required.
+- Preview lists permissions and the seven-provider-request ceiling without
+  making a model/search request. Up to three tools can run; saved text-model
+  connections reserve all seven daily requests conservatively before launch.
+  Initial cost/input estimates exclude subsequent context and search costs.
+  Only public non-confidential research is appropriate; queries may leave the
+  model provider. Endpoint readiness is not proof of account/model eligibility.
+- Received tool results, completed/failed status, instructions and source links
+  persist on jobs and remain inspectable after reload or final-draft failure.
+  Web passages are marked provider-cited synthesis, not verbatim page evidence.
+  Citation excerpts must match retained versions/locators. Explicit acceptance,
+  revision checks and unchanged-scene undo protections remain intact.
+- No automatic retry or restart replay of tool runs; bounded tool/final deadlines
+  fit the existing bridge timeout. No arbitrary plugin loading, shell/file tools,
+  publishing or media-production access. Consult Pythia and experience/video
+  treatments are intentionally unchanged in this first connection.
+- Evidence: focused backend tests report 61 cases with one opt-in case skipped;
+  15 desktop/mobile Chromium, Firefox and WebKit checks pass. TypeScript and the
+  production build pass with the existing chunk-size warning. Installed MCP
+  discovery reports all six specialists and endpoint-level web-search support.
+  The affected Pythia MCP/provider/authoring suites pass 44 tests and contract
+  validation. Full Pythia discovery runs 442 cases: 329 pass, 90 skip and 23 error
+  on unchanged conversation/media reviewed-byte pin mismatches. Those unrelated
+  trust pins are not altered or bypassed.
+  No live model/search call, paid media call, real-course mutation or automatic
+  retry was performed. Source guidance is updated; bundled PDF remains unchanged.
+
+Local Storyboard suggestions expansion fix:
+
+- Confirmed root cause: the legacy Engine `storyboard.enhance` only copied learner
+  text into missing action descriptions, ignored expansion goals and reported
+  zero proposals as completed. Single-user runs now use the installed live local
+  `pythia_storyboard_enhancement` tool. Shared installations retain the Engine.
+  Preview discovers capability without a model call; explicit submission can
+  incur charges through the installed plugin or saved text-model connection.
+- New `additionalScenes` proposals draft after selected anchors, including
+  whole-course expansion. Strict bounded drafts receive server-owned identities
+  and normal native layouts. Originals/media remain unchanged; explicit grouped
+  acceptance is required. Undo preserves changed scenes and assessment references.
+  Default layouts are captured before approval so reload preparation cannot
+  falsely mark untouched additions as edited.
+- Empty results fail explicitly; historical zero-result runs remain visible and
+  are never retried automatically. All proposal changes are preflighted before
+  persistence. Submitted readable, versioned references and citations are checked.
+  File paths and `@research` alone grant no browsing permission. Without the
+  explicit orchestration/research controls above, missing research remains a
+  production gap, not invented evidence.
+- Evidence: 41 focused Chimera expansion/context/bridge tests, 30 Pythia
+  enhancement/provider/authoring/video/experience tests, contract validation and
+  six desktop/mobile browser cases across Chromium, Firefox and WebKit pass.
+  TypeScript and production build pass with the existing chunk-size warning.
+  A broader 77-test storyboard/bridge run had one unrelated existing SCORM
+  optional-only completion harness error (`cmi.core.lesson_status` missing);
+  it also fails in isolation and was not changed in this slice. Existing Python
+  diagnostics outside the new logic remain; no clean repository-wide claim.
+- No live model requests, paid media calls, user-course mutations or automatic
+  retries. Source guidance is updated; bundled PDF is unchanged. This local fix
+  does not qualify shared deployment or close integration/release gates.
+
+Local Scene Editor media integration:
+
+- **Edit scene > Media** reuses candidate generation, scene-aware Pythia video
+  treatments, job feedback, and candidate review without leaving the editor.
+  Configured image/narration/video connections and existing authorization gates
+  are unchanged. Opening the tab does not generate media.
+- Unsaved scene context requires explicit **Save scene for media**, which saves
+  without closing the editor. Save failures preserve edits and block new requests.
+  Media request fields survive tab switches, not editor closure.
+- Candidate approval refreshes the editor's project/assets without resetting its
+  local scene state. Placement remains explicit through the reused placement,
+  captions, and shared-media panel; stage image insertion and timeline controls
+  remain available. Submission/approval/placement busy states protect editor saves.
+- Evidence: 20 targeted provider-free Chromium scenarios pass, including image
+  requests, narration prefill from newly saved context, both video providers in
+  both entry points, failed context saves, tab retention, candidate approval,
+  persistent placement, mobile scene-aware context reachability, treatment
+  review/refinement, and original media-library regressions. Stale test fixtures
+  now return an array for job-list GET and expand Other project media before
+  attaching. TypeScript, production build, editor diagnostics, and diff whitespace
+  checks pass; the existing large-chunk build warning remains.
+- No live model or paid-render calls were made; tests use synthetic projects and
+  provider fixtures. Source user guidance is updated; bundled PDF is unchanged.
+  This does not close shared integration/release gates.
+
+Local authoring polish (Autopilot request):
+
+- Question saves now show a bordered checkmarked confirmation with a live status
+  announcement, and the action changes to **Question saved**. Edits and save
+  attempts clear the old success state; failed saves retain the draft and show
+  the server error.
+- Scene duration accepts keyboard replacement and decimals, committing on Enter
+  or blur. Escape restores the current duration. Invalid numeric input cannot
+  silently save the old value; existing content-endpoint checks remain intact.
+- **Consult Pythia** is first in WORKSPACE; visible application, documentation,
+  and browser-test references use the new name. Internal routes and identifiers
+  remain compatible.
+- Text insertion is a labeled **Text layer** action grouped with **Insert shape**.
+  Selection, Undo/Redo, persistence, and reopening are covered.
+- Validation: 23 distinct provider-free Chromium scenarios passed across
+  authoring polish, question authoring (light/dark at 390/1440 px, including saved
+  cue contrast), layer selection, timeline, consultation, project dismissal,
+  and project planning. Three live-Pythia cases remained intentionally skipped.
+  Two new test expectation mismatches were corrected (server error wording and
+  disambiguation of the timeline status from its clock output); both new
+  scenarios passed on rerun. TypeScript and the production frontend build pass;
+  the existing large-chunk warning remains. Frontend and backend HTTP checks
+  both returned 200. No provider/render calls or user-course edits were made.
+- Markdown guidance is updated; bundled PDF and older guide screenshots have
+  not been regenerated. These local UI checks do not close shared G1-G6 gates.
+
 This guide owns Chimera's current responsibilities, evidence, dependencies, and
 next work for the shared journey. It supersedes the next-action order in older
 [current work](docs/current-work.md) and [contract handoff](docs/pythia-sprint-9-contract-extraction-handoff.md)
@@ -279,6 +472,62 @@ exact owned files only; no push/merge/release/deploy/training or formal approval
 is authorized by this guide.
 
 ## Change Record
+
+- 2026-11-04: Follow-up to screenshot-reported bottom reveal-editor clipping:
+  bounded the experience dialog to its backdrop using a non-growing flex
+  container and explicit full-height internal scrolling. Added last-explanation,
+  conclusion and bottom-application-control reachability checks with eight long
+  reveals at short desktop and 817x768 viewports. Three focused Chromium
+  scenarios passed, including mobile accessibility and existing design/apply.
+  Original screenshot environment was not exposed in the shared browser;
+  final confirmation there remains an author check. No provider or scene calls
+  were made outside isolated test fixtures.
+
+- 2026-11-04: Fixed experience-review modal CSS specificity so the generic
+  450px dialog rule cannot override it. The experience dialog now uses available
+  viewport width up to 1,440px with 16px gutters and compact mobile padding.
+  Focused Chromium whole-scene and mobile-reflow scenarios passed (2 tests),
+  including explicit desktop width, mobile overflow and accessibility assertions.
+  No provider calls or user-course changes.
+
+- 2026-11-04: Native scene-experience slice is `implemented-local` and
+  `qualified-synthetic`, owned by Chimera's local authoring surface and Pythia's
+  explicit local MCP producer. Human direction and selected source snapshots
+  produce a private learning-intent/rationale/native-composition proposal,
+  editable executable preview, explicit production blockers and revision-checked
+  application. Native flow/reveals share semantic playback across authoring,
+  preview, local-file standalone, SCORM 2004 and SCORM 1.2; print snapshots expand
+  explanations. Mobile reflow, keyboard/touch, reduced motion and contrast are
+  covered. Original canvas, source content and attached media are preserved,
+  with provider-free editing and explicit canvas restoration.
+  Baselines: Chimera `9748ec961b5255685ab52c53339232735901b0ff` and configured
+  compatibility checkout Pythia `d8b29e223ab2412c93bb06fbc0919469feb4ef01`,
+  both dirty before/after this slice; prior work preserved. No contracts,
+  Manteion or shared G1-G6 status change is claimed.
+  Evidence: `python -m unittest backend.tests.test_experience_treatments
+  backend.tests.test_video_treatments backend.tests.test_pythia_talk
+  backend.tests.test_scene_timeline backend.tests.test_pythia_actions
+  backend.tests.test_video_generation` passed 79 tests; Pythia
+  `python -m unittest tests.evals.test_chimera_experience
+  tests.evals.test_chimera_video tests.evals.test_chimera_authoring` passed 15.
+  Chromium `npx playwright test --config=playwright.onboarding.config.cjs
+  --project=chromium scene-experience.spec.cjs video-treatments.spec.cjs`
+  passed 9. Final apply-context/restoration adjustments were rechecked with
+  all 11 experience backend tests, all 6 experience browser tests and the
+  frontend TypeScript/Vite build. Source tests and browser specifications are
+  the reproducible evidence; no live provider was used. Existing chunk-size
+  and Python deprecation/resource warnings remain.
+  Live read-only checks: frontend/backend HTTP 200; installed MCP advertises
+  `experience_treatments: true`; Sporting Merit `sporting-merit-244393e6`,
+  scene `scene-cf12b7a1`, remains revision 3 without an applied experience or
+  generated experience draft. No billable model/render calls or user-course
+  mutations occurred. Limits: native linear concept flow, not arbitrary
+  rich-media production, assessment/timeline replacement, cross-session reveal
+  tracking, real-model creative qualification or release acceptance. Next:
+  author-led live reference design with explicitly selected brand evidence,
+  human review and separate apply decision. Updated guides:
+  `docs/talk-to-pythia.md`, `docs/user-guide.md`, `docs/ai-connection.md` and the
+  configured Pythia local-authoring guide; bundled user-guide PDF unchanged.
 
 - 2026-10-24: Enlarged the metallic wings into the upper blank space and moved
   them behind the shoulders and all three heads, preserving the dragon ear and

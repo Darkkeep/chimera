@@ -16,6 +16,8 @@ import { ElementAppearanceControls } from "./ElementAppearanceControls";
 import { animationEndMs, defaultAppearance, withSceneTimeline } from "./scene-timeline";
 import { useMediaConnections } from "./media-connections";
 import { backgroundMode } from "./background";
+import { GeneratedMediaPanel } from "./GeneratedMediaPanel";
+import { MediaToolsPanel } from "./MediaToolsPanel";
 
 function InspectorSection({ title, children }: { title: string; children: ReactNode }) {
   return <details className="visual-inspector-section">
@@ -70,7 +72,7 @@ function syncSceneText(layout: SceneLayout, scene: Scene, title: string, screenT
   return next;
 }
 
-export function SceneVisualEditor({ project, scene, templates, onClose, onSave, onExtract, onApplyTemplate, onGenerate, canGenerate, initialPanel = "canvas" }: { project: Project; scene: Scene; templates: { id: string; title: string }[]; onClose: () => void; onSave: (layout: SceneLayout, settings: SceneEditSettings) => Promise<void>; onExtract: () => Promise<SceneLayout>; onApplyTemplate: (templateId: string, title: string, extractedText: string[]) => Promise<SceneLayout>; onGenerate: (prompt: string, currentScene: Partial<Scene>, connectionId?: string) => Promise<GeneratedSceneDraft>; canGenerate: boolean; initialPanel?: "canvas" | "details" }) {
+export function SceneVisualEditor({ project, scene, templates, onClose, onSave, onExtract, onApplyTemplate, onGenerate, onProjectUpdated, canGenerate, initialPanel = "canvas" }: { project: Project; scene: Scene; templates: { id: string; title: string }[]; onClose: () => void; onSave: (layout: SceneLayout, settings: SceneEditSettings) => Promise<void>; onExtract: () => Promise<SceneLayout>; onApplyTemplate: (templateId: string, title: string, extractedText: string[]) => Promise<SceneLayout>; onGenerate: (prompt: string, currentScene: Partial<Scene>, connectionId?: string) => Promise<GeneratedSceneDraft>; onProjectUpdated: (project: Project) => void; canGenerate: boolean; initialPanel?: "canvas" | "details" }) {
   const { catalog: mediaCatalog, error: connectionError } = useMediaConnections();
   const [connectionId, setConnectionId] = useState("");
   const sceneConnections = mediaCatalog?.connections.filter(item => item.readyFor.includes("scene")) ?? [];
@@ -97,10 +99,14 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
   const [timelineTime, setTimelineTime] = useState(0);
   const [timelinePlaying, setTimelinePlaying] = useState(false);
   const [timelinePreview, setTimelinePreview] = useState(false);
+  const [durationValid, setDurationValid] = useState(true);
   const [editingText, setEditingText] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [saving, setBusy] = useState(false);
+  const [mediaWorking, setMediaWorking] = useState(false);
+  const [placementWorking, setPlacementWorking] = useState(false);
+  const busy = saving || mediaWorking || placementWorking;
   const [error, setError] = useState("");
-  const [panel, setPanel] = useState<"details" | "canvas">(initialPanel);
+  const [panel, setPanel] = useState<"details" | "canvas" | "media">(initialPanel);
   const [canvasEdited, setCanvasEdited] = useState(false);
   const [sceneTextDirty, setSceneTextDirty] = useState(false);
   const [generatedLayoutApplied, setGeneratedLayoutApplied] = useState(false);
@@ -123,6 +129,10 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
   const [draftError, setDraftError] = useState("");
   const textInput = useRef<HTMLTextAreaElement>(null);
   const layout = withSceneTimeline(history[cursor]);
+  const mediaContextSignature = JSON.stringify({ title, sceneType, layoutMode, templateId, screenText, actionDescription, narration, notes, required, audioRequired, assessmentItem, assessmentSettings, layout });
+  const [savedMediaContext, setSavedMediaContext] = useState(mediaContextSignature);
+  const mediaContextDirty = savedMediaContext !== mediaContextSignature;
+  const [mediaVisited, setMediaVisited] = useState(false);
   const stageLayout = resolvedSceneBackground(project, { ...scene, visualLayout: layout }).visualLayout || layout;
   const questionRegion = assessmentRegion(layout, title);
   const selected = layout.elements.find(element => element.id === selection);
@@ -217,7 +227,8 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
     catch (issue) { setError(issue instanceof Error ? issue.message : "Source extraction failed."); }
     finally { setBusy(false); }
   }
-  async function save() {
+  async function save(closeAfterSave = true) {
+    if (!durationValid) { setError("Enter a valid scene duration before saving."); return; }
     setBusy(true); setError("");
     try {
       const savedMode = layoutMode === "template" ? "template" : scene.sourceSlide ? "hybrid" : "native";
@@ -235,7 +246,8 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
         assessmentSettings: sceneType === "question" ? assessmentSettings : null,
         canvasEdited: canvasEdited || JSON.stringify(layout) !== JSON.stringify(initialLayout(scene)),
       });
-      onClose();
+      setSavedMediaContext(mediaContextSignature);
+      if (closeAfterSave) onClose();
     }
     catch (issue) { setError(issue instanceof Error ? issue.message : "Scene could not be saved."); }
     finally { setBusy(false); }
@@ -285,11 +297,24 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
     setPanel("canvas");
   }
   return <EditorDialog className="visual-editor" labelledBy="visual-editor-title" busy={busy} onClose={onClose} onboardingTarget="scene.edit" onboardingJourney={panel === "canvas" ? "canvas" : "edit-scene"}>
+    {scene.experience && <p role="status">This scene delivers a native experience instead of the underlying canvas. To edit its diagram, reveals and activities, close this editor and select Design experience. Canvas edits here are retained but are not the learner-facing stage.</p>}
     <header className="visual-editor-header"><div><p className="eyebrow">SCENE EDITOR</p><h2 id="visual-editor-title">{title || scene.title}</h2></div><button type="button" className="icon-button" aria-label="Close scene editor" disabled={busy} onClick={onClose}><X size={18} /></button></header>
     <div className="visual-editor-tabs" role="tablist" aria-label="Scene editor sections">
       <button type="button" role="tab" aria-selected={panel === "canvas"} onClick={() => setPanel("canvas")}>Stage</button>
       <button type="button" role="tab" aria-selected={panel === "details"} onClick={() => setPanel("details")}>Details</button>
+      <button type="button" role="tab" aria-selected={panel === "media"} onClick={() => { setMediaVisited(true); setPanel("media"); setTimelinePlaying(false); setMotionPreview(0); }}>Media</button>
     </div>
+    {mediaVisited && <div className="scene-editor-media" hidden={panel !== "media"}>
+      <h3>Media for {scene.title}</h3>
+      <p className="field-hint">Create image, narration, or video requests for this scene using the same workflow as Media Library. Requests may incur provider charges. Review candidates before approving; approval does not attach media.</p>
+      {mediaContextDirty && <div role="status"><p>Save your scene edits before requesting media so Pythia and the selected provider use the current scene context.</p><button type="button" className="button button-accent" disabled={busy || !title.trim() || !durationValid || Boolean((scene.sourceSlide || scene.previewImage) && !scene.visualLayout && !canvasEdited)} onClick={() => void save(false)}>Save scene for media</button></div>}
+      <div hidden={mediaContextDirty}>
+        <GeneratedMediaPanel project={project} scene={scene} busy={busy || mediaContextDirty} onProjectUpdated={onProjectUpdated} onEditScene={() => setPanel("canvas")} onBusyChange={setMediaWorking} />
+        <fieldset className="scene-editor-placement" disabled={saving || mediaWorking || mediaContextDirty}>
+          <MediaToolsPanel project={project} scene={scene} onProjectUpdated={onProjectUpdated} onBusyChange={setPlacementWorking} />
+        </fieldset>
+      </div>
+    </div>}
     {panel === "canvas" && <div className="visual-editor-toolbar" role="toolbar" aria-label="Stage content tools">
       <button type="button" className="button button-outline" disabled={busy || sourceVisible} onClick={async () => {
         setBusy(true); setError("");
@@ -301,7 +326,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
         } catch (issue) { setError(issue instanceof Error ? issue.message : "Text could not be measured."); }
         finally { setBusy(false); }
       }}><Check size={16} />Fit text</button>
-      <button type="button" className="icon-button" title="Preview animations" aria-label="Preview animations" disabled={busy || sourceVisible} onClick={() => {if(layout.timeline){setTimelinePreview(true);setTimelinePlaying(true);}else setMotionPreview(current => current + 1);}}><Play size={18} /></button>
+      <button type="button" className="icon-button" title="Preview animations" aria-label="Preview animations" disabled={busy || sourceVisible} onClick={() => {setTimelinePreview(false);setTimelinePlaying(false);setMotionPreview(current => current + 1);}}><Play size={18} /></button>
       {motionPreview > 0 && <button type="button" className="icon-button" title="Stop animation preview" aria-label="Stop animation preview" onClick={() => setMotionPreview(0)}><Square size={18} /></button>}
       <button type="button" className="icon-button" title="Stagger text entrances" aria-label="Stagger text entrances" disabled={busy || sourceVisible} onClick={() => {
         let textIndex = 0;
@@ -312,8 +337,10 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
           return animations.exit.delayMs > 3600000 ? element : { ...element, animations };
         }) });
       }}><Sparkles size={18} /></button>
-      <button type="button" className="icon-button" title="Add text" aria-label="Add text" disabled={busy || sourceVisible} onClick={() => { const element = newElement("text"); commit({ ...layout, elements: [...layout.elements, element] }); setSelection(element.id); }}><Plus size={18} /></button>
+      <div className="visual-layer-insert" role="group" aria-label="Add layers">
+      <button type="button" className="button button-outline" title="Add a text layer" aria-label="Add text layer" disabled={busy || sourceVisible} onClick={() => { const element = newElement("text"); commit({ ...layout, elements: [...layout.elements, element] }); setSelection(element.id); }}><Plus size={18} aria-hidden="true" />Text layer</button>
       <select aria-label="Insert shape" value="" disabled={busy || sourceVisible} onChange={event=>{if(!event.target.value)return;const shape=event.target.value as SceneElement['nativeShape'];const element=newElement("shape",{nativeShape:shape,shapeName:shape,name:shape||"Shape",appearance:defaultAppearance()});commit({...layout,elements:[...layout.elements,element]});setSelection(element.id);}}><option value="">Insert shape?</option>{["rectangle","rounded-rectangle","ellipse","line","arrow","triangle","diamond"].map(shape=><option key={shape} value={shape}>{shape}</option>)}</select>
+      </div>
       <button type="button" className="icon-button" title="Undo (Ctrl+Z)" aria-label="Undo" aria-keyshortcuts="Control+Z Meta+Z" disabled={busy || cursor === 0} onClick={() => restoreHistory(cursor - 1)}><Undo2 size={18} /></button>
       <button type="button" className="icon-button" title="Redo (Ctrl+Shift+Z / Ctrl+Y)" aria-label="Redo" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y" disabled={busy || cursor === history.length - 1} onClick={() => restoreHistory(cursor + 1)}><Redo2 size={18} /></button>
       <span className="visual-editor-dimensions">{Math.round(layout.width)} x {Math.round(layout.height)}</span>
@@ -351,15 +378,15 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
         <label className="visual-scene-checkbox"><input type="checkbox" checked={required} onChange={event => setRequired(event.target.checked)} /><span>Required scene</span></label>
         {(scene.audioAssets.length > 0 || layout.timeline?.clips.some(c=>c.kind==="audio")) && <label className="visual-scene-checkbox"><input type="checkbox" checked={audioRequired} onChange={event => setAudioRequired(event.target.checked)} /><span>Require attached audio to finish</span></label>}
       </div>
-    </div> : <div className="visual-editor-workspace">
+    </div> : panel === "canvas" ? <div className="visual-editor-workspace">
       <div className="visual-editor-canvas" onClick={event => { if (event.target instanceof HTMLElement && (event.target === event.currentTarget || event.target.classList.contains("visual-stage") || event.target.classList.contains("visual-stage-frame"))) setSelection(null); }} onDragOver={event => { if (event.dataTransfer.types.includes("application/x-chimera-image")) event.preventDefault(); }} onDrop={event => { event.preventDefault(); if (sourceVisible || busy) return; const frame = event.currentTarget.querySelector(".visual-stage-frame")?.getBoundingClientRect(); if (frame) addImage(event.dataTransfer.getData("application/x-chimera-image"), (event.clientX - frame.left) * layout.width / frame.width, (event.clientY - frame.top) * layout.height / frame.height); }}>
         {layout.timeline && timelinePreview && !sourceVisible ? <SceneSurface project={project} scene={{...scene,title,sceneType,assessmentItem,visualLayout:stageLayout}} timeMs={timelineTime} playing={timelinePlaying} onTime={setTimelineTime} onPlaying={setTimelinePlaying} audition={audition}/> : motionPreview > 0 ? <SceneSurface key={motionPreview} project={project} scene={{ ...scene, title, sceneType, assessmentItem, visualLayout: { ...(sceneTextDirty ? syncSceneText(layout, scene, title.trim(), screenText, generatedLayoutApplied) : layout), enabled: true } }} animate /> : sourceVisible ? scene.previewImage ? <img className="visual-source" src={`/api/projects/${project.id}/${scene.previewImage}`} alt={`Source slide ${scene.sourceSlide}`} /> : <p role="status">The original slide image is unavailable. Restore the retained source to prepare this scene.</p> : <ScaledStage layout={stageLayout} projectId={project.id}>{scale => <>{visibleSceneElements(stageLayout, title, Boolean(sceneType === "question" && assessmentItem)).map((element, index) => <Rnd key={element.id} scale={scale} position={{ x: element.x, y: element.y }} size={{ width: element.width, height: element.height }} lockAspectRatio={element.aspectLocked ?? false} resizeHandleClasses={{ bottomRight: "visual-resize-handle-se" }} disableDragging={busy || element.locked || editingText === element.id} enableResizing={multiSelection.includes(element.id) && !busy && !element.locked && editingText !== element.id} minWidth={20} minHeight={20} style={{ zIndex: index*2+1 }} onDragStart={event => { if (event.ctrlKey || event.metaKey) return false; if (!multiSelection.includes(element.id)) setSelection(element.id); }} onDragStop={(_, data) => moveElement(element.id,data.x,data.y)} onResizeStart={() => setFocusedElement(element.id)} onResizeStop={(_, __, reference, ___, position) => commit({ ...layout, elements: layout.elements.map(item => item.id === element.id ? { ...item, ...position, width: parseFloat(reference.style.width), height: parseFloat(reference.style.height) } : item) })}>
           <div role={editingText === element.id ? undefined : "button"} tabIndex={editingText === element.id ? undefined : 0} aria-label={`${element.kind === "text" ? element.text.slice(0, 50) || "Empty text" : element.name || element.shapeName || "Image"} element`} aria-pressed={editingText === element.id ? undefined : multiSelection.includes(element.id)} className={`visual-element visual-editable ${(multiSelection.includes(element.id)) ? "is-selected" : ""}`} style={{ transform: `rotate(${element.rotation}deg)` }} onFocus={event => { if (event.currentTarget.matches(":focus-visible") && !multiSelection.includes(element.id)) setSelection(element.id); }} onClick={event => selectObject(element.id, event.ctrlKey || event.metaKey)} onDoubleClick={() => { setSelection(element.id); if (element.kind === "text" && !element.locked && !busy) setEditingText(element.id); }} onKeyDown={event => { if (event.target instanceof HTMLTextAreaElement || !["Enter", " ", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return; if ((event.key === " " || event.key === "Enter") && (event.ctrlKey || event.metaKey)) { event.preventDefault(); selectObject(element.id, true); return; } if (!multiSelection.includes(element.id)) setSelection(element.id); if (element.locked || busy) return; if (event.key === "Enter" && element.kind === "text") { event.preventDefault(); setEditingText(element.id); return; } const step = event.shiftKey ? 10 : 1; const moves: Record<string, {x:number;y:number}> = {ArrowLeft:{x:-step,y:0},ArrowRight:{x:step,y:0},ArrowUp:{x:0,y:-step},ArrowDown:{x:0,y:step}}; if (moves[event.key]) { event.preventDefault(); moveElement(element.id,element.x+moves[event.key].x,element.y+moves[event.key].y); } }}>{editingText === element.id ? <textarea autoFocus aria-label="Edit canvas text" className="visual-inline-text" value={element.text} maxLength={50000} style={{fontSize:element.fontSize,fontFamily:element.fontFamily,color:"#202020",backgroundColor:"#fff"}} onChange={event => commit({...layout,elements:layout.elements.map(item => item.id === element.id ? {...item,text:event.target.value} : item)})} onBlur={() => setEditingText(null)} onKeyDown={event => { if(event.key === "Escape") { event.stopPropagation(); setEditingText(null); } }} /> : <ElementContent element={element} project={project} scene={scene} />}</div>
         </Rnd>)}{sceneType === "question" && assessmentItem && <Rnd scale={scale} bounds="parent" position={{ x: questionRegion.x, y: questionRegion.y }} size={{ width: questionRegion.width, height: questionRegion.height }} minWidth={120} minHeight={80} disableDragging={busy} enableResizing={!busy && selection === "assessment-region"} onMouseDown={() => setSelection("assessment-region")} style={{ zIndex: 2001 }} onDragStop={(_, data) => commit({ ...layout, assessmentRegion: { ...questionRegion, x: data.x, y: data.y } })} onResizeStop={(_, __, reference, ___, position) => commit({ ...layout, assessmentRegion: { ...position, width: parseFloat(reference.style.width), height: parseFloat(reference.style.height) } })}>
           <div className="assessment-stage-region" aria-label="Assessment component" style={{ inset: 0, width: "100%", height: "100%" }}><AssessmentStageContent item={assessmentItem} /></div>
         </Rnd>}</>}</ScaledStage>}
-        {<SceneTimeline layout={layout} project={project} commit={commit} selection={selection} select={setSelection} time={timelineTime} setTime={setTimelineTime} playing={timelinePlaying} setPlaying={setTimelinePlaying} preview={timelinePreview} setPreview={setTimelinePreview} disabled={busy || sourceVisible} audition={audition} onAudition={setAudition}/>}
         <section className="visual-attached-images" aria-label="Stage image content"><h3>Content</h3><div>{images.filter(asset => scene.imageAssets.includes(asset.id)).map(asset => <button type="button" key={asset.id} title={asset.filename} aria-label={`Add ${asset.filename}`} draggable={!busy} disabled={busy || sourceVisible} onDragStart={event => event.dataTransfer.setData("application/x-chimera-image", asset.id)} onClick={() => addImage(asset.id)}><img src={`/api/projects/${project.id}/assets/${asset.id}`} alt={asset.filename} /></button>)}</div><div className="visual-library-picker"><select aria-label="Image from media library" value={imageId} onChange={event => setImageId(event.target.value)}><option value="">Media library</option>{images.map(asset => <option key={asset.id} value={asset.id}>{asset.filename}</option>)}</select><button type="button" className="icon-button" title="Add selected image" aria-label="Add selected image" disabled={!imageId || busy || sourceVisible} onClick={() => addImage(imageId)}><ImagePlus size={18} /></button></div></section>
+        {<SceneTimeline layout={layout} project={project} commit={commit} selection={selection} select={setSelection} time={timelineTime} setTime={setTimelineTime} playing={timelinePlaying} setPlaying={setTimelinePlaying} preview={timelinePreview} setPreview={setTimelinePreview} disabled={busy || sourceVisible} audition={audition} onAudition={setAudition} onDurationValidityChange={setDurationValid}/>}
       </div>
       <aside className="visual-inspector" aria-label="Element properties">
         {selected && <InspectorSection title="Appearance"><ElementAppearanceControls element={selected} onChange={update} disabled={busy || selected.locked || sourceVisible}/></InspectorSection>}
@@ -400,7 +427,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
           {selected.kind === "text" ? <><label>Text<textarea ref={textInput} aria-label="Element text" rows={5} maxLength={50000} value={selected.text} onChange={event => update({text:event.target.value})} /></label><label>Font size<input type="number" min={1} max={500} value={selected.fontSize} onChange={event => { const value=event.target.valueAsNumber; if(value>=1 && value<=500) update({fontSize:value}); }} /></label><label>Text color<input type="color" value={selected.color} onChange={event => update({color:event.target.value})} /></label><label>Typeface<select value={selected.fontFamily} onChange={event => update({fontFamily:event.target.value})}>{[...new Set([selected.fontFamily,"sans-serif","serif","monospace","Manrope"])].map(font => <option key={font}>{font}</option>)}</select></label><div className="visual-formatting"><button type="button" aria-label="Bold" aria-pressed={selected.bold} onClick={() => update({bold:!selected.bold})}><b>B</b></button><button type="button" aria-label="Italic" aria-pressed={selected.italic} onClick={() => update({italic:!selected.italic})}><i>I</i></button><select aria-label="Text alignment" value={selected.align} onChange={event => update({align:event.target.value as SceneElement["align"]})}><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></div></> : selected.kind === "image" ? <><label>Image<select value={selected.assetId || ""} onChange={event => update({assetId:event.target.value})}>{images.map(asset => <option key={asset.id} value={asset.id}>{asset.filename}</option>)}</select></label><button type="button" className="button button-outline" onClick={() => update({crop:[0,0,0,0]})}>Reset crop</button></> : <p className="visual-shape-note">Extracted PowerPoint shape. Move, resize, rotate, layer, lock, or delete it on the canvas.</p>}
           </fieldset></InspectorSection>}
       </aside>
-    </div>}
+    </div> : null}
     <footer className="modal-actions"><button type="button" className="button button-outline" disabled={busy} onClick={onClose}>Cancel</button><button type="button" className="button button-accent" disabled={busy || !title.trim() || Boolean((scene.sourceSlide || scene.previewImage) && !scene.visualLayout && !canvasEdited) || layoutMode === "template" && !templateId} onClick={() => void save()}><Check size={16} />{busy ? "Saving" : "Save scene"}</button></footer>
   </EditorDialog>;
 }

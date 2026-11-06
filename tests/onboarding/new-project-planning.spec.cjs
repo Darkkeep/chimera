@@ -117,33 +117,78 @@ test('a failed New Project attachment can be retried without creating another pr
   expect(attempts).toBe(2);
 });
 
-test('rough drafts follow the expanded outline instead of the legacy five-scene default', async ({ page, request }) => {
+test('numbered advice stays in consultation until the author agrees a brief and explicitly requests a draft', async ({ page, request }) => {
   const titles = Array.from({ length: 12 }, (_, index) => `Expanded topic ${index + 1}`);
-  const state = { sessionId: 'outline-session', configured: true,
+  const sceneTitles = titles.flatMap(title => [`Explore ${title}`, `Practice ${title}`]);
+  let state = { sessionId: 'outline-session', configured: true,
     authorDirection: 'Create a concise rough sequence of up to five content scenes from the agreed conversation.',
     turns: [{ id: 'outline-turn', question: 'Expand the outline.', outlineItemCount: 12, status: 'completed', context: { sceneId: null, sourceIds: [] },
       result: { content: titles.map((title, i) => `${i + 1}. ${title}`).join('\n'), kind: 'answer', rationale: '', limits: [], producer_id: 'live-test-outline', stopping_boundary: 'advisory-only' } }], actions: [] };
   await page.route('**/pythia-conversation', route => route.fulfill({ json: state }));
+  let planningDecisions = 0;
+  let draftRequests = 0;
+  await page.route('**/pythia-conversation/planning', async route => {
+    planningDecisions++;
+    if (planningDecisions === 1) return route.fulfill({ status: 503, json: { detail: 'The brief could not be saved. Please retry.' } });
+    const body = route.request().postDataJSON();
+    expect(body.sessionId).toBe(state.sessionId);
+    state = { ...state, planning: { stage: body.stage, brief: body.brief, turnId: body.turnId } };
+    await route.fulfill({ json: state });
+  });
   await page.route('**/pythia-conversation/actions', async route => {
+    draftRequests++;
     const body = route.request().postDataJSON();
     expect(body.followOutline).toBe(true);
-    expect(body.direction).toContain('every top-level item');
+    expect(body.direction).toContain('learner-sized scene sequence');
+    expect(body.direction).toContain('Split topics or source slides');
     expect(body.direction).not.toContain('five');
-    await route.fulfill({ status: 202, json: { ...state, actions: [{ id: body.requestId, turnId: 'outline-turn', mode: 'add-scenes', sceneId: null,
-      direction: body.direction, sourceRevision: body.expectedRevision, before: null, status: 'pending', error: null,
-      result: { rationale: 'One scene per outline item.', producer_id: 'live-chimera-authoring-v1', changes: [], scenes: titles.map(title => ({ title, sceneType: 'content', extractedText: ['Rough content.'], narration: '', actionDescription: '', notes: '' })) } }] } });
+    state = { ...state, actions: [{ id: body.requestId, turnId: 'outline-turn', mode: 'add-scenes', sceneId: null,
+      direction: body.direction, designBrief: state.planning.brief, sourceRevision: body.expectedRevision, before: null, status: 'pending', error: null,
+      result: { rationale: 'Separate exploration from practice.', producer_id: 'live-chimera-authoring-v1', changes: [], scenes: sceneTitles.map(title => ({ title, sceneType: 'content', extractedText: ['Rough content.'], narration: '', actionDescription: '', notes: '' })) } }] };
+    await route.fulfill({ status: 202, json: state });
   });
   const title = 'Expanded-outline rough draft';
   const initial = await begin(page, title);
   await initial.getByRole('button', { name: 'Create & plan with Pythia', exact: true }).click();
   const planner = page.getByRole('dialog', { name: 'Plan your course', exact: true });
   await expect(planner.getByLabel('Author direction', { exact: true })).not.toHaveValue(/five/);
-  await expect(planner.getByRole('region', { name: 'Turn outline into scenes' })).toContainText('12 top-level items');
-  await planner.getByRole('button', { name: 'Create scene draft from outline', exact: true }).click();
-  await expect(planner.locator('.pythia-action-new-scene')).toHaveCount(12);
-  await expect(planner.getByRole('button', { name: 'Apply changes', exact: true })).toBeEnabled();
-  await planner.getByRole('button', { name: 'Review draft and apply 12 scenes', exact: true }).click();
-  await expect(planner.locator('.pythia-action-review')).toBeFocused();
+  await expect(planner.getByRole('region', { name: 'Turn outline into scenes' })).toHaveCount(0);
+  await expect(planner.getByRole('button', { name: 'Prepare a content draft from this advice', exact: true })).toHaveCount(0);
+  await planner.getByRole('button', { name: 'Review our design brief', exact: true }).click();
+  await expect(planner.getByRole('button', { name: 'Agree brief and explore scene design', exact: true })).toBeDisabled();
+  const agreedBrief = 'General audience. Explain the concepts with examples and practice. Duration remains open.';
+  await planner.getByRole('textbox', { name: 'Design brief', exact: true }).fill(agreedBrief);
+  await planner.getByRole('button', { name: 'Agree brief and explore scene design', exact: true }).click();
+  await expect(planner.getByRole('alert')).toContainText('The brief could not be saved');
+  await expect(planner.getByRole('textbox', { name: 'Design brief', exact: true })).toHaveValue(agreedBrief);
+  await expect(planner.getByRole('button', { name: 'Prepare a content draft from this advice', exact: true })).toHaveCount(0);
+  expect(draftRequests).toBe(0);
+  await planner.getByRole('button', { name: 'Agree brief and explore scene design', exact: true }).click();
+  expect(planningDecisions).toBe(2);
+  expect(draftRequests).toBe(0);
+  await expect(planner.getByRole('heading', { name: 'Explore the learning design', exact: true })).toBeVisible();
+  await planner.getByRole('button', { name: 'Open storyboard', exact: true }).click();
+  await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
+  const resumed = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
+  await expect(resumed.getByRole('heading', { name: 'Explore the learning design', exact: true })).toBeVisible();
+  await resumed.getByText('Your recorded design brief', { exact: true }).click();
+  await expect(resumed.getByText(agreedBrief, { exact: true })).toBeVisible();
+  await resumed.getByRole('button', { name: 'Return to consultation', exact: true }).click();
+  await expect(resumed.getByRole('button', { name: 'Prepare a content draft from this advice', exact: true })).toHaveCount(0);
+  await resumed.getByRole('button', { name: 'Review our design brief', exact: true }).click();
+  await expect(resumed.getByRole('textbox', { name: 'Design brief', exact: true })).toHaveValue(agreedBrief);
+  await resumed.getByRole('button', { name: 'Agree brief and explore scene design', exact: true }).click();
+  await resumed.getByRole('button', { name: 'Prepare a content draft from this advice', exact: true }).click();
+  await resumed.getByRole('button', { name: 'Generate content draft', exact: true }).click();
+  await expect(resumed.locator('.pythia-action-new-scene')).toHaveCount(24);
+  await expect(resumed.getByRole('button', { name: 'Apply changes', exact: true })).toBeEnabled();
+  await expect(resumed.locator('.pythia-action-review')).toBeFocused();
+  await resumed.getByText('Design brief used', { exact: true }).click();
+  await expect(resumed.locator('.pythia-action-review').getByText(agreedBrief, { exact: true })).toBeVisible();
+  expect(draftRequests).toBe(1);
+  expect((await new AxeBuilder({ page }).include('.pythia-talk-dialog').analyze()).violations).toEqual([]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await resumed.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
   const project = await projectByTitle(request, title);
   expect((await (await request.get(`/api/projects/${project.id}`)).json()).storyboard.scenes).toHaveLength(0);
 });
@@ -170,7 +215,10 @@ test('New Project holds a real source-grounded conversation until the author req
   await planner.getByRole('button', { name: 'Send to Pythia', exact: true }).click();
   await expect(planner.locator('.pythia-talk-answer')).toHaveCount(2, { timeout: 90000 });
   expect((await getProject()).storyboard.scenes).toHaveLength(0);
-  await planner.getByRole('button', { name: 'Draft rough scenes from this advice', exact: true }).last().click();
+  await planner.getByRole('button', { name: 'Review our design brief', exact: true }).click();
+  await planner.getByRole('textbox', { name: 'Design brief', exact: true }).fill('New operators need a self-paced orientation to choosing category labels and checking before sending. Use the supplied guide; no media or assessments.');
+  await planner.getByRole('button', { name: 'Agree brief and explore scene design', exact: true }).click();
+  await planner.getByRole('button', { name: 'Prepare a content draft from this advice', exact: true }).last().click();
   await planner.getByLabel('Author direction', { exact: true }).fill("Draft exactly two new content scenes, titled 'Choose the label' and 'Check before sending', each with one concise screen paragraph. Use the guide and our agreed self-paced plan. Do not add assessments or media.");
   await planner.getByRole('button', { name: 'Generate content draft', exact: true }).click();
   await expect(planner.getByRole('button', { name: 'Apply changes', exact: true })).toBeEnabled({ timeout: 90000 });
@@ -189,8 +237,8 @@ test('New Project holds a real source-grounded conversation until the author req
   await page.screenshot({ path: testInfo.outputPath('new-project-live-rough-scenes.png'), fullPage: true });
   await planner.getByRole('button', { name: 'Open storyboard', exact: true }).click();
   await page.reload();
-  await page.getByRole('button', { name: 'Talk to Pythia', exact: true }).click();
-  const restored = page.getByRole('dialog', { name: 'Talk to Pythia', exact: true });
+  await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
+  const restored = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
   await expect(restored.locator('.pythia-talk-answer')).toHaveCount(2);
   await expect(restored.getByText(/Applied to storyboard revision/)).toBeVisible();
 });

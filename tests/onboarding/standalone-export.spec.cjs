@@ -1,7 +1,17 @@
 const { test, expect } = require('@playwright/test');
 const { execFileSync } = require('node:child_process');
+const fs = require('node:fs/promises');
+const os = require('node:os');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+
+let extractedPath;
+test.afterEach(async () => {
+  if (extractedPath) {
+    await fs.rm(extractedPath, { recursive: true, force: true });
+    extractedPath = undefined;
+  }
+});
 
 test('standalone export runs directly from an extracted local folder without networking', async ({ page, request, browser }, testInfo) => {
   let project = await (await request.post('/api/projects', { data: { title: 'Local </script> course' } })).json();
@@ -66,7 +76,7 @@ test('standalone export runs directly from an extracted local folder without net
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/-standalone\.zip$/);
   const archivePath = testInfo.outputPath('course.zip');
-  const extractedPath = testInfo.outputPath('local course');
+  extractedPath = path.join(os.tmpdir(), `chimera-standalone-${project.id}`);
   await download.saveAs(archivePath);
   const python = require('./python.cjs');
   execFileSync(python, ['-m', 'zipfile', '-e', archivePath, extractedPath]);

@@ -18,8 +18,8 @@ export function SceneMediaLibrary({ project, scene, renderAsset, onEditScene, bu
   }, [project.id, project.storyboard.revision]);
   const attached = new Set(scene ? effectivePlacements(project, scene).map(item => item.assetId) : []);
   const intended = new Set(origins.filter(item => item.status === "approved" && item.sceneId === scene?.id).map(item => item.approvedAssetId));
-  const current = project.storyboard.assets.filter(asset => attached.has(asset.id) || intended.has(asset.id));
-  const other = project.storyboard.assets.filter(asset => !current.includes(asset));
+  const current = project.storyboard.assets.filter(asset => asset.kind !== "html5" && (attached.has(asset.id) || intended.has(asset.id)));
+  const other = project.storyboard.assets.filter(asset => asset.kind !== "html5" && !current.includes(asset));
   function card(asset: Asset) {
     const origin = origins.find(item => item.approvedAssetId === asset.id);
     const destination = project.storyboard.scenes.find(item => item.id === origin?.sceneId);

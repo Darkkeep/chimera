@@ -81,6 +81,13 @@ for (const theme of ['light', 'dark']) {
         expect(violations).toEqual([]);
         await dialog.getByRole('button', { name: 'Save question', exact: true }).click();
         await expect(dialog.getByText(/^Saved to/)).toBeVisible();
+        await expect(dialog.getByRole('status')).toContainText('Saved to');
+        await expect(dialog.getByRole('button', { name: 'Question saved', exact: true })).toBeVisible();
+        if (type === 'drag-drop') {
+          expect((await new AxeBuilder({ page }).include('.assessment-editor-dialog').withRules(['color-contrast']).analyze()).violations).toEqual([]);
+          expect(await dialog.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+          await page.screenshot({ path: test.info().outputPath('question-saved.png') });
+        }
         const saved = await (await request.get(`/api/projects/${project.id}`)).json();
         const item = saved.storyboard.scenes[0].assessmentItem;
         expect(item.type).toBe(type);
@@ -92,6 +99,9 @@ for (const theme of ['light', 'dark']) {
         await dialog.getByRole('button', { name: 'Close question editor', exact: true }).click();
         await page.getByRole('button', { name: 'Edit question', exact: true }).click();
         await expect(dialog.getByRole('textbox', { name: `Text for ${prefixes[0]}_A`, exact: true })).toHaveValue(`${prefixes[0]} answer A`);
+        await dialog.getByRole('textbox', { name: 'Question prompt', exact: true }).fill(`An updated ${type} prompt.`);
+        await expect(dialog.getByRole('button', { name: 'Save question', exact: true })).toBeVisible();
+        await expect(dialog.getByText(/^Saved to/)).toHaveCount(0);
         await page.screenshot({ path: test.info().outputPath(`${type}.png`) });
       }
     });

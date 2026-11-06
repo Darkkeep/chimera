@@ -9,7 +9,7 @@ from jsonschema import Draft202012Validator
 from pydantic import SecretStr, ValidationError
 from fastapi.testclient import TestClient
 
-from backend.app import ai_connection, enhancement_jobs, main, media_generation, storage
+from backend.app import ai_connection, enhancement_jobs, main, media_generation, pythia_talk, storage
 from backend.app.models import ProjectCreate, SceneCreate, EnhancementJobCreate, MediaGenerationJobCreate
 
 
@@ -74,6 +74,20 @@ class AIConnectionTests(unittest.TestCase):
             with ai_connection.request_budget(connection):
                 pass
 
+    def test_tool_run_reserves_all_seven_requests_before_launch(self):
+        self.save(maxRequestsPerDay=7)
+        connection = ai_connection.resolve_connection(self.root)
+        with ai_connection.request_budget(connection, requests=7):
+            pass
+        self.assertEqual(json.loads((self.root / "identity" / "ai-usage.json").read_text())["requests"], 7)
+        with self.assertRaisesRegex(RuntimeError, "daily"):
+            with ai_connection.request_budget(connection):
+                pass
+        for count in (0, 8):
+            with self.assertRaises(ValueError):
+                with ai_connection.request_budget(connection, requests=count):
+                    pass
+
     def test_test_connection_does_not_send_course_content(self):
         self.save()
         response = Mock(status=200)
@@ -114,11 +128,9 @@ class AIConnectionTests(unittest.TestCase):
         media = storage.create_media_generation_job(project.id, MediaGenerationJobCreate(kind="image", sceneId=scene_id, purpose="Illustration", prompt="Fixture"))
         self.assertIsNone(enhancement.aiConnectionRevision)
         self.assertEqual(media.aiConnectionRevision, saved["revision"])
-        self.assertEqual(enhancement_jobs._provider().name, "Pythia Engine")
+        self.assertEqual(enhancement_jobs._provider().name, "Pythia local live drafting")
         self.assertEqual(media_generation._provider(saved["revision"]).image_model, "gpt-image-1")
-        with patch.object(enhancement_jobs.PythiaProvider, "health", return_value={"status": "ok"}), patch.object(
-            enhancement_jobs.PythiaProvider, "capabilities", return_value={"capabilities": {"storyboard.enhance": {}}},
-        ):
+        with patch.object(pythia_talk, "local_mcp", return_value={"storyboard_enhancements": True}):
             self.assertTrue(enhancement_jobs.preview_enhancement_submission(
                 project.id, EnhancementJobCreate(scope="whole-course", goal="Check"),
             )["engineConfigured"])

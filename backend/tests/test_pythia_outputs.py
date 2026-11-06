@@ -54,7 +54,9 @@ class PythiaOutputTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'unavailable'):
                 storage.create_media_generation_job('project', MediaGenerationJobCreate(kind='video',sceneId='scene',purpose='Demo',prompt='Rolling ball'))
     def test_video_rejects_unsupported_dimensions_and_length(self):
-        for extra in ({'durationSeconds':8},{'width':1024,'height':1024}):
+        for extra in ({'durationSeconds':31},{'durationSeconds':3},{'width':1024,'height':1024}):
             with self.assertRaises(ValidationError): MediaGenerationJobCreate(kind='video',sceneId='scene',purpose='Demo',prompt='Rolling ball',**extra)
+        for seconds in (4, 8, 30):
+            self.assertEqual(MediaGenerationJobCreate(kind='video',sceneId='scene',purpose='Demo',prompt='Title',durationSeconds=seconds).durationSeconds, seconds)
 
 if __name__=='__main__': unittest.main()

@@ -58,6 +58,11 @@ def validate_project(project: ProjectDetail, target: Literal["authoring", "produ
     project_root = project_path(project.id).resolve()
     assets_root = (project_root / "assets").resolve()
     for scene in scenes:
+        if scene.html5Activity:
+            asset = asset_by_id.get(scene.html5Activity.assetId)
+            if not asset or asset.kind != "html5":
+                issues.append(ValidationIssue(severity="error", code="invalid-html5-reference", message="Imported HTML5 activity is missing.", sceneId=scene.id, sceneTitle=scene.title))
+            issues.append(ValidationIssue(severity="warning", code="html5-review-required", message="Review imported activity accessibility, text alternative and reported score/completion in the target LMS.", sceneId=scene.id, sceneTitle=scene.title))
         if scene.visualLayout and scene.visualLayout.timeline:
             for clip in scene.visualLayout.timeline.clips:
                 asset = asset_by_id.get(clip.assetId)

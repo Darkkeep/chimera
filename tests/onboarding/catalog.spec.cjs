@@ -345,7 +345,7 @@ test('editing waits for a real save, preserves failed drafts, and has independen
 test('media upload, attachment, credit and image description confirm persisted outcomes', async ({ page }) => {
   const id = await seed(page); await choose(page, 'Upload images or audio');
   await page.getByLabel('Add media', { exact: true }).setInputFiles({ name: 'guide.png', mimeType: 'image/png', buffer: image }); await finish(page);
-  await choose(page, 'Attach or detach media'); await page.getByRole('button', { name: 'Attach to scene', exact: true }).click(); await finish(page);
+  await choose(page, 'Attach or detach media'); await page.locator('.other-project-media > summary').click(); await page.getByRole('button', { name: 'Attach to scene', exact: true }).click(); await finish(page);
   await choose(page, 'Save media attribution'); await page.getByLabel('Attribution / credit').fill('Practice illustration, local fixture'); await page.getByRole('button', { name: 'Save credit' }).click(); await finish(page);
   await choose(page, 'Describe scene images');
   const descriptions = page.getByRole('dialog', { name: 'Image descriptions' });

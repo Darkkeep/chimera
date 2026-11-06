@@ -135,7 +135,13 @@ export function PublishedMedia({ project, scene, position, completedAudioKeys, o
   videoProgress?: Record<string, VideoProgress>;
   onVideoProgress?: (key: string, progress: VideoProgress) => void;
 }) {
-  const embedded = new Set(scene.visualLayout?.enabled ? scene.visualLayout.elements.filter(e => e.kind === "image").map(e => e.assetId) : []);
+  const embedded = new Set([
+    ...(!scene.experience && scene.visualLayout?.enabled ? scene.visualLayout.elements.filter(e => e.kind === "image").map(e => e.assetId) : []),
+    ...(scene.experience?.activities ?? []).flatMap(activity => activity.kind === "hotspots" && activity.imageAssetId
+      ? [activity.imageAssetId] : activity.kind === "software-walkthrough"
+        ? activity.steps.map(step => step.screenshotAssetId) : activity.kind === "before-after"
+          ? [activity.before.imageAssetId, activity.after.imageAssetId] : []),
+  ]);
   return <div className="published-media">{effectivePlacements(project, scene).filter(p => p.position === position && !embedded.has(p.assetId) && !scheduledAssets(scene).has(p.assetId)).map(placement => {
     const asset = project.storyboard.assets.find(a => a.id === placement.assetId);
     if (!asset) return null;

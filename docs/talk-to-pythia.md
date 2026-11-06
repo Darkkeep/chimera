@@ -1,11 +1,90 @@
-# Talk to Pythia directly
+# Consult Pythia directly
 
-Open a project and select **Talk to Pythia** in the workspace navigation. This
+Open a project and select **Consult Pythia** in the workspace navigation. This
 calls the local Pythia plugin's actual `pythia_consult` tool over MCP stdio, using
 Pythia's own Python environment and live `TextConversationProducer`. It is the
 adapter supplied by Pythia. A ChatGPT folder mention provides project context;
 it does not configure this adapter. This feature does not use Chimera's
 deterministic Engine authoring tasks, and there is no scripted-answer fallback.
+
+## Native scene experiences
+
+Select a storyboard scene and choose **Design experience**. This local-Pythia
+workflow is independent of the Engine status dropdown. It proposes a whole
+native learning scene, not a video storyboard: a responsive concept-flow
+diagram, meaningful click-reveal explanations, a conclusion, author-selected
+colors, and optional replayable motion. This first assembly slice supports
+content scenes without existing timeline or assessment components; it refuses
+to overwrite those components.
+
+The native schema also supports branching decisions, hotspots over a project
+image or a labelled schematic, sequencing and guided practice. Image-backed
+hotspots use the source image's aspect ratio and percentage coordinates; the
+separate explanation list keeps the author-defined reading order, and the
+project image remains credited and retained in portable delivery. These are
+formative activities with feedback, not graded assessments. It also supports a
+bounded scripted learner roleplay: authored follow-up messages, no live AI,
+network service, saved transcript, or evaluation. Pythia receives their schema
+and capability constraints with each explicit design request.
+All proposed content remains subject to validation and author review. You can instead start and save an
+experience without a model call using **Start native experience without
+Pythia**. See [native activity authoring](user-guide.md#author-native-activities-without-a-provider)
+for controls, route validation, accessible alternatives and progress behavior.
+
+1. Inspect **Context shared only when you request a design**. The scene's
+   content, layout, current native experience, narration text and notes are
+   supplied as context. Narration text does not authorize audio production.
+   Include the agreed design brief only if appropriate.
+2. Explicitly select up to five source documents and choose **Load selected
+   context**. Inspect their versioned passages. No source document is sent
+   merely because it exists in the project; no text is silently truncated.
+3. Give Pythia your learning and production direction, including the governing
+   brand direction when sources disagree. For the Sporting Merit reference,
+   the author's choice is the main DARKROGUE plum/violet/pink identity, not a
+   different section's palette. This is author direction, not a global theme.
+4. Choose **Ask Pythia for a scene experience**. This is the only initial
+   model call and may incur normal provider charges. Subsequent
+   **Refine experience with Pythia** calls include your current edits.
+   Nothing creates assets, changes scenes, renders video, or publishes.
+5. Review the learning intent, assumptions, flow, explanations, colors and
+   outstanding production work. Edit the literal content directly. Inspect
+   **Actual learner experience preview**: it is the real native playback,
+   not a mock picture. **Save treatment privately** persists edits without
+   changing the scene.
+6. Required production dependencies block application. Resolve them or make an
+   explicit author decision to defer them; optional needs remain documented.
+   A music filename is not evidence of licensing. This slice does not execute
+   media generation, music licensing, scored assessment design, or Shotstack
+   production.
+7. Check the review acknowledgement, then choose **Apply reviewed experience
+   to scene**. Application is revision-checked and source/brief drift requires
+   a refreshed design. The existing canvas and source text are retained, but
+   the native experience becomes the learner-facing stage. Existing media
+   attachments and revision history are preserved.
+8. Reopen to review the saved proposal. **Edit applied scene without Pythia**
+   allows provider-free native edits and explicit saving. **Restore underlying
+   canvas** requires a separate confirmation and removes only the native
+   experience.
+
+Keyboard and touch activation use native disclosure controls. **Show all
+explanations** provides a non-exploratory reading alternative. Text reflows
+on mobile instead of shrinking a fixed canvas; optional motion respects
+reduced-motion preferences and never gates reading.
+The experience review dialog uses available desktop width (up to 1,440px)
+and retains viewport gutters and compact padding on mobile.
+Its height is bounded by the backdrop, with one scrollable dialog surface
+so the final reveal fields, preview and application controls remain reachable.
+Text colors require 4.5:1 contrast, diagram accents 3:1. Body fonts use local system fonts.
+Chimera preview, standalone (including local-file playback), SCORM 2004 and
+SCORM 1.2 share this renderer. Printing and authored document snapshots expand
+all explanations. Reveal state is not a scored assessment or a promise of
+cross-session progress tracking.
+
+Private proposals retain source hashes/versions, author direction, agreed-brief
+snapshot and source revision. Drafts remain local to the actor/project/scene;
+the applied native experience travels with the project and exported course.
+Failed refinements preserve the previous proposal; retries are always explicit.
+No live-provider creative-quality qualification is implied by automated tests.
 
 ## Use
 
@@ -22,14 +101,31 @@ deterministic Engine authoring tasks, and there is no scripted-answer fallback.
 5. **Author direction** holds the author's constraints and preferences. It is
    included in the next question or draft request and saved when that request is
    submitted. Each message and content draft retains its own direction snapshot.
-6. **Draft changes from this advice** selects a completed answer. Choose
+6. Consultation is the default, even when Pythia replies with a numbered outline.
+   Discuss sources, audience, purpose, outcomes, constraints, approaches, and
+   unresolved questions at your own pace. Pythia receives the current process
+   stage and is asked to distinguish evidence, assumptions, suggestions, and
+   author decisions, not run a fixed questionnaire or jump to scenes.
+7. When ready, choose **Review our design brief**. Write or edit your brief.
+   **Use latest reply as a starting point** copies that reply only when you
+   choose it; it does not accept Pythia's suggestions automatically. The brief
+   is limited to 8,000 characters. Choose **Agree brief and explore scene design**
+   to save your decision without a model call or scene creation. Ask Pythia to
+   explore sequence, pacing, boundaries, and source coverage before production.
+   **Return to consultation** preserves the brief and history while closing new
+   draft controls. There is no required number of exchanges or mandatory form
+   fields beyond a nonempty author-reviewed brief.
+8. Only after that explicit decision, **Prepare a content draft from this advice**
+   selects a completed answer. Choose
    **Update selected scene** or **Add new content scenes**, provide author
    direction, and choose **Generate content draft**. Chimera shows literal
    before/after values or new scenes, rationale, target, and source revision.
-7. **Apply changes** commits the reviewed content through Chimera's normal
+   The agreed brief is sent with the draft and retained on its private record.
+   The backend also enforces this author-controlled transition.
+9. **Apply changes** commits the reviewed content through Chimera's normal
    scene authoring and revision history. **Discard draft** preserves the current
    storyboard. A newer storyboard revision requires a fresh draft.
-8. **New conversation** asks before clearing this account's saved conversation
+10. **New conversation** asks before clearing this account's saved conversation
    and drafts for the current project. It preserves applied scenes and sources.
 
 Messages, selected text and successful prior exchanges are sent to the model
@@ -41,6 +137,12 @@ storyboard edits automatically. Content drafts are applied only by the author's
 explicit **Apply changes** decision; they grant no release approval. The tools
 do not browse or create files. The conversation does not access
 ChatGPT history or Manteion's private conversations.
+
+Existing conversations without an explicitly saved brief open in consultation;
+completed replies and existing draft decisions are retained. The consultation
+stage and brief are private to the account/project conversation, survive reload,
+and reset with **New conversation**. Returning to consultation does not discard
+previous drafts or reverse applied content.
 
 ## Local configuration
 
@@ -211,14 +313,27 @@ hosted deployment, broader action capability or release acceptance is implied.
 
 ## Outline-driven first drafts
 
-Course planning and empty-project first drafts create one scene per top-level
-item in the selected expanded outline. Numbered lists and Markdown headings are
-supported; nested details become content within their parent scene. The old
-five-scene starter prompt is replaced when restoring saved author direction.
+Course planning and empty-project first drafts treat top-level outline items
+as coverage topics, not fixed scene boundaries. Numbered lists and Markdown
+headings identify those topics. Pythia may split a topic or source slide into
+several learner-sized scenes for explanation, examples, practice, and reflection,
+using learner-facing titles rather than copying planning headings. Review the
+content coverage and pacing: structural validation cannot prove instructional
+quality or that every substantive detail was retained.
+
+The old five-scene and one-scene-per-heading starter directions are replaced
+when restoring those exact defaults; custom author direction is preserved.
 There is no fixed total scene-count cap on this path.
 
-Chimera generates the outline in batches of four scenes, accounting for each
-model request against the saved daily allowance. Every batch must return the
-expected titles and count in order. Only a complete validated draft is offered
-for application; a failed or incomplete batch does not publish a partial draft
-or change the project. Apply changes appends the complete sequence atomically.
+Chimera requests one topic at a time with the full advice and successful
+conversation context, accounting for each model request against the saved daily
+allowance. This can require more provider calls than the previous four-heading
+batches. Every topic must return a valid nonempty scene sequence before the
+complete draft is offered for review. A failed batch does not publish a partial
+draft or change the project. Apply changes appends the complete sequence
+atomically. Existing scenes are not split or replaced by this add-scenes action;
+use **Transform with Pythia** for a reviewed replacement sequence.
+
+This path requires the local Pythia adapter's `outlineTopics` authoring support.
+Older adapters reject the new field rather than silently reverting to one scene
+per heading.

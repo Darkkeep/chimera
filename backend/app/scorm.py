@@ -37,11 +37,14 @@ APPEARANCE_RUNTIME = (Path(__file__).parent / "static" / "scene-appearance.js").
 
 TRANSPORT_RUNTIME = (Path(__file__).parent / "static" / "scene-transport.js").read_text(encoding="utf-8").replace("export function ", "function ")
 TIMELINE_POLICY = (Path(__file__).parent / "static" / "timeline-policy.js").read_text(encoding="utf-8").replace("export function ", "function ")
+EXPERIENCE_RUNTIME = (Path(__file__).parent / "static" / "scene-experience.js").read_text(encoding="utf-8").replace("export function ", "function ")
+EXPERIENCE_CSS = (Path(__file__).parent / "static" / "scene-experience.css").read_text(encoding="utf-8")
+HTML5_RUNTIME = (Path(__file__).parent / "static" / "html5-activity.js").read_text(encoding="utf-8").replace("export function ", "function ")
 
-PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
+PLAYER_JS = EXPERIENCE_RUNTIME + TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION_RUNTIME + CAPTION_RUNTIME + r'''
 (() => {
     const suspendDataLimit = 64000;
-    const state = { scenes: [], completionSettings: { passingScore: 80, includeOptionalAssessments: false }, current: 0, visited: new Set(), completedAudio: new Set(), videoProgress: {}, assessments: {}, remediation: null, startedAt: Date.now() };
+    const state = { scenes: [], completionSettings: { passingScore: 80, includeOptionalAssessments: false }, current: 0, visited: new Set(), completedAudio: new Set(), videoProgress: {}, experiences: {}, assessments: {}, remediation: null, startedAt: Date.now() };
   let api = null;
         let resumeChoicePending = false;
     let lmsWarningShown = false;
@@ -69,6 +72,8 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
     function suspendSnapshot() {
         const snapshot = { current: state.current, visited: [...state.visited], completedAudio: [...state.completedAudio], assessments: state.assessments, remediation: state.remediation };
         if (Object.keys(state.videoProgress).length) snapshot.videoProgress = state.videoProgress;
+        if (Object.keys(state.experiences).length) snapshot.experiences = state.experiences;
+        if (state.html5 && Object.keys(state.html5).length) snapshot.html5 = state.html5;
         return JSON.stringify(snapshot);
     }
     function utf8Size(text) {
@@ -189,10 +194,19 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
     function finish() {
         if (!save()) return;
         const required = state.scenes.filter(scene => scene.required);
-        const complete = state.scenes.length > 0 && required.every(scene => { if (!state.visited.has(scene.id)) return false; if (!scene.assessmentItem) return true; const result = state.assessments[scene.id]; const config = settings(scene); return result && result.attempts > 0 && (result.isCorrect === true || result.attempts >= config.maxAttempts); }) && state.scenes.filter(scene => scene.audioRequired).every(scene => (scene.audioAssets.length > 0 || scene.visualLayout?.timeline?.clips.some(c=>c.kind==="audio")) && scene.audioAssets.filter(id=>!scheduledAssets(scene).has(id)).every(id => state.completedAudio.has(`${scene.id}:${id}`))) && requiredVideos().every(({ key, threshold }) => videoCoverage(state.videoProgress[key]) >= threshold);
+        const complete = state.scenes.length > 0 && required.every(scene => { if (!state.visited.has(scene.id)) return false; if (!scene.assessmentItem) return true; const result = state.assessments[scene.id]; const config = settings(scene); return result && result.attempts > 0 && (result.isCorrect === true || result.attempts >= config.maxAttempts); }) && state.scenes.filter(scene => scene.audioRequired).every(scene => (scene.audioAssets.length > 0 || scene.visualLayout?.timeline?.clips.some(c=>c.kind==="audio")) && scene.audioAssets.filter(id=>!scheduledAssets(scene).has(id)).every(id => state.completedAudio.has(`${scene.id}:${id}`))) && requiredVideos().every(({ key, threshold }) => videoCoverage(state.videoProgress[key]) >= threshold)
+          && required.every(scene => !scene.html5Activity || scene.html5Activity.tracking === "view"
+            || state.html5?.[scene.id]?.assetId === scene.html5Activity.assetId && state.html5[scene.id].completed
+              && (scene.html5Activity.tracking !== "scored" || Number.isFinite(state.html5[scene.id].score)));
         const scored = state.scenes.filter(scene => scene.assessmentItem && (scene.required || (state.completionSettings.includeOptionalAssessments && (state.assessments[scene.id]?.attempts || 0) > 0)));
-        const totalWeight = scored.reduce((sum, scene) => sum + settings(scene).scoreWeight, 0);
-        const score = totalWeight ? Math.round(scored.reduce((sum, scene) => sum + (state.assessments[scene.id]?.isCorrect === true ? 100 : 0) * settings(scene).scoreWeight, 0) / totalWeight) : null;
+        const external = state.scenes.filter(scene => scene.html5Activity?.tracking === "scored"
+          && (scene.required || state.completionSettings.includeOptionalAssessments
+            && state.html5?.[scene.id]?.assetId === scene.html5Activity.assetId
+            && state.html5[scene.id].completed && Number.isFinite(state.html5[scene.id].score)));
+        const totalWeight = scored.reduce((sum, scene) => sum + settings(scene).scoreWeight, 0)
+          + external.reduce((sum, scene) => sum + scene.html5Activity.scoreWeight, 0);
+        const score = totalWeight ? Math.round((scored.reduce((sum, scene) => sum + (state.assessments[scene.id]?.isCorrect === true ? 100 : 0) * settings(scene).scoreWeight, 0)
+          + external.reduce((sum, scene) => sum + (state.html5?.[scene.id]?.assetId === scene.html5Activity.assetId && state.html5[scene.id].completed ? state.html5[scene.id].score || 0 : 0) * scene.html5Activity.scoreWeight, 0)) / totalWeight) : null;
         const passed = complete && (score === null || score >= state.completionSettings.passingScore);
         call("SetValue", ["cmi.completion_status", complete ? "completed" : "incomplete"]);
         call("SetValue", ["cmi.success_status", complete ? (passed ? "passed" : "failed") : "unknown"]);
@@ -279,6 +293,23 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
     let motionEnabled = true;
     let sceneTransport = null;
     function renderVisualScene(scene, body) {
+        if (scene.html5Activity) {
+            const data = globalThis.__CHIMERA_HTML5?.[scene.html5Activity.assetId];
+            if (!data) { body.textContent = "Imported activity is unavailable. Rebuild this course."; return; }
+            state.html5 ||= {};
+            stopStageAnimations = mountHTML5Activity(body, scene.html5Activity, data, {
+                progress: state.html5[scene.id],
+                onProgress: progress => { state.html5[scene.id] = progress; finish(); },
+            });
+            return;
+        }
+        if (scene.experience) {
+            stopStageAnimations = mountExperience(body, scene.experience, {
+                progress: state.experiences[scene.id] || {},
+                onProgress: progress => { state.experiences[scene.id] = progress; save(); },
+            });
+            return;
+        }
         const layout = scene.visualLayout;
         const frame = document.createElement("div");
         frame.className = "visual-stage-frame";
@@ -367,7 +398,7 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
     document.querySelector("#scene-title").textContent = scene.title;
     const body = document.querySelector("#scene-body");
     if (visualObserver) { visualObserver.disconnect(); visualObserver = null; }
-    const visual = scene.visualLayout && scene.visualLayout.enabled;
+    const visual = Boolean(scene.html5Activity || scene.experience || scene.visualLayout && scene.visualLayout.enabled);
     const nativeSlide = !visual && !scene.previewImage && scene.layoutMode === "native";
     document.querySelector("#scene-title").className = nativeSlide || scene.assessmentItem ? "sr-only" : "";
     body.innerHTML = (state.remediation && state.remediation.remediationSceneId === scene.id ? `<button type="button" data-return-assessment>Return to question</button>` : "") + (visual ? "" : nativeSlide ? `<section class="native-slide" aria-label="Scene content"><h3>${escapeHtml(scene.title)}</h3><div>${text(scene)}</div></section>` : text(scene));
@@ -391,7 +422,13 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
     if (returnButton) returnButton.addEventListener("click", () => { state.current = state.scenes.findIndex(item => item.id === state.remediation.assessmentSceneId); state.remediation = null; save(); render(); });
     const media = document.querySelector("#scene-media"); media.innerHTML = "";
     const before = document.querySelector("#scene-media-before"); before.innerHTML = "";
-    const embeddedImages = new Set(visual ? scene.visualLayout.elements.filter(e => e.kind === "image").map(e => e.assetId) : []);
+    const embeddedImages = new Set([
+        ...(visual && !scene.experience ? scene.visualLayout.elements.filter(e => e.kind === "image").map(e => e.assetId) : []),
+        ...(scene.experience?.activities || []).flatMap(activity => activity.kind === "hotspots" && activity.imageAssetId
+            ? [activity.imageAssetId] : activity.kind === "software-walkthrough"
+                ? activity.steps.map(step => step.screenshotAssetId) : activity.kind === "before-after"
+                  ? [activity.before.imageAssetId, activity.after.imageAssetId] : []),
+    ]);
     const placements = scene.mediaPlacements?.length ? scene.mediaPlacements : [...(scene.imageAssets || []), ...(scene.audioAssets || []), ...(scene.videoAssets || [])].map(assetId => ({ assetId, position: "after" }));
     placements.forEach(placement => {
         const id = placement.assetId, asset = window.__CHIMERA_ASSETS[id];
@@ -476,7 +513,8 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
       let lastSaved = 0, playRequested = false;
       const controller=createSceneTransport({root:body,stage,layout,resolveAsset:id=>window.__CHIMERA_ASSETS[id],initialTimeMs:(state.videoProgress[`clock:${scene.id}`]?.position||0)*1000,
         progress:Object.fromEntries(timeline.clips.map(c=>[c.id,state.videoProgress[clipProgressKey(scene.id,c)]]).filter(([,v])=>v)),
-        onUpdate:(time,playing)=>{seek.value=String(time);output.textContent=`${formatTime(time)} / ${formatTime(timeline.durationMs)}`;play.textContent=playing?'Pause scene':'Play scene';if(time>=timeline.durationMs)playRequested=false;state.videoProgress[`clock:${scene.id}`]={position:time/1000,duration:timeline.durationMs/1000,watchedRanges:[]};if(!playing||time-lastSaved>5000){lastSaved=time;save();}},
+        onUpdate:(time,playing)=>{seek.value=String(time);output.textContent=`${formatTime(time)} / ${formatTime(timeline.durationMs)}`;play.textContent=playing?'Pause scene':'Play scene';if(playing)playRequested=true;if(time>=timeline.durationMs)playRequested=false;state.videoProgress[`clock:${scene.id}`]={position:time/1000,duration:timeline.durationMs/1000,watchedRanges:[]};if(!playing||time-lastSaved>5000){lastSaved=time;save();}},
+        onInteraction:()=>{playRequested=false;},
         onProgress:(id,value)=>{const clip=timeline.clips.find(c=>c.id===id);if(clip){state.videoProgress[clipProgressKey(scene.id,clip)]=value;finish();}},onError:message=>{if(!message.startsWith('Media is buffering'))playRequested=false;runtimeStatus(message);}});
       sceneTransport=controller;
       // A deterministic snapshot hook is also used by Word scene rendering.
@@ -487,8 +525,10 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
       mute.onclick=()=>{const muted=mute.getAttribute('aria-pressed')!=='true';controller.setAudition({muted:muted?timeline.clips.map(clip=>clip.id):[],solo:null});mute.setAttribute('aria-pressed',String(muted));mute.textContent=muted?'Unmute audio':'Mute audio';};
       seek.oninput=()=>controller.seek(Number(seek.value));
       for(const {node,asset,clip} of controller.media){
-        node.addEventListener('waiting',()=>{if(playRequested){play.textContent='Cancel playback';runtimeStatus('Buffering media. Playback will resume when it is ready.');}});
-        node.addEventListener('canplay',()=>{if(playRequested && !controller.playing && !document.hidden){controller.play();if(document.querySelector('#runtime-status').textContent.startsWith('Buffering media.'))runtimeStatus(api?'Connected to LMS tracking.':'Media ready.');}});
+        node.addEventListener('waiting',()=>{if(playRequested && !controller.playing){play.textContent='Cancel playback';runtimeStatus('Buffering media. Playback will resume when it is ready.');}});
+        const resumeReadyMedia=()=>{if(playRequested && !controller.playing && !document.hidden && node.readyState>=3 && !node.seeking){controller.play();if(document.querySelector('#runtime-status').textContent.startsWith('Buffering media.'))runtimeStatus(api?'Connected to LMS tracking.':'Media ready.');}};
+        node.addEventListener('canplay',resumeReadyMedia);
+        node.addEventListener('seeked',resumeReadyMedia);
         if(asset?.captionsVtt)installCaptionTrack(node,asset.captionsVtt,asset.language||'en');
         if(asset?.transcript){const details=document.createElement('details'),summary=document.createElement('summary'),text=document.createElement('p');summary.textContent=`Transcript: ${clip.name||asset.filename}`;text.textContent=asset.transcript;details.append(summary,text);body.appendChild(details);}
       }
@@ -506,19 +546,29 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
     const courseProgress = document.querySelector("#course-progress"); courseProgress.max = state.scenes.length; courseProgress.value = state.visited.size;
     courseProgress.title = `${state.visited.size} of ${state.scenes.length} scenes visited`;
     const article = document.querySelector(".player-main"); article.scrollTop = 0;
-    document.querySelector("#motion").hidden = Boolean(scene.visualLayout?.timeline) || !scene.visualLayout?.elements.some(element => element.animations && Object.values(element.animations).some(phase => phase.effect !== "none"));
+    document.querySelector("#motion").hidden = Boolean(scene.html5Activity || scene.experience || scene.visualLayout?.timeline) || !scene.visualLayout?.elements.some(element => element.animations && Object.values(element.animations).some(phase => phase.effect !== "none"));
     document.querySelector("#motion").textContent = motionEnabled ? "Stop motion" : "Play motion";
     finish();
   }
   async function start() {
                 const localCourse = window.__CHIMERA_STORYBOARD;
-                api = localCourse ? null : findApi(); if (!api) runtimeStatus(localCourse ? "Local course: progress is kept only while this page is open." : "Preview mode: no LMS tracking connection detected."); if (api) { const initialized = call("Initialize", [""]); if (initialized !== true && initialized !== "true") { runtimeStatus("LMS initialization failed; progress and grades will not be saved."); api = null; } else { runtimeStatus("Connected to LMS tracking."); const location = Number(call("GetValue", ["cmi.location"])); if (Number.isInteger(location) && location >= 0) state.current = location; try { const saved = JSON.parse(call("GetValue", ["cmi.suspend_data"]) || "{}"); (saved.visited || []).forEach(id => state.visited.add(id)); (saved.completedAudio || []).forEach(key => state.completedAudio.add(key)); state.videoProgress = saved.videoProgress || {}; state.assessments = saved.assessments || {}; state.remediation = saved.remediation || null; } catch (_) { savedProgressUnreadable = true; runtimeStatus("Saved progress could not be read. Close this course and contact the administrator; existing progress will not be overwritten."); } } }
+                api = localCourse ? null : findApi(); if (!api) runtimeStatus(localCourse ? "Local course: progress is kept only while this page is open." : "Preview mode: no LMS tracking connection detected."); if (api) { const initialized = call("Initialize", [""]); if (initialized !== true && initialized !== "true") { runtimeStatus("LMS initialization failed; progress and grades will not be saved."); api = null; } else { runtimeStatus("Connected to LMS tracking."); const location = Number(call("GetValue", ["cmi.location"])); if (Number.isInteger(location) && location >= 0) state.current = location; try { const saved = JSON.parse(call("GetValue", ["cmi.suspend_data"]) || "{}"); (saved.visited || []).forEach(id => state.visited.add(id)); (saved.completedAudio || []).forEach(key => state.completedAudio.add(key)); state.videoProgress = saved.videoProgress || {}; state.experiences = saved.experiences || {}; state.assessments = saved.assessments || {}; state.remediation = saved.remediation || null; } catch (_) { savedProgressUnreadable = true; runtimeStatus("Saved progress could not be read. Close this course and contact the administrator; existing progress will not be overwritten."); } } }
+        if (api && !savedProgressUnreadable) {
+            try {
+              const progress = JSON.parse(call("GetValue", ["cmi.suspend_data"]) || "{}").html5 || {};
+              if (typeof progress !== "object" || Array.isArray(progress) || Object.values(progress).some(value => !isHTML5Progress(value)))
+                throw new Error("Invalid saved activity progress");
+              state.html5 = progress;
+            }
+            catch (_) { savedProgressUnreadable = true; runtimeStatus("Saved activity progress could not be read; existing progress will not be overwritten."); }
+        }
         const storyboard = localCourse || await (await fetch("storyboard.json")).json(); state.scenes = storyboard.scenes || []; state.completionSettings = storyboard.completionSettings || state.completionSettings;
     window.__CHIMERA_ASSETS = Object.fromEntries((storyboard.assets || []).map(asset => [asset.id, { ...asset, path: asset.path }]));
     const requiredVideoKeys = new Set(requiredVideos().map(item => item.key));
     for(const scene of state.scenes){if(scene.visualLayout?.timeline)requiredVideoKeys.add(`clock:${scene.id}`);for(const clip of scene.visualLayout?.timeline?.clips||[])requiredVideoKeys.add(clipProgressKey(scene.id,clip));}
     state.videoProgress = Object.fromEntries(Object.entries(state.videoProgress).flatMap(([key, value]) => {
-        const progress = requiredVideoKeys.has(key) ? normalizeVideoProgress(value) : null;
+        const clock = state.scenes.find(scene => key === `clock:${scene.id}`)?.visualLayout?.timeline;
+        const progress = clock ? normalizeTimelineClock(clock, value) : requiredVideoKeys.has(key) ? normalizeVideoProgress(value) : null;
         return progress ? [[key, progress]] : [];
     }));
     if (!Number.isInteger(state.current) || state.current < 0 || state.current >= state.scenes.length) state.current = 0;
@@ -553,6 +603,8 @@ PLAYER_JS = TRANSPORT_RUNTIME + TIMELINE_POLICY + APPEARANCE_RUNTIME + ANIMATION
                     state.visited.clear();
                     state.completedAudio.clear();
                     state.videoProgress = {};
+                    state.experiences = {};
+                    state.html5 = {};
                     state.assessments = {};
                     state.remediation = null;
                     resolve();
@@ -587,7 +639,10 @@ PLAYER_HTML = '''<!doctype html>
 PLAYER_HTML = PLAYER_HTML.replace("</head>", "<style>" + (Path(__file__).parent / "static" / "player-shell.css").read_text(encoding="utf-8") + "</style></head>")
 
 
-PLAYER_HTML = PLAYER_HTML.replace("</head>", f"<style>{ASSESSMENT_SURFACE_CSS}</style></head>")
+PLAYER_HTML = PLAYER_HTML.replace(
+    "</head>",
+    f"<style>{ASSESSMENT_SURFACE_CSS}\n{EXPERIENCE_CSS}\n.mobile-contents{{overflow-x:hidden}}</style></head>",
+)
 
 
 def _scorm_12_player() -> str:
@@ -745,6 +800,35 @@ def _resume_budget_report(project: ProjectDetail, profile: str) -> dict[str, obj
                 "videoProgress": video_progress,
                 "assessments": assessments,
                 "remediation": {"assessmentSceneId": longest_scene, "remediationSceneId": longest_scene}}
+    experiences = {}
+    for scene in scenes:
+        progress = {}
+        for activity in scene.experience.activities if scene.experience else []:
+            if activity.kind == "external-link":
+                continue  # Consent is ephemeral; external launches report no results.
+            elif activity.kind == "learner-conversation":
+                continue  # Learner text remains local and is never part of resume data.
+            elif activity.kind == "branching":
+                progress[activity.id] = {"path": [5] * len(activity.nodes)}
+            elif activity.kind == "hotspots":
+                progress[activity.id] = {"opened": [point.id for point in activity.hotspots]}
+            elif activity.kind == "sequencing":
+                progress[activity.id] = {"order": [item.id for item in activity.items]}
+            elif activity.kind == "software-walkthrough":
+                progress[activity.id] = {"completedSteps": [step.id for step in activity.steps]}
+            elif activity.kind == "before-after":
+                progress[activity.id] = {"reviewedImages": [activity.before.imageAssetId, activity.after.imageAssetId]}
+            elif activity.kind == "guided-practice":
+                progress[activity.id] = {"answers": [step.correctChoiceId for step in activity.steps]}
+        if progress:
+            experiences[scene.id] = progress
+    if experiences:
+        snapshot["experiences"] = experiences
+    html5 = {scene.id: {"assetId": scene.html5Activity.assetId, "completed": True, "score": 100,
+                       "suspendData": "\x00" * 2000, "location": "\x00" * 200}
+             for scene in scenes if scene.html5Activity}
+    if html5:
+        snapshot["html5"] = html5
     size = len(json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
     return {"budgetBytes": 4096 if profile == "SCORM 1.2" else 64000,
             "estimatedMaximumBytes": size, "encoding": "JSON UTF-8", "overflowPolicy": "warn-and-retain-previous-save",
@@ -816,6 +900,19 @@ def _published_storyboard_json(project: ProjectDetail) -> bytes:
     return json.dumps(storyboard, indent=2).encode("utf-8")
 
 
+def _html5_data_script(project: ProjectDetail) -> bytes:
+    root = project_path(project.id).resolve()
+    documents = {}
+    for asset in project.storyboard.assets:
+        if asset.kind != "html5":
+            continue
+        path = (root / _safe_package_path(asset.path)).resolve()
+        if not path.is_relative_to(root / "assets") or not path.is_file():
+            raise ValueError(f"Imported activity is unavailable: {asset.filename}")
+        documents[asset.id] = json.loads(path.read_text(encoding="utf-8"))
+    return ("globalThis.__CHIMERA_HTML5 = " + json.dumps(documents) + ";\n").encode()
+
+
 def _ensure_build_revision(project: ProjectDetail) -> None:
     current = read_project(project.id)
     if current.storyboard.revision != project.storyboard.revision:
@@ -841,7 +938,7 @@ def _build_scorm_2004_locked(project: ProjectDetail) -> tuple[bytes, dict[str, o
     files: dict[str, bytes] = {
         "imsmanifest.xml": _manifest(project),
         "index.html": PLAYER_HTML.encode("utf-8"),
-        "player.js": PLAYER_JS.encode("utf-8"),
+        "player.js": _html5_data_script(project) + HTML5_RUNTIME.encode("utf-8") + PLAYER_JS.encode("utf-8"),
         "storyboard.json": _published_storyboard_json(project),
     }
     for asset in project.storyboard.assets:
@@ -894,7 +991,7 @@ def _build_scorm_12_locked(project: ProjectDetail) -> tuple[bytes, dict[str, obj
     files: dict[str, bytes] = {
         "imsmanifest.xml": _manifest_12(project),
         "index.html": PLAYER_HTML.encode("utf-8"),
-        "player.js": _scorm_12_player().encode("utf-8"),
+        "player.js": _html5_data_script(project) + HTML5_RUNTIME.encode("utf-8") + _scorm_12_player().encode("utf-8"),
         "storyboard.json": _published_storyboard_json(project),
     }
     for asset in project.storyboard.assets:

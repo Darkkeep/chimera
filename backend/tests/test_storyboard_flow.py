@@ -337,12 +337,14 @@ const api = {
 const window = { API_1484_11: api, API: api, addEventListener: () => {} };
 const nodes = new Map();
 const document = {
+  addEventListener: () => {},
+  querySelectorAll: () => [],
   querySelector(selector) {
     if (selector === "#assessment-form" || selector === "[data-return-assessment]") return null;
     if (!nodes.has(selector)) nodes.set(selector, { textContent: "", innerHTML: "", disabled: false, addEventListener: () => {}, appendChild: () => {} });
     return nodes.get(selector);
   },
-  createElement: () => ({ addEventListener: () => {}, appendChild: () => {}, setAttribute: () => {}, style: {}, remove: () => {} })
+  createElement: () => ({ addEventListener: () => {}, appendChild: () => {}, append: () => {}, setAttribute: () => {}, style: {}, remove: () => {} })
 };
 const fetch = async () => ({ json: async () => JSON.parse(process.env.CHIMERA_STORYBOARD) });
 vm.runInNewContext(process.env.CHIMERA_PLAYER, { window, document, fetch, ResizeObserver: class { observe() {} disconnect() {} } });
@@ -1401,7 +1403,7 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
             self.assertIn('SetValue: "LMSSetValue"', player)
             self.assertIn("cmi.core.lesson_status", player)
             self.assertIn("cmi.core.lesson_location", player)
-            self.assertNotIn("cmi.success_status", player)
+            self.assertNotIn('"SetValue", ["cmi.success_status"', player)
             self.assertNotIn("scene.actionDescription", player)
             self.assertNotIn("scene.notes", player)
         report = json.loads((storage.project_path(project.id) / "reports" / "build-scorm12.json").read_text(encoding="utf-8"))

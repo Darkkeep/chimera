@@ -24,8 +24,9 @@ async function openConversation(page, request, title) {
   project = await response.json();
   await page.goto('/');
   await page.getByRole('combobox', { name: 'Switch project', exact: true }).selectOption(project.id);
-  await page.getByRole('button', { name: 'Talk to Pythia', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Talk to Pythia', exact: true });
+  await expect(page.getByRole('navigation', { name: 'Workspace', exact: true }).getByRole('button').first()).toHaveText('Consult Pythia');
+  await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
   await expect(dialog.getByLabel('Your message', { exact: true })).toBeEnabled();
   return { project, dialog };
 }
@@ -90,7 +91,15 @@ test('prior exchanges roll up and processing animates for consultations and draf
       sourceRevision: project.storyboard.revision, status: 'drafting', before: { title: 'Fictional approval queue' }, result: null, error: null }] };
     await route.fulfill({ status: 202, json: state });
   });
-  await dialog.getByRole('button', { name: 'Draft changes from this advice', exact: true }).last().click();
+  await page.route('**/pythia-conversation/planning', async route => {
+    const body = route.request().postDataJSON();
+    state = { ...state, planning: { stage: body.stage, brief: body.brief, turnId: body.turnId } };
+    await route.fulfill({ json: state });
+  });
+  await dialog.getByRole('button', { name: 'Review our design brief', exact: true }).click();
+  await dialog.getByRole('textbox', { name: 'Design brief', exact: true }).fill('Help new operators navigate the approval queue. Clarify the existing title.');
+  await dialog.getByRole('button', { name: 'Agree brief and explore scene design', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Prepare a content draft from this advice', exact: true }).last().click();
   await dialog.getByLabel('Author direction', { exact: true }).fill('Make the title clearer.');
   await dialog.getByRole('button', { name: 'Generate content draft', exact: true }).click();
   await expect(processing).toBeVisible();
@@ -128,8 +137,8 @@ test('real local Pythia answers, revises and recovers browser history', async ({
   await page.screenshot({ path: testInfo.outputPath('pythia-live-desktop.png'), fullPage: true });
   await dialog.getByRole('button', { name: 'Close Pythia conversation', exact: true }).click();
   await page.reload();
-  await page.getByRole('button', { name: 'Talk to Pythia', exact: true }).click();
-  const restored = page.getByRole('dialog', { name: 'Talk to Pythia', exact: true });
+  await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
+  const restored = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
   await expect(restored.locator('.pythia-talk-answer')).toHaveCount(2);
   expect(await restored.locator('.pythia-talk-answer > div > p').allTextContents()).toEqual(answers);
   await page.setViewportSize({ width: 390, height: 844 });

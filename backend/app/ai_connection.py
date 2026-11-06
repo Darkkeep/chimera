@@ -198,8 +198,10 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 @contextmanager
-def request_budget(connection: Connection) -> Iterator[None]:
+def request_budget(connection: Connection, *, requests: int = 1) -> Iterator[None]:
     from .storage import storyboard_transaction
+    if not 1 <= requests <= 7:
+        raise ValueError("Reserve between 1 and 7 provider requests")
 
     identifier = str(connection.root.resolve())
     with _usage_lock, storyboard_transaction():
@@ -209,9 +211,9 @@ def request_budget(connection: Connection) -> Iterator[None]:
         usage = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
         today = datetime.now(timezone.utc).date().isoformat()
         count = usage.get("requests", 0) if usage.get("date") == today else 0
-        if count >= connection.max_requests_per_day:
+        if count + requests > connection.max_requests_per_day:
             raise RuntimeError("The daily AI request limit has been reached.")
-        _atomic_json(path, {"date": today, "requests": count + 1})
+        _atomic_json(path, {"date": today, "requests": count + requests})
         _active_requests[identifier] = _active_requests.get(identifier, 0) + 1
     try:
         yield

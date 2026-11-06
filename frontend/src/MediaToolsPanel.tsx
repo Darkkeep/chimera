@@ -8,7 +8,7 @@ import "./media-tools.css";
 type SharedRecord = { id: string; asset: Asset; createdAt: string };
 type Capability = { canPublishShared: boolean; ocr: { available: boolean; languages: string[]; message: string } };
 
-export function MediaToolsPanel({ project, scene, onProjectUpdated }: { project: Project; scene?: Scene; onProjectUpdated: (p: Project) => void }) {
+export function MediaToolsPanel({ project, scene, onProjectUpdated, onBusyChange }: { project: Project; scene?: Scene; onProjectUpdated: (p: Project) => void; onBusyChange?: (busy: boolean) => void }) {
   const [shared, setShared] = useState<SharedRecord[]>([]);
   const [capability, setCapability] = useState<Capability | null>(null);
   const [selected, setSelected] = useState("");
@@ -18,9 +18,11 @@ export function MediaToolsPanel({ project, scene, onProjectUpdated }: { project:
   const [captions, setCaptions] = useState("");
   const [language, setLanguage] = useState("en");
   const [busy, setBusy] = useState(false);
+  useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const asset = project.storyboard.assets.find(a => a.id === selected) ?? project.storyboard.assets[0];
+  const mediaAssets = project.storyboard.assets.filter(a => a.kind !== "html5");
+  const asset = mediaAssets.find(a => a.id === selected) ?? mediaAssets[0];
   const placements = scope === "course" ? project.storyboard.courseMedia ?? [] : scene ? scenePlacements(scene) : [];
   const placed = Boolean(asset && placements.some(p => p.assetId === asset.id));
   const uses = asset ? project.storyboard.scenes.filter(s => effectivePlacements(project, s).some(p => p.assetId === asset.id)) : [];
@@ -67,7 +69,7 @@ export function MediaToolsPanel({ project, scene, onProjectUpdated }: { project:
       <p className="field-hint">Place project media on one scene or throughout the course. Shared media is copied into this project before use.</p>
       {error && <p role="alert" className="visual-editor-error">{error}</p>}{notice && <p role="status">{notice}</p>}
       <div className="media-tools-columns"><section><h3>Project media</h3>
-        <label>Media<select value={asset?.id ?? ""} onChange={e => setSelected(e.target.value)} disabled={busy || !project.storyboard.assets.length}><option value="" disabled>Select media</option>{project.storyboard.assets.map(a => <option value={a.id} key={a.id}>{a.filename}</option>)}</select></label>
+        <label>Media<select value={asset?.id ?? ""} onChange={e => setSelected(e.target.value)} disabled={busy || !mediaAssets.length}><option value="" disabled>Select media</option>{mediaAssets.map(a => <option value={a.id} key={a.id}>{a.filename}</option>)}</select></label>
         {asset && <><p className="field-hint">{uses.length ? `Used in ${uses.map(s => s.title).join(", ")}` : "No placements yet."}{asset.sharedSourceId ? " · Pinned copy from shared library" : ""}</p>
           <div className="media-tools-row"><label>Placement scope<select value={scope} onChange={e => setScope(e.target.value as "scene" | "course")} disabled={busy}><option value="scene">Selected scene</option><option value="course">Entire course</option></select></label><label>Media order<input type="number" min={0} max={10000} value={placement.order} disabled={busy} onChange={e => setPlacement({ ...placement, order: Number(e.target.value) })} /></label></div>
           <label>Position<select value={placement.position} disabled={busy} onChange={e => setPlacement({ ...placement, position: e.target.value as "before" | "after" })}><option value="before">Before scene content</option><option value="after">After scene content</option></select></label>

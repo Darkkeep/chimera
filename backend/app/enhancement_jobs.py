@@ -8,7 +8,7 @@ from typing import Protocol, get_args
 
 from .ai_context import course_context, scene_context
 from .models import CourseCompletionSettings, EnhancementField, EnhancementJob, EnhancementJobCreate, EnhancementProposalCreate, EnhancementReferenceCitation, SceneUpdate
-from .models import EnhancementResourceConflict
+from .models import EnhancementResourceConflict, EnhancementSceneDraft, EnhancementToolExecution, EnhancementResearchSource
 from . import storage
 from .learning_intelligence import PythiaProvider, PythiaUnavailableError
 
@@ -115,7 +115,24 @@ class PythiaEnhancementProvider:
         raise RuntimeError("Intelligence Engine task did not finish within 120 seconds")
 
 
+class LocalPythiaEnhancementProvider:
+    name = "Pythia local live drafting"
+    model = "configured-text-model"
+
+    def generate(self, payload: dict[str, object]) -> object:
+        from . import pythia_talk as talk
+        if not talk.CAPACITY.acquire(blocking=False):
+            raise RuntimeError("Two Pythia operations are already active. Retry explicitly when one finishes.")
+        try:
+            return talk.local_mcp(enhancement_request=payload)
+        finally:
+            talk.CAPACITY.release()
+
+
 def _provider() -> EnhancementProvider:
+    from .platform import get_actor_context
+    if get_actor_context().deploymentMode == "single-user":
+        return LocalPythiaEnhancementProvider()
     return PythiaEnhancementProvider()
 
 
@@ -140,6 +157,8 @@ def _load_job_context(job: EnhancementJob) -> tuple[dict[str, object], dict[tupl
         version = next((item for item in resource.versions if item.version == version_number), None)
         if version is None:
             raise ValueError("A selected reference version is no longer available")
+        if version.extractionStatus != "complete" or not version.passages:
+            raise ValueError("A selected reference has no complete readable text. Remove it or upload a readable source.")
         selected_resources.append({
             "id": resource.id,
             "title": resource.title,
@@ -164,6 +183,7 @@ def _load_job_context(job: EnhancementJob) -> tuple[dict[str, object], dict[tupl
         "fieldValueSchemas": {
             "$defs": scene_schema.get("$defs", {}),
             "sceneFields": {field: schema for field, schema in scene_schema["properties"].items() if field in allowed_fields},
+            "additionalScenes": {"type": "array", "minItems": 1, "maxItems": 40, "items": EnhancementSceneDraft.model_json_schema()},
             "globalFields": {
                 "sceneOrder": {"type": "array", "items": {"type": "string", "enum": job.sceneIds}, "minItems": len(job.sceneIds), "maxItems": len(job.sceneIds), "uniqueItems": True},
                 "storyboardTitle": {"type": "string", "minLength": 1, "maxLength": 120},
@@ -182,6 +202,8 @@ def _load_job_context(job: EnhancementJob) -> tuple[dict[str, object], dict[tupl
             }],
         },
     }
+    if job.useTools:
+        payload.update({"useTools": True, "allowWebResearch": job.allowWebResearch})
     return payload, locator_text
 
 
@@ -200,16 +222,34 @@ def preview_enhancement_submission(project_id: str, data: EnhancementJobCreate) 
         goal=data.goal,
         resourceIds=data.resourceIds,
         resourceVersions={resource.id: resource.currentVersion for resource in selected_resources},
+        useTools=data.useTools,
+        allowWebResearch=data.allowWebResearch,
         createdAt=timestamp,
         updatedAt=timestamp,
     )
     payload, _ = _load_job_context(preview_job)
     serialized_payload = json.dumps(payload, ensure_ascii=False)
     estimated_tokens = max(1, len(serialized_payload) // 4)
+    tool_catalog = []
+    web_research = False
     try:
-        engine = PythiaProvider()
-        engine_configured = engine.health().get("status") == "ok" and "storyboard.enhance" in engine.capabilities().get("capabilities", {})
-    except (PythiaUnavailableError, ValueError):
+        if isinstance(_provider(), LocalPythiaEnhancementProvider):
+            from . import pythia_talk as talk
+            capabilities = talk.local_mcp()
+            engine_configured = capabilities.get("storyboard_enhancements") is True
+            tool_catalog = capabilities.get("authoring_tools", [])
+            web_research = capabilities.get("web_research") is True
+            if data.useTools:
+                engine_configured = engine_configured and capabilities.get("authoring_orchestration") is True
+            if data.allowWebResearch:
+                engine_configured = engine_configured and web_research
+        else:
+            if data.useTools:
+                raise ValueError("Shared Engine connections do not execute authoring tools")
+            engine = PythiaProvider()
+            capabilities = engine.capabilities().get("capabilities", {})
+            engine_configured = engine.health().get("status") == "ok" and isinstance(capabilities, (dict, list)) and "storyboard.enhance" in capabilities
+    except (PythiaUnavailableError, ValueError, RuntimeError):
         engine_configured = False
     return {
         "sourceRevision": project.storyboard.revision,
@@ -219,6 +259,9 @@ def preview_enhancement_submission(project_id: str, data: EnhancementJobCreate) 
         "estimatedCostUsd": None,
         "engineConfigured": engine_configured,
         "payload": payload,
+        "tools": tool_catalog,
+        "webResearchAvailable": web_research,
+        "maxProviderRequests": 7 if data.useTools else 1,
     }
 
 
@@ -242,6 +285,7 @@ def _validate_provider_proposals(
     proposals: list[EnhancementProposalCreate] = []
     conflicting_fields: set[tuple[str | None, str]] = set()
     suggested_values: dict[tuple[str | None, str], str] = {}
+    additional_scene_count = 0
     for item in raw_proposals:
         if not isinstance(item, dict):
             raise ValueError("Each generated proposal must be an object")
@@ -259,11 +303,22 @@ def _validate_provider_proposals(
                 raise ValueError("Provider returned a global change for a scene-only field")
             if target_scene_id is None and job.scope != "whole-course":
                 raise ValueError("Selected-scene runs cannot propose whole-course changes")
+            if raw_change.get("field") == "additionalScenes":
+                values = raw_change.get("proposedValue")
+                if not isinstance(values, list) or not 1 <= len(values) <= 40:
+                    raise ValueError("Expansion must contain 1-40 new scenes per anchor")
+                for value in values:
+                    EnhancementSceneDraft.model_validate(value)
+                additional_scene_count += len(values)
+                if additional_scene_count > 100:
+                    raise ValueError("Expand at most 100 scenes per run. Select fewer anchor scenes.")
             normalized_changes.append({
                 "targetSceneId": target_scene_id,
                 "field": raw_change.get("field"),
                 "proposedValue": raw_change.get("proposedValue"),
             })
+            if any(change["targetSceneId"] == target_scene_id and change["field"] == raw_change.get("field") for change in normalized_changes[:-1]):
+                raise ValueError("A proposal cannot change the same field more than once")
             key = (target_scene_id, str(raw_change.get("field")))
             value = json.dumps(raw_change.get("proposedValue"), sort_keys=True, ensure_ascii=False)
             prior_value = suggested_values.get(key)
@@ -293,6 +348,10 @@ def _validate_provider_proposals(
             referenceCitations=citations,
             jobId=job.id,
         ))
+        if any(change.field == "additionalScenes" for change in proposals[-1].changes) and any(
+            change.field == "sceneOrder" for change in proposals[-1].changes
+        ):
+            raise ValueError("Expansion and reordering must be reviewed separately")
     conflicts: list[EnhancementResourceConflict] = []
     for raw_conflict in raw_conflicts:
         if not isinstance(raw_conflict, dict):
@@ -327,6 +386,13 @@ def recover_enhancement_jobs() -> None:
     for project in storage.list_projects():
         for job in storage.list_enhancement_jobs(project.id):
             if job.status in {"queued", "running"}:
+                if job.useTools:
+                    storage.update_enhancement_job(
+                        project.id, job.id, status="failed", progress=100,
+                        message="Interrupted authoring tool run was not replayed",
+                        error="The server restarted before this tool run completed. It may have incurred charges. Inspect retained results and retry explicitly; no automatic replay.",
+                    )
+                    continue
                 if job.cancelRequested:
                     storage.update_enhancement_job(project.id, job.id, status="cancelled", progress=100, message="Cancelled before server restart")
                     continue
@@ -357,7 +423,8 @@ def _run_job(project_id: str, job_id: str) -> None:
             project_id,
             job_id,
             progress=20,
-            message="Submitting selected content to the configured provider",
+            message=("Pythia is planning and executing permitted authoring tools (up to 3 calls); execution records appear when the run returns"
+                     if job.useTools else "Submitting selected content to the configured provider"),
             provider=provider.name,
             model=provider.model,
             estimatedInputTokens=token_estimate,
@@ -368,8 +435,43 @@ def _run_job(project_id: str, job_id: str) -> None:
         if job.cancelRequested:
             storage.update_enhancement_job(project_id, job_id, status="cancelled", progress=100, message="Cancelled; provider output was discarded")
             return
+        if job.useTools:
+            if not isinstance(raw_output, dict):
+                raise ValueError("Pythia returned no orchestration execution record")
+            executions = [EnhancementToolExecution.model_validate(item) for item in raw_output.get("toolExecutions", [])]
+            sources = [EnhancementResearchSource.model_validate(item) for item in raw_output.get("researchSources", [])]
+            allowed_tools = {"research.synthesize", "learning.design-brief", "storyboard.analyze",
+                             "assessment.blueprint", "standards.select", "evaluation.plan"}
+            if job.allowWebResearch:
+                allowed_tools.add("research_web")
+            if (len(executions) > 3 or len(sources) > 36
+                    or [item.sequence for item in executions] != list(range(1, len(executions) + 1))
+                    or any(item.tool not in allowed_tools for item in executions)
+                    or len({source.id for source in sources}) != len(sources)):
+                raise ValueError("Pythia returned invalid or unpermitted tool execution records")
+            if sources and not any(item.tool == "research_web" and item.status == "completed" for item in executions):
+                raise ValueError("Research evidence has no completed web-search execution")
+            storage.update_enhancement_job(project_id, job_id, toolExecutions=executions, researchSources=sources)
+            orchestration_error = raw_output.get("orchestrationError")
+            if orchestration_error:
+                if not isinstance(orchestration_error, str):
+                    raise ValueError("Pythia returned an invalid orchestration error")
+                raise ValueError(orchestration_error[:2000])
+            if not executions or any(item.status != "completed" for item in executions):
+                raise ValueError("Pythia tool orchestration did not complete. Inspect the retained execution results; nothing was applied. Retry explicitly.")
+            if job.allowWebResearch and (not sources or executions[0].tool != "research_web"):
+                raise ValueError("Selected public web research requires a completed search with cited sources before specialist drafting. Nothing was applied; no automatic retry.")
+            for source in sources:
+                locator_text.update({(source.id, source.version, passage.locator): passage.text for passage in source.passages})
         storage.update_enhancement_job(project_id, job_id, progress=75, message="Validating structured proposals and source citations")
         proposals, has_conflicts, resource_conflicts = _validate_provider_proposals(job, raw_output, provider, locator_text)
+        if not proposals:
+            storage.update_enhancement_job(project_id, job_id, resourceConflicts=resource_conflicts)
+            raise ValueError(
+                "Pythia returned no actionable suggestions. No changes were made. "
+                "Review the goal and selected readable references, then submit a new run. "
+                "The legacy Engine only fills missing action descriptions; it cannot expand scenes or run @research."
+            )
         stored_proposals = []
         with storage.storyboard_transaction():
             job = storage.read_enhancement_job(project_id, job_id)
@@ -382,6 +484,10 @@ def _run_job(project_id: str, job_id: str) -> None:
                     f"Storyboard changed during enhancement from revision {job.sourceRevision} "
                     f"to {current_revision}. No proposals were saved; submit a new run."
                 )
+            project = storage.read_project(project_id)
+            for proposal in proposals:
+                for change in proposal.changes:
+                    storage._snapshot_proposal_change(project, change)
             for proposal_index, proposal_data in enumerate(proposals):
                 proposal_data = proposal_data.model_copy(update={"jobId": f"{job.id}:{proposal_index}"})
                 stored_proposals.append(storage.create_enhancement_proposal(project_id, proposal_data))
@@ -427,6 +533,8 @@ def retry_enhancement_job(project_id: str, job_id: str) -> EnhancementJob:
         "sceneIds": previous.sceneIds if previous.scope == "selected-scenes" else [],
         "goal": previous.goal,
         "resourceIds": previous.resourceIds,
+        "useTools": previous.useTools,
+        "allowWebResearch": previous.allowWebResearch,
     }
     new_job = storage.create_enhancement_job(
         project_id,
