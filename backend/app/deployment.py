@@ -39,4 +39,7 @@ def public_origin() -> str:
 def cors_origins() -> list[str]:
     if deployment_profile() == "networked":
         return [public_origin()]
-    return ["http://localhost:5173", "http://127.0.0.1:5173"]
+    port = os.environ.get("CHIMERA_WEB_PORT") or "5173"
+    if not port.isdigit() or not 0 < int(port) < 65536:
+        raise RuntimeError("CHIMERA_WEB_PORT must be a port number")
+    return [f"http://localhost:{port}", f"http://127.0.0.1:{port}"]
