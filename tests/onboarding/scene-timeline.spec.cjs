@@ -8,8 +8,35 @@ const servers = [];
 test.beforeEach(async({page})=>{
   // Font fitting must not wait on unrelated internet font downloads in local fixtures.
   await page.route(/^https:\/\/fonts\.(?:googleapis|gstatic)\.com\//,route=>route.abort());
+  await page.addInitScript(() => {
+    window.__mediaReadiness = [];
+    for (const event of ["waiting", "seeking", "seeked", "canplay", "playing", "pause", "error"]) {
+      document.addEventListener(event, ({ target, type }) => {
+        if (!(target instanceof HTMLMediaElement)) return;
+        window.__mediaReadiness.push({
+          event: type, time: target.currentTime, readyState: target.readyState,
+          seeking: target.seeking, paused: target.paused,
+          clock: window.__CHIMERA_SCENE_TRANSPORT?.currentTime,
+        });
+        if (window.__mediaReadiness.length > 100) window.__mediaReadiness.shift();
+      }, true);
+    }
+  });
 });
-test.afterEach(async () => {
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status !== testInfo.expectedStatus && !page.isClosed()) {
+    const snapshot = await page.evaluate(() => ({
+      events: window.__mediaReadiness,
+      clock: window.__CHIMERA_SCENE_TRANSPORT?.currentTime,
+      playing: window.__CHIMERA_SCENE_TRANSPORT?.playing,
+      media: window.__CHIMERA_SCENE_TRANSPORT?.media.map(({ node, seekTarget }) => ({
+        time: node.currentTime, readyState: node.readyState, seeking: node.seeking,
+        paused: node.paused, seekTarget,
+        buffered: Array.from({ length: node.buffered.length }, (_, i) => [node.buffered.start(i), node.buffered.end(i)]),
+      })),
+    }));
+    await testInfo.attach("media-readiness", { body: JSON.stringify(snapshot, null, 2), contentType: "application/json" });
+  }
   for (const server of servers.splice(0))
     await new Promise((resolve) => {
       server.closeAllConnections();
