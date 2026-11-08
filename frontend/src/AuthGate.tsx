@@ -13,8 +13,22 @@ async function responseError(response: Response) {
   return typeof body?.detail === "string" ? body.detail : "The request could not be completed. Please try again.";
 }
 
+async function darkrogueHandoff(sessionUrl: string, fetcher: typeof fetch): Promise<boolean> {
+  try {
+    const session = await fetcher(sessionUrl, { credentials: "include" });
+    if (!session.ok) return false;
+    const body = await session.json().catch(() => null) as { token?: unknown } | null;
+    if (typeof body?.token !== "string") return false;
+    const login = await fetcher("/api/auth/darkrogue", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: body.token }),
+    });
+    return login.ok;
+  } catch { return false; }
+}
+
 export function AuthGate({ children }: { children: ReactNode }) {
-  const [config, setConfig] = useState<{ deploymentMode: string; identityProvider: string; passwordLoginAvailable: boolean } | null>(null);
+  const [config, setConfig] = useState<{ deploymentMode: string; identityProvider: string; passwordLoginAvailable: boolean; darkrogue?: { sessionUrl: string; signInUrl: string } } | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
   const [mode, setMode] = useState<"login" | "recovery" | "reset">(() => location.hash.startsWith("#reset=") ? "reset" : location.hash === "#recovery" ? "recovery" : "login");
@@ -47,10 +61,18 @@ export function AuthGate({ children }: { children: ReactNode }) {
         const next = await response.json() as typeof config;
         if (!alive || !next) return;
         setConfig(next);
-        if (next.passwordLoginAvailable) {
+        if (next.passwordLoginAvailable || next.identityProvider === "darkrogue") {
           const identity = await nativeFetch.current("/api/identity/context");
           if (identity.ok) { const actor = await identity.json() as Session; if (alive) setSession(actor); }
           else if (identity.status !== 401) throw new Error(await responseError(identity));
+          else if (next.identityProvider === "darkrogue" && next.darkrogue) {
+            // Silently adopt an existing DARKROGUE session before showing the sign-in screen.
+            const adopted = await darkrogueHandoff(next.darkrogue.sessionUrl, nativeFetch.current);
+            if (adopted && alive) {
+              const refreshed = await nativeFetch.current("/api/identity/context");
+              if (refreshed.ok) { const actor = await refreshed.json() as Session; if (alive) setSession(actor); }
+            }
+          }
         }
       } catch (issue) { if (alive) setError(issue instanceof Error ? issue.message : "Sign-in configuration is unavailable."); }
       finally { if (alive) setChecking(false); }
@@ -60,7 +82,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!config?.passwordLoginAvailable) return;
+    if (!config?.passwordLoginAvailable && config?.identityProvider !== "darkrogue") return;
     const original = window.fetch;
     window.fetch = async (input, init) => {
       const response = await original(input, init);
@@ -73,7 +95,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     const expired = () => { setSession(null); setMode("login"); setPassword(""); setError("Your session expired. Sign in again to continue. Unsaved changes must be re-entered."); };
     window.addEventListener(AUTH_EXPIRED, expired);
     return () => { window.fetch = original; window.removeEventListener(AUTH_EXPIRED, expired); };
-  }, [config?.passwordLoginAvailable]);
+  }, [config?.passwordLoginAvailable, config?.identityProvider]);
 
   useEffect(() => { titleRef.current?.focus(); }, [mode, checking, session]);
 
@@ -100,6 +122,23 @@ export function AuthGate({ children }: { children: ReactNode }) {
     finally { setBusy(false); setPassword(""); setConfirmation(""); setVisible(false); }
   }
 
+  async function continueWithDarkrogue() {
+    if (busy || !config?.darkrogue) return;
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const adopted = await darkrogueHandoff(config.darkrogue.sessionUrl, nativeFetch.current);
+      if (adopted) {
+        const identity = await nativeFetch.current("/api/identity/context");
+        if (!identity.ok) throw new Error(await responseError(identity));
+        setSession(await identity.json() as Session);
+      } else {
+        location.assign(config.darkrogue.signInUrl);
+        return;
+      }
+    } catch (issue) { setError(issue instanceof Error ? issue.message : "DARKROGUE sign-in failed. Please try again."); }
+    finally { setBusy(false); }
+  }
+
   async function logout() {
     const response = await nativeFetch.current("/api/auth/logout", { method: "POST" });
     if (!response.ok) throw new Error(await responseError(response));
@@ -108,7 +147,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (!checking && config?.identityProvider === "local" && config.deploymentMode === "single-user") return <SessionContext.Provider value={{ session: null, logout }}>{children}</SessionContext.Provider>;
   if (!checking && session && mode !== "reset") return <SessionContext.Provider value={{ session, logout }}>{children}</SessionContext.Provider>;
-  const unavailable = !config?.passwordLoginAvailable;
+  const darkrogue = config?.identityProvider === "darkrogue" ? config.darkrogue : undefined;
+  const unavailable = !config?.passwordLoginAvailable && !darkrogue;
   return <main className="auth-screen">
     <header className="auth-brand"><div><BrandMark className="auth-brand-mark" /><span>CHIMERA</span></div><p>Turn presentations into purposeful learning.</p></header>
     <section className={`auth-card ${mode === "recovery" ? "auth-recovery" : ""}`} aria-labelledby="auth-title">
@@ -116,7 +156,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
       <h1 id="auth-title" ref={titleRef} tabIndex={-1}>{checking ? "Connecting to Chimera" : unavailable ? "Sign-in unavailable" : mode === "reset" ? "Reset your password" : mode === "recovery" ? "Request a password reset link" : "Sign in to Chimera"}</h1>
       {error && <p className="auth-error" role="alert">{error}</p>}
       {message && <p className="auth-message" role="status">{message}</p>}
-      {checking ? <p role="status">Checking your workspace…</p> : unavailable ? <><p>Your installation’s sign-in provider is not ready. Contact your administrator.</p><button className="auth-submit" onClick={() => location.reload()}>Try again</button></> : mode === "recovery" ? <><p>Contact your administrator to request a secure password reset link. Account recovery is administrator-managed.</p><button className="auth-submit" onClick={() => { setMode("login"); setError(""); }}>Back to sign in</button></> : <form onSubmit={(event) => void submit(event)} aria-busy={busy}>
+      {checking ? <p role="status">Checking your workspace…</p> : darkrogue ? <>
+        <p>Chimera uses your DARKROGUE account. Continue with your existing session, or sign in at DARKROGUE and return here.</p>
+        <button className="auth-submit" disabled={busy} onClick={() => void continueWithDarkrogue()}>{busy ? "Please wait…" : "Continue with DARKROGUE"}</button>
+        <p className="auth-footnote">Account access is managed by your DARKROGUE administrator.</p>
+      </> : unavailable ? <><p>Your installation’s sign-in provider is not ready. Contact your administrator.</p><button className="auth-submit" onClick={() => location.reload()}>Try again</button></> : mode === "recovery" ? <><p>Contact your administrator to request a secure password reset link. Account recovery is administrator-managed.</p><button className="auth-submit" onClick={() => { setMode("login"); setError(""); }}>Back to sign in</button></> : <form onSubmit={(event) => void submit(event)} aria-busy={busy}>
         {mode === "reset" && <p className="auth-help">Use a passphrase of at least 15 characters.</p>}
         {mode === "login" && <label className="auth-field">Email<div className="auth-input"><Mail size={20} aria-hidden="true" /><input type="email" autoComplete="username" maxLength={254} placeholder="you@domain.com" value={email} required disabled={busy} onChange={(event) => setEmail(event.target.value)} /></div></label>}
         <label className="auth-field">{mode === "reset" ? "New password" : "Password"}<div className="auth-input"><LockKeyhole size={20} aria-hidden="true" /><input type={visible ? "text" : "password"} autoComplete={mode === "reset" ? "new-password" : "current-password"} minLength={mode === "reset" ? 15 : 1} maxLength={1024} placeholder={mode === "reset" ? "Enter new password" : "Enter your password"} value={password} required disabled={busy} onChange={(event) => setPassword(event.target.value)} /><button type="button" aria-label={visible ? "Hide password" : "Show password"} aria-pressed={visible} onClick={() => setVisible(!visible)}>{visible ? <EyeOff size={20} /> : <Eye size={20} />}</button></div></label>

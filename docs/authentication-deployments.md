@@ -7,6 +7,7 @@ Chimera uses one backend with installation-specific authentication. No hosted de
 | `local` | Existing local single-user identity | Available; no login required |
 | `encarta` | Encarta adapter | Profile prepared; protected requests return 503 until real validation is implemented |
 | `networked` | Built-in email/password accounts | Login, logout, recovery, project roles, and authenticated review links implemented; live server qualification deferred |
+| `darkrogue` | Verified DARKROGUE handoff and Chimera session | Sibling application SSO; qualify against the intended hosted environment before enabling |
 
 The examples under `deploy/` describe environment variables. They are not automatically loaded. Each hosted profile must use its own `CHIMERA_WORKSPACE`; do not reuse the local authoring workspace. Profiles take precedence over stored installation identity settings. A `local` profile cannot override a workspace already configured for team identity. Unimplemented OIDC, SAML, or generic adapters never fall back to local identity.
 
@@ -99,6 +100,29 @@ The user selected an existing Linux server with Nginx. Server/SSH details and li
 Before enabling the live site, adapt the hostname, certificate paths, checkout directory, service user, and workspace to the actual server. Build `frontend/dist`, install Python dependencies into the server's virtual environment, provision accounts under the service identity, and restrict workspace ownership/permissions. Validate `nginx -t` and service startup before switching traffic. These configuration templates were not installed or tested against the real Nginx server in this session.
 
 Remaining live checks: certificate/hostname and redirect behavior, proxy client-IP handling, Linux workspace permissions, real-domain login/logout/reset/review flows, and intended browser coverage. MFA, email verification, automatic email delivery, and multi-organization tenancy are separate scope; they are not implemented by this single-organization deployment.
+
+## DARKROGUE deployment
+
+Set these variables only in the hosted service environment, retaining the existing hosted workspace when switching from `networked`:
+
+```text
+CHIMERA_DEPLOYMENT_PROFILE=darkrogue
+CHIMERA_PUBLIC_ORIGIN=https://chimera.darkrogue.io
+CHIMERA_DARKROGUE_ORIGIN=https://darkrogue.io
+CHIMERA_WORKSPACE=/srv/chimera/networked-workspace
+CHIMERA_REVIEW_ACCESS=authenticated
+CHIMERA_DARKROGUE_SSO_SECRET=<dedicated shared secret of at least 32 characters>
+```
+
+Configure the same secret as `CHIMERA_SSO_SECRET` on DARKROGUE. Generate it separately from Supabase credentials and keep it out of source, logs, browser configuration and project exports. DARKROGUE must have account access enabled (`PUBLIC_LAUNCH_MODE` must not be true).
+
+The frontend requests `GET https://darkrogue.io/api/chimera/session` with credentials. DARKROGUE verifies its Supabase session and server-owned profile role, then returns a 90-second HS256 token bound to the exact Chimera origin. The Supabase cookie stays host-only on DARKROGUE. The frontend sends the token to `POST /api/auth/darkrogue`; Chimera verifies signature, issuer, audience, lifetime and claims, consumes the one-time `jti` under the account-store transaction, and issues its own eight-hour session cookie. Tokens must not be placed in URLs or persistent browser storage. Without a DARKROGUE session, the sign-in button redirects to DARKROGUE with an allowlisted root return URL.
+
+`ADMIN` maps to administrator, author and instructional-designer; `INSTRUCTOR` maps to author and instructional-designer; `LEARNER` maps to reviewer. These organization roles refresh at sign-in; project memberships remain separate. Role changes on DARKROGUE do not revoke an already issued Chimera session: disable the Chimera account when immediate withdrawal is required. Signing out of Chimera revokes its session only; the DARKROGUE session remains available for another explicit sign-in or automatic adoption on reload.
+
+Accounts match normalized email. First sign-in adopts an existing password account while retaining its ID and project memberships; a conflicting external user ID is rejected, and disabled accounts remain disabled. Under this profile, password login and reset endpoints return 404. Keep account-recovery operations on DARKROGUE.
+
+`GET /api/auth/config` advertises the DARKROGUE session/sign-in URLs. `GET /api/identity/context`, `POST /api/auth/logout`, account/project authorization and secure cookie rules use the hosted account store. Mutations require the exact Chimera origin. Before enabling this profile, verify the production profile/role, CORS denial for untrusted origins, token expiry/replay rejection, account adoption, project creation, logout and reload behavior in a real browser. Keep the workstation's local profile unchanged.
 
 ## Encarta integration contract
 

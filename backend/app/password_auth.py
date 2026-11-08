@@ -126,9 +126,10 @@ class AccountStore:
             if any(len(data["failures"].get(k, [])) >= limit for k, limit in zip(keys, (5, 30))):
                 raise HTTPException(429, "Too many sign-in attempts; try again later", headers={"Retry-After": "900"})
             account = data["accounts"].get(email)
-            salt = account["salt"] if account else "00"*16
+            salt = account["salt"] if account and account.get("salt") else "00"*16
             candidate = password_digest(password, salt)
-            valid = account and hmac.compare_digest(candidate, account["passwordHash"]) and not account["disabled"]
+            stored_hash = account.get("passwordHash") if account else None
+            valid = stored_hash and hmac.compare_digest(candidate, stored_hash) and not account["disabled"]
             if not valid:
                 for key in keys:
                     data["failures"].setdefault(key, []).append(now)
@@ -139,6 +140,47 @@ class AccountStore:
             token = secrets.token_urlsafe(32)
             data["sessions"][token_digest(token)] = {"userId": account["id"], "expires": now+SESSION_SECONDS, "origin": public_origin()}
             data["failures"].pop(keys[0], None)
+            self._write(data)
+            self.audit("auth.signed_in", account["id"])
+            return token
+
+    def sso_login(self, claims: dict, roles: list[str]) -> str:
+        """Create or refresh the DARKROGUE-backed account and issue a session.
+
+        The handoff token ID is one-time: replays inside the token lifetime are
+        rejected under the same filesystem transaction that records them. Roles
+        are replaced from the current DARKROGUE role on every sign-in so
+        upstream promotions and demotions propagate. Disabled accounts stay
+        signed out regardless of upstream state.
+        """
+        from .storage import storyboard_transaction
+        email = normalize_email(claims["email"])
+        if not roles or not set(roles) <= ROLES:
+            raise HTTPException(503, "DARKROGUE role mapping is invalid")
+        now = time.time()
+        with storyboard_transaction():
+            data = self._read()
+            data["sessions"] = {k: v for k, v in data["sessions"].items() if v["expires"] > now}
+            data.setdefault("ssoTokens", {})
+            data["ssoTokens"] = {k: v for k, v in data["ssoTokens"].items() if v > now}
+            token_key = token_digest(claims["jti"])
+            if token_key in data["ssoTokens"]:
+                raise HTTPException(401, "Sign-in token was already used. Try signing in again.")
+            data["ssoTokens"][token_key] = claims["exp"]
+            account = data["accounts"].get(email)
+            if account and account["disabled"]:
+                self._write(data)
+                raise HTTPException(403, "This account is disabled. Contact your administrator.")
+            if account and account.get("externalId") not in (None, claims["sub"]):
+                self._write(data)
+                raise HTTPException(403, "This email is linked to a different DARKROGUE identity. Contact your administrator.")
+            if account is None:
+                account = {"id": "user-" + secrets.token_hex(16), "displayName": claims["name"], "roles": roles, "disabled": False}
+                data["accounts"][email] = account
+                self.audit("account.provisioned", account["id"])
+            account.update(displayName=claims["name"], roles=roles, externalId=claims["sub"], identityProvider="darkrogue")
+            token = secrets.token_urlsafe(32)
+            data["sessions"][token_digest(token)] = {"userId": account["id"], "expires": now + SESSION_SECONDS, "origin": public_origin()}
             self._write(data)
             self.audit("auth.signed_in", account["id"])
             return token

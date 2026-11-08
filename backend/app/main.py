@@ -6,6 +6,7 @@ import mimetypes
 import tempfile
 from pathlib import Path
 from typing import Annotated, Literal
+from urllib.parse import quote
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
@@ -13,6 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
+from pydantic import BaseModel, Field, SecretStr
 from starlette.concurrency import run_in_threadpool
 from PIL import Image, UnidentifiedImageError
 from pptx import Presentation
@@ -43,8 +45,9 @@ from .learning_intelligence import PythiaProvider, PythiaUnavailableError, valid
 from .ai_connection import ConnectionRevision, ConnectionUpdate, connection_status, disconnect_connection, save_connection, test_connection
 from .narration_connections import SPEECH_PROVIDERS, NarrationConnectionUpdate, disconnect_narration_connection, narration_status, save_narration_connection, test_narration_connection
 from .word_export import DOCX_MEDIA_TYPE, FULL_TEMPLATE_PATH, SME_TEMPLATE_PATH, TemplateArtworkError, build_full_storyboard_docx, build_sme_storyboard_docx, build_storyboard_docx
-from .deployment import cors_origins, installation_policy, public_origin
+from .deployment import cors_origins, darkrogue_origin, installation_policy, public_origin
 from .password_auth import AccountStore, COOKIE, HostedAuthorizationPolicy, LoginRequest, ResetPasswordRequest, ReviewInvitationRequest, SESSION_SECONDS, require_origin
+from . import darkrogue_auth
 from .models import AssessmentGroup, AssessmentGroupWrite, CourseDraftRequest, CourseContentDraft, SceneDraftRequest, SceneContentDraft
 from .storage import create_scenes, save_assessment_group
 from .models import ProjectBackgroundUpdate, ProjectRelationshipUpdate, ProjectRestore
@@ -57,6 +60,10 @@ from .experience_models import ExperienceDesignRequest, ExperienceReview
 from . import video_treatments
 from .models import ReviewedVideoTreatment
 from . import pythia_actions
+
+
+HOSTED_ACCOUNT_PROVIDERS = {"builtin", "darkrogue"}
+PUBLIC_API_PATHS = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password", "/api/auth/darkrogue"}
 
 
 ROUTE_ACTIONS = {
@@ -82,7 +89,7 @@ ROUTE_ACTIONS = {
     "copy_shared_media": "media.manage", "delete_shared_media": "media.manage", "post_reference_ocr": "reference.create",
     "post_reference_ocr_accept": "reference.create",
     "health": "identity.view", "auth_config": "identity.view", "login": "identity.view",
-    "logout": "identity.view", "reset_password": "identity.view", "get_accounts": "admin.policy.manage",
+    "logout": "identity.view", "reset_password": "identity.view", "darkrogue_login": "identity.view", "get_accounts": "admin.policy.manage",
     "get_identity_context": "identity.view", "get_identity_policy": "identity.view",
     "get_installation_config": "identity.view", "patch_identity_policy": "admin.policy.manage",
     "get_project_members": "project.membership.manage", "post_project_member": "project.membership.manage",
@@ -150,7 +157,7 @@ ROUTE_ACTIONS = {
 def get_authorization_policy() -> AuthorizationPolicy:
     directory = LocalIdentityDirectory(ROOT)
     selected = installation_policy(directory)
-    if selected.identityProvider == "builtin":
+    if selected.identityProvider in HOSTED_ACCOUNT_PROVIDERS:
         return HostedAuthorizationPolicy(AccountStore(ROOT), selected)
     return RoleBasedAuthorizationPolicy(directory)
 
@@ -278,7 +285,7 @@ def _hosted_request_action(request: Request) -> str:
 
 
 def _request_action(request: Request) -> str:
-    if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider == "builtin":
+    if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider in HOSTED_ACCOUNT_PROVIDERS:
         return _hosted_request_action(request)
     return ROUTE_ACTIONS.get(getattr(request.scope.get("route"), "name", ""), "unknown")
 
@@ -287,7 +294,7 @@ async def _require_request_access(
     request: Request,
     policy: Annotated[AuthorizationPolicy, Depends(get_authorization_policy)],
 ) -> None:
-    if request.url.path in {"/api/health", "/api/auth/config", "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password"}:
+    if request.url.path in PUBLIC_API_PATHS:
         yield
         return
     context = resolve_actor_context(request)
@@ -327,7 +334,7 @@ async def validation_error(request: Request, error: RequestValidationError):
 async def private_response_headers(request: Request, call_next):
     token = None
     actor = None
-    public = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password"}
+    public = PUBLIC_API_PATHS
     if request.url.path.startswith("/api/") and request.url.path not in public and request.method != "OPTIONS":
         try:
             actor = await run_in_threadpool(resolve_actor_context, request)
@@ -416,11 +423,22 @@ def _password_store() -> AccountStore:
     return AccountStore(ROOT)
 
 
+def _account_store() -> AccountStore:
+    if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider not in HOSTED_ACCOUNT_PROVIDERS:
+        raise HTTPException(404, "Hosted accounts are not enabled")
+    return AccountStore(ROOT)
+
+
 @app.get("/api/auth/config")
-def auth_config() -> dict[str, str | bool]:
+def auth_config() -> dict[str, str | bool | dict[str, str]]:
     selected = installation_policy(LocalIdentityDirectory(ROOT))
-    return {"deploymentMode": selected.deploymentMode, "identityProvider": selected.identityProvider,
+    config: dict[str, str | bool | dict[str, str]] = {"deploymentMode": selected.deploymentMode, "identityProvider": selected.identityProvider,
         "passwordLoginAvailable": selected.identityProvider == "builtin"}
+    if selected.identityProvider == "darkrogue":
+        origin = darkrogue_origin()
+        config["darkrogue"] = {"sessionUrl": origin + "/api/chimera/session",
+            "signInUrl": origin + "/sign-in?returnTo=" + quote(public_origin() + "/", safe="")}
+    return config
 
 
 @app.post("/api/auth/login")
@@ -435,11 +453,30 @@ def login(data: LoginRequest, request: Request) -> JSONResponse:
 
 @app.post("/api/auth/logout")
 def logout(request: Request) -> JSONResponse:
-    store = _password_store()
+    store = _account_store()
     require_origin(request)
     store.logout(request.cookies.get(COOKIE))
     response = JSONResponse({"authenticated": False}, headers={"Cache-Control": "no-store"})
     response.delete_cookie(COOKIE, path="/", secure=True, httponly=True, samesite="strict")
+    return response
+
+
+class DarkrogueLoginRequest(BaseModel):
+    token: SecretStr = Field(min_length=1, max_length=4096)
+
+
+@app.post("/api/auth/darkrogue")
+def darkrogue_login(data: DarkrogueLoginRequest, request: Request) -> JSONResponse:
+    if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider != "darkrogue":
+        raise HTTPException(404, "DARKROGUE sign-in is not enabled")
+    require_origin(request)
+    try:
+        claims = darkrogue_auth.verify_handoff(data.token.get_secret_value())
+    except darkrogue_auth.HandoffError as error:
+        raise HTTPException(401, str(error)) from error
+    token = AccountStore(ROOT).sso_login(claims, darkrogue_auth.ROLE_MAP[claims["role"]])
+    response = JSONResponse({"authenticated": True}, headers={"Cache-Control": "no-store"})
+    response.set_cookie(COOKIE, token, max_age=SESSION_SECONDS, httponly=True, secure=True, samesite="strict", path="/")
     return response
 
 
@@ -453,12 +490,12 @@ def reset_password(data: ResetPasswordRequest, request: Request) -> dict[str, bo
 
 @app.get("/api/accounts")
 def get_accounts() -> list[dict]:
-    return _password_store().accounts()
+    return _account_store().accounts()
 
 
 def _identity_directory():
     local = LocalIdentityDirectory(ROOT)
-    return AccountStore(ROOT) if installation_policy(local).identityProvider == "builtin" else local
+    return AccountStore(ROOT) if installation_policy(local).identityProvider in HOSTED_ACCOUNT_PROVIDERS else local
 
 
 @app.get("/api/identity/context", response_model=IdentitySnapshot)
@@ -466,7 +503,7 @@ def get_identity_context(context: Annotated[ActorContext, Depends(resolve_actor_
     directory = LocalIdentityDirectory(ROOT)
     snapshot = directory.snapshot()
     policy = installation_policy(directory)
-    if policy.identityProvider == "builtin":
+    if policy.identityProvider in HOSTED_ACCOUNT_PROVIDERS:
         from .identity import Membership, TeamRecord, UserRecord
         return IdentitySnapshot(actor=context, user=UserRecord(id=context.actorId, displayName=context.actorDisplayName),
             teams=[TeamRecord(id=context.installationId, name="Hosted workspace")],
@@ -496,7 +533,7 @@ def patch_identity_policy(
     policy: Annotated[AuthorizationPolicy | None, Depends(get_authorization_policy)] = None,
 ) -> OrganizationPolicy:
     actor = context or LOCAL_ACTOR
-    if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider == "builtin":
+    if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider in HOSTED_ACCOUNT_PROVIDERS:
         raise HTTPException(409, "Hosted installation choices are operator-managed")
     _require_action(policy or get_authorization_policy(), actor, "admin.policy.manage")
     return LocalIdentityDirectory(ROOT).update_policy(policy_data)
@@ -775,7 +812,7 @@ def post_project(
             project = create_project(data, actor)
         except RuntimeError as error:
             raise HTTPException(status_code=409, detail=str(error)) from error
-        if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider == "builtin":
+        if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider in HOSTED_ACCOUNT_PROVIDERS:
             AccountStore(ROOT).add_project_membership(ProjectMembership(projectId=project.id, userId=actor.actorId, role="instructional-designer"))
     return project
 

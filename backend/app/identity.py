@@ -53,7 +53,7 @@ class ProjectMembershipCreate(BaseModel):
 
 class OrganizationPolicy(BaseModel):
     deploymentMode: Literal["single-user", "team"] = "single-user"
-    identityProvider: Literal["local", "encarta", "oidc", "saml", "adapter", "builtin"] = "local"
+    identityProvider: Literal["local", "encarta", "oidc", "saml", "adapter", "builtin", "darkrogue"] = "local"
     tenancyMode: Literal["single-organization", "multi-organization"] = "single-organization"
     userProvisioning: Literal["invitation", "directory-sync", "invitation-and-sync"] = "invitation"
     trackingMode: Literal["disabled", "local", "centralized"] = "local"

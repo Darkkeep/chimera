@@ -100,7 +100,7 @@ def get_identity_provider() -> IdentityProvider:
         raise RuntimeError("Guest review is not enabled for the team pilot")
     if policy.identityProvider == "encarta":
         return EncartaIdentityProvider(directory)
-    if policy.identityProvider == "builtin":
+    if policy.identityProvider in {"builtin", "darkrogue"}:
         from .password_auth import AccountStore, PasswordIdentityProvider
         return PasswordIdentityProvider(AccountStore(ROOT))
     if policy.identityProvider == "local" and policy.deploymentMode == "single-user":

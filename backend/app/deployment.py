@@ -7,7 +7,7 @@ from .identity import OrganizationPolicy
 
 def deployment_profile() -> str | None:
     value = os.environ.get("CHIMERA_DEPLOYMENT_PROFILE")
-    if value not in (None, "local", "encarta", "networked"):
+    if value not in (None, "local", "encarta", "networked", "darkrogue"):
         raise RuntimeError("Unknown CHIMERA_DEPLOYMENT_PROFILE")
     return value
 
@@ -21,10 +21,11 @@ def installation_policy(directory) -> OrganizationPolicy:
         if stored.deploymentMode != "single-user" or stored.identityProvider != "local":
             raise RuntimeError("Local profile cannot override a team workspace")
         return stored
+    providers = {"networked": "builtin", "darkrogue": "darkrogue", "encarta": "encarta"}
     return OrganizationPolicy.model_validate({
         **stored.model_dump(), "deploymentMode": "team",
-        "identityProvider": "builtin" if profile == "networked" else "encarta",
-        "reviewAccess": os.environ.get("CHIMERA_REVIEW_ACCESS", "no-external-review") if profile == "networked" else "no-external-review", "allowGuestReviewers": False,
+        "identityProvider": providers[profile],
+        "reviewAccess": os.environ.get("CHIMERA_REVIEW_ACCESS", "no-external-review") if profile in {"networked", "darkrogue"} else "no-external-review", "allowGuestReviewers": False,
     })
 
 
@@ -37,6 +38,14 @@ def public_origin() -> str:
 
 
 def cors_origins() -> list[str]:
-    if deployment_profile() == "networked":
+    if deployment_profile() in {"networked", "darkrogue"}:
         return [public_origin()]
     return ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+
+def darkrogue_origin() -> str:
+    origin = os.environ.get("CHIMERA_DARKROGUE_ORIGIN", "https://darkrogue.io")
+    parsed = urlsplit(origin)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.path or parsed.query or parsed.fragment:
+        raise RuntimeError("CHIMERA_DARKROGUE_ORIGIN must be an HTTPS origin without a path")
+    return origin
