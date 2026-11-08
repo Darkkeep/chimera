@@ -1,5 +1,7 @@
 # Production brand integration
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 The approved Mechanicus Trinity kit is archived in `Chimera_Production_Asset_Kit_v1.zip` and extracted under `brand/Chimera_Production_Kit_v1` for reference.
 
 The frontend imports the original tokens and framework-independent component skin from `src/production-kit`. `src/production-brand.css` maps these to the existing UI variables and supplies the application integration layer. Keep kit tokens intact; make application adjustments in the integration layer.

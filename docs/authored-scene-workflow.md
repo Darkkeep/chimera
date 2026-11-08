@@ -1,5 +1,7 @@
 # One authored scene
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Chimera authors one scene composition. Stage, storyboard, course preview, and delivery outputs use that composition with the same resolved project defaults. Fidelity, Hybrid, Native, and Template remain legacy API values, not authoring decisions.
 
 ## Authoring

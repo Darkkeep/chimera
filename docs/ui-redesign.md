@@ -1,5 +1,7 @@
 # Authoring workspace redesign
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Implemented September 30, 2026, using 12ui Design candidate A.
 
 **Current navigation addendum (2026-10-27):** Assessments is a direct **WORKSPACE** rail action, opening the question bank/import/assessment manager. Project background is in **Storyboard**, above the scene list. The question editor's tags and learning-objective references are collapsed at the bottom and use compact searchable dropdowns. The original implementation/design evidence below describes the September layout; use the [user guide](user-guide.md) for current operating instructions.

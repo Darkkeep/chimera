@@ -1,5 +1,9 @@
 # Chimera backend
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](../docs/release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
+The API metadata follows the Chimera product version, **1.2.0**. Hosted DARKROGUE SSO and local single-user mode use the same authorization boundary; see [authentication deployments](../docs/authentication-deployments.md). The product license is MIT, with upstream and content exceptions recorded in [licensing](../docs/licensing.md).
+
 ## Connected external launch links
 
 Experience version 1 includes `kind: "external-link"`: `id`, `title` (120),

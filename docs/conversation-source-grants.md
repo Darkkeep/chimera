@@ -1,5 +1,7 @@
 # Authoring source-transfer and CSV consumer requirements
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 2026-10-18. Consumer requirements and narrow synthetic provenance qualification against the
 additive source contracts candidate. No upload/CSV turn support or public release.
 

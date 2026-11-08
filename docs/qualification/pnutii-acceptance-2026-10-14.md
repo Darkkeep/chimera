@@ -1,5 +1,7 @@
 # PNutII Acceptance Pass
 
+Repository context: **Chimera 1.2.0** | [MIT license](../../LICENSE) | [Release notes](../release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Date: 2026-10-14. Project: `pnutii-9ce7c7f7`. The operator approved using the open course directly as a throw-away lesson. No live AI requests were made during this pass.
 
 ## Findings and Repairs

@@ -1,5 +1,6 @@
 """Render the guide source to print HTML; Chromium produces the PDF."""
 import argparse
+import json
 from pathlib import Path
 import markdown
 
@@ -7,11 +8,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--output', type=Path, default=Path('workspace/user-guide-print.html'))
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[3]
+version = json.loads((root / 'package.json').read_text(encoding='utf-8'))['version']
 source = root / 'docs/user-guide.md'
 body = markdown.markdown(source.read_text(encoding='utf-8'), extensions=['tables', 'toc', 'sane_lists'])
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text('''<!doctype html><html lang="en"><head><meta charset="utf-8">
-<title>Chimera user guide</title><base href="''' + (root / 'docs').as_uri() + '''/">
+<title>Chimera ''' + version + ''' user guide</title><base href="''' + (root / 'docs').as_uri() + '''/">
 <style>
 @page { size: A4 landscape; margin: 14mm 14mm 17mm; }
 body { font: 10pt/1.42 Arial,sans-serif; color: #202c36; }

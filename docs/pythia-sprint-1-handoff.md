@@ -1,5 +1,7 @@
 # Pythia Sprint 1 Integration Handoff
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Sprint 1 is complete. For the current real scene-analysis contract, use
 [Pythia Sprint 2 Handoff](pythia-sprint-2-handoff.md).
 

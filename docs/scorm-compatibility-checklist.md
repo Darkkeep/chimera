@@ -1,5 +1,7 @@
 # SCORM Compatibility Checklist
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 ## October 28 timed-media scope
 
 Shared-clock animation, positioned video, trimmed audio/video, captions, seeking, and independent required-clip coverage have local browser checks in SCORM 1.2/2004 and standalone outputs. They have not been accepted in the target LMS for a new candidate package. Requalify the exact exported ZIP/hash for seek-versus-consumption behavior, clip completion, resume, retries, captions, and gradebook reporting before claiming LMS readiness for timed courses. Historical package attestations below retain their original scope. See [creator pre-alpha readiness](pre-alpha-readiness.md) and the [human acceptance packet](qualification/human-acceptance-1.1.0.md).

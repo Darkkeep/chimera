@@ -1,5 +1,7 @@
 # Local candidate review — 2026-10-16
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Reviewed application commit `2d5d44cd4549399d852e2df87c981fb752d59971` and the previously untracked evaluation packaging helpers. No release or hosted deployment approval is implied.
 
 The branding commit builds successfully. Its focused Chromium checks pass in Light and Dark (2 tests), covering authoring dialogs, accessibility, mobile fit and the Source picker. The complete backend suite ran 242 tests successfully, with 6 skipped. The production build retains a non-blocking 611.43 kB entry-chunk warning. This is focused candidate review, not a fresh complete cross-browser qualification.

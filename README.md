@@ -1,5 +1,9 @@
 # Chimera
 
+Repository context: **Chimera 1.2.0** | [MIT license](LICENSE) | [Release notes](docs/release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
+Chimera **1.2.0** is the hosted DARKROGUE SSO release. Use [hosted Chimera](https://chimera.darkrogue.io/) with a DARKROGUE account, or run the local authoring installation below. See [release notes](docs/release-1.2.0.md) for verified scope and open checks.
+
 **Imported HTML5 activities** can now sit alongside native scene experiences.
 Import an offline HTML file or single-entry ZIP, review its isolated preview and
 accessible text alternative, then choose view-only, completion, or scored tracking.
@@ -176,7 +180,7 @@ Editable Word storyboard export is available from **Export**. Choose **SME Maste
 
 ## License
 
-Chimera is licensed under the [MIT License](LICENSE). Third-party components retain their own licenses; for example, the vendored `@guided-workflows/onboarding` package is ISC-licensed, with its license included in the package tarball.
+Chimera first-party software and associated documentation are licensed under the [MIT License](LICENSE), copyright 2026 DARKROGUE. Preserve the complete notice in copies and distributions. Third-party components and course/media content retain their own terms; see [licensing and redistribution](docs/licensing.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## Verify changes
 

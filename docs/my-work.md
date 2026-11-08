@@ -1,5 +1,7 @@
 # My Work
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 My Work is the default opening screen after authentication. Refreshing the application returns to My Work; the remembered project remains available through Resume authoring. Direct review links still open their review surface.
 
 New Project in the My Work header opens the existing course-creation dialog. Cancelling keeps My Work open; successful creation enters the new project's Storyboard workspace. Creation uses the same role checks as the sidebar command.

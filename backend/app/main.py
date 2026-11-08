@@ -317,7 +317,7 @@ async def _require_request_access(
             ))
 
 
-app = FastAPI(title="Chimera API", version="0.1.0", dependencies=[Depends(_require_request_access)])
+app = FastAPI(title="Chimera API", version="1.2.0", dependencies=[Depends(_require_request_access)])
 app.include_router(media_router)
 
 

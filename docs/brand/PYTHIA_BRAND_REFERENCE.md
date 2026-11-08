@@ -1,5 +1,7 @@
 # Pythia Brand Reference
 
+Repository context: **Chimera 1.2.0** | [MIT license](../../LICENSE) | [Release notes](../release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Pythia's canonical visual identity is owned by **Darkkeep/Pythia**.
 
 **Approved identity:** *Pythia App Icon — Emergent Vision (Concept 4)*  

@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-08",
+  "product": "Chimera",
+  "productVersion": "1.2.0",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2026 DARKROGUE",
+  "baseCommit": "2f01e675e7179d0e33b83856a863a16e6b1eaec3",
+  "scope": "Documentation/version/license reconciliation. Existing screenshots, historical evidence, brand-kit versions, dependency terms and upstream contracts retain their original scope. No new provider, human, LMS, sign-out/reload or public-distribution acceptance. Source metadata is not a deployment or release tag.",
+  "guideVerification": {
+    "pages": 100,
+    "internalPdfLinks": 36,
+    "localReferences": 461,
+    "errors": []
+  },
+  "files": {
+    "docs/user-guide.md": "96b1772763ffac5e402627ed1b7a357bb8350535c6ee0b07a13b64054212dbfe",
+    "docs/user-guide.pdf": "e3f861e64dd9ecec1019214bcd6dbf41c6d8448ea604804cef3a1bff92a90751",
+    "docs/user-guide/support/render-pdf.py": "b9d9691ad0ac2daf98b46f8e03dadb00dbf3b5b10ba18604d8a3fd4a685846a4",
+    "docs/user-guide/support/render-pdf.cjs": "4277d05e53a1471a67f3fd9efee1b95ddf9c7361ee68f2c55fb337ea49e88aa8",
+    "docs/user-guide/support/README.md": "595f0799c08fe09e346f7cdc26767fc7669efda74799f38d207aaa5d640ac274",
+    "docs/release-1.2.0.md": "2b91f015ad4ce973d742d74c30f84accc9c0511e77aa7db2afadda0e884a2e86",
+    "docs/licensing.md": "2271a5907276fa299f87a6ca606396c2938ba3295303e81b24a29417715dcf21",
+    "LICENSE": "b652ab582c469fd1a0a3339aa1c85a58a25bd313abf9891bcb1b59bc48f5d055",
+    "THIRD_PARTY_NOTICES.md": "f95dbc9c2129c24a37e6689c4f284c1b30c739d1815b29dc043df07df69105a5"
+  },
+  "screenshotsRecaptured": false,
+  "versionedAssetKit": "Unchanged; all original MANIFEST.json file hashes verified."
+}

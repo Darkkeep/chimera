@@ -1,5 +1,7 @@
 # Visual scene authoring
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 October 28 update: [native shapes, appearance, layers, and the shared scene timeline](scene-timeline-implementation.md) extend the authored composition. Insert native shapes and adjust fill/outline/object opacity; text and shapes support drop-shadow and bevel/emboss approximations. Group and arrange layers, then optionally schedule object lifetimes, animations, audio, and positioned video. Use the [user-guide procedures](user-guide.md#insert-shapes-and-style-layers) for current controls and [pre-alpha readiness](pre-alpha-readiness.md) for open acceptance work.
 
 Current navigation (2026-10-27): set the project-wide default using **Storyboard > Project background**, above the scene list, not Settings. Scene-specific choices still live in **Edit scene > Stage > Background** and can inherit the project default, select a local image, or explicitly choose None. **Assessments** now opens directly from **WORKSPACE** in the left rail. For question imports, Fill-in-the-blank, and collapsed tag/objective-reference dropdowns, see the [assessment user guide](user-guide.md#5-author-assessments).

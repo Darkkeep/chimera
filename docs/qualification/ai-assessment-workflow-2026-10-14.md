@@ -1,5 +1,7 @@
 # AI and Assessment Workflow Qualification
 
+Repository context: **Chimera 1.2.0** | [MIT license](../../LICENSE) | [Release notes](../release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Date: 2026-10-14. This pass finalizes the existing workspace changes for AI drafting, Question scenes, Assessment collections, Stage playback, and standalone/SCORM export.
 
 ## Repairs in this pass

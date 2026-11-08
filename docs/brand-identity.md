@@ -1,5 +1,7 @@
 # Chimera identity
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 **Distinct parts. Deliberate design. Powerful learning.**
 
 Chimera represents the instructional designer's work: assembling different disciplines, materials, and technologies into a coherent learning experience. The current application uses the metallic Mechanicus Trinity artwork: a central lion, eagle and dragon with layered wings. The 2026-10-24 refinement preserves that existing composition, glowing eyes and silver/copper palette, adding a broader feline jaw, fuller swept mane and matching faceted wing layers.

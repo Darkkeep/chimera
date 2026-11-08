@@ -1,6 +1,8 @@
 # Creator pre-alpha readiness
 
-Reviewed 2026-10-28. This is the current release-readiness checklist for a proposed invitation-only, supported, local Windows creator pilot. It records open work; it does not approve distribution or change the release policy.
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
+Reviewed for release context 2026-11-08. Chimera 1.2.0 establishes hosted SSO and the MIT software/documentation license; see [release notes](release-1.2.0.md). The checklist below retains the independent local-pilot checks originally reviewed 2026-10-28. This is the release-readiness checklist for a proposed invitation-only, supported, local Windows creator pilot. It records open work; it does not approve distribution or change the release policy.
 
 Use [current work](current-work.md) for delivered features, the [user guide](user-guide.md) for supported procedures, and the [human acceptance packet](qualification/human-acceptance-1.1.0.md) for observations. Dated qualification documents retain evidence for their original revisions and artifact hashes.
 
@@ -26,8 +28,8 @@ The October 28 backend run recorded 403 tests with 71 skipped; 27 focused browse
 ## Scope-dependent checks
 
 - **LMS publishing:** qualify a newly exported ZIP in the selected LMS, with captions, timed/trimmed media, seek-versus-consumption behavior, resume, retries, and gradebook reporting. Historical October 14 attestations apply to their recorded packages. If LMS publishing is outside the pilot, state that explicitly rather than claiming acceptance.
-- **AI-assisted authoring:** approve provider configuration/content handling/spending and review actual outputs against the captured-output rubric. Manual authoring and imported media do not require a live AI connection. Synthesia/Shotstack remain setup/read-only-test integrations, not video generation.
-- **Hosted participation:** requires deployment-specific identity/isolation, secrets, recovery, and operational acceptance. Hosting and Encarta remain deferred; a local pilot does not qualify them.
+- **AI-assisted authoring:** approve provider configuration/content handling/spending and review actual outputs against the captured-output rubric. Manual authoring and imported media do not require a live AI connection. Synthesia/Shotstack have asynchronous video adapters; live render access, entitlement, billing and output quality require their own qualification.
+- **Hosted participation:** requires deployment-specific identity/isolation, secrets, recovery, and operational acceptance. Chimera hosting and DARKROGUE SSO now have the bounded evidence in the 1.2.0 release notes; broader hosted participation and final sign-out/reload checks remain separate. Encarta remains unimplemented; a local pilot does not qualify it.
 
 ## During the pilot and before wider rollout
 

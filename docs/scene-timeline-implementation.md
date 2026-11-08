@@ -1,5 +1,7 @@
 # Scene timeline, layers, and appearance
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Implemented on 2026-10-28 against `main` following the [plan](scene-timeline-layers-plan.md), and delivered with the reconciled documentation in this source revision. Release/distribution approval remains pending under [creator pre-alpha readiness](pre-alpha-readiness.md). Existing scenes do not gain scheduled playback automatically.
 
 ## Authoring

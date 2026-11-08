@@ -1,5 +1,7 @@
 # Onboarding repository migration
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Current disposition (2026-10-28): extraction and Chimera's pinned integration are complete. Local Git history records PR #1 merged at `6475eff`. The implementation-era branch/PR statements below are historical. Manual novice/screen-reader acceptance, a second maintained consumer for API-stability claims, and applicable redistribution-rights review remain separate; see [creator pre-alpha readiness](pre-alpha-readiness.md).
 
 Implemented 2026-10-05 using the authorized defaults in the [extraction plan](onboarding-repository-plan.md).

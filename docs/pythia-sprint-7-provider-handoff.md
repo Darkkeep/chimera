@@ -1,5 +1,7 @@
 # Pythia Sprint 7 Provider Consolidation Handoff
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 ## Ownership
 
 Pythia now owns learning-intelligence execution-provider selection. Capability

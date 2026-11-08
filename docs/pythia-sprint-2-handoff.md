@@ -1,5 +1,7 @@
 # Pythia Sprint 2 Handoff for Chimera
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 ## Scope
 
 Pythia's Sprint 2 work is complete. `storyboard.analyze` now performs bounded,

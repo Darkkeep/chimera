@@ -1,5 +1,7 @@
 # Pythia Sprint 6 Course Review Handoff
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 ## Availability
 
 Pythia exposes `course.review` through the Engine API. It produces a validated

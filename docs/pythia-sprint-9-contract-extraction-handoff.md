@@ -1,5 +1,7 @@
 # Pythia Sprint 9 Contract Extraction Handoff
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 ## Package Location
 
 The local contract package is at `C:\inetpub\pythia-contracts`. It is a

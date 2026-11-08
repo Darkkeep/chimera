@@ -1,5 +1,7 @@
 # Reusable onboarding implementation
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 The reusable package now lives in the private [Darkkeep/onboarding repository](https://github.com/Darkkeep/onboarding). See the [repository extraction plan](onboarding-repository-plan.md) and [migration record](onboarding-repository-migration.md).
 
 The first implementation consists of a headless package, a shared DOM renderer and Playwright helpers, and two application adapters. The package imports neither React nor Chimera. It remains private and unpublished.

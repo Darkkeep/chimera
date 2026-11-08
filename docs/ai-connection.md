@@ -1,5 +1,7 @@
 # AI Connection
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Storyboard suggestions can optionally execute registered specialists and public
 web research before drafting. They use the local Pythia plugin's text provider,
 or the saved legacy text-model AI connection when no plugin is configured, not

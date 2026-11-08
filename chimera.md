@@ -1,4 +1,7 @@
 # Chimera Build Plan  
+
+Repository context: **Chimera 1.2.0** | [MIT license](LICENSE) | [Release notes](docs/release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 **Purpose:** Local, database-free application that ingests PowerPoint (`.pptx`) files, converts them into editable storyboards, supports integrated audio/video authoring, and exports Blackboard Learn-compatible SCORM packages.
 
 ---
@@ -9,7 +12,7 @@ Chimera will use a **filesystem-backed project model** and a **canonical storybo
 
 **Primary export target:** SCORM 1.2 for the currently documented target LMS.
 **Additional export:** SCORM 2004 4th Edition; local qualification does not imply acceptance by every target LMS.
-**Deployment model:** Local single-user operation remains supported; networked authentication is available. External media hosting is not required.
+**Deployment model:** Chimera 1.2.0 supports local single-user operation and the hosted DARKROGUE SSO installation. See [release scope and evidence](docs/release-1.2.0.md) and [authentication deployment profiles](docs/authentication-deployments.md). External media hosting is not required.
 
 ## 1.1 Current Status and Roadmap Authority
 

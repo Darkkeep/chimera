@@ -1,5 +1,7 @@
 # CSV source candidate client
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 The opt-in `backend/app/csv_source_client.py` adds `PublicCsvSourceCandidate(root,
 allowed_workers=callback)` and `CsvSourceCandidateClient`, with the same constructor
 and `ingest(metadata, original_bytes)` / `read_manifest(metadata, original_bytes)`

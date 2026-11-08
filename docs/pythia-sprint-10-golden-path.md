@@ -1,5 +1,7 @@
 # Pythia Sprint 10 Golden Path
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 ## Qualification
 
 The cross-service regression runner starts a temporary local Pythia Engine and

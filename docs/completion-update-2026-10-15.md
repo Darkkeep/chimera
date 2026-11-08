@@ -1,5 +1,7 @@
 # Completion update 1.1.0
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Implemented locally on 2026-10-15 from `a181b7336a792f1a2840fbc059d7314bf09f606a`, following the [completion plan](completion-plan-2026-10-15.md). The owner selected video, shared media, course-wide placement and OCR, and explicitly deferred hosted deployment. This record does not approve a release or replace human acceptance.
 
 ## Delivered

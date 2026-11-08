@@ -1,6 +1,7 @@
 const { chromium } = require('@playwright/test');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const { version } = require('../../../package.json');
 (async () => {
   const browser = await chromium.launch();
   try {
@@ -18,7 +19,7 @@ const { pathToFileURL } = require('node:url');
       }
     }, pathToFileURL(path.resolve('.') + path.sep).href);
     await page.pdf({ path: path.resolve('docs/user-guide.pdf'), format: 'A4', landscape: true, printBackground: true, preferCSSPageSize: true, displayHeaderFooter: true,
-      headerTemplate: '<span></span>', footerTemplate: '<div style="font:9px Arial;color:#52606a;width:100%;margin:0 14mm;display:flex;justify-content:space-between"><span>Chimera user guide · 2026-11-03</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>' });
+      headerTemplate: '<span></span>', footerTemplate: `<div style="font:9px Arial;color:#52606a;width:100%;margin:0 14mm;display:flex;justify-content:space-between"><span>Chimera ${version} user guide · MIT · 2026-11-08</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>` });
     console.log('Rendered docs/user-guide.pdf');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

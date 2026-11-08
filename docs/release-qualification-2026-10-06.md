@@ -1,5 +1,7 @@
 # Release qualification: 2026-10-06
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 ## CI reliability
 
 PR #1's run `37469497612` failed four WebKit checks and reported one flaky check. Clicks stalled during visibility/stability, scrolling or dispatch; one retry exhausted its overall test deadline during an API read. This is insufficient evidence of a product defect.

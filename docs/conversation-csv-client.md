@@ -1,5 +1,7 @@
 # CSV1.1 public conversation client qualification
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 2026-10-18. Narrow synthetic client qualification; G3 remains in-progress.
 Exact unreleased contracts candidate:
 `0fb76c5cf6517db5db6e8aeb0ff217410c189614`.

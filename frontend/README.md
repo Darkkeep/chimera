@@ -1,6 +1,8 @@
 # Chimera Studio
 
-React/Vite authoring interface for the local Chimera API.
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](../docs/release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
+React/Vite authoring interface for Chimera 1.2.0, usable with the local API or hosted DARKROGUE SSO installation. Product version and MIT licensing follow the root package; see the [hosted sign-in guide](../docs/user-guide.md#version-license-and-sign-in) and [deployment configuration](../docs/authentication-deployments.md).
 
 ```powershell
 npm install

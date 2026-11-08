@@ -1,5 +1,9 @@
 # Pythia + Chimera Integrated Build Plan
 
+Repository context: **Chimera 1.2.0** | [MIT license](LICENSE) | [Release notes](docs/release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
+**November 8 release context:** Chimera 1.2.0 establishes hosted DARKROGUE sign-in and MIT licensing for its first-party code and docs. Pythia remains independently versioned; its contracts, brand and redistribution terms are not changed by Chimera's license. See [release notes](docs/release-1.2.0.md).
+
 **October 28 Chimera authoring disposition:** native shapes/appearance/layers and the shared animation/audio/video timeline are implemented in Chimera. See [implementation scope](docs/scene-timeline-implementation.md) and [creator pre-alpha readiness](docs/pre-alpha-readiness.md). This local authoring work does not assert Pythia/Manteion shared-journey acceptance, live-provider qualification, or G3 exit; the integration milestones below keep their own evidence boundaries.
 
 **Working strategy:** Pythia provides learning intelligence, orchestration, evidence, validation, and governed AI execution. Chimera provides the authoring environment, production workflow, media handling, preview, assessment implementation, and learning-package export.

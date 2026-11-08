@@ -1,5 +1,7 @@
 # Platform foundation readiness: 2026-10-06
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 This is the historical source audit. Follow-up implementation and current deployment boundaries are recorded in [Platform Foundation Implementation](platform-foundation-implementation.md).
 
 Word rendering/editability and representative SCORM 1.2 human qualification are recorded in the [release evidence](release-qualification-2026-10-06.md). This audit starts the next foundation milestone in the [operating model](product-operating-model.md); it does not certify team deployment or external review.

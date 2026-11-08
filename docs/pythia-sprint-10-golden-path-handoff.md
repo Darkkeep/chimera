@@ -1,5 +1,7 @@
 # Pythia Sprint 10 Golden Path Handoff
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Updated 2026-11-02.
 
 ## Delivered

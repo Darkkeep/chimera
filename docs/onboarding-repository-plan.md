@@ -1,5 +1,7 @@
 # Plan: extract onboarding into its own GitHub repository
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Prepared 2026-10-05. Planning only; this document does not create a repository, move code, publish a package, or change dependencies.
 
 Implementation is recorded in the [migration record](onboarding-repository-migration.md). This document preserves the original plan; the user subsequently authorized implementation using these defaults.

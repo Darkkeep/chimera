@@ -1,6 +1,8 @@
 # Authentication deployment preparation
 
-Chimera uses one backend with installation-specific authentication. No hosted deployment or real user account was created by this change. The existing local workspace is unchanged.
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
+Chimera 1.2.0 uses one backend with installation-specific authentication. Hosted DARKROGUE SSO was enabled on November 8, 2026; see the [release record](release-1.2.0.md) for source/build identities, browser evidence and remaining checks. The workstation local workspace remains unchanged. Older qualification statements below retain their original dates and scope.
 
 | Profile | Identity | Current status |
 | --- | --- | --- |

@@ -1,5 +1,7 @@
 # Live AI Quality and LMS Qualification
 
+Repository context: **Chimera 1.2.0** | [MIT license](../../LICENSE) | [Release notes](../release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Date: 2026-10-14. Provider: saved OpenAI connection, `gpt-4.1-mini`. All submitted course/reference content was a synthetic widget-packing fixture. The existing PNutII course was not edited. Seven provider requests were made: one connection test and six generation requests, including failed and successful retests.
 
 ## Live AI findings

@@ -1,11 +1,17 @@
 # Chimera Delivery Guide
 
+Repository context: **Chimera 1.2.0** | [MIT license](LICENSE) | [Release notes](docs/release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Last reviewed: 2026-10-18. Shared journey: `conversation-explainable-answers-files`.
 Guide revision: 13. This is a maintained snapshot, not automatic telemetry.
 
 Product-level reconciliation (2026-10-28): Chimera's local timeline/appearance delivery is recorded in [current work](docs/current-work.md); [creator pre-alpha readiness](docs/pre-alpha-readiness.md) owns the local pilot's open release checks. This guide continues to govern the named shared journey; local authoring completion does not close its integration or G3 gates.
 
 Cross-repository records below use `repository:path` locators rather than links into absent sibling checkouts. Their sources belong to [Manteion](https://github.com/Darkkeep/manteion), [Pythia](https://github.com/Darkkeep/Pythia), and [pythia-contracts](https://github.com/Darkkeep/pythia-contracts). Those records are not bundled Chimera guides; their availability and current acceptance must be verified upstream before changing shared-journey status.
+
+## November 8 product release context
+
+Chimera **1.2.0** establishes the hosted DARKROGUE SSO release and aligned source version metadata. First-party code and docs use MIT; upstream contracts, onboarding, identity assets and user content retain their own terms. See [release notes](docs/release-1.2.0.md) and [licensing](docs/licensing.md). Recorded hosted account adoption/admin project creation does not close this guide's shared-journey or human gates. Final hosted sign-out/reload checks remain open.
 
 ## Start Here
 

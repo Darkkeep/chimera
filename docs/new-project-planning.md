@@ -1,5 +1,7 @@
 # Sources and Pythia planning in New Project
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 The **New Project** modal now supports source intake independently of the
 separate AI connection setting. Name the course, attach documents, and optionally
 expand **Add pasted text, web links, or Pythia excerpts**. Text and excerpts are

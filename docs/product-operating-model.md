@@ -1,5 +1,7 @@
 # Chimera Product Operating Model
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 The 2026-10-06 foundation execution uses adapter-first identity, one organization and guests disabled, as selected by the installation owner. See [implementation and acceptance boundaries](platform-foundation-implementation.md); a real provider and collector trust/residency contract remain deployment gates.
 
 Status: Direction agreed 2026-09-30

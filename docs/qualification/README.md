@@ -1,5 +1,7 @@
 # Retained release qualification evidence
 
+Repository context: **Chimera 1.2.0** | [MIT license](../../LICENSE) | [Release notes](../release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 ## Scope of later documentation and provider changes
 
 The October 27 six-provider connection work and refreshed [user guide](../user-guide.md#configure-media-connections) do not extend the dated evidence below. Its targeted test results are recorded in [current work](../current-work.md#october-27-media-provider-connections-and-help); provider screenshots use inert safe-status fixtures with [separate provenance](../user-guide/refresh-providers-2026-10-27.json). No real-provider entitlement, narration-quality or Synthesia/Shotstack video-generation qualification is implied. Video generation for those two providers is not yet implemented. Existing LMS attestations remain specific to their original package hashes; new code requires its own candidate/CI and human release decisions.

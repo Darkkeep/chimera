@@ -1,5 +1,7 @@
 # Chimera storyboard, export, and enhancement build plan
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Status: Release qualification in progress; the integrated authoring, enhancement, review, and backup flows are implemented, with external qualification and selected media gaps remaining. Team-platform direction is defined in [Product Operating Model](product-operating-model.md) before further breadth expansion.
 
 Prepared: 2026-09-30

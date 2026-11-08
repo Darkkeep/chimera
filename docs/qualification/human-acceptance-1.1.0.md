@@ -1,5 +1,7 @@
 # Human acceptance packet — candidate 1.1.0
 
+Repository context: **Chimera 1.2.0** | [MIT license](../../LICENSE) | [Release notes](../release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Status: pending operator/reviewer evidence. Hosted deployment is deferred for this update. This packet specifies concrete checks; no item is approved by its existence.
 
 Updated 2026-10-28 for timeline/appearance and supported creator-pilot readiness. Use [pre-alpha readiness](../pre-alpha-readiness.md) to select scope and distinguish pre-distribution checks from observations collected during the pilot. Existing observations remain tied to their recorded candidate and artifacts.

@@ -1,5 +1,7 @@
 # Platform foundation implementation
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Implemented after the 2026-10-06 qualification/readiness review. Selected pilot direction: adapter-first identity, one organization per installation, guests disabled. Local/offline authoring remains the supported default; a production identity adapter and collector transport are not supplied or silently enabled.
 
 ## Identity and permissions

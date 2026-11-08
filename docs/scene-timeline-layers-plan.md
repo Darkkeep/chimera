@@ -1,5 +1,7 @@
 # Scene timeline, layers, shapes, and effects
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Date: 2026-10-28. Status: implemented locally; see the [implementation record](scene-timeline-implementation.md) for delivered behavior, verification, approximations, and remaining manual acceptance. The original phased plan below is retained as its design and acceptance reference.
 
 ## Outcome

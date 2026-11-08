@@ -1,4 +1,18 @@
-# Chimera user guide
+# Chimera 1.2.0 user guide
+
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
+## Version, license and sign-in
+
+This guide accompanies **Chimera 1.2.0**, the hosted DARKROGUE SSO release, and its local authoring installation. First-party software and documentation use the [MIT License](../LICENSE), copyright 2026 DARKROGUE. Keep that notice with copies; dependencies, course materials and media retain their own terms. See [licensing](licensing.md) and [release notes](release-1.2.0.md).
+
+At [hosted Chimera](https://chimera.darkrogue.io/), an existing DARKROGUE browser session can sign you in automatically. Otherwise choose **Continue with DARKROGUE**, sign in on `darkrogue.io`, and return to Chimera. Password entry and account recovery belong to DARKROGUE; the hosted Chimera profile has no separate password-login/reset flow. The local single-user profile does not require a hosted account.
+
+DARKROGUE administrators receive administrator, author and instructional-designer roles; instructors receive author and instructional-designer; learners receive reviewer. Project membership separately controls project access. Account continuity retains the existing Chimera account ID on first matching-email sign-in.
+
+**Sign out** revokes the Chimera session only. A surviving DARKROGUE session can be adopted again after reload. Sign out of DARKROGUE separately when you need to end that upstream session. Final hosted sign-out/reload observation remains pending in the release record; this describes the implemented session boundary rather than completed browser acceptance of those last steps.
+
+Existing illustrations retain their original capture dates and synthetic-fixture provenance; a 1.2.0 guide rebuild does not recapture every screen or requalify historical exports.
 
 ## Design a native learning experience
 
@@ -1395,6 +1409,8 @@ See the [implementation build plan](storyboard-export-enhancement-build-plan.md)
 | AI generation does not yield a candidate | Check the visible error and ask the administrator to inspect provider/job configuration. The media form has no complete job monitor. |
 
 ## Screenshot and verification record
+
+The November 8, 2026 [release/licensing refresh](user-guide/refresh-release-2026-11-08.json) updates the guide to Chimera 1.2.0, MIT notices and hosted DARKROGUE sign-in instructions. Existing screenshots and earlier evidence retain their original provenance. This rebuild is documentation verification, not a new full screenshot, provider, human or LMS acceptance pass.
 
 The [2026-10-27 refresh manifest](user-guide/refresh-manifest-2026-10-27.json) records 19 updated captures: workspace rail/Storyboard background location, Review tools, question bank and import review, named assessment editing/list, all seven question types, and collapsed/expanded reference and metadata controls. The searchable dropdown captures verify existing values from another saved question in the same isolated project. No user course, provider credentials, paid generation, or external submission was used. Older images below retain their original scope; this selective refresh is not a full release or LMS qualification.
 

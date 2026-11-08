@@ -1,8 +1,10 @@
 # Single-User Deployment Checklist
 
-Use this checklist for a repeatable local demonstration. Built-in hosted accounts are implemented separately; Encarta remains fail-closed until its integration contract is supplied.
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
 
-## Current readiness - 2026-10-28
+Use this checklist for a repeatable local demonstration. Hosted DARKROGUE SSO is recorded separately in [Chimera 1.2.0](release-1.2.0.md); built-in hosted accounts remain an alternative installation profile. Encarta remains fail-closed until its integration contract is supplied. The local installation checks below are independent of the hosted release evidence.
+
+## Local-pilot readiness baseline - 2026-10-28
 
 Use [current work](current-work.md) for delivered features and [creator pre-alpha readiness](pre-alpha-readiness.md) for outstanding candidate, clean-install, recovery, and participant-support tasks. The October 28 timeline/effects update has local engineering evidence but no new release or target-LMS acceptance. The evaluation installer still omits root npm/Chromium setup for Word visuals; follow the manual Word-renderer setup below and in the evaluation start guide until that helper is repaired. All dated records below remain historical.
 

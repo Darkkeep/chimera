@@ -1,5 +1,7 @@
 # Resume data policy
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 SCORM 1.2 packages use a conservative **4,096-byte** JSON/UTF-8 resume budget; SCORM 2004 4th Edition packages use **64,000 bytes**. ADL specifies character-based smallest permitted maxima; byte counting is deliberately stricter for Unicode portability. See the [ADL SCORM conformance requirements](https://www.adlnet.gov/assets/uploads/SCORM_2004_4ED_v1_1_TR_20090814.pdf) and [runtime reference](https://scorm.com/scorm-explained/technical-scorm/run-time/run-time-reference/).
 
 The build report's `resumeData` section records the budget, full-course estimate, encoding and overflow policy. It warns when many scenes, audio completions, required videos, questions or long free-text responses could exceed that budget. Required-video estimates include one watched range per video; repeated seeking can fragment ranges and increase actual size. This is a risk estimate, not an LMS compatibility certification or an arbitrary scene-count limit.

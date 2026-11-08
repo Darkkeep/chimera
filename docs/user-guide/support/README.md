@@ -1,5 +1,13 @@
 # Maintaining the illustrated user guide
 
+Repository context: **Chimera 1.2.0** | [MIT license](../../../LICENSE) | [Release notes](../../release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
+## November 8 release and licensing refresh
+
+The guide source and bundled PDF identify Chimera 1.2.0 and the MIT software/documentation license. The [release refresh manifest](../refresh-release-2026-11-08.json) records their hashes and the verification scope. The PDF title and footer derive their product version from the root package manifest; update the footer date for a new documented refresh.
+
+This pass adds the hosted DARKROGUE sign-in and session-boundary instructions, licensing links and current release/evidence references. It does not recapture historical screenshots, relicense third-party content or establish new human/LMS/provider acceptance. The guide verifier reports 100 pages, 460 local references and 36 internal PDF links with no errors. Earlier capture manifests retain their original hashes and dates.
+
 ## October 28 timeline and appearance refresh
 
 The [timeline manifest](../refresh-timeline-2026-10-28.json) records the source, screenshot, and PDF hashes for shape appearance, named layers, and seconds-based timeline instructions. Run `scene-timeline.spec.cjs` with the existing isolated Playwright configuration; its native-shapes case captures `timeline-editor.png` and `timeline-controls.png` from synthetic courses. Copy the Chromium captures to `images/timeline-shape-editor.png` and `images/timeline-controls.png`, inspect them, then rebuild/finalize/verify the PDF using the commands below. The suite also retains mobile and light-theme views as test artifacts. No user course is used for these captures. Other screenshots retain their earlier provenance.

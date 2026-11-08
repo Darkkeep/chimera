@@ -1,5 +1,7 @@
 # PDF/DOCX source candidate client
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 2026-10-19. Opt-in local candidate qualification only. The client consumes the
 unreleased document partial-text schemas from pythia-contracts and the explicit
 Pythia signed source-manifest route. It adds no document turn/citation operation,

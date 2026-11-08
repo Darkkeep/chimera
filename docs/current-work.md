@@ -1,5 +1,15 @@
 # Current work and handoff
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
+## November 8 - Chimera 1.2.0 and MIT licensing
+
+The product version is now **1.2.0** across root/frontend manifests, lockfiles and backend API source metadata. The existing MIT license (copyright 2026 DARKROGUE) explicitly covers first-party software and documentation; upstream code/assets and user content retain their own terms. See [release notes](release-1.2.0.md), [licensing](licensing.md) and [third-party notices](../THIRD_PARTY_NOTICES.md).
+
+Hosted DARKROGUE sign-in, ADMIN role mapping, existing account-ID continuity and project creation were observed in the browser. The disposable project was moved to recoverable trash. Final sign-out-state/reload verification and temporary credential cleanup remain open after Computer Use stopped; the notes retain exact source/build identities and evidence limits. This source documentation/version change does not deploy new metadata, create a tag or qualify unrelated providers, LMSs, human acceptance or public distribution.
+
+The dated entries below retain their original evidence and chronology. Earlier hosting deferrals and the 1.1.0 candidate instructions are superseded only for the specifically recorded November 8 hosted scope; independent local-pilot and human gates remain.
+
 ## November 3 video generation and scene fitting
 
 Synthesia and Shotstack now have direct asynchronous Chimera video adapters.

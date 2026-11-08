@@ -1,5 +1,7 @@
 # Media and scene drafts from Pythia in Chimera
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Chimera's existing **Media library → Create a media candidate** can send image
 requests to Pythia. Pythia uses its existing image generator and retains the
 provider receipt; Chimera retains the returned image as a candidate. Approve the

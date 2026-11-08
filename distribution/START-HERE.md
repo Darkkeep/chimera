@@ -1,9 +1,12 @@
-# Chimera 1.1.0 evaluation installation
+# Chimera 1.2.0 evaluation installation
 
-Human acceptance is pending. This package is for local evaluation. See
-`docs/qualification/human-acceptance-1.1.0.md` and its interactive HTML checklist.
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](../docs/release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
+Human acceptance is pending. This guide describes local evaluation setup; it does not mean a new 1.2.0 evaluation ZIP has been published. See `docs/release-1.2.0.md` for the current version/scope. The `docs/qualification/human-acceptance-1.1.0.md` packet and its interactive HTML checklist are historical and do not establish 1.2.0 acceptance.
 The ZIP does not certify Word editing, screen-reader usability, instructional
 quality, or acceptance of newly exported packages in your LMS.
+
+First-party software and documentation are MIT-licensed, copyright 2026 DARKROGUE. Retain the root `LICENSE` and `THIRD_PARTY_NOTICES.md` when distributing a package. Third-party components, assets and course content retain their own terms; private upstream source requires its own redistribution permission.
 
 The current creator-pilot checklist is `docs/pre-alpha-readiness.md`. Timeline and appearance changes must be included in the package's committed source revision; the packager intentionally excludes uncommitted application edits. A source package is not an approved pre-alpha release by its existence.
 

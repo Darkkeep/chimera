@@ -1,5 +1,7 @@
 # Guided review practice: pinned core consumer audit
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 2026-10-18. Chimera package/provenance and sister-consumer review only. Optional
 synthetic practice is not formal review, owner acceptance or product qualification.
 Manteion owns its React implementation and browser/build evidence.

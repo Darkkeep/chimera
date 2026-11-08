@@ -1,5 +1,7 @@
 # Consult Pythia directly
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 Open a project and select **Consult Pythia** in the workspace navigation. This
 calls the local Pythia plugin's actual `pythia_consult` tool over MCP stdio, using
 Pythia's own Python environment and live `TextConversationProducer`. It is the

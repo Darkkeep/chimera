@@ -1,5 +1,7 @@
 # Pythia I2 Storyboard Transform Handoff
 
+Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+
 ## Availability
 
 Pythia now exposes `storyboard.transform` through the Engine API. It produces a
