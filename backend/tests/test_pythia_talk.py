@@ -115,6 +115,17 @@ class SavedConnectionBridgeTests(unittest.TestCase):
         saved.assert_not_called()
         self.assertNotIn("provider", bridge.call_args.args[1])
 
+    def test_media_plugin_capabilities_mode_is_accepted_and_others_rejected(self):
+        process = Mock(returncode=0)
+        capabilities = {"mode": "private-local-media", "consultation": True, "media_tools": True}
+        process.communicate.return_value = (json.dumps({"ok": True, "result": capabilities}).encode(), b"")
+        with patch.object(talk.subprocess, "Popen", return_value=process):
+            self.assertEqual(talk._run_local_mcp(self.root, {"action": "capabilities"}), capabilities)
+        for unsupported in ({"mode": "remote-service", "consultation": True}, {"mode": "private-local-media", "consultation": False}):
+            process.communicate.return_value = (json.dumps({"ok": True, "result": unsupported}).encode(), b"")
+            with patch.object(talk.subprocess, "Popen", return_value=process), self.assertRaises(talk.TalkError):
+                talk._run_local_mcp(self.root, {"action": "capabilities"})
+
     def test_installation_runtime_preference_and_environment_override(self):
         runtime = self.root / "runtime"
         for relative in (".venv/Scripts/python.exe", "scripts/pythia_chatgpt.py"):

@@ -162,9 +162,16 @@ adapter's process environment; no credential file is created. Consultation and
 draft generation consume the saved connection's daily/concurrent request budget;
 capability discovery makes no model call and consumes no generation allowance.
 
-An existing `plugins/pythia/mcp.json` takes precedence. It must supply the supported
-local Python command, adapter and explicit `--provider-file` argument. That path
-continues to use Pythia's own operator-managed provider configuration.
+An existing `plugins/pythia/mcp.json` takes precedence. This is the same
+operator-managed configuration the installed `@Pythia` ChatGPT plugin uses, so
+Chimera works directly with that plugin's adapter. It must supply the plugin
+checkout's own virtual-environment Python command, its `scripts/pythia_chatgpt.py`
+adapter and the explicit `--provider-file` argument. The plugin's optional
+loopback `--media-url` and absolute `--media-output-dir` arguments are also
+accepted, and the plugin's checkout may differ from the configured consultation
+checkout. Both the text-only (`private-local-text`) and media-enabled
+(`private-local-media`) plugin modes are supported. That path continues to use
+Pythia's own operator-managed provider configuration.
 
 For content drafting the adapter also exposes `pythia_draft_changes`, backed by
 Pythia's live `ChimeraDraftProducer`. Its strictly validated result supports only

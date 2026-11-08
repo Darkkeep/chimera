@@ -134,7 +134,7 @@ def _run_local_mcp(root, payload):
         if payload["action"] == "experience-treatment":
             return ExperienceTreatment.model_validate(value).model_dump()
         if payload["action"] == "capabilities":
-            if value.get("mode") != "private-local-text" or value.get("consultation") is not True:
+            if value.get("mode") not in {"private-local-text", "private-local-media"} or value.get("consultation") is not True:
                 raise ValueError("Unsupported Pythia mode")
             return value
         return PythiaAdvice.model_validate(value).model_dump()

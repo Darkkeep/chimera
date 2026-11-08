@@ -6,40 +6,75 @@ import os
 import re
 from pathlib import Path
 import sys
-
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from urllib.parse import urlsplit
 
 MAX_BRIDGE_BYTES = 128 * 1024 * 1024
+PLUGIN_OPTIONS = {"--provider-file", "--media-url", "--media-output-dir"}
 
 
 class LocalContextLimitError(ValueError):
     pass
 
 
+def _loopback_http_url(value):
+    try:
+        parsed = urlsplit(value)
+        return (parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+                and bool(parsed.port) and not parsed.username and not parsed.password)
+    except ValueError:
+        return False
+
+
+def plugin_parameters(config_path):
+    """Validate the installed @Pythia plugin's operator-managed command.
+
+    The mcp.json may point at the plugin's own Pythia checkout. Only that
+    checkout's virtual-environment interpreter running scripts/pythia_chatgpt.py
+    is accepted, with the explicit --provider-file argument and optionally the
+    plugin's loopback --media-url and absolute --media-output-dir arguments.
+    No browser-controlled commands, other executables, options, or shells.
+    """
+    config = json.loads(config_path.read_text(encoding="utf-8"))["mcpServers"]["pythia"]
+    args = [str(value) for value in config.get("args", [])]
+    try:
+        adapter = Path(args[0]).resolve()
+        root = adapter.parents[1]
+        interpreter = root / ".venv/Scripts/python.exe"
+        options = dict(zip(args[1::2], args[2::2], strict=True))
+        supported = (Path(args[0]).is_absolute() and adapter.name == "pythia_chatgpt.py"
+                     and adapter.parent.name == "scripts" and adapter.is_file()
+                     and Path(config["command"]).resolve() == interpreter and interpreter.is_file()
+                     and set(options) <= PLUGIN_OPTIONS and len(options) == (len(args) - 1) // 2
+                     and Path(options["--provider-file"]).is_absolute()
+                     and ("--media-output-dir" not in options or Path(options["--media-output-dir"]).is_absolute())
+                     and ("--media-url" not in options or _loopback_http_url(options["--media-url"])))
+    except (IndexError, KeyError, TypeError, ValueError, OSError):
+        supported = False
+    if not supported:
+        raise ValueError("Unsupported local Pythia plugin configuration")
+    return str(interpreter), args, str(root)
+
+
 async def exchange(payload):
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
     checkout = Path(sys.argv[1]).resolve()
-    interpreter = checkout / ".venv/Scripts/python.exe"
-    adapter = checkout / "scripts/pythia_chatgpt.py"
-    # Reuse the installed, local plugin's supported adapter and provider-file
-    # argument only. No browser-controlled commands, environment, or shell.
+    command = str(checkout / ".venv/Scripts/python.exe")
+    args = [str(checkout / "scripts/pythia_chatgpt.py")]
+    cwd = str(checkout)
+    # Reuse the installed, local plugin's supported adapter and arguments only.
     config_path = checkout / "plugins/pythia/mcp.json"
     environment = None
     if config_path.is_file():
-        config = json.loads(config_path.read_text(encoding="utf-8"))["mcpServers"]["pythia"]
-        args = config.get("args", [])
-        if (Path(config["command"]).resolve() != interpreter.resolve() or
-            len(args) != 3 or Path(args[0]).resolve() != adapter.resolve() or
-            args[1] != "--provider-file" or not Path(args[2]).is_absolute()):
-            raise ValueError("Unsupported local Pythia plugin configuration")
+        command, args, cwd = plugin_parameters(config_path)
     else:
         provider = payload.pop("provider")
         names = {"PYTHIA_ANALYSIS_API_URL", "PYTHIA_ANALYSIS_API_KEY", "PYTHIA_ANALYSIS_MODEL"}
         if set(provider) != names or not all(isinstance(value, str) and value.strip() for value in provider.values()):
             raise ValueError("Incomplete saved AI connection")
         environment = dict(provider)
-        args = [str(adapter)]
-    parameters = StdioServerParameters(command=str(interpreter), args=args, cwd=str(checkout), env=environment)
+    parameters = StdioServerParameters(command=command, args=args, cwd=cwd, env=environment)
     with open(os.devnull, "w") as errors:
         async with stdio_client(parameters, errlog=errors) as (reader, writer):
             async with ClientSession(reader, writer, read_timeout_seconds=timedelta(seconds=630)) as session:
