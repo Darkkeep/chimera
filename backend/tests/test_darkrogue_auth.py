@@ -114,6 +114,13 @@ class DarkrogueSignInTests(unittest.TestCase):
         self.assertEqual(replay.status_code, 401)
         self.assertIn("already used", replay.json()["detail"])
 
+    def test_signing_in_again_revokes_the_presented_session(self):
+        self.assertEqual(self.sign_in().status_code, 200)
+        previous = self.client.cookies.get(COOKIE)
+        self.assertEqual(self.sign_in().status_code, 200)
+        self.assertNotEqual(self.client.cookies.get(COOKIE), previous)
+        self.assertEqual(self.client.get("/api/projects", headers={"Cookie": f"{COOKIE}={previous}"}).status_code, 401)
+
     def test_learner_maps_to_reviewer_without_project_creation(self):
         self.assertEqual(self.sign_in(sub="supabase-user-2", email="learner@example.com", name="Learner", role="LEARNER").status_code, 200)
         identity = self.client.get("/api/identity/context").json()

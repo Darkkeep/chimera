@@ -144,7 +144,7 @@ class AccountStore:
             self.audit("auth.signed_in", account["id"])
             return token
 
-    def sso_login(self, claims: dict, roles: list[str]) -> str:
+    def sso_login(self, claims: dict, roles: list[str], previous_token: str | None = None) -> str:
         """Create or refresh the DARKROGUE-backed account and issue a session.
 
         The handoff token ID is one-time: replays inside the token lifetime are
@@ -179,6 +179,8 @@ class AccountStore:
                 data["accounts"][email] = account
                 self.audit("account.provisioned", account["id"])
             account.update(displayName=claims["name"], roles=roles, externalId=claims["sub"], identityProvider="darkrogue")
+            if previous_token:
+                data["sessions"].pop(token_digest(previous_token), None)
             token = secrets.token_urlsafe(32)
             data["sessions"][token_digest(token)] = {"userId": account["id"], "expires": now + SESSION_SECONDS, "origin": public_origin()}
             self._write(data)

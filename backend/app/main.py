@@ -474,7 +474,7 @@ def darkrogue_login(data: DarkrogueLoginRequest, request: Request) -> JSONRespon
         claims = darkrogue_auth.verify_handoff(data.token.get_secret_value())
     except darkrogue_auth.HandoffError as error:
         raise HTTPException(401, str(error)) from error
-    token = AccountStore(ROOT).sso_login(claims, darkrogue_auth.ROLE_MAP[claims["role"]])
+    token = AccountStore(ROOT).sso_login(claims, darkrogue_auth.ROLE_MAP[claims["role"]], request.cookies.get(COOKIE))
     response = JSONResponse({"authenticated": True}, headers={"Cache-Control": "no-store"})
     response.set_cookie(COOKIE, token, max_age=SESSION_SECONDS, httponly=True, secure=True, samesite="strict", path="/")
     return response
