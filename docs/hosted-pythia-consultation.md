@@ -33,7 +33,9 @@ operator-actionable message. All values live only in the backend environment.
 - `CHIMERA_PYTHIA_SERVICE_TOKEN` — bearer token registered with the engine's
   Chimera trust profile; at least 32 characters.
 - `CHIMERA_PYTHIA_SIGNING_KEY` — Ed25519 private key PEM whose public half is
-  the engine's `PYTHIA_HOSTED_PUBLIC_KEY`.
+  the engine's `PYTHIA_HOSTED_PUBLIC_KEY`. Accepts inline PEM or an absolute
+  path to a PEM file readable only by the backend service user, because
+  systemd environment files cannot hold multiline values.
 - `CHIMERA_PYTHIA_KEY_ID` — key identifier matching `PYTHIA_HOSTED_KEY_ID`.
 - `CHIMERA_PYTHIA_TENANT_ID` — tenant identifier matching
   `PYTHIA_HOSTED_TENANT_ID`.
@@ -44,7 +46,9 @@ operator-actionable message. All values live only in the backend environment.
 The matching engine-side profile is enabled with `PYTHIA_HOSTED_CHIMERA=1` and
 `PYTHIA_CHIMERA_ORIGIN` set to this installation's exact HTTPS origin. See
 Pythia's `docs/operations/render-hosting.md` for the full engine checklist,
-including the per-tenant `PYTHIA_HOSTED_TURN_LIMIT` allowance.
+including the per-tenant `PYTHIA_HOSTED_TURN_LIMIT` allowance. The
+`deploy/hosted-pythia.env.example` template in this repository holds a
+commented copy of every backend variable.
 
 ## Who may consult
 

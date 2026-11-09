@@ -66,7 +66,8 @@ class ConfigurationTests(unittest.TestCase):
                                  ({"CHIMERA_PYTHIA_CALLBACK_TOKEN": "s" * 40}, "Distinct"),
                                  ({"CHIMERA_PYTHIA_BASE_URL": "http://pythia.example.test"}, "HTTPS"),
                                  ({"CHIMERA_PYTHIA_BASE_URL": "https://example.test/path"}, "HTTPS"),
-                                 ({"CHIMERA_PYTHIA_SIGNING_KEY": "not a key"}, "Ed25519"),
+                                 ({"CHIMERA_PYTHIA_SIGNING_KEY": "-----BEGIN PRIVATE KEY-----\nnot a key\n-----END PRIVATE KEY-----"}, "Ed25519"),
+                                 ({"CHIMERA_PYTHIA_SIGNING_KEY": "relative/not-a-key"}, "absolute path"),
                                  ({"CHIMERA_PYTHIA_TENANT_ID": "bad tenant!"}, "identifiers")):
             with self.subTest(changed=changed), patch.dict(os.environ, {**HOSTED_ENV, **changed}, clear=True):
                 with self.assertRaisesRegex(hosted.HostedError, pattern):
@@ -75,6 +76,20 @@ class ConfigurationTests(unittest.TestCase):
     def test_accepts_exact_https_origin(self):
         with patch.dict(os.environ, {**HOSTED_ENV, "CHIMERA_PYTHIA_BASE_URL": "https://pythia.darkrogue.io/"}, clear=True):
             self.assertEqual(hosted.configuration().base_url, "https://pythia.darkrogue.io")
+
+    def test_signing_key_can_be_an_absolute_pem_file_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "signing.pem"
+            path.write_text(PEM, encoding="utf-8")
+            with patch.dict(os.environ, {**HOSTED_ENV, "CHIMERA_PYTHIA_SIGNING_KEY": str(path)}, clear=True):
+                self.assertEqual(hosted.configuration().key_id, "chimera-key-1")
+            with patch.dict(os.environ, {**HOSTED_ENV,
+                    "CHIMERA_PYTHIA_SIGNING_KEY": str(Path(directory) / "missing.pem")}, clear=True):
+                with self.assertRaisesRegex(hosted.HostedError, "could not be read"):
+                    hosted.configuration()
+        with patch.dict(os.environ, {**HOSTED_ENV, "CHIMERA_PYTHIA_SIGNING_KEY": "relative/key.pem"}, clear=True):
+            with self.assertRaisesRegex(hosted.HostedError, "absolute path"):
+                hosted.configuration()
 
 
 class ConsultTransportTests(unittest.TestCase):

@@ -16,6 +16,7 @@ import os
 import re
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -100,6 +101,29 @@ def _exact_origin(value):
     return parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"} and bool(parsed.port)
 
 
+def _signing_key(value):
+    """Accept inline PEM or an absolute path to a PEM file (systemd env files
+    cannot hold multiline values)."""
+    material = value
+    if "-----BEGIN" not in value:
+        path = Path(value)
+        if not path.is_absolute():
+            raise HostedError("CHIMERA_PYTHIA_SIGNING_KEY must contain a PEM private key or an "
+                              "absolute path to one.")
+        try:
+            material = path.read_text(encoding="utf-8")
+        except OSError:
+            raise HostedError("The CHIMERA_PYTHIA_SIGNING_KEY file could not be read. Check its "
+                              "path and permissions.") from None
+    try:
+        key = load_pem_private_key(material.encode(), password=None)
+    except (ValueError, TypeError):
+        key = None
+    if not isinstance(key, Ed25519PrivateKey):
+        raise HostedError("CHIMERA_PYTHIA_SIGNING_KEY must be an Ed25519 private key in PEM format.")
+    return key
+
+
 def configuration() -> HostedConfiguration:
     values = {name: os.environ.get(name, "").strip() for name in SETTINGS}
     missing = [name for name, value in values.items() if not value]
@@ -112,12 +136,7 @@ def configuration() -> HostedConfiguration:
     service_token, callback_token = values["CHIMERA_PYTHIA_SERVICE_TOKEN"], values["CHIMERA_PYTHIA_CALLBACK_TOKEN"]
     if len(service_token) < 32 or len(callback_token) < 32 or service_token == callback_token:
         raise HostedError("Distinct hosted Pythia service and callback tokens of at least 32 characters are required.")
-    try:
-        key = load_pem_private_key(values["CHIMERA_PYTHIA_SIGNING_KEY"].encode(), password=None)
-    except (ValueError, TypeError):
-        key = None
-    if not isinstance(key, Ed25519PrivateKey):
-        raise HostedError("CHIMERA_PYTHIA_SIGNING_KEY must be an Ed25519 private key in PEM format.")
+    key = _signing_key(values["CHIMERA_PYTHIA_SIGNING_KEY"])
     if any(not _IDENTITY.fullmatch(values[name]) for name in ("CHIMERA_PYTHIA_KEY_ID", "CHIMERA_PYTHIA_TENANT_ID")):
         raise HostedError("Hosted Pythia key and tenant identifiers must use letters, digits, '. _ : -' only.")
     return HostedConfiguration(values["CHIMERA_PYTHIA_BASE_URL"].rstrip("/"), service_token,
