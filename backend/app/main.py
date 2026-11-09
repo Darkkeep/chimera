@@ -1,5 +1,6 @@
 import io
 import hashlib
+import hmac
 import json
 import os
 import mimetypes
@@ -55,6 +56,7 @@ from .storage import update_project_background, update_project_relationship, Pro
 from .question_import import parse_questions, question_template, question_spreadsheet
 from .pythia_connection import LocalEngineConnection, configured_engine_url, local_engine_url, save_engine_url
 from . import pythia_talk
+from . import pythia_hosted
 from . import experience_treatments
 from .experience_models import ExperienceDesignRequest, ExperienceReview
 from . import video_treatments
@@ -63,7 +65,7 @@ from . import pythia_actions
 
 
 HOSTED_ACCOUNT_PROVIDERS = {"builtin", "darkrogue"}
-PUBLIC_API_PATHS = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password", "/api/auth/darkrogue"}
+PUBLIC_API_PATHS = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password", "/api/auth/darkrogue", "/api/internal/pythia/turn-access"}
 
 
 ROUTE_ACTIONS = {
@@ -89,7 +91,7 @@ ROUTE_ACTIONS = {
     "copy_shared_media": "media.manage", "delete_shared_media": "media.manage", "post_reference_ocr": "reference.create",
     "post_reference_ocr_accept": "reference.create",
     "health": "identity.view", "auth_config": "identity.view", "login": "identity.view",
-    "logout": "identity.view", "reset_password": "identity.view", "darkrogue_login": "identity.view", "get_accounts": "admin.policy.manage",
+    "logout": "identity.view", "reset_password": "identity.view", "darkrogue_login": "identity.view", "pythia_turn_access": "identity.view", "get_accounts": "admin.policy.manage",
     "get_identity_context": "identity.view", "get_identity_policy": "identity.view",
     "get_installation_config": "identity.view", "patch_identity_policy": "admin.policy.manage",
     "get_project_members": "project.membership.manage", "post_project_member": "project.membership.manage",
@@ -486,6 +488,43 @@ def reset_password(data: ResetPasswordRequest, request: Request) -> dict[str, bo
     require_origin(request)
     store.reset_password(data.token.get_secret_value(), data.password.get_secret_value())
     return {"reset": True}
+
+
+@app.post("/api/internal/pythia/turn-access")
+async def pythia_turn_access(request: Request) -> JSONResponse:
+    """Pythia's per-turn current-access callback; bearer-authenticated, fail-closed."""
+    def respond(allowed: bool, status: int = 200) -> JSONResponse:
+        return JSONResponse({"allowed": allowed}, status_code=status, headers={"Cache-Control": "no-store"})
+    try:
+        expected = pythia_hosted.configuration().callback_token
+    except pythia_hosted.HostedError:
+        return respond(False, 503)
+    presented = request.headers.get("Authorization", "")
+    if not presented.startswith("Bearer ") or not hmac.compare_digest(
+            hashlib.sha256(expected.encode()).digest(),
+            hashlib.sha256(presented.removeprefix("Bearer ").encode()).digest()):
+        return respond(False, 401)
+    if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+        return respond(False, 415)
+    body = await request.body()
+    if len(body) > 8192:
+        return respond(False, 413)
+
+    def unique_pairs(pairs):
+        document = {}
+        for key, value in pairs:
+            if key in document:
+                raise ValueError("Duplicate JSON member")
+            document[key] = value
+        return document
+    try:
+        claims = json.loads(body, object_pairs_hook=unique_pairs)
+    except (ValueError, UnicodeDecodeError):
+        return respond(False, 400)
+    try:
+        return respond(await run_in_threadpool(pythia_hosted.turn_access_allowed, claims))
+    except Exception:
+        return respond(False, 503)
 
 
 @app.get("/api/accounts")
@@ -1991,9 +2030,11 @@ def put_local_pythia_connection(request: Request, data: LocalEngineConnection) -
 
 
 def _local_pythia_access(project_id: str, actor: ActorContext) -> None:
-    selected = installation_policy(LocalIdentityDirectory(ROOT))
-    if selected.deploymentMode != "single-user" or actor.deploymentMode != "single-user":
-        raise HTTPException(403, "Direct local Pythia consultation is available only in a single-user local installation.")
+    if not pythia_hosted.active():
+        # Without a hosted engine, consultation runs through the local desktop adapter only.
+        selected = installation_policy(LocalIdentityDirectory(ROOT))
+        if selected.deploymentMode != "single-user" or actor.deploymentMode != "single-user":
+            raise HTTPException(403, "Direct local Pythia consultation is available only in a single-user local installation.")
     _require_action(get_authorization_policy(), actor, "enhancement.job.create", project_id)
     _require_action(get_authorization_policy(), actor, "project.view", project_id)
     read_project(project_id)
