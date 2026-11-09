@@ -12,6 +12,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import storage
+from . import pythia_hosted
 from .ai_connection import resolve_connection, request_budget
 from .pythia_limits import MAX_CONTEXT_CHARS, MAX_BRIDGE_BYTES, BRIDGE_TIMEOUT_SECONDS
 from .outline import outline_titles
@@ -74,7 +75,22 @@ def checkout():
     return root
 
 
+def hosted_configuration():
+    """Validated hosted-engine settings, as an operator-actionable TalkError on failure."""
+    try:
+        return pythia_hosted.configuration()
+    except pythia_hosted.HostedError as error:
+        raise TalkError(str(error), error.status) from None
+
+
 def local_mcp(question=None, history=None, *, authoring_request=None, video_request=None, experience_request=None, enhancement_request=None):
+    if pythia_hosted.active():
+        if question is None and authoring_request is None and video_request is None and experience_request is None and enhancement_request is None:
+            try:
+                return pythia_hosted.check(hosted_configuration())
+            except pythia_hosted.HostedError as error:
+                raise TalkError(str(error), error.status) from None
+        raise TalkError("This Pythia operation uses the local desktop adapter and is not yet available in this hosted deployment. Hosted consultation is available; drafting and media requests remain desktop-only for now.", 503)
     root = checkout()
     payload = {"action": "capabilities"} if question is None else {"action": "consult", "question": question, "history": history or []}
     if authoring_request is not None:
@@ -188,13 +204,16 @@ def public_state(state):
         "actions": [{key: value for key, value in action.items() if key not in {"fingerprint", "runId", "binding"}}
                     for action in state.get("actions", [])],
         "turns": [{**{key: value for key, value in turn.items()
-        if key not in {"wireQuestion", "fingerprint", "runId", "binding"}}, "outlineItemCount": outline_count(turn)} for turn in state["turns"]]}
+        if key not in {"wireQuestion", "fingerprint", "runId", "binding", "hosted"}}, "outlineItemCount": outline_count(turn)} for turn in state["turns"]]}
 
 
 def get_conversation(project_id, actor):
     with storage.storyboard_transaction():
         state = public_state(read_state(state_path(project_id, actor)))
     try:
+        if pythia_hosted.active():
+            hosted_configuration()
+            return {**state, "configured": True, "message": "Uses the hosted Pythia engine configured for this deployment."}
         checkout()
         return {**state, "configured": True, "message": "Uses the local Pythia adapter with its plugin configuration or your saved AI connection."}
     except TalkError as error:
@@ -318,7 +337,10 @@ def deduplicate_source_context(messages):
 
 
 def submit(project_id, actor, data, authorize):
-    checkout()
+    hosted = pythia_hosted.active()
+    hosted_config = hosted_configuration() if hosted else None
+    if not hosted:
+        checkout()
     authorize()
     with storage.storyboard_transaction():
         path = state_path(project_id, actor)
@@ -338,16 +360,33 @@ def submit(project_id, actor, data, authorize):
             if turn["status"] == "completed":
                 history.extend([{"role": "user", "content": turn["wireQuestion"]}, {"role": "assistant", "content": turn["result"]["content"]}])
         question, binding = compose(project_id, data, state.get("planning"))
-        compact = deduplicate_source_context([*history, {"role": "user", "content": question}])
-        history, question = compact[:-1], compact[-1]["content"]
-        if len(history) > 32 or sum(len(message["content"]) for message in history) + len(question) > MAX_CONTEXT_CHARS or len(state["turns"]) >= 32:
-            raise TalkError("This conversation has reached its context limit. Start a new conversation; no history was silently dropped.")
+        hosted_request = None
+        if hosted:
+            # The durable hosted thread is the exact wire context Pythia recorded,
+            # including accepted-but-failed turns it hides from its model producer.
+            thread = state.get("hostedThread") or {"revision": 0, "messages": []}
+            compact = deduplicate_source_context([*thread["messages"], {"role": "user", "content": question}])
+            question = compact[-1]["content"]
+            history = thread["messages"]
+            if sum(len(message["content"]) for message in history) + len(question) > pythia_hosted.HOSTED_CONTEXT_CHARS or len(state["turns"]) >= 32:
+                raise TalkError("This conversation has reached the hosted consultation allowance of 24,000 context characters. Start a new conversation; no history was silently dropped.")
+            try:
+                scope = pythia_hosted.conversation_scope(hosted_config, actor.actorId, state["sessionId"])
+            except pythia_hosted.HostedError as error:
+                raise TalkError(str(error), error.status) from None
+            hosted_request = {"scope": scope, "messageId": uuid4().hex, "revision": thread["revision"],
+                "idempotencyKey": hashlib.sha256(f"{state['sessionId']}\0{data.requestId}".encode()).hexdigest()}
+        else:
+            compact = deduplicate_source_context([*history, {"role": "user", "content": question}])
+            history, question = compact[:-1], compact[-1]["content"]
+            if len(history) > 32 or sum(len(message["content"]) for message in history) + len(question) > MAX_CONTEXT_CHARS or len(state["turns"]) >= 32:
+                raise TalkError("This conversation has reached its context limit. Start a new conversation; no history was silently dropped.")
         if not CAPACITY.acquire(blocking=False):
             raise TalkError("Two Pythia consultations are already active. Try again when one finishes.", 429)
         turn = {"id": data.requestId, "question": data.message.strip(), "wireQuestion": question,
             "direction": data.direction.strip(),
             "planningStage": state.get("planning", {}).get("stage", "consulting"),
-            "fingerprint": fingerprint, "runId": RUN_ID, "binding": binding,
+            "fingerprint": fingerprint, "runId": RUN_ID, "binding": binding, "hosted": hosted_request,
             "context": {"sceneId": data.sceneId, "sourceIds": data.sourceIds}, "status": "running", "result": None, "error": None}
         state["turns"].append(turn)
         state["authorDirection"] = data.direction.strip()
@@ -364,6 +403,9 @@ def finish(path, project_id, session_id, turn, history, authorize):
     try:
         authorize()
         check_binding(project_id, turn["binding"])
+        if turn.get("hosted"):
+            _finish_hosted(path, project_id, session_id, turn, history, authorize)
+            return
         result = local_mcp(turn["wireQuestion"], history)
         authorize()
         with storage.storyboard_transaction():
@@ -377,10 +419,39 @@ def finish(path, project_id, session_id, turn, history, authorize):
         CAPACITY.release()
 
 
-def persist_result(path, session_id, turn_id, *, result=None, error=None):
+def _finish_hosted(path, project_id, session_id, turn, messages, authorize):
+    request = turn["hosted"]
+    try:
+        outcome = pythia_hosted.consult(hosted_configuration(), request["scope"],
+            message_id=request["messageId"], idempotency_key=request["idempotencyKey"],
+            revision=request["revision"], messages=messages, question=turn["wireQuestion"])
+    except pythia_hosted.HostedError as error:
+        raise TalkError(str(error), error.status) from None
+    if outcome["advice"] is not None:
+        try:
+            outcome["advice"] = PythiaAdvice.model_validate(outcome["advice"]).model_dump()
+        except Exception:
+            outcome.update(advice=None, error="Pythia returned an unsupported consultation result. Retry explicitly; this turn is excluded from the advice context.")
+    # The turn is durably accepted: record the advanced wire thread even when the
+    # final authorization or binding check fails, so follow-ups stay in step.
+    thread = {"revision": outcome["revision"], "messages": [*messages, *outcome["appended"]]}
+    try:
+        authorize()
+        with storage.storyboard_transaction():
+            check_binding(project_id, turn["binding"])
+            persist_result(path, session_id, turn["id"], result=outcome["advice"], error=outcome["error"], hosted_thread=thread)
+    except Exception as error:
+        message = str(error) if isinstance(error, TalkError) else "Pythia's response could not be saved or access changed. This turn is excluded from follow-up context. Retry explicitly."
+        with storage.storyboard_transaction():
+            persist_result(path, session_id, turn["id"], error=message, hosted_thread=thread)
+
+
+def persist_result(path, session_id, turn_id, *, result=None, error=None, hosted_thread=None):
     state = read_state(path)
     if state["sessionId"] != session_id:
         return
     turn = next(item for item in state["turns"] if item["id"] == turn_id)
     turn.update(status="failed" if error else "completed", result=result, error=error)
+    if hosted_thread is not None:
+        state["hostedThread"] = hosted_thread
     write_state(path, state)

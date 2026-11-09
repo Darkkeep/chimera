@@ -8,6 +8,9 @@ Pythia's own Python environment and live `TextConversationProducer`. It is the
 adapter supplied by Pythia. A ChatGPT folder mention provides project context;
 it does not configure this adapter. This feature does not use Chimera's
 deterministic Engine authoring tasks, and there is no scripted-answer fallback.
+Team deployments can instead consult a hosted Pythia engine configured by the
+operator; see [hosted Pythia consultation](hosted-pythia-consultation.md) for
+the configuration, entitlement rules and the hosted context allowance.
 
 ## Native scene experiences
 
