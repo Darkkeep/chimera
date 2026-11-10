@@ -3,7 +3,7 @@ const {mockMediaConnections} = require('./media-connection-fixtures.cjs');
 const AxeBuilder = require('@axe-core/playwright').default;
 
 async function setup(page, options = {}) {
-  let status = { configured: false, keyConfigured: false, storageAvailable: true, credentialError: false, canManage: true, revision: 'unconfigured', source: 'none', provider: 'openai', textModel: 'gpt-4.1-mini', textModels: ['gpt-4.1-mini'], imageModel: 'gpt-image-1', audioModel: 'gpt-4o-mini-tts', imageModels: ['gpt-image-1', 'gpt-image-2'], audioModels: ['gpt-4o-mini-tts', 'tts-1'], maxRequestsPerDay: 20, maxConcurrentRequests: 1, ...options };
+  let status = { configured: false, keyConfigured: false, storageAvailable: true, credentialError: false, canManage: true, revision: 'unconfigured', source: 'none', provider: 'openai', textModel: 'gpt-4.1-mini', textModels: ['gpt-4.1-mini'], imageModel: 'gpt-image-2.6-sunburst', audioModel: 'gpt-4o-mini-tts', imageModels: ['gpt-image-2.6-sunburst', 'gpt-image-2.6-flare', 'gpt-image-1'], audioModels: ['gpt-4o-mini-tts', 'tts-1'], maxRequestsPerDay: 20, maxConcurrentRequests: 1, ...options };
   const actions = [];
   await page.route('**/api/ai-connection**', async route => {
     const path = new URL(route.request().url()).pathname;
@@ -32,8 +32,9 @@ async function setup(page, options = {}) {
 test('admin can save a write-only key, explicitly test and disconnect', async ({ page }) => {
   const actions = await setup(page);
   const dialog = page.getByRole('dialog', { name: 'AI Connections' });
+  await expect(dialog.getByRole('combobox', { name: 'Image generation mode' })).toHaveValue('gpt-image-2.6-sunburst');
   await dialog.getByLabel('API key', { exact: true }).fill('test-only-not-a-real-key');
-  await dialog.getByRole('combobox', { name: 'Image model', exact: true }).selectOption('gpt-image-2');
+  await dialog.getByRole('combobox', { name: 'Image generation mode', exact: true }).selectOption('gpt-image-2.6-flare');
   await dialog.getByRole('combobox', { name: 'Audio model', exact: true }).selectOption('tts-1');
   await dialog.getByLabel('Daily request limit', { exact: true }).fill('10');
   await dialog.getByRole('button', { name: 'Save media settings', exact: true }).click();
@@ -41,7 +42,7 @@ test('admin can save a write-only key, explicitly test and disconnect', async ({
   await expect(dialog.getByLabel('API key', { exact: true })).toHaveValue('');
   expect(actions).toHaveLength(1);
   expect(actions[0].data.provider).toBe('openai');
-  expect(actions[0].data.imageModel).toBe('gpt-image-2');
+  expect(actions[0].data.imageModel).toBe('gpt-image-2.6-flare');
   expect(actions[0].data.audioModel).toBe('tts-1');
   expect(dialog.getByRole('combobox', { name: /^Text model/ })).toHaveCount(0);
   expect(actions[0].data.maxRequestsPerDay).toBe(10);
