@@ -79,6 +79,7 @@ ROUTE_ACTIONS = {
     "get_consultation_artifacts": "project.view",
     "download_consultation_artifact": "project.export",
     "export_consultation_answer": "project.export",
+    "import_pythia_native_artifact": "project.import",
     "post_pythia_conversation": "enhancement.job.create",
     "preview_pythia_capacity": "enhancement.job.create",
     "reset_pythia_conversation": "enhancement.job.create",
@@ -2131,6 +2132,20 @@ def export_consultation_answer(project_id: str, turn_id: str, request: Request):
         raise HTTPException(422, str(error)) from error
 
 
+@app.post("/api/projects/{project_id}/consultation-artifacts/native/{native_id}",
+          name="import_pythia_native_artifact")
+def import_pythia_native_artifact(project_id: str, native_id: str, request: Request):
+    """Import an existing registered Pythia SVG/GIF into the project shelf."""
+    _require_ai_origin(request)
+    try:
+        return _talk_operation(project_id, lambda actor:
+            consultation_artifacts.import_native_from_pythia(project_id, actor, native_id))
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+
+
 @app.get("/api/projects/{project_id}/consultation-artifacts", name="get_consultation_artifacts")
 def get_consultation_artifacts(project_id: str, session_id: str | None = None):
     return _talk_operation(project_id, lambda actor:
@@ -2146,10 +2161,11 @@ def download_consultation_artifact(project_id: str, artifact_id: str):
         raise HTTPException(404, "Artifact not found") from error
     except (OSError, ValueError) as error:
         raise HTTPException(409, "Saved artifact is unavailable or damaged") from error
-    return Response(content, media_type=descriptor["mimeType"], headers={
+    return Response(content, media_type="application/octet-stream" if descriptor["mimeType"] == "image/svg+xml" else descriptor["mimeType"], headers={
         "Content-Disposition": f'attachment; filename="{descriptor["filename"]}"',
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "sandbox",
     })
 
 
