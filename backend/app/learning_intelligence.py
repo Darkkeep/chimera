@@ -62,6 +62,9 @@ class PythiaProvider:
             raise PythiaUnavailableError("Pythia returned an invalid JSON response")
         return result
 
+    def discover_native_files(self, project_id: str) -> dict[str, object]:
+        return self._request("GET", f"/media/native-files?project_id={quote(project_id, safe='')}&limit=100")
+
     def native_file(self, artifact_id: str) -> tuple[bytes, str, str, str, str]:
         """Retrieve registered original file bytes; never invoke generation."""
         if not isinstance(artifact_id, str) or len(artifact_id) > 120:
