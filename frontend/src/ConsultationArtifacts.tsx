@@ -81,6 +81,12 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
   const [incomingStatus, setIncomingStatus] = useState<"loading" | "ready" | "unavailable">("loading");
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [promotionNotice, setPromotionNotice] = useState("");
+  const [nativePrompt, setNativePrompt] = useState("");
+  const [nativeFormat, setNativeFormat] = useState<"svg" | "gif">("svg");
+  const [gifFrames, setGifFrames] = useState(9);
+  const [gifDuration, setGifDuration] = useState(200);
+  const [generatingNative, setGeneratingNative] = useState(false);
+  const [generatedNotice, setGeneratedNotice] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -151,6 +157,33 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
     } finally { setExporting(null); }
   }
 
+  async function generateNative() {
+    if (!nativePrompt.trim()) { setError("Enter an image direction first."); return; }
+    setGeneratingNative(true);
+    setGeneratedNotice("");
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/projects/${encodeURIComponent(projectId)}/pythia-native-images`,
+        { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: nativePrompt.trim(), outputFormat: nativeFormat,
+            ...(nativeFormat === "gif" ? { frameCount: gifFrames, frameDurationMs: gifDuration } : {}),
+            confirmPaid: true,
+          }) },
+      );
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({})) as { detail?: string };
+        throw new Error(detail.detail || "Image generation was not completed. Check Pythia's request record before retrying.");
+      }
+      const output = await response.json() as { artifactId: string; mimeType: string };
+      setGeneratedNotice(`Pythia created ${output.mimeType === "image/svg+xml" ? "an SVG" : "an animated GIF"} and registered asset ${output.artifactId}. Choose Retain in project below.`);
+      setRevision(value => value + 1);
+    } catch (issue) {
+      setError(issue instanceof Error ? issue.message : "Image generation status is unknown; verify Pythia before retrying.");
+    } finally { setGeneratingNative(false); }
+  }
+
   async function importNativeSource(artifactId?: string) {
     const source = (artifactId ?? nativeSourceId).trim();
     if (!/^[A-Za-z0-9][A-Za-z0-9_-]{7,119}$/.test(source)) {
@@ -205,6 +238,33 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
       <button type="button" className="button button-outline" onClick={() => setRevision(value => value + 1)} disabled={loading} aria-label="Refresh artifacts"><RefreshCw size={15} /> Refresh</button>
     </div>
     <label className="pythia-artifacts-filter"><input type="checkbox" checked={showAll} onChange={event => setShowAll(event.target.checked)} /> Include previous consultations in this project</label>
+    <form className="pythia-native-import" onSubmit={event => { event.preventDefault(); void generateNative(); }}>
+      <label htmlFor="pythia-native-prompt">Generate new SVG or animated GIF with Pythia</label>
+      <textarea id="pythia-native-prompt" value={nativePrompt} maxLength={2000}
+        onChange={event => setNativePrompt(event.target.value)} rows={3}
+        placeholder="Describe the vector illustration or motion you need..." />
+      <div className="pythia-native-import-controls">
+        <label htmlFor="pythia-native-format">Output format</label>
+        <select id="pythia-native-format" value={nativeFormat}
+          onChange={event => setNativeFormat(event.target.value as "svg" | "gif")}>
+          <option value="svg">Editable SVG vector</option><option value="gif">Animated GIF</option>
+        </select>
+        {nativeFormat === "gif" && <>
+          <label htmlFor="pythia-gif-frames">Frames</label>
+          <input id="pythia-gif-frames" type="number" min={2} max={16} value={gifFrames}
+            onChange={event => setGifFrames(Number(event.target.value))} />
+          <label htmlFor="pythia-gif-duration">ms/frame</label>
+          <input id="pythia-gif-duration" type="number" min={20} max={2000} value={gifDuration}
+            onChange={event => setGifDuration(Number(event.target.value))} />
+        </>}
+      </div>
+      <small>This action calls a paid image model once. There is no automatic retry. You decide separately whether to retain, use, or publish the result.</small>
+      <button type="submit" className="button button-outline"
+        disabled={generatingNative || !nativePrompt.trim() || (nativeFormat === "gif" && (gifFrames < 2 || gifFrames > 16 || gifDuration < 20 || gifDuration > 2000))}>
+        {generatingNative ? "Generating…" : "Generate with Pythia (billable)"}
+      </button>
+    </form>
+    {generatedNotice && <p role="status">{generatedNotice}</p>}
     <div className="pythia-artifacts-heading"><div>
       <h3>Incoming from Pythia <span className="pythia-artifacts-count">{incoming.length}</span></h3>
       <p>Verified native SVG and GIF sources registered for this project. Retain a private original copy before authoring reuse.</p>
