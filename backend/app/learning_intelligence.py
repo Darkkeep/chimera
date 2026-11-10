@@ -62,7 +62,7 @@ class PythiaProvider:
             raise PythiaUnavailableError("Pythia returned an invalid JSON response")
         return result
 
-    def native_file(self, artifact_id: str) -> tuple[bytes, str, str, str]:
+    def native_file(self, artifact_id: str) -> tuple[bytes, str, str, str, str]:
         """Retrieve registered original file bytes; never invoke generation."""
         if not isinstance(artifact_id, str) or len(artifact_id) > 120:
             raise ValueError("Invalid Pythia native artifact ID")
@@ -84,7 +84,8 @@ class PythiaProvider:
                         raise ValueError("Native Pythia asset exceeds allowed size")
                 return (bytes(data), response.headers.get("X-Pythia-Source-Mime", ""),
                         response.headers.get("X-Pythia-Source-SHA256", ""),
-                        response.headers.get("X-Pythia-Source-ID", ""))
+                        response.headers.get("X-Pythia-Source-ID", ""),
+                        response.headers.get("X-Pythia-Project-ID", ""))
         except httpx.HTTPStatusError as error:
             raise PythiaUnavailableError(f"Pythia source retrieval returned HTTP {error.response.status_code}",
                                          error.response.status_code) from error
