@@ -367,5 +367,46 @@ class PythiaTalkTests(unittest.TestCase):
 
 
 
+    def test_consultation_artifacts_download_real_json_and_survive_reset(self):
+        import hashlib
+        with patch.object(talk, "local_mcp", return_value=copy.deepcopy(ADVICE)):
+            self.assertEqual(self.send().status_code, 202)
+            completed = self.finished()
+        artifact_url = f"/api/projects/{self.project.id}/consultation-artifacts"
+        response = self.client.get(artifact_url)
+        self.assertEqual(response.status_code, 200)
+        artifacts = response.json()["artifacts"]
+        self.assertEqual(len(artifacts), 1)
+        descriptor = artifacts[0]
+        self.assertEqual(descriptor["type"], "advice")
+        self.assertEqual(descriptor["sessionId"], completed["sessionId"])
+        download = self.client.get(artifact_url + f"/{descriptor['id']}/download")
+        self.assertEqual(download.status_code, 200)
+        self.assertEqual(download.headers["content-type"], "application/json")
+        self.assertEqual(hashlib.sha256(download.content).hexdigest(), descriptor["sha256"])
+        self.assertEqual(download.json()["advice"]["content"], ADVICE["content"])
+        self.assertEqual(download.json()["kind"], "consultation-advice")
+        self.assertEqual(self.client.get(artifact_url + "/invalid-id/download").status_code, 404)
+
+        reset = self.client.post(self.url + "/reset", headers=self.headers)
+        self.assertEqual(reset.status_code, 200)
+        self.assertNotEqual(reset.json()["sessionId"], completed["sessionId"])
+        self.assertEqual(self.client.get(artifact_url, params={"session_id": reset.json()["sessionId"]}).json()["artifacts"], [])
+        self.assertEqual(len(self.client.get(artifact_url).json()["artifacts"]), 1)
+        self.assertEqual(self.client.get(artifact_url + f"/{descriptor['id']}/download").status_code, 200)
+
+    def test_artifact_download_rejects_corrupted_saved_bytes(self):
+        from backend.app import consultation_artifacts
+        with patch.object(talk, "local_mcp", return_value=copy.deepcopy(ADVICE)):
+            self.assertEqual(self.send().status_code, 202)
+            self.finished()
+        artifact_url = f"/api/projects/{self.project.id}/consultation-artifacts"
+        descriptor = self.client.get(artifact_url).json()["artifacts"][0]
+        _, root = consultation_artifacts._paths(self.project.id, LOCAL_ACTOR)
+        (root / (descriptor["id"] + ".json")).write_bytes(b"tampered")
+        self.assertEqual(self.client.get(artifact_url + f"/{descriptor['id']}/download").status_code, 409)
+
+
+
 if __name__ == "__main__":
     unittest.main()
