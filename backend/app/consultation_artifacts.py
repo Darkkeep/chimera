@@ -221,8 +221,8 @@ def import_native_from_pythia(project_id, actor, native_id, provider=None):
         raise ValueError("Invalid native source ID")
     from .learning_intelligence import PythiaProvider
     provider = provider or PythiaProvider()
-    data, media_type, source_digest, source_id = provider.native_file(native_id)
-    if (not isinstance(data, bytes) or not re.fullmatch(r"[a-f0-9]{64}", source_digest)
+    data, media_type, source_digest, source_id, source_project_id = provider.native_file(native_id)
+    if (source_project_id != project_id or not isinstance(data, bytes) or not re.fullmatch(r"[a-f0-9]{64}", source_digest)
             or hashlib.sha256(data).hexdigest() != source_digest
             or not isinstance(source_id, str)
             or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{7,119}", source_id)):
