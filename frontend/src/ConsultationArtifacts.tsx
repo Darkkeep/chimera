@@ -237,7 +237,7 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
         <p>Retained consultation records, exports and verified original vector or animated assets. Originals are never rasterized or flattened.</p></div>
       <button type="button" className="button button-outline" onClick={() => setRevision(value => value + 1)} disabled={loading} aria-label="Refresh artifacts"><RefreshCw size={15} /> Refresh</button>
     </div>
-    <label className="pythia-artifacts-filter"><input type="checkbox" checked={showAll} onChange={event => setShowAll(event.target.checked)} /> Include previous consultations in this project</label>
+    <label className="pythia-artifacts-filter"><input type="checkbox" checked={showAll} onChange={event => setShowAll(event.target.checked)} /><span>Include previous consultations in this project</span></label>
     <form className="pythia-native-import" onSubmit={event => { event.preventDefault(); void generateNative(); }}>
       <label htmlFor="pythia-native-prompt">Generate new SVG or animated GIF with Pythia</label>
       <textarea id="pythia-native-prompt" value={nativePrompt} maxLength={2000}
