@@ -63,7 +63,7 @@ class NativeArtifactTests(unittest.TestCase):
     def test_svg_is_preserved_and_forced_attachment(self):
         provider = self.fake(VECTOR, "image/svg+xml")
         with patch("backend.app.learning_intelligence.PythiaProvider", return_value=provider):
-            response = self.client.post(self.root + "/native/" + self.source_id)
+            response = self.client.post(self.root + "/native/" + self.source_id, headers=self.headers)
         self.assertEqual(200, response.status_code, response.text)
         descriptor = response.json()
         self.assertEqual("vector", descriptor["type"])
@@ -76,21 +76,21 @@ class NativeArtifactTests(unittest.TestCase):
     def test_source_cannot_be_imported_into_unrelated_project(self):
         provider = self.fake(VECTOR, "image/svg+xml", "different-project")
         with patch("backend.app.learning_intelligence.PythiaProvider", return_value=provider):
-            response = self.client.post(self.root + "/native/" + self.source_id)
+            response = self.client.post(self.root + "/native/" + self.source_id, headers=self.headers)
         self.assertEqual(422, response.status_code)
         self.assertEqual([], self.client.get(self.root).json()["artifacts"])
 
     def test_mime_and_hash_mismatch_are_rejected(self):
         provider = self.fake(ANIMATED_GIF, "image/svg+xml")
         with patch("backend.app.learning_intelligence.PythiaProvider", return_value=provider):
-            response = self.client.post(self.root + "/native/" + self.source_id)
+            response = self.client.post(self.root + "/native/" + self.source_id, headers=self.headers)
         self.assertEqual(422, response.status_code)
         provider = self.fake(ANIMATED_GIF, "image/gif")
         values = list(provider.native_file.return_value)
         values[2] = "0" * 64
         provider.native_file.return_value = tuple(values)
         with patch("backend.app.learning_intelligence.PythiaProvider", return_value=provider):
-            response = self.client.post(self.root + "/native/" + self.source_id)
+            response = self.client.post(self.root + "/native/" + self.source_id, headers=self.headers)
         self.assertEqual(422, response.status_code)
         self.assertEqual([], self.client.get(self.root).json()["artifacts"])
 
