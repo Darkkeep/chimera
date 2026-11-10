@@ -253,3 +253,54 @@ def import_native_from_pythia(project_id, actor, native_id, provider=None):
         index[key] = descriptor
         _atomic_write(root / "index.json", json.dumps(index, ensure_ascii=False, sort_keys=True).encode("utf-8"))
         return descriptor
+
+
+def _svg_authoring_safe(data: bytes) -> bool:
+    """Conservative, source-preserving SVG publishing gate.
+
+    Reject active content rather than sanitizing away the original creator's
+    intended geometry. The original remains recoverable in the artifact shelf.
+    """
+    import xml.etree.ElementTree as ET
+    if re.search(rb"<!\s*(?:DOCTYPE|ENTITY)|<\?", data, flags=re.I):
+        return False
+    try:
+        root = ET.fromstring(data)
+    except ET.ParseError:
+        return False
+    namespace = "{http://www.w3.org/2000/svg}"
+    tags = {"svg", "g", "path", "rect", "circle", "ellipse", "line", "polyline",
+            "polygon", "text", "tspan", "defs", "linearGradient", "radialGradient",
+            "stop", "clipPath"}
+    attributes = {"width", "height", "viewBox", "x", "y", "x1", "y1", "x2", "y2",
+                  "cx", "cy", "r", "rx", "ry", "d", "points", "fill", "stroke",
+                  "stroke-width", "stroke-linecap", "stroke-linejoin", "opacity",
+                  "fill-opacity", "stroke-opacity", "font-size", "font-family",
+                  "text-anchor", "transform", "gradientTransform", "offset",
+                  "stop-color", "stop-opacity", "id", "clip-path"}
+    if root.tag != namespace + "svg":
+        return False
+    for node in root.iter():
+        if not isinstance(node.tag, str) or not node.tag.startswith(namespace):
+            return False
+        if node.tag[len(namespace):] not in tags:
+            return False
+        for attribute, value in node.attrib.items():
+            if attribute not in attributes or re.search(r"url\s*\(|javascript:|data:|https?:|@import", value, flags=re.I):
+                return False
+    return True
+
+
+def promote_native_media(project_id, actor, artifact_id, expected_revision):
+    """Explicit author-controlled import into Chimera's canonical image library."""
+    if type(expected_revision) is not int or expected_revision < 1:
+        raise ValueError("Expected storyboard revision is required")
+    descriptor, content = get_artifact(project_id, actor, artifact_id)
+    if descriptor.get("type") not in {"vector", "gif", "animated-gif"}:
+        raise ValueError("Only native SVG and GIF originals can be promoted")
+    if descriptor["mimeType"] == "image/svg+xml" and not _svg_authoring_safe(content):
+        raise ValueError("SVG contains unsupported active or externally linked content; download the original instead")
+    if descriptor["mimeType"] not in {"image/svg+xml", "image/gif"}:
+        raise ValueError("Unsupported native authoring asset")
+    # The original source bytes stay retained. No rasterization or frame flattening.
+    return storage.add_project_asset(project_id, descriptor["filename"], content, "image", expected_revision)
