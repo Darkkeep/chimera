@@ -62,6 +62,35 @@ class PythiaProvider:
             raise PythiaUnavailableError("Pythia returned an invalid JSON response")
         return result
 
+    def native_file(self, artifact_id: str) -> tuple[bytes, str, str, str]:
+        """Retrieve registered original file bytes; never invoke generation."""
+        if not isinstance(artifact_id, str) or len(artifact_id) > 120:
+            raise ValueError("Invalid Pythia native artifact ID")
+        try:
+            headers = {}
+            api_key = os.environ.get("CHIMERA_PYTHIA_API_KEY", "").strip()
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+            with httpx.stream("GET", f"{self.base_url}/media/native-files/{quote(artifact_id, safe='')}",
+                              headers=headers, timeout=30.0, follow_redirects=False) as response:
+                response.raise_for_status()
+                declared_length = response.headers.get("content-length")
+                if declared_length and int(declared_length) > 8 * 1024 * 1024:
+                    raise ValueError("Native Pythia asset exceeds allowed size")
+                data = bytearray()
+                for chunk in response.iter_bytes():
+                    data.extend(chunk)
+                    if len(data) > 8 * 1024 * 1024:
+                        raise ValueError("Native Pythia asset exceeds allowed size")
+                return (bytes(data), response.headers.get("X-Pythia-Source-Mime", ""),
+                        response.headers.get("X-Pythia-Source-SHA256", ""),
+                        response.headers.get("X-Pythia-Source-ID", ""))
+        except httpx.HTTPStatusError as error:
+            raise PythiaUnavailableError(f"Pythia source retrieval returned HTTP {error.response.status_code}",
+                                         error.response.status_code) from error
+        except httpx.RequestError as error:
+            raise PythiaUnavailableError("Pythia source retrieval is unavailable") from error
+
     def health(self) -> dict[str, object]:
         return self._request("GET", "/health")
 
