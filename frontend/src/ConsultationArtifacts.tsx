@@ -5,7 +5,7 @@ type Artifact = {
   id: string;
   sessionId: string;
   turnId: string | null;
-  type: "advice" | "draft" | "markdown";
+  type: "advice" | "draft" | "markdown" | "vector" | "gif" | "animated-gif";
   title: string;
   filename: string;
   mimeType: string;
@@ -13,6 +13,9 @@ type Artifact = {
   sha256: string;
   status: string;
   origin: string;
+  animated?: boolean;
+  frameCount?: number;
+  durationMs?: number;
 };
 
 type EngineArtifact = {
@@ -61,6 +64,8 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
   const [engineStatus, setEngineStatus] = useState<"loading" | "ready" | "unavailable">("loading");
   const [mediaCandidates, setMediaCandidates] = useState<PythiaCandidate[]>([]);
   const [mediaStatus, setMediaStatus] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [nativeSourceId, setNativeSourceId] = useState("");
+  const [importingNative, setImportingNative] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -116,23 +121,56 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
     } finally { setExporting(null); }
   }
 
+  async function importNativeSource() {
+    const source = nativeSourceId.trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{7,119}$/.test(source)) {
+      setError("Enter a valid Pythia native artifact ID.");
+      return;
+    }
+    setImportingNative(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/consultation-artifacts/native/${encodeURIComponent(source)}`, { method: "POST" });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({})) as { detail?: string };
+        throw new Error(detail.detail || "Pythia native asset import failed.");
+      }
+      setNativeSourceId("");
+      setRevision(value => value + 1);
+    } catch (issue) {
+      setError(issue instanceof Error ? issue.message : "Pythia native asset import failed.");
+    } finally { setImportingNative(false); }
+  }
+
   const visible = artifacts.filter(item => showAll || item.sessionId === sessionId);
   return <section className="pythia-consultation-artifacts" aria-label="Consultation artifacts">
     <div className="pythia-artifacts-heading">
       <div><h3><FolderOpen size={18} aria-hidden="true" /> Artifacts <span className="pythia-artifacts-count">{artifacts.filter(a => a.sessionId === sessionId).length}</span></h3>
-        <p>Retained consultation records and Markdown exports. PDF, image and audio retrieval require their own verified file connections.</p></div>
+        <p>Retained consultation records, exports and verified original vector or animated assets. Originals are never rasterized or flattened.</p></div>
       <button type="button" className="button button-outline" onClick={() => setRevision(value => value + 1)} disabled={loading} aria-label="Refresh artifacts"><RefreshCw size={15} /> Refresh</button>
     </div>
     <label className="pythia-artifacts-filter"><input type="checkbox" checked={showAll} onChange={event => setShowAll(event.target.checked)} /> Include previous consultations in this project</label>
+    <form className="pythia-native-import" onSubmit={event => { event.preventDefault(); void importNativeSource(); }}>
+      <label htmlFor="pythia-native-source-id">Retrieve registered Pythia SVG / GIF original</label>
+      <div className="pythia-native-import-controls">
+        <input id="pythia-native-source-id" type="text" value={nativeSourceId}
+          onChange={event => setNativeSourceId(event.target.value)} maxLength={120}
+          placeholder="Pythia artifact ID" autoComplete="off" />
+        <button className="button button-outline" type="submit" disabled={importingNative || !nativeSourceId.trim()}>
+          {importingNative ? "Importing…" : "Import original"}
+        </button>
+      </div>
+      <small>Use the artifact ID returned by Pythia's registered-file API. SVG previews are disabled for security; GIF downloads preserve the original frames.</small>
+    </form>
     {loading && <p role="status">Checking saved artifacts…</p>}
     {error && <p role="alert">{error}</p>}
-    {!loading && !error && visible.length === 0 && <p>No saved artifacts yet. Completed answers and content drafts will appear here; media retrieval is not connected yet.</p>}
+    {!loading && !error && visible.length === 0 && <p>No retained consultation artifacts yet. Completed answers and imported native assets will appear here.</p>}
     {visible.map(item => <div className="pythia-artifact-item" key={item.id}>
-      <div><strong>{item.title}</strong><small>{item.type === "draft" ? `Draft · ${item.status}` : item.type === "markdown" ? "Exported answer" : "Completed consultation"} · {item.type === "markdown" ? "Markdown" : "JSON"} · {Math.ceil(item.byteSize / 1024)} KB</small></div>
+      <div><strong>{item.title}</strong><small>{item.type === "draft" ? `Draft · ${item.status}` : item.type === "markdown" ? "Exported answer" : item.type === "vector" ? "SVG vector · original only" : item.type === "animated-gif" ? `Animated GIF · ${item.frameCount ?? "?"} frames` : item.type === "gif" ? "GIF image" : "Completed consultation"} · {item.mimeType === "image/svg+xml" ? "SVG" : item.mimeType === "image/gif" ? "GIF" : item.type === "markdown" ? "Markdown" : "JSON"} · {Math.ceil(item.byteSize / 1024)} KB</small></div>
       {item.type === "advice" && item.turnId && <button type="button" className="button button-outline"
         disabled={exporting !== null}
         onClick={() => void exportMarkdown(item.turnId!)}>{exporting === item.turnId ? "Exporting…" : "Export Markdown"}</button>}
-      <a className="button button-outline" href={`/api/projects/${encodeURIComponent(projectId)}/consultation-artifacts/${encodeURIComponent(item.id)}/download`} download={item.filename} aria-label={`Download ${item.title} ${item.type === "markdown" ? "Markdown" : "JSON"}`}><Download size={15} /> Download</a>
+      <a className="button button-outline" href={`/api/projects/${encodeURIComponent(projectId)}/consultation-artifacts/${encodeURIComponent(item.id)}/download`} download={item.filename} aria-label={`Download ${item.title} original file`}><Download size={15} /> Download</a>
     </div>)}
     <div className="pythia-artifacts-heading"><div><h3>Engine drafts <span className="pythia-artifacts-count">{engineArtifacts.length}</span></h3>
       <p>Structured proposals from the Pythia Engine associated with this project. These are not generated media files or consultation attachments.</p></div></div>
