@@ -10,7 +10,7 @@ from zipfile import ZipFile
 from fastapi.testclient import TestClient
 
 from backend.app import main, consultation_artifacts, storage, scorm
-from backend.app.models import ProjectCreate, SceneCreate
+from backend.app.models import ProjectCreate, SceneCreate, SceneUpdate
 
 ANIMATED_GIF = base64.b64decode(
     "R0lGODlhAgACAIEAAAAAAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACwAAACwAAAAAAgACAAAIBgABCAQQEAAh+QQBFwABACwAAAAAAgACAIH///8AAAAAAAAAAAAIBgABCAQQEAA7"
@@ -132,7 +132,13 @@ class NativeArtifactTests(unittest.TestCase):
             applied = self.client.post(self.root + "/" + result.json()["id"] + "/promote",
                                        headers={**self.headers, "If-Match": str(revision)})
             self.assertEqual(200, applied.status_code, applied.text)
-        storage.create_scene(self.project.id, SceneCreate(title="Source fidelity in SCORM"))
+        project = storage.read_project(self.project.id)
+        asset_ids = [asset.id for asset in project.storyboard.assets]
+        for idx, asset_id in enumerate(asset_ids):
+            project = storage.create_scene(self.project.id, SceneCreate(title=f"Source fidelity {idx + 1}"))
+            project = storage.update_scene(
+                self.project.id, project.storyboard.scenes[-1].id,
+                SceneUpdate(backgroundAsset=asset_id), project.storyboard.revision)
         project = storage.read_project(self.project.id)
         package, _ = scorm.build_scorm_2004(project)
         with ZipFile(io.BytesIO(package)) as archive:
