@@ -228,6 +228,8 @@ def decide(project_id, actor, action_id, data):
             return {"conversation": talk.public_state(state), "project": None}
         if action["status"] != "pending":
             raise talk.TalkError("Only a pending draft can be applied or discarded.", 409)
+        from . import consultation_artifacts
+        consultation_artifacts.retain_current_before_reset(project_id, actor)
         if data.decision == "discard":
             action.update(status="discarded", decidedAt=storage.now_iso(), decidedBy=actor.actorId)
             talk.write_state(path, state)
