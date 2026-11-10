@@ -28,6 +28,7 @@ class NativeArtifactTests(unittest.TestCase):
         self.addCleanup(self.client.close)
         self.project = storage.create_project(ProjectCreate(title="Native assets"))
         self.root = f"/api/projects/{self.project.id}/consultation-artifacts"
+        self.headers = {"Origin": "http://127.0.0.1:5173"}
         self.source_id = "native-file-012345"
 
     def fake(self, raw, mime, project=None):
@@ -40,7 +41,7 @@ class NativeArtifactTests(unittest.TestCase):
     def test_gif_original_keeps_animation_after_import_and_download(self):
         provider = self.fake(ANIMATED_GIF, "image/gif")
         with patch("backend.app.learning_intelligence.PythiaProvider", return_value=provider):
-            response = self.client.post(self.root + "/native/" + self.source_id)
+            response = self.client.post(self.root + "/native/" + self.source_id, headers=self.headers)
         self.assertEqual(200, response.status_code, response.text)
         descriptor = response.json()
         self.assertTrue(descriptor["animated"])
@@ -53,7 +54,7 @@ class NativeArtifactTests(unittest.TestCase):
         self.assertEqual("nosniff", file.headers["x-content-type-options"])
         self.assertEqual("sandbox", file.headers["content-security-policy"])
         self.assertEqual(200, self.client.post(
-            f"/api/projects/{self.project.id}/pythia-conversation/reset").status_code)
+            f"/api/projects/{self.project.id}/pythia-conversation/reset", headers=self.headers).status_code)
         self.assertEqual(ANIMATED_GIF,
                          self.client.get(self.root + "/" + descriptor["id"] + "/download").content)
         self.assertEqual(1, len(self.client.get(self.root).json()["artifacts"]))
