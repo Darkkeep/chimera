@@ -89,3 +89,9 @@
 .pythia-artifact-item small { color: var(--muted); font-size: 12px; }
 .pythia-artifact-item .button { flex-shrink: 0; }
 @media (max-width: 600px) { .pythia-consultation-artifacts { padding: 12px; } .pythia-artifact-item { flex-wrap: wrap; } }
+
+.pythia-native-import { display: grid; gap: 6px; margin: 12px 0; padding: 12px; border: 1px dashed var(--line); border-radius: 9px; }
+.pythia-native-import label { font-weight: 600; font-size: 12px; }
+.pythia-native-import-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.pythia-native-import-controls input { min-width: 180px; flex: 1; padding: 8px 10px; color: inherit; background: var(--theme-panel, var(--surface)); border: 1px solid var(--line); border-radius: 6px; }
+.pythia-native-import small { color: var(--muted); line-height: 1.45; }
