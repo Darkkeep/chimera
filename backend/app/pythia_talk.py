@@ -83,9 +83,9 @@ def hosted_configuration():
         raise TalkError(str(error), error.status) from None
 
 
-def local_mcp(question=None, history=None, *, authoring_request=None, video_request=None, experience_request=None, enhancement_request=None):
+def local_mcp(question=None, history=None, *, authoring_request=None, video_request=None, experience_request=None, enhancement_request=None, export_request=None):
     if pythia_hosted.active():
-        if question is None and authoring_request is None and video_request is None and experience_request is None and enhancement_request is None:
+        if question is None and authoring_request is None and video_request is None and experience_request is None and enhancement_request is None and export_request is None:
             try:
                 return pythia_hosted.check(hosted_configuration())
             except pythia_hosted.HostedError as error:
@@ -101,6 +101,8 @@ def local_mcp(question=None, history=None, *, authoring_request=None, video_requ
         payload = {"action": "experience-treatment", "request": {**experience_request, "outputSchema": ExperienceTreatment.model_json_schema()}}
     if enhancement_request is not None:
         payload = {"action": "storyboard-enhancement", "request": enhancement_request}
+    if export_request is not None:
+        payload = {"action": "export-text", "title": export_request["title"], "content": export_request["content"]}
     connection = None
     if not (root / "plugins/pythia/mcp.json").is_file():
         try:
@@ -115,7 +117,7 @@ def local_mcp(question=None, history=None, *, authoring_request=None, video_requ
                                "PYTHIA_ANALYSIS_API_KEY": connection.api_key,
                                "PYTHIA_ANALYSIS_MODEL": connection.text_model}
     reserved_requests = 7 if enhancement_request and enhancement_request.get("useTools") else 1
-    with request_budget(connection, requests=reserved_requests) if connection and payload["action"] != "capabilities" else nullcontext():
+    with request_budget(connection, requests=reserved_requests) if connection and payload["action"] not in {"capabilities", "export-text"} else nullcontext():
         return _run_local_mcp(root, payload)
 
 
@@ -143,7 +145,7 @@ def _run_local_mcp(root, payload):
         if envelope.get("ok") is not True:
             raise ValueError("Local consultation failed")
         value = envelope["result"]
-        if payload["action"] in {"draft", "storyboard-enhancement"}:
+        if payload["action"] in {"draft", "storyboard-enhancement", "export-text"}:
             return value
         if payload["action"] == "video-treatment":
             return VideoTreatment.model_validate(value).model_dump()
