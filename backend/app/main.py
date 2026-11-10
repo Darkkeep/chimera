@@ -1191,7 +1191,8 @@ def get_pythia_engine_artifacts(project_id: str) -> dict[str, object]:
         if result.get("schema_version") != "1.0" or not isinstance(result.get("artifacts"), list):
             raise HTTPException(502, "Pythia returned an invalid artifact catalog")
         visible = [item for item in result["artifacts"]
-                   if item.get("project_id") == project.id and item.get("content_kind") == "structured"]
+                   if item.get("project_id") == project.id and item.get("consumer") == "chimera"
+                   and item.get("content_kind") == "structured"]
         return {"artifacts": visible, "hasMore": result.get("has_more", False)}
     except FileNotFoundError as error:
         raise HTTPException(404, "Project not found") from error
@@ -1209,6 +1210,7 @@ def download_pythia_engine_artifact(project_id: str, artifact_id: str) -> Respon
         descriptor = next((item for item in listing.get("artifacts", [])
                            if item.get("artifact_id") == artifact_id
                            and item.get("project_id") == project.id
+                           and item.get("consumer") == "chimera"
                            and item.get("content_kind") == "structured"), None)
         if descriptor is None:
             raise HTTPException(404, "Pythia artifact not found in this project")
