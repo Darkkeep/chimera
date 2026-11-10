@@ -6,7 +6,7 @@ import unittest
 from contextlib import ExitStack
 from io import BytesIO
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import httpx
 from jsonschema import Draft202012Validator
@@ -206,9 +206,8 @@ class LearningIntelligenceTests(unittest.TestCase):
         }
         response.iter_bytes.return_value = [svg]
         response.raise_for_status.return_value = None
-        cm = Mock()
-        cm.__enter__ = Mock(return_value=response)
-        cm.__exit__ = Mock(return_value=False)
+        cm = MagicMock()
+        cm.__enter__.return_value = response
         with patch.dict(os.environ, {
             "CHIMERA_PYTHIA_NATIVE_BASE_URL": "https://pythia-showcase.example/v1/chimera-engine",
             "CHIMERA_PYTHIA_NATIVE_API_KEY": "native-scoped-token",
