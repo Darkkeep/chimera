@@ -83,6 +83,15 @@ class PythiaProvider:
     def video_status(self, operation: str) -> dict[str, object]:
         return self._request("GET", f"/media/videos/{quote(operation, safe='')}", timeout=190.0)
 
+    def retrieve_native_output(self, kind: str, operation: str) -> dict[str, object]:
+        if kind == "image":
+            path = f"/media/images/{quote(operation, safe='')}"
+        elif kind == "narration":
+            path = f"/media/outputs/narration/{quote(operation, safe='')}"
+        else:
+            raise ValueError("Only image and narration source recovery are supported")
+        return self._request("GET", path, timeout=60.0)
+
     def image_status(self) -> dict[str, object]:
         return self._request("GET", "/media/images/status")
 
