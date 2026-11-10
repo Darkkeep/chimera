@@ -46,7 +46,7 @@ def _snapshot(record_type, item, session_id):
         return None
     # An applied or discarded draft is a distinct immutable record from its pending proposal.
     # The payload digest also prevents silent mutation of a saved version.
-    key = hashlib.sha256(f"{session_id}\\0{record_type}\\0{source_id}\\0{status}\\0{hashlib.sha256(raw).hexdigest()}".encode()).hexdigest()
+    key = hashlib.sha256(f"{session_id}\0{record_type}\0{source_id}\0{status}\0{hashlib.sha256(raw).hexdigest()}".encode()).hexdigest()
     return key, {"id": key, "sessionId": session_id, "sourceId": source_id,
                  "turnId": payload.get("turnId"), "type": record_type,
                  "title": title, "filename": f"{record_type}-{key[:12]}.json",
@@ -130,16 +130,16 @@ def export_answer_markdown(project_id, actor, turn_id):
         if not body:
             raise ValueError("Answer has no exportable text")
         if result.get("rationale"):
-            body += "\\n\\n## Rationale\\n\\n" + result["rationale"]
+            body += "\n\n## Rationale\n\n" + result["rationale"]
         if result.get("limits"):
-            body += "\\n\\n## Limits\\n\\n" + "\\n".join("- " + str(value) for value in result["limits"])
+            body += "\n\n## Limits\n\n" + "\n".join("- " + str(value) for value in result["limits"])
         session_id = state["sessionId"]
     if pythia_talk.pythia_hosted.active():
         # Chimera may export its own retained hosted advice, without claiming
         # that the hosted Pythia engine supports remote file generation.
-        safe_title = title.strip().replace("\\r", " ").replace("\\n", " ")
+        safe_title = title.strip().replace("\r", " ").replace("\n", " ")
         stem = re.sub(r"[^a-z0-9]+", "-", safe_title.lower()).strip("-")[:64] or "consultation"
-        data = f"# {safe_title}\\n\\n{body.rstrip()}\\n".encode("utf-8")
+        data = f"# {safe_title}\n\n{body.rstrip()}\n".encode("utf-8")
         export = {"filename": stem + ".md", "mime_type": "text/markdown",
                   "size_bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
         origin = "Chimera Markdown export of hosted Pythia answer"
@@ -159,7 +159,7 @@ def export_answer_markdown(project_id, actor, turn_id):
     digest = hashlib.sha256(data).hexdigest()
     if export.get("size_bytes") != len(data) or export.get("sha256") != digest:
         raise ValueError("Pythia export integrity check failed")
-    key = hashlib.sha256(f"{session_id}\\0markdown\\0{turn_id}\\0{digest}".encode()).hexdigest()
+    key = hashlib.sha256(f"{session_id}\0markdown\0{turn_id}\0{digest}".encode()).hexdigest()
     descriptor = {"id": key, "sessionId": session_id, "sourceId": turn_id,
                   "turnId": turn_id, "type": "markdown", "title": "Consultation answer",
                   "filename": "pythia-consultation-" + key[:12] + ".md",
