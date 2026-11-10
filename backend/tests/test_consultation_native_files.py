@@ -1,14 +1,16 @@
 import base64
 import hashlib
+import io
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
+from zipfile import ZipFile
 
 from fastapi.testclient import TestClient
 
-from backend.app import main, consultation_artifacts, storage
-from backend.app.models import ProjectCreate
+from backend.app import main, consultation_artifacts, storage, scorm
+from backend.app.models import ProjectCreate, SceneCreate
 
 ANIMATED_GIF = base64.b64decode(
     "R0lGODlhAgACAIEAAAAAAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACwAAACwAAAAAAgACAAAIBgABCAQQEAAh+QQBFwABACwAAAAAAgACAIH///8AAAAAAAAAAAAIBgABCAQQEAA7"
@@ -117,6 +119,27 @@ class NativeArtifactTests(unittest.TestCase):
         asset = result.json()["storyboard"]["assets"][-1]
         self.assertEqual("image/svg+xml", asset["contentType"])
         self.assertEqual(VECTOR, (storage.project_path(self.project.id) / asset["path"]).read_bytes())
+
+    def test_native_gif_and_svg_keep_original_bytes_in_scorm_package(self):
+        for source_id, raw, mime in (("native-gif-source-01", ANIMATED_GIF, "image/gif"),
+                                     ("native-svg-source-01", VECTOR, "image/svg+xml")):
+            provider = self.fake(raw, mime)
+            with patch("backend.app.learning_intelligence.PythiaProvider", return_value=provider):
+                result = self.client.post(self.root + "/native/" + source_id,
+                                          headers=self.headers)
+            self.assertEqual(200, result.status_code, result.text)
+            revision = storage.read_project(self.project.id).storyboard.revision
+            applied = self.client.post(self.root + "/" + result.json()["id"] + "/promote",
+                                       headers={**self.headers, "If-Match": str(revision)})
+            self.assertEqual(200, applied.status_code, applied.text)
+        storage.create_scene(self.project.id, SceneCreate(title="Source fidelity in SCORM"))
+        project = storage.read_project(self.project.id)
+        package, _ = scorm.build_scorm_2004(project)
+        with ZipFile(io.BytesIO(package)) as archive:
+            assets = project.storyboard.assets
+            self.assertEqual(2, len(assets))
+            self.assertEqual(ANIMATED_GIF, archive.read(assets[0].path))
+            self.assertEqual(VECTOR, archive.read(assets[1].path))
 
     def test_source_cannot_be_imported_into_unrelated_project(self):
         provider = self.fake(VECTOR, "image/svg+xml", "different-project")
