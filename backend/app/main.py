@@ -56,6 +56,7 @@ from .storage import update_project_background, update_project_relationship, Pro
 from .question_import import parse_questions, question_template, question_spreadsheet
 from .pythia_connection import LocalEngineConnection, configured_engine_url, local_engine_url, save_engine_url
 from . import pythia_talk
+from . import consultation_artifacts
 from . import pythia_hosted
 from . import experience_treatments
 from .experience_models import ExperienceDesignRequest, ExperienceReview
@@ -74,6 +75,8 @@ ROUTE_ACTIONS = {
     "post_pythia_action": "enhancement.proposal.create",
     "decide_pythia_action": "enhancement.proposal.decide",
     "get_pythia_conversation": "enhancement.job.create",
+    "get_consultation_artifacts": "project.view",
+    "download_consultation_artifact": "project.view",
     "post_pythia_conversation": "enhancement.job.create",
     "preview_pythia_capacity": "enhancement.job.create",
     "reset_pythia_conversation": "enhancement.job.create",
@@ -2050,6 +2053,28 @@ def _talk_operation(project_id: str, operation):
         raise HTTPException(error.status, str(error)) from error
     except FileNotFoundError as error:
         raise HTTPException(404, "Project not found") from error
+
+
+@app.get("/api/projects/{project_id}/consultation-artifacts", name="get_consultation_artifacts")
+def get_consultation_artifacts(project_id: str, session_id: str | None = None):
+    return _talk_operation(project_id, lambda actor:
+        consultation_artifacts.list_artifacts(project_id, actor, session_id))
+
+
+@app.get("/api/projects/{project_id}/consultation-artifacts/{artifact_id}/download", name="download_consultation_artifact")
+def download_consultation_artifact(project_id: str, artifact_id: str):
+    try:
+        descriptor, content = _talk_operation(project_id, lambda actor:
+            consultation_artifacts.get_artifact(project_id, actor, artifact_id))
+    except KeyError as error:
+        raise HTTPException(404, "Artifact not found") from error
+    except (OSError, ValueError) as error:
+        raise HTTPException(409, "Saved artifact is unavailable or damaged") from error
+    return Response(content, media_type="application/json", headers={
+        "Content-Disposition": f'attachment; filename="{descriptor["filename"]}"',
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+    })
 
 
 @app.get("/api/projects/{project_id}/pythia-conversation", name="get_pythia_conversation")
