@@ -76,7 +76,7 @@ ROUTE_ACTIONS = {
     "decide_pythia_action": "enhancement.proposal.decide",
     "get_pythia_conversation": "enhancement.job.create",
     "get_consultation_artifacts": "project.view",
-    "download_consultation_artifact": "project.view",
+    "download_consultation_artifact": "project.export",
     "export_consultation_answer": "project.export",
     "post_pythia_conversation": "enhancement.job.create",
     "preview_pythia_capacity": "enhancement.job.create",
@@ -186,6 +186,9 @@ def _hosted_request_action(request: Request) -> str:
     if path.startswith(("/api/ai-connection", "/api/narration-connections")):
         return "identity.self" if request.method == "GET" else "admin.policy.manage"
     if "/consultation-artifacts/exports/" in path:
+        return "project.export"
+    if request.method == "GET" and ("/consultation-artifacts/" in path and path.endswith("/download")
+                                    or "/pythia-engine-artifacts/" in path and path.endswith("/download")):
         return "project.export"
     if "/shared-media" in path:
         return "media.manage"
