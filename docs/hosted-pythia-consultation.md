@@ -11,10 +11,10 @@ remains advisory only; it grants no approval and applies no changes.
 
 ## What is and is not hosted
 
-- Hosted consultation covers the **Consult Pythia** conversation only.
-- Authoring drafts, video/experience treatments, storyboard enhancement and
-  media generation still use the local desktop adapter and report a clear
-  "desktop-only" message in hosted deployments.
+- Hosted Pythia supports consultation and, with the coordinated authoring update,
+  content drafts and storyboard suggestions. See [hosted storyboarding](hosted-storyboarding.md).
+- Video/experience treatments, specialist tool orchestration, public web research
+  and media generation still require their compatible local adapter.
 - The engine advertises consultation capacity. The coordinated repair defaults
   to **200,000 characters across history and the next question**, **100,000 per
   message**, and **100 preceding wire messages**. A conservative model budget

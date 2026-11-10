@@ -90,7 +90,7 @@ def local_mcp(question=None, history=None, *, authoring_request=None, video_requ
                 return pythia_hosted.check(hosted_configuration())
             except pythia_hosted.HostedError as error:
                 raise TalkError(str(error), error.status) from None
-        raise TalkError("This Pythia operation uses the local desktop adapter and is not yet available in this hosted deployment. Hosted consultation is available; drafting and media requests remain desktop-only for now.", 503)
+        raise TalkError("This operation requires a compatible local desktop adapter. Hosted consultation and native storyboard drafts are available; video, experiences and media remain desktop-only.", 503)
     root = checkout()
     payload = {"action": "capabilities"} if question is None else {"action": "consult", "question": question, "history": history or []}
     if authoring_request is not None:
