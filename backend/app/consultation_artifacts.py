@@ -286,7 +286,14 @@ def _svg_authoring_safe(data: bytes) -> bool:
         if node.tag[len(namespace):] not in tags:
             return False
         for attribute, value in node.attrib.items():
-            if attribute not in attributes or re.search(r"url\s*\(|javascript:|data:|https?:|@import", value, flags=re.I):
+            if attribute not in attributes:
+                return False
+            # SVG-native local gradients and clip paths are safe references.
+            if re.search(r"url\\s*\\(", value, flags=re.I):
+                if attribute not in {"fill", "stroke", "clip-path"} or not re.fullmatch(
+                        r"url\\(\\s*#[A-Za-z_][A-Za-z0-9_.-]*\\s*\\)", value):
+                    return False
+            if re.search(r"javascript:|data:|https?:|@import", value, flags=re.I):
                 return False
     return True
 
