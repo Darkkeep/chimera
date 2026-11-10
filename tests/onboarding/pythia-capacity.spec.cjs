@@ -1,4 +1,17 @@
 const { test, expect } = require('@playwright/test');
+async function logDialogOverflow(dialog) {
+  const report=await dialog.evaluate(el=>{
+    const bounds=el.getBoundingClientRect();
+    return {clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,
+      overflowing:[...el.querySelectorAll('*')].map(node=>({tag:node.tagName,
+        className:typeof node.className==='string'?node.className.slice(0,110):'',
+        width:Math.round(node.getBoundingClientRect().width),
+        right:Math.round(node.getBoundingClientRect().right-bounds.right),
+        scroll:node.scrollWidth,client:node.clientWidth
+      })).filter(node=>node.right>1 || node.scroll>node.client+2).slice(0,18)};
+  });
+  if(report.scrollWidth>report.clientWidth)console.log('NARROW_DIALOG_OVERFLOW',JSON.stringify(report));
+}
 const AxeBuilder = require('@axe-core/playwright').default;
 
 async function openCapacityFixture(page, request) {
@@ -63,6 +76,7 @@ test('capacity includes sources, warns early and preserves an over-capacity draf
   await dialog.getByRole('region', { name: 'Conversation capacity' }).scrollIntoViewIfNeeded();
   await send.scrollIntoViewIfNeeded();
   await expect(send).toBeVisible();
+  await logDialogOverflow(dialog);
   expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('capacity-mobile.png'), fullPage: true });
   await send.click();
