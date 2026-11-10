@@ -73,6 +73,51 @@ class NativeArtifactTests(unittest.TestCase):
         self.assertEqual("application/octet-stream", file.headers["content-type"])
         self.assertIn(".svg", file.headers["content-disposition"])
 
+    def test_animated_gif_promotes_losslessly_with_revision_guard(self):
+        provider = self.fake(ANIMATED_GIF, "image/gif")
+        with patch("backend.app.learning_intelligence.PythiaProvider", return_value=provider):
+            descriptor = self.client.post(self.root + "/native/" + self.source_id,
+                                          headers=self.headers).json()
+        endpoint = self.root + "/" + descriptor["id"] + "/promote"
+        self.assertEqual(428, self.client.post(endpoint, headers=self.headers).status_code)
+        self.assertEqual(412, self.client.post(endpoint, headers={**self.headers, "If-Match": "999"}).status_code)
+        project = storage.read_project(self.project.id)
+        response = self.client.post(endpoint, headers={**self.headers, "If-Match": str(project.storyboard.revision)})
+        self.assertEqual(200, response.status_code, response.text)
+        asset = response.json()["storyboard"]["assets"][-1]
+        self.assertEqual("image", asset["kind"])
+        self.assertEqual("image/gif", asset["contentType"])
+        self.assertEqual(hashlib.sha256(ANIMATED_GIF).hexdigest(), asset["sha256"])
+        self.assertEqual(ANIMATED_GIF, (storage.project_path(self.project.id) / asset["path"]).read_bytes())
+        self.assertEqual(ANIMATED_GIF, self.client.get(
+            self.root + "/" + descriptor["id"] + "/download").content)
+
+    def test_svg_promotion_rejects_active_document_but_keeps_original(self):
+        unsafe = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
+        provider = self.fake(unsafe, "image/svg+xml")
+        with patch("backend.app.learning_intelligence.PythiaProvider", return_value=provider):
+            descriptor = self.client.post(self.root + "/native/" + self.source_id,
+                                          headers=self.headers).json()
+        project = storage.read_project(self.project.id)
+        result = self.client.post(self.root + "/" + descriptor["id"] + "/promote",
+                                  headers={**self.headers, "If-Match": str(project.storyboard.revision)})
+        self.assertEqual(422, result.status_code, result.text)
+        self.assertEqual([], storage.read_project(self.project.id).storyboard.assets)
+        self.assertEqual(unsafe, self.client.get(self.root + "/" + descriptor["id"] + "/download").content)
+
+    def test_safe_svg_promotes_losslessly_as_vector_image(self):
+        provider = self.fake(VECTOR, "image/svg+xml")
+        with patch("backend.app.learning_intelligence.PythiaProvider", return_value=provider):
+            descriptor = self.client.post(self.root + "/native/" + self.source_id,
+                                          headers=self.headers).json()
+        project = storage.read_project(self.project.id)
+        result = self.client.post(self.root + "/" + descriptor["id"] + "/promote",
+                                  headers={**self.headers, "If-Match": str(project.storyboard.revision)})
+        self.assertEqual(200, result.status_code, result.text)
+        asset = result.json()["storyboard"]["assets"][-1]
+        self.assertEqual("image/svg+xml", asset["contentType"])
+        self.assertEqual(VECTOR, (storage.project_path(self.project.id) / asset["path"]).read_bytes())
+
     def test_source_cannot_be_imported_into_unrelated_project(self):
         provider = self.fake(VECTOR, "image/svg+xml", "different-project")
         with patch("backend.app.learning_intelligence.PythiaProvider", return_value=provider):
