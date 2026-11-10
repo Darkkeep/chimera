@@ -15,6 +15,19 @@ type Artifact = {
   origin: string;
 };
 
+type EngineArtifact = {
+  artifact_id: string;
+  artifact_version: number;
+  artifact_type: string;
+  task_id: string;
+  project_id: string;
+  consumer: string;
+  content_kind: "structured";
+  retrieval: "json-envelope";
+  downloadable_file: false;
+  status: string;
+};
+
 async function getArtifacts(projectId: string, signal?: AbortSignal): Promise<Artifact[]> {
   const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/consultation-artifacts`, { signal });
   if (!response.ok) throw new Error("Could not retrieve consultation artifacts. Check your project access and try again.");
@@ -33,6 +46,8 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [engineArtifacts, setEngineArtifacts] = useState<EngineArtifact[]>([]);
+  const [engineStatus, setEngineStatus] = useState<"loading" | "ready" | "unavailable">("loading");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -43,6 +58,19 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [projectId, sessionId, refreshKey, revision]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setEngineStatus("loading");
+    fetch(`/api/projects/${encodeURIComponent(projectId)}/pythia-engine-artifacts`, { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error("Engine artifact discovery is not available");
+        return await response.json() as { artifacts: EngineArtifact[] };
+      })
+      .then(data => { setEngineArtifacts(data.artifacts); setEngineStatus("ready"); })
+      .catch(() => { if (!controller.signal.aborted) { setEngineArtifacts([]); setEngineStatus("unavailable"); } });
+    return () => controller.abort();
+  }, [projectId, revision]);
 
   async function exportMarkdown(turnId: string) {
     setExporting(turnId);
@@ -75,7 +103,16 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
       {item.type === "advice" && item.turnId && <button type="button" className="button button-outline"
         disabled={exporting !== null}
         onClick={() => void exportMarkdown(item.turnId!)}>{exporting === item.turnId ? "Exporting…" : "Export Markdown"}</button>}
-      <a className="button button-outline" href={`/api/projects/${encodeURIComponent(projectId)}/consultation-artifacts/${encodeURIComponent(item.id)}/download`} download={item.filename} aria-label={`Download ${item.title} JSON`}><Download size={15} /> Download</a>
+      <a className="button button-outline" href={`/api/projects/${encodeURIComponent(projectId)}/consultation-artifacts/${encodeURIComponent(item.id)}/download`} download={item.filename} aria-label={`Download ${item.title} ${item.type === "markdown" ? "Markdown" : "JSON"}`}><Download size={15} /> Download</a>
+    </div>)}
+    <div className="pythia-artifacts-heading"><div><h3>Engine drafts <span className="pythia-artifacts-count">{engineArtifacts.length}</span></h3>
+      <p>Structured proposals from the Pythia Engine associated with this project. These are not generated media files or consultation attachments.</p></div></div>
+    {engineStatus === "loading" && <p role="status">Checking Engine drafts…</p>}
+    {engineStatus === "unavailable" && <p className="field-hint">Engine artifact discovery is unavailable on this connection. Your saved consultation exports remain accessible.</p>}
+    {engineStatus === "ready" && engineArtifacts.length === 0 && <p className="field-hint">No Engine drafts found for this project.</p>}
+    {engineStatus === "ready" && engineArtifacts.map(item => <div className="pythia-artifact-item" key={item.artifact_id}>
+      <div><strong>{item.artifact_type.replaceAll("-", " ")}</strong><small>Engine draft · {item.status} · Version {item.artifact_version} · JSON envelope</small></div>
+      <a className="button button-outline" href={`/api/projects/${encodeURIComponent(projectId)}/pythia-engine-artifacts/${encodeURIComponent(item.artifact_id)}/download`} download aria-label={`Download ${item.artifact_type} structured JSON`}><Download size={15} /> JSON</a>
     </div>)}
   </section>;
 }
