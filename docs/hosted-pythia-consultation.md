@@ -15,9 +15,11 @@ remains advisory only; it grants no approval and applies no changes.
 - Authoring drafts, video/experience treatments, storyboard enhancement and
   media generation still use the local desktop adapter and report a clear
   "desktop-only" message in hosted deployments.
-- The hosted text pilot allows **24,000 characters of conversation context**
-  per conversation (the desktop allowance is much larger). Authors see an
-  explicit message when a conversation reaches the allowance.
+- The engine advertises consultation capacity. The coordinated repair defaults
+  to **200,000 characters across history and the next question**, **100,000 per
+  message**, and **100 preceding wire messages**. A conservative model budget
+  can bind first. Older engines retain their actual 24,000-character allowance.
+  See [capacity configuration](consultation-capacity.md).
 - Pythia's durable wire context records every accepted turn, including failed
   ones; Pythia's engine projects only completed exchanges to its model
   producer, so failed turns still never join the advice context.

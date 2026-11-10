@@ -75,6 +75,7 @@ ROUTE_ACTIONS = {
     "decide_pythia_action": "enhancement.proposal.decide",
     "get_pythia_conversation": "enhancement.job.create",
     "post_pythia_conversation": "enhancement.job.create",
+    "preview_pythia_capacity": "enhancement.job.create",
     "reset_pythia_conversation": "enhancement.job.create",
     "save_pythia_planning": "enhancement.job.create",
     "get_video_treatment": "project.view", "post_video_treatment": "enhancement.job.create",
@@ -2061,6 +2062,12 @@ def post_pythia_conversation(project_id: str, request: Request, data: pythia_tal
     _require_ai_origin(request)
     return _talk_operation(project_id, lambda actor: pythia_talk.submit(project_id, actor, data,
         lambda: _local_pythia_access(project_id, actor)))
+
+
+@app.post("/api/projects/{project_id}/pythia-conversation/capacity", name="preview_pythia_capacity")
+def preview_pythia_capacity(project_id: str, request: Request, data: pythia_talk.TalkRequest):
+    _require_ai_origin(request)
+    return _talk_operation(project_id, lambda actor: pythia_talk.preview_capacity(project_id, actor, data))
 
 
 @app.post("/api/projects/{project_id}/pythia-conversation/reset", name="reset_pythia_conversation")

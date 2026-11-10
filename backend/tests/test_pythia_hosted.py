@@ -32,6 +32,8 @@ ADVICE = {"kind": "answer", "content": "Hosted advisory answer.", "rationale": "
           "limits": [], "citations": [], "producer_id": "live-hosted-chimera-text-v1",
           "stopping_boundary": "advisory-only"}
 WIRE_ADVICE = {**ADVICE, "answer_sha256": hosted.digest(ADVICE)}
+LIMITS = {'contextChars': 200000, 'messageChars': 100000, 'historyMessages': 100,
+          'requestBytes': 1048576, 'warningPercent': 80, 'verified': True}
 
 
 def decode_part(part):
@@ -97,6 +99,7 @@ class ConfigurationTests(unittest.TestCase):
 class ConsultTransportTests(unittest.TestCase):
     def setUp(self):
         self.enterContext(patch.dict(os.environ, HOSTED_ENV, clear=True))
+        self.enterContext(patch.object(hosted, 'limits', return_value=LIMITS))
         self.enterContext(patch.object(hosted, "POLL_SECONDS", 0.01))
         self.config = hosted.configuration()
         self.scope = {"tenant_id": "darkrogue", "consumer_id": "chimera", "actor_id": "user-1",
@@ -277,6 +280,7 @@ class HostedTalkFlowTests(unittest.TestCase):
         self.enterContext(patch.object(main, "ROOT", self.root))
         self.enterContext(patch.dict(os.environ, HOSTED_ENV, clear=True))
         self.enterContext(patch.object(hosted, "account_roles", return_value={"author"}))
+        self.enterContext(patch.object(hosted, 'limits', return_value=LIMITS))
         self.project = storage.create_project(ProjectCreate(title="Hosted course"))
 
     def settle(self):
@@ -440,10 +444,57 @@ class HostedTalkFlowTests(unittest.TestCase):
         session = talk.get_conversation(self.project.id, LOCAL_ACTOR)["sessionId"]
         talk.write_state(path, {"sessionId": session, "turns": [],
             "hostedThread": {"revision": 1, "messages": [
-                {"message_id": "m-big", "role": "user", "content": "x" * hosted.HOSTED_CONTEXT_CHARS}]}})
+                {"message_id": "m-big", "role": "user", "content": "x" * LIMITS['contextChars']}]}})
         data = talk.TalkRequest(message="One more question", requestId="request-big", sessionId=session)
-        with self.assertRaisesRegex(talk.TalkError, "24,000"):
+        with self.assertRaisesRegex(talk.TalkError, "connection capacity"):
             talk.submit(self.project.id, LOCAL_ACTOR, data, lambda: None)
+
+    def test_capacity_preview_counts_selected_sources_without_sending_or_changing_history(self):
+        source_text = ('# Tutorial outline\n' + 'a' * 30000).encode()
+        passages, status, error = extract_reference_passages('outline.txt', source_text)
+        source = storage.save_reference_resource(self.project.id, 'outline.txt', 'Outline',
+            'supporting-document', False, [], source_text, 'text/plain', passages, status, error)
+        state = talk.get_conversation(self.project.id, LOCAL_ACTOR)
+        path = talk.state_path(self.project.id, LOCAL_ACTOR)
+        before = path.read_bytes()
+        data = talk.TalkRequest(message='Help me plan this course.', requestId='capacity-check',
+                               sessionId=state['sessionId'], sourceIds=[source.id])
+        with patch.object(hosted, 'consult') as provider:
+            capacity = talk.preview_capacity(self.project.id, LOCAL_ACTOR, data)
+        provider.assert_not_called()
+        self.assertGreater(capacity['used']['contextChars'], 30000)
+        self.assertEqual(capacity['status'], 'available')
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_capacity_rejection_does_not_append_a_turn(self):
+        state = talk.get_conversation(self.project.id, LOCAL_ACTOR)
+        path = talk.state_path(self.project.id, LOCAL_ACTOR)
+        before = path.read_bytes()
+        data = talk.TalkRequest(message='x' * 100001, requestId='request-too-big', sessionId=state['sessionId'])
+        with patch.object(hosted, 'consult') as provider, self.assertRaisesRegex(talk.TalkError, 'capacity'):
+            talk.submit(self.project.id, LOCAL_ACTOR, data, lambda: None)
+        provider.assert_not_called()
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_more_than_32_saved_turns_do_not_trigger_an_artificial_turn_cap(self):
+        state = talk.get_conversation(self.project.id, LOCAL_ACTOR)
+        path = talk.state_path(self.project.id, LOCAL_ACTOR)
+        saved = json.loads(path.read_text(encoding='utf-8'))
+        saved['turns'] = [{'id': f'turn-{number}', 'status': 'completed', 'question': 'Earlier question',
+                          'wireQuestion': 'Earlier question', 'result': dict(ADVICE)} for number in range(33)]
+        saved['hostedThread'] = {'revision': 33, 'messages': [
+            {'message_id': f'm-{number}', 'role': 'user' if number % 2 == 0 else 'assistant',
+             'content': 'Earlier question' if number % 2 == 0 else ADVICE['content']} for number in range(66)]}
+        talk.write_state(path, saved)
+        def outcome(config, scope, *, message_id, revision, messages, question, **kwargs):
+            self.assertEqual(revision, 33)
+            self.assertEqual(len(messages), 66)
+            return {'advice': dict(WIRE_ADVICE), 'error': None, 'revision': 34,
+                    'appended': [{'message_id': message_id, 'role': 'user', 'content': question},
+                                 {'message_id': 'op-34', 'role': 'assistant', 'content': ADVICE['content']}]}
+        with patch.object(hosted, 'consult', side_effect=outcome):
+            self.send('Continue the same conversation.', 'request-next')
+            self.assertEqual(self.settle()['turns'][-1]['status'], 'completed')
 
     def test_unentitled_account_cannot_submit(self):
         with patch.object(hosted, "account_roles", return_value={"reviewer"}):

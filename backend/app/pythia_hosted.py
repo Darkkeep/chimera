@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import uuid4
+from .consultation_capacity import negotiate
 
 import httpx
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -26,7 +27,7 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 CONSUMER_ID = "chimera"
 AUDIENCE = "pythia-conversation"
-HOSTED_CONTEXT_CHARS = 24_000
+_CAPACITY_CACHE = {}
 ENTITLED_ROLES = frozenset({"author", "instructional-designer", "administrator"})
 POLL_SECONDS = 1.0
 DEADLINE_SECONDS = 150
@@ -195,6 +196,14 @@ def _failure(response):
         return HostedError("The hosted Pythia consultation allowance for this installation is "
                            "exhausted. Contact your operator.", 429)
     if response.status_code in {413, 422}:
+        try:
+            error = response.json().get('error', {}) if len(response.content) <= MAX_RESPONSE_BYTES else {}
+        except (ValueError, AttributeError):
+            error = {}
+        if isinstance(error, dict) and error.get('code') == 'consultation_capacity_exceeded':
+            return HostedError("Pythia's configured model or conversation capacity would be exceeded. "
+                "Select fewer sources, shorten the message, or start a new conversation. "
+                "No model call was made and the saved history is unchanged.", 422)
         return HostedError("Pythia rejected this consultation request. Shorten the question or "
                            "start a new conversation.", 422)
     return HostedError("The hosted Pythia engine is unavailable. Retry explicitly; no failed turn "
@@ -242,6 +251,10 @@ def consult(config, scope, *, message_id, idempotency_key, revision, messages, q
                "context": context, "context_sha256": digest(context),
                "message": question, "requested_outputs": []}
     bound = request_digest(request)
+    allowance = limits(config)
+    usage = measure(allowance, scope, revision, messages, question)
+    if usage['exceeded']:
+        raise HostedError(capacity_error(usage), 422)
     try:
         with httpx.Client(base_url=config.base_url, timeout=20, trust_env=False,
                           follow_redirects=False) as client:
@@ -292,7 +305,7 @@ def consult(config, scope, *, message_id, idempotency_key, revision, messages, q
     return {"advice": None, "error": message, "appended": appended, "revision": revision + 1}
 
 
-def check(config):
+def _capabilities(config):
     """Verify the hosted engine answers with engine capabilities for our credentials."""
     try:
         with httpx.Client(base_url=config.base_url, timeout=10, trust_env=False,
@@ -310,7 +323,54 @@ def check(config):
         raise HostedError("The hosted Pythia engine returned an unreadable response.", 502) from None
     if not isinstance(value, dict) or not isinstance(value.get("capabilities"), dict):
         raise HostedError("The configured address did not identify a compatible Pythia Engine.", 503)
+    return value
+
+
+def limits(config, *, refresh=False):
+    key = (config.base_url, hashlib.sha256(config.service_token.encode()).hexdigest())
+    cached = _CAPACITY_CACHE.get(key)
+    if refresh or cached is None or time.monotonic() - cached[0] >= 60:
+        advertised = _capabilities(config).get('consultationLimits')
+        _CAPACITY_CACHE[key] = (time.monotonic(), advertised)
+    try:
+        return negotiate(_CAPACITY_CACHE[key][1])
+    except ValueError as error:
+        raise HostedError(str(error), 503) from None
+
+
+def measure(allowance, scope, revision, messages, question):
+    context = {'messages': messages, 'source_snapshots': []}
+    # Fixed-length identifiers match submit's UUID and SHA-256 identifiers.
+    request = {'schema_version': '1.0', 'scope': scope, 'message_id': 'm' * 32,
+               'idempotency_key': 'k' * 64, 'expected_context_revision': revision,
+               'context': context, 'context_sha256': digest(context),
+               'message': question, 'requested_outputs': []}
+    usage = {'contextChars': sum(len(m['content']) for m in messages) + len(question),
+             'messageChars': max([len(question), *(len(m['content']) for m in messages)]),
+             'historyMessages': len(messages), 'requestBytes': len(canonical_bytes(request))}
+    if allowance.get('tokenCounting') == 'conservative-utf8-bytes':
+        model_input = {'conversation': messages, 'current_question': question}
+        usage['modelInputTokens'] = allowance['modelFixedInputBytes'] + len(json.dumps(model_input, ensure_ascii=False).encode('utf-8'))
+    exceeded = [name for name, used in usage.items() if used > allowance[name]]
+    warning = any(used >= allowance[name] * .8 for name, used in usage.items())
+    return {'used': usage, 'limits': allowance, 'exceeded': exceeded,
+            'status': 'full' if exceeded else 'warning' if warning else 'available'}
+
+
+def capacity_error(usage):
+    labels = {'contextChars': 'conversation text', 'messageChars': 'one message or its selected sources',
+              'historyMessages': 'saved conversation messages', 'requestBytes': 'request size',
+              'modelInputTokens': 'the conservative model input estimate'}
+    names = ', '.join(labels[name] for name in usage['exceeded'])
+    return (f'This request exceeds the connection capacity for {names}. '
+            'Select fewer sources, shorten the message, or start a new conversation. '
+            'Your draft and saved history are unchanged; no model call was made.')
+
+
+def check(config):
+    allowance = limits(config, refresh=True)
     return {"mode": "hosted-text", "consultation": True, "authoring_drafts": False,
+            'consultationLimits': allowance,
             "attachments": False, "private_history_access": False, "exports": False,
             "media_tools": False, "approval_authority": False,
             "context": "Explicit text supplied with each call; the hosted engine keeps only this "

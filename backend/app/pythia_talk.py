@@ -209,15 +209,42 @@ def public_state(state):
 
 def get_conversation(project_id, actor):
     with storage.storyboard_transaction():
-        state = public_state(read_state(state_path(project_id, actor)))
+        private = read_state(state_path(project_id, actor))
+        state = public_state(private)
     try:
         if pythia_hosted.active():
-            hosted_configuration()
-            return {**state, "configured": True, "message": "Uses the hosted Pythia engine configured for this deployment."}
+            config = hosted_configuration()
+            capacity = _hosted_capacity(private, actor, config)
+            return {**state, "configured": True, 'mode': 'hosted-text', 'capacity': capacity,
+                    "message": "Uses the hosted Pythia engine configured for this deployment."}
         checkout()
         return {**state, "configured": True, "message": "Uses the local Pythia adapter with its plugin configuration or your saved AI connection."}
-    except TalkError as error:
+    except (TalkError, pythia_hosted.HostedError) as error:
         return {**state, "configured": False, "message": str(error)}
+
+
+def _hosted_capacity(state, actor, config, question=''):
+    thread = state.get('hostedThread') or {'revision': 0, 'messages': []}
+    scope = pythia_hosted.conversation_scope(config, actor.actorId, state['sessionId'])
+    return pythia_hosted.measure(pythia_hosted.limits(config), scope, thread['revision'],
+                                 thread['messages'], question)
+
+
+def preview_capacity(project_id, actor, data):
+    """Exact local composition only; never send draft/source text to a provider."""
+    if not pythia_hosted.active():
+        return None
+    with storage.storyboard_transaction():
+        state = read_state(state_path(project_id, actor))
+        if data.sessionId != state['sessionId']:
+            raise TalkError('The conversation changed. Refresh before checking capacity.', 409)
+        question, _ = compose(project_id, data, state.get('planning'))
+        messages = (state.get('hostedThread') or {}).get('messages', [])
+        question = _hosted_question(messages, question)
+        try:
+            return _hosted_capacity(state, actor, hosted_configuration(), question)
+        except pythia_hosted.HostedError as error:
+            raise TalkError(str(error), error.status) from None
 
 
 def reset_conversation(project_id, actor):
@@ -336,6 +363,14 @@ def deduplicate_source_context(messages):
     return result
 
 
+def _hosted_question(messages, question):
+    # Only completed wire pairs reach Pythia's model. A source shared in a
+    # failed user-only turn must be sent again, not replaced with a reference.
+    completed = [message for index, message in enumerate(messages[:-1])
+                 if message['role'] == 'user' and messages[index + 1]['role'] == 'assistant']
+    return deduplicate_source_context([*completed, {'role': 'user', 'content': question}])[-1]['content']
+
+
 def submit(project_id, actor, data, authorize):
     hosted = pythia_hosted.active()
     hosted_config = hosted_configuration() if hosted else None
@@ -365,13 +400,13 @@ def submit(project_id, actor, data, authorize):
             # The durable hosted thread is the exact wire context Pythia recorded,
             # including accepted-but-failed turns it hides from its model producer.
             thread = state.get("hostedThread") or {"revision": 0, "messages": []}
-            compact = deduplicate_source_context([*thread["messages"], {"role": "user", "content": question}])
-            question = compact[-1]["content"]
+            question = _hosted_question(thread['messages'], question)
             history = thread["messages"]
-            if sum(len(message["content"]) for message in history) + len(question) > pythia_hosted.HOSTED_CONTEXT_CHARS or len(state["turns"]) >= 32:
-                raise TalkError("This conversation has reached the hosted consultation allowance of 24,000 context characters. Start a new conversation; no history was silently dropped.")
             try:
                 scope = pythia_hosted.conversation_scope(hosted_config, actor.actorId, state["sessionId"])
+                capacity = _hosted_capacity(state, actor, hosted_config, question)
+                if capacity['exceeded']:
+                    raise TalkError(pythia_hosted.capacity_error(capacity))
             except pythia_hosted.HostedError as error:
                 raise TalkError(str(error), error.status) from None
             hosted_request = {"scope": scope, "messageId": uuid4().hex, "revision": thread["revision"],
@@ -379,7 +414,7 @@ def submit(project_id, actor, data, authorize):
         else:
             compact = deduplicate_source_context([*history, {"role": "user", "content": question}])
             history, question = compact[:-1], compact[-1]["content"]
-            if len(history) > 32 or sum(len(message["content"]) for message in history) + len(question) > MAX_CONTEXT_CHARS or len(state["turns"]) >= 32:
+            if len(history) > 100 or sum(len(message["content"]) for message in history) + len(question) > MAX_CONTEXT_CHARS:
                 raise TalkError("This conversation has reached its context limit. Start a new conversation; no history was silently dropped.")
         if not CAPACITY.acquire(blocking=False):
             raise TalkError("Two Pythia consultations are already active. Try again when one finishes.", 429)
