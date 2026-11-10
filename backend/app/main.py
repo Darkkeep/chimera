@@ -81,6 +81,7 @@ ROUTE_ACTIONS = {
     "export_consultation_answer": "project.export",
     "import_pythia_native_artifact": "project.import",
     "get_pythia_native_files": "project.view",
+    "generate_pythia_native_image": "media.manage",
     "promote_pythia_native_media": "media.manage",
     "post_pythia_conversation": "enhancement.job.create",
     "preview_pythia_capacity": "enhancement.job.create",
@@ -2132,6 +2133,50 @@ def export_consultation_answer(project_id: str, turn_id: str, request: Request):
         raise HTTPException(404, "Completed consultation answer not found") from error
     except ValueError as error:
         raise HTTPException(422, str(error)) from error
+
+
+class NativePythiaImageRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=2000)
+    outputFormat: Literal["svg", "gif"]
+    frameCount: int | None = Field(default=None, ge=2, le=16)
+    frameDurationMs: int | None = Field(default=None, ge=20, le=2000)
+    confirmPaid: Literal[True]
+
+
+@app.post("/api/projects/{project_id}/pythia-native-images", name="generate_pythia_native_image")
+def generate_pythia_native_image(project_id: str, request: Request, data: NativePythiaImageRequest):
+    """One explicit paid generation request. Subsequent discovery/import is read-only."""
+    _require_ai_origin(request)
+    if data.outputFormat != "gif" and (data.frameCount is not None or data.frameDurationMs is not None):
+        raise HTTPException(422, "GIF frame settings cannot be used with SVG")
+    try:
+        project = read_project(project_id)
+        provider = _pythia_provider()
+        status = provider.image_status()
+        if (not status.get("configured")
+                or data.outputFormat not in status.get("output_formats", [])):
+            raise HTTPException(409, "Connected Pythia image model does not support this format")
+        operation_id = "chimera-native-" + uuid4().hex
+        body = {"request_id": operation_id, "project_id": project.id,
+                "prompt": data.prompt.strip(), "width": 1024, "height": 1024,
+                "output_format": data.outputFormat,
+                "expected_revision": status["revision"]}
+        if data.outputFormat == "gif":
+            body["frame_count"] = data.frameCount if data.frameCount is not None else 9
+            body["frame_duration_ms"] = data.frameDurationMs if data.frameDurationMs is not None else 200
+        result = provider.generate_image(body)
+        if (result.get("format") != "pythia-native-generation-result-v1"
+                or result.get("request_id") != operation_id
+                or result.get("media_type") != ("image/svg+xml" if data.outputFormat == "svg" else "image/gif")
+                or not result.get("native_artifact_id")):
+            raise HTTPException(502, "Pythia native generation response failed verification")
+        return {"artifactId": result["native_artifact_id"], "requestId": operation_id,
+                "mimeType": result["media_type"], "sha256": result["sha256"],
+                "model": result.get("model"), "cost": "provider-billed"}
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
 
 
 @app.get("/api/projects/{project_id}/pythia-native-files", name="get_pythia_native_files")
