@@ -79,6 +79,8 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
   const [importingNative, setImportingNative] = useState(false);
   const [incoming, setIncoming] = useState<NativeIncoming[]>([]);
   const [incomingStatus, setIncomingStatus] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [promotingId, setPromotingId] = useState<string | null>(null);
+  const [promotionNotice, setPromotionNotice] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -170,6 +172,31 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
     } finally { setImportingNative(false); }
   }
 
+  async function promoteNative(artifactId: string) {
+    setPromotingId(artifactId);
+    setPromotionNotice("");
+    setError("");
+    try {
+      const project = await fetch(`/api/projects/${encodeURIComponent(projectId)}`);
+      if (!project.ok) throw new Error("Project is unavailable.");
+      const details = await project.json() as { storyboard?: { revision?: number } };
+      const revision = details.storyboard?.revision;
+      if (!Number.isInteger(revision)) throw new Error("Cannot determine the current storyboard revision.");
+      const response = await fetch(
+        `/api/projects/${encodeURIComponent(projectId)}/consultation-artifacts/${encodeURIComponent(artifactId)}/promote`,
+        { method: "POST", headers: { "If-Match": String(revision) } },
+      );
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({})) as { detail?: string };
+        throw new Error(result.detail || "Media promotion was not completed.");
+      }
+      setPromotionNotice("Original image added to Chimera's project media library. Placement remains under author control.");
+      setRevision(value => value + 1);
+    } catch (issue) {
+      setError(issue instanceof Error ? issue.message : "Media promotion failed.");
+    } finally { setPromotingId(null); }
+  }
+
   const visible = artifacts.filter(item => showAll || item.sessionId === sessionId);
   return <section className="pythia-consultation-artifacts" aria-label="Consultation artifacts">
     <div className="pythia-artifacts-heading">
@@ -205,12 +232,18 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
     </form>
     {loading && <p role="status">Checking saved artifacts…</p>}
     {error && <p role="alert">{error}</p>}
+    {promotionNotice && <p role="status">{promotionNotice}</p>}
     {!loading && !error && visible.length === 0 && <p>No retained consultation artifacts yet. Completed answers and imported native assets will appear here.</p>}
     {visible.map(item => <div className="pythia-artifact-item" key={item.id}>
       <div><strong>{item.title}</strong><small>{item.type === "draft" ? `Draft · ${item.status}` : item.type === "markdown" ? "Exported answer" : item.type === "vector" ? "SVG vector · original only" : item.type === "animated-gif" ? `Animated GIF · ${item.frameCount ?? "?"} frames` : item.type === "gif" ? "GIF image" : "Completed consultation"} · {item.mimeType === "image/svg+xml" ? "SVG" : item.mimeType === "image/gif" ? "GIF" : item.type === "markdown" ? "Markdown" : "JSON"} · {Math.ceil(item.byteSize / 1024)} KB</small></div>
       {item.type === "advice" && item.turnId && <button type="button" className="button button-outline"
         disabled={exporting !== null}
         onClick={() => void exportMarkdown(item.turnId!)}>{exporting === item.turnId ? "Exporting…" : "Export Markdown"}</button>}
+      {["vector", "gif", "animated-gif"].includes(item.type) &&
+        <button type="button" className="button button-outline" disabled={promotingId !== null}
+          onClick={() => void promoteNative(item.id)}>
+          {promotingId === item.id ? "Promoting…" : "Add to media library"}
+        </button>}
       <a className="button button-outline" href={`/api/projects/${encodeURIComponent(projectId)}/consultation-artifacts/${encodeURIComponent(item.id)}/download`} download={item.filename} aria-label={`Download ${item.title} original file`}><Download size={15} /> Download</a>
     </div>)}
     <div className="pythia-artifacts-heading"><div><h3>Engine drafts <span className="pythia-artifacts-count">{engineArtifacts.length}</span></h3>
