@@ -81,6 +81,7 @@ ROUTE_ACTIONS = {
     "export_consultation_answer": "project.export",
     "import_pythia_native_artifact": "project.import",
     "get_pythia_native_files": "project.view",
+    "promote_pythia_native_media": "media.manage",
     "post_pythia_conversation": "enhancement.job.create",
     "preview_pythia_capacity": "enhancement.job.create",
     "reset_pythia_conversation": "enhancement.job.create",
@@ -2149,6 +2150,27 @@ def get_pythia_native_files(project_id: str):
         raise HTTPException(404, "Project not found") from error
     except PythiaUnavailableError as error:
         raise _pythia_error(error) from error
+
+
+@app.post("/api/projects/{project_id}/consultation-artifacts/{artifact_id}/promote",
+          name="promote_pythia_native_media")
+def promote_pythia_native_media(project_id: str, artifact_id: str, request: Request,
+                                if_match: Annotated[str | None, Header()] = None):
+    _require_ai_origin(request)
+    if if_match is None:
+        raise HTTPException(428, "An If-Match storyboard revision is required")
+    try:
+        revision = _expected_revision(if_match)
+        if revision is None:
+            raise HTTPException(428, "An If-Match storyboard revision is required")
+        return _talk_operation(project_id, lambda actor:
+            consultation_artifacts.promote_native_media(project_id, actor, artifact_id, revision))
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except (FileNotFoundError, KeyError) as error:
+        raise HTTPException(404, "Native artifact not found") from error
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
 
 
 @app.post("/api/projects/{project_id}/consultation-artifacts/native/{native_id}",
