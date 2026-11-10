@@ -43,8 +43,9 @@ def _snapshot(record_type, item, session_id):
     raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8")
     if len(raw) > MAX_RECORD_BYTES:
         return None
-    # Stable per source/session, not by value: a review decision does not create a duplicate.
-    key = hashlib.sha256(f"{session_id}\0{record_type}\0{source_id}".encode()).hexdigest()
+    # An applied or discarded draft is a distinct immutable record from its pending proposal.
+    # The payload digest also prevents silent mutation of a saved version.
+    key = hashlib.sha256(f"{session_id}\\0{record_type}\\0{source_id}\\0{status}\\0{hashlib.sha256(raw).hexdigest()}".encode()).hexdigest()
     return key, {"id": key, "sessionId": session_id, "sourceId": source_id,
                  "turnId": payload.get("turnId"), "type": record_type,
                  "title": title, "filename": f"{record_type}-{key[:12]}.json",
