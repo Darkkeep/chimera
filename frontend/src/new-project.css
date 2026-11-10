@@ -1,4 +1,4 @@
-.modal.new-project-dialog { width: min(1080px, calc(100vw - 32px)); }
+.modal.new-project-dialog { box-sizing: border-box; min-width: 0; max-width: calc(100vw - 32px); width: min(1080px, calc(100vw - 32px)); }
 .modal.new-project-dialog:has(.pythia-talk-embedded) { width: min(1440px, calc(100vw - 32px)); min-height: calc(100dvh - 64px); }
 .new-project-dialog > .modal-head { gap: 12px; }
 .new-project-dialog > .modal-head > div { flex: 1; min-width: 0; }
@@ -18,3 +18,5 @@
 .pythia-talk-embedded { min-width: 0; }
 .new-project-source-retry { border: 1px solid var(--line); padding: 16px; border-radius: 8px; margin: 16px 0; }
 @media (max-width: 600px) { .modal.new-project-dialog { padding: 16px; } .new-project-tabs [role=tab] { padding: 10px 12px; } }
+
+.new-project-dialog, .new-project-dialog [role=tabpanel], .new-project-dialog .pythia-talk-embedded { min-width: 0; max-width: 100%; }

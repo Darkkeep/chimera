@@ -87,6 +87,11 @@ async def exchange(payload):
                     raise ValueError("Pythia capabilities unavailable")
                 if payload["action"] == "capabilities":
                     result = capabilities
+                elif payload["action"] == "export-text":
+                    if "pythia_export_text" not in {tool.name for tool in tools.tools}:
+                        raise ValueError("Update local Pythia to enable consultation file exports")
+                    result = await session.call_tool("pythia_export_text", {
+                        "title": payload["title"], "content": payload["content"]})
                 elif payload["action"] == "draft":
                     if "pythia_draft_changes" not in {tool.name for tool in tools.tools}:
                         raise ValueError("Update the local Pythia adapter to enable authoring drafts")

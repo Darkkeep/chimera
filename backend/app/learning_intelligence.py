@@ -19,6 +19,8 @@ class LearningIntelligenceProvider(Protocol):
 
     def artifact(self, artifact_id: str) -> dict[str, object]: ...
 
+    def discover_artifacts(self, project_id: str) -> dict[str, object]: ...
+
     def cancel_task(self, task_id: str) -> dict[str, object]: ...
 
 
@@ -38,14 +40,26 @@ class PythiaProvider:
         if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password or parsed.query or parsed.fragment:
             raise ValueError("CHIMERA_PYTHIA_BASE_URL must be an HTTP(S) URL without credentials, query, or fragment")
         self.base_url = configured_url.rstrip("/")
+        native_url = os.environ.get("CHIMERA_PYTHIA_NATIVE_BASE_URL", "").strip()
+        if native_url:
+            native = urlsplit(native_url)
+            if (native.scheme != "https" or not native.netloc or native.username or native.password
+                    or native.query or native.fragment
+                    or not native.path.rstrip("/").endswith("/v1/chimera-engine")):
+                raise ValueError("Hosted native bridge must use an HTTPS /v1/chimera-engine endpoint")
+        self.native_base_url = native_url.rstrip("/") if native_url else self.base_url
 
     def _request(self, method: str, path: str, body: dict[str, object] | None = None, *, timeout: float = 10.0) -> dict[str, object]:
         try:
             request_options: dict[str, object] = {"json": body, "timeout": timeout}
-            api_key = os.environ.get("CHIMERA_PYTHIA_API_KEY", "").strip()
+            native_route = path.startswith("/media/native-files") or path == "/media/images" or path == "/media/images/status"
+            native_bridge = native_route and self.native_base_url != self.base_url
+            api_key = os.environ.get("CHIMERA_PYTHIA_NATIVE_API_KEY" if native_bridge else "CHIMERA_PYTHIA_API_KEY", "").strip()
+            if native_bridge and not api_key:
+                raise ValueError("CHIMERA_PYTHIA_NATIVE_API_KEY is required for the native bridge")
             if api_key:
                 request_options["headers"] = {"Authorization": f"Bearer {api_key}"}
-            response = httpx.request(method, f"{self.base_url}{path}", **request_options)
+            response = httpx.request(method, f"{self.native_base_url if native_route else self.base_url}{path}", **request_options)
             response.raise_for_status()
             result = response.json()
         except httpx.HTTPStatusError as error:
@@ -59,6 +73,42 @@ class PythiaProvider:
         if not isinstance(result, dict):
             raise PythiaUnavailableError("Pythia returned an invalid JSON response")
         return result
+
+    def discover_native_files(self, project_id: str) -> dict[str, object]:
+        return self._request("GET", f"/media/native-files?project_id={quote(project_id, safe='')}&limit=100")
+
+    def native_file(self, artifact_id: str) -> tuple[bytes, str, str, str, str]:
+        """Retrieve registered original file bytes; never invoke generation."""
+        if not isinstance(artifact_id, str) or len(artifact_id) > 120:
+            raise ValueError("Invalid Pythia native artifact ID")
+        try:
+            headers = {}
+            native_bridge = self.native_base_url != self.base_url
+            api_key = os.environ.get("CHIMERA_PYTHIA_NATIVE_API_KEY" if native_bridge else "CHIMERA_PYTHIA_API_KEY", "").strip()
+            if native_bridge and not api_key:
+                raise ValueError("CHIMERA_PYTHIA_NATIVE_API_KEY is required for the native bridge")
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+            with httpx.stream("GET", f"{self.native_base_url}/media/native-files/{quote(artifact_id, safe='')}",
+                              headers=headers, timeout=30.0, follow_redirects=False) as response:
+                response.raise_for_status()
+                declared_length = response.headers.get("content-length")
+                if declared_length and int(declared_length) > 8 * 1024 * 1024:
+                    raise ValueError("Native Pythia asset exceeds allowed size")
+                data = bytearray()
+                for chunk in response.iter_bytes():
+                    data.extend(chunk)
+                    if len(data) > 8 * 1024 * 1024:
+                        raise ValueError("Native Pythia asset exceeds allowed size")
+                return (bytes(data), response.headers.get("X-Pythia-Source-Mime", ""),
+                        response.headers.get("X-Pythia-Source-SHA256", ""),
+                        response.headers.get("X-Pythia-Source-ID", ""),
+                        response.headers.get("X-Pythia-Project-ID", ""))
+        except httpx.HTTPStatusError as error:
+            raise PythiaUnavailableError(f"Pythia source retrieval returned HTTP {error.response.status_code}",
+                                         error.response.status_code) from error
+        except httpx.RequestError as error:
+            raise PythiaUnavailableError("Pythia source retrieval is unavailable") from error
 
     def health(self) -> dict[str, object]:
         return self._request("GET", "/health")
@@ -81,6 +131,15 @@ class PythiaProvider:
     def video_status(self, operation: str) -> dict[str, object]:
         return self._request("GET", f"/media/videos/{quote(operation, safe='')}", timeout=190.0)
 
+    def retrieve_native_output(self, kind: str, operation: str) -> dict[str, object]:
+        if kind == "image":
+            path = f"/media/images/{quote(operation, safe='')}"
+        elif kind == "narration":
+            path = f"/media/outputs/narration/{quote(operation, safe='')}"
+        else:
+            raise ValueError("Only image and narration source recovery are supported")
+        return self._request("GET", path, timeout=60.0)
+
     def image_status(self) -> dict[str, object]:
         return self._request("GET", "/media/images/status")
 
@@ -101,6 +160,9 @@ class PythiaProvider:
 
     def task_status(self, task_id: str) -> dict[str, object]:
         return self._request("GET", f"/tasks/{quote(task_id, safe='')}")
+
+    def discover_artifacts(self, project_id: str) -> dict[str, object]:
+        return self._request("GET", f"/artifacts?project_id={quote(project_id, safe='')}&limit=100")
 
     def artifact(self, artifact_id: str) -> dict[str, object]:
         return self._request("GET", f"/artifacts/{quote(artifact_id, safe='')}")

@@ -1,4 +1,17 @@
 const { test, expect } = require('@playwright/test');
+async function logDialogOverflow(dialog) {
+  const report=await dialog.evaluate(el=>{
+    const bounds=el.getBoundingClientRect();
+    return {clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,
+      overflowing:[...el.querySelectorAll('*')].map(node=>({tag:node.tagName,
+        className:typeof node.className==='string'?node.className.slice(0,110):'',
+        width:Math.round(node.getBoundingClientRect().width),
+        right:Math.round(node.getBoundingClientRect().right-bounds.right),
+        scroll:node.scrollWidth,client:node.clientWidth
+      })).filter(node=>node.right>1 || node.scroll>node.client+2).slice(0,18)};
+  });
+  if(report.scrollWidth>report.clientWidth)console.log('NARROW_DIALOG_OVERFLOW',JSON.stringify(report));
+}
 const AxeBuilder = require('@axe-core/playwright').default;
 
 test.beforeEach(async ({ page }) => {
@@ -80,6 +93,7 @@ test('New Project accepts every source kind without AI configuration and preserv
   await expect(planner.getByRole('checkbox', { name: 'Later source', exact: true })).toBeVisible();
   expect((await new AxeBuilder({ page }).include('.new-project-dialog').analyze()).violations).toEqual([]);
   await page.setViewportSize({ width: 390, height: 844 });
+  await logDialogOverflow(planner);
   expect(await planner.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('new-project-planning-mobile.png'), fullPage: true });
   await planner.getByRole('button', { name: 'Open storyboard', exact: true }).click();
@@ -188,6 +202,7 @@ test('numbered advice stays in consultation until the author agrees a brief and 
   expect(draftRequests).toBe(1);
   expect((await new AxeBuilder({ page }).include('.pythia-talk-dialog').analyze()).violations).toEqual([]);
   await page.setViewportSize({ width: 390, height: 844 });
+  await logDialogOverflow(resumed);
   expect(await resumed.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
   const project = await projectByTitle(request, title);
   expect((await (await request.get(`/api/projects/${project.id}`)).json()).storyboard.scenes).toHaveLength(0);

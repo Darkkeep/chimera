@@ -1,4 +1,4 @@
-.modal.pythia-talk-dialog { width: min(1440px, calc(100vw - 32px)); min-height: calc(100dvh - 64px); border-radius: 18px; padding: 24px; }
+.modal.pythia-talk-dialog { box-sizing: border-box; min-width: 0; max-width: calc(100vw - 32px); width: min(1440px, calc(100vw - 32px)); min-height: calc(100dvh - 64px); border-radius: 18px; padding: 24px; }
 .pythia-talk-heading { display: flex; align-items: center; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
 .pythia-talk-heading > img { flex-shrink: 0; object-fit: contain; }
 .pythia-talk-heading > div { flex: 1; min-width: 0; }
@@ -76,3 +76,34 @@
 @media (max-width: 600px) { .modal.pythia-talk-dialog { padding: 16px; } .pythia-talk-heading { gap: 10px; } .pythia-talk-heading > img { width: 40px; height: 40px; } .pythia-talk-message { grid-template-columns: minmax(0, 1fr); } .pythia-talk-message > img { display: none; } .pythia-talk-working { margin-left: 0; } .pythia-talk-send { flex-wrap: wrap; } }
 .pythia-action-builder textarea { width: 100%; min-width: 0; resize: vertical; }
 .pythia-design-brief { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Consultation artifact shelf: matches the existing Pythia dialog, without another toolbar. */
+.pythia-consultation-artifacts { margin: 14px 0 20px; border: 1px solid var(--chimera-pythia-link, #7f5cff); border-radius: 12px; padding: 14px 16px; background: var(--theme-panel, var(--surface)); }
+.pythia-artifacts-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 12px; }
+.pythia-artifacts-heading h3 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 16px; }
+.pythia-artifacts-heading p { margin: 6px 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.pythia-artifacts-count { padding: 2px 8px; border-radius: 12px; background: var(--chimera-pythia-link, #7f5cff); color: #fff; font-size: 12px; }
+.pythia-artifacts-filter { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0; font-size: 12px; color: var(--muted); max-width: 100%; min-width: 0; white-space: normal; }
+.pythia-artifacts-filter > input { flex: 0 0 auto; width: auto; margin-top: 2px; }
+.pythia-artifacts-filter > span { flex: 1 1 0; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.pythia-artifact-item { border-top: 1px solid var(--line); display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+.pythia-artifact-item > div { display: grid; gap: 4px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.pythia-artifact-item small { color: var(--muted); font-size: 12px; }
+.pythia-artifact-item .button { flex-shrink: 0; }
+@media (max-width: 600px) { .pythia-consultation-artifacts { padding: 12px; } .pythia-artifact-item { flex-wrap: wrap; } }
+
+.pythia-native-import { display: grid; gap: 6px; margin: 12px 0; padding: 12px; border: 1px dashed var(--line); border-radius: 9px; }
+.pythia-native-import label { font-weight: 600; font-size: 12px; }
+.pythia-native-import-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.pythia-native-import-controls input { min-width: 180px; flex: 1; padding: 8px 10px; color: inherit; background: var(--theme-panel, var(--surface)); border: 1px solid var(--line); border-radius: 6px; }
+.pythia-native-import small { color: var(--muted); line-height: 1.45; }
+
+.pythia-native-import textarea { width: 100%; min-height: 72px; resize: vertical; box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px; color: inherit; background: var(--theme-panel, var(--surface)); font: inherit; }
+.pythia-native-import-controls select { min-width: 175px; flex: 1; padding: 8px; border: 1px solid var(--line); border-radius: 6px; color: inherit; background: var(--theme-panel, var(--surface)); }
+.pythia-native-import-controls input[type=number] { flex: 0 0 72px; min-width: 72px; max-width: 90px; }
+.pythia-native-import-controls label { align-self: center; }
+
+.pythia-talk-dialog, .pythia-talk-dialog .pythia-consultation-artifacts { min-width: 0; max-width: 100%; }
+.pythia-native-import, .pythia-native-import-controls { min-width: 0; max-width: 100%; }
+.pythia-native-import-controls input, .pythia-native-import-controls select { box-sizing: border-box; max-width: 100%; min-width: 0; }
+.pythia-artifact-item, .pythia-artifact-item a { max-width: 100%; overflow-wrap: anywhere; }

@@ -367,5 +367,140 @@ class PythiaTalkTests(unittest.TestCase):
 
 
 
+    def test_consultation_artifacts_download_real_json_and_survive_reset(self):
+        import hashlib
+        with patch.object(talk, "local_mcp", return_value=copy.deepcopy(ADVICE)):
+            self.assertEqual(self.send().status_code, 202)
+            completed = self.finished()
+        artifact_url = f"/api/projects/{self.project.id}/consultation-artifacts"
+        response = self.client.get(artifact_url)
+        self.assertEqual(response.status_code, 200)
+        artifacts = response.json()["artifacts"]
+        self.assertEqual(len(artifacts), 1)
+        descriptor = artifacts[0]
+        self.assertEqual(descriptor["type"], "advice")
+        self.assertEqual(descriptor["sessionId"], completed["sessionId"])
+        download = self.client.get(artifact_url + f"/{descriptor['id']}/download")
+        self.assertEqual(download.status_code, 200)
+        self.assertEqual(download.headers["content-type"], "application/json")
+        self.assertEqual(hashlib.sha256(download.content).hexdigest(), descriptor["sha256"])
+        self.assertEqual(download.json()["advice"]["content"], ADVICE["content"])
+        self.assertEqual(download.json()["kind"], "consultation-advice")
+        self.assertEqual(self.client.get(artifact_url + "/invalid-id/download").status_code, 404)
+
+        reset = self.client.post(self.url + "/reset", headers=self.headers)
+        self.assertEqual(reset.status_code, 200)
+        self.assertNotEqual(reset.json()["sessionId"], completed["sessionId"])
+        self.assertEqual(self.client.get(artifact_url, params={"session_id": reset.json()["sessionId"]}).json()["artifacts"], [])
+        self.assertEqual(len(self.client.get(artifact_url).json()["artifacts"]), 1)
+        self.assertEqual(self.client.get(artifact_url + f"/{descriptor['id']}/download").status_code, 200)
+
+    def test_artifact_download_rejects_corrupted_saved_bytes(self):
+        from backend.app import consultation_artifacts
+        with patch.object(talk, "local_mcp", return_value=copy.deepcopy(ADVICE)):
+            self.assertEqual(self.send().status_code, 202)
+            self.finished()
+        artifact_url = f"/api/projects/{self.project.id}/consultation-artifacts"
+        descriptor = self.client.get(artifact_url).json()["artifacts"][0]
+        _, root = consultation_artifacts._paths(self.project.id, LOCAL_ACTOR)
+        (root / (descriptor["id"] + ".json")).write_bytes(b"tampered")
+        self.assertEqual(self.client.get(artifact_url + f"/{descriptor['id']}/download").status_code, 409)
+
+
+
+    def test_real_pythia_markdown_export_can_be_downloaded(self):
+        import base64
+        import hashlib
+        from backend.app import consultation_artifacts
+        with patch.object(talk, "local_mcp", return_value=copy.deepcopy(ADVICE)):
+            self.assertEqual(self.send().status_code, 202)
+            completed = self.finished()
+        turn_id = completed["turns"][-1]["id"]
+        data = ("# Pythia consultation answer\n\n" + ADVICE["content"] +
+                "\n\n## Rationale\n\n" + ADVICE["rationale"] +
+                "\n\n## Limits\n\n- " + ADVICE["limits"][0] + "\n").encode()
+        export = {"format": "pythia-text-export-v1", "filename": "pythia-consultation-answer.md",
+                  "mime_type": "text/markdown", "size_bytes": len(data),
+                  "sha256": hashlib.sha256(data).hexdigest(),
+                  "data_base64": base64.b64encode(data).decode("ascii")}
+        url = f"/api/projects/{self.project.id}/consultation-artifacts"
+        with patch.object(talk, "local_mcp", return_value=export) as adapter:
+            response = self.client.post(url + "/exports/" + turn_id, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.text)
+        adapter.assert_called_once()
+        self.assertEqual(adapter.call_args.kwargs["export_request"]["content"].splitlines()[0], ADVICE["content"])
+        descriptor = response.json()
+        self.assertEqual(descriptor["mimeType"], "text/markdown")
+        saved = self.client.get(url + "/" + descriptor["id"] + "/download")
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.content, data)
+        self.assertEqual(saved.headers["content-type"].split(";")[0], "text/markdown")
+        self.assertEqual(hashlib.sha256(saved.content).hexdigest(), descriptor["sha256"])
+        self.assertEqual(self.client.post(self.url + "/reset", headers=self.headers).status_code, 200)
+        self.assertEqual(self.client.get(url + "/" + descriptor["id"] + "/download").content, data)
+
+    def test_hosted_markdown_export_uses_consumer_owned_snapshot(self):
+        with patch.object(talk, "local_mcp", return_value=copy.deepcopy(ADVICE)):
+            self.assertEqual(self.send().status_code, 202)
+            completed = self.finished()
+        from backend.app import consultation_artifacts
+        with patch.object(talk.pythia_hosted, "active", return_value=True), patch.object(talk, "local_mcp") as adapter:
+            descriptor = consultation_artifacts.export_answer_markdown(
+                self.project.id, LOCAL_ACTOR, completed["turns"][-1]["id"])
+        adapter.assert_not_called()
+        self.assertEqual(descriptor["origin"], "Chimera Markdown export of hosted Pythia answer")
+        path = f"/api/projects/{self.project.id}/consultation-artifacts/{descriptor['id']}/download"
+        self.assertIn(ADVICE["content"], self.client.get(path).text)
+
+    def test_markdown_export_requires_completed_turn(self):
+        url = f"/api/projects/{self.project.id}/consultation-artifacts/exports/not-a-turn"
+        self.assertEqual(self.client.post(url, headers=self.headers).status_code, 404)
+
+
+
+    def test_engine_draft_discovery_filters_non_chimera_consumers_and_downloads_json(self):
+        provider = Mock()
+        descriptor = {"artifact_id": "engine-artifact-001", "artifact_version": 1,
+                      "artifact_type": "storyboard-analysis", "task_id": "engine-task-001",
+                      "project_id": self.project.id, "consumer": "chimera",
+                      "capability": "storyboard.analyze", "status": "draft",
+                      "content_kind": "structured", "retrieval": "json-envelope",
+                      "downloadable_file": False}
+        other = {**descriptor, "artifact_id": "other-consumer-artifact", "consumer": "manteion"}
+        provider.discover_artifacts.return_value = {
+            "schema_version": "1.0", "artifacts": [descriptor, other], "has_more": False}
+        provider.task_status.return_value = {"task_id": descriptor["task_id"],
+                                              "project_id": self.project.id,
+                                              "consumer": "chimera", "artifact_id": descriptor["artifact_id"]}
+        provider.artifact.return_value = {"schema_version": "1.0", "artifact": {
+            "id": descriptor["artifact_id"], "type": "storyboard-analysis", "version": 1},
+            "status": "draft", "payload": {"example": "test"}}
+        root = f"/api/projects/{self.project.id}/pythia-engine-artifacts"
+        with patch.object(main, "_pythia_provider", return_value=provider):
+            listing = self.client.get(root)
+            self.assertEqual(listing.status_code, 200, listing.text)
+            self.assertEqual([descriptor], listing.json()["artifacts"])
+            download = self.client.get(root + "/engine-artifact-001/download")
+            self.assertEqual(download.status_code, 200, download.text)
+            self.assertEqual("application/json", download.headers["content-type"])
+            self.assertEqual(descriptor["artifact_id"], download.json()["artifact"]["id"])
+            self.assertEqual(404, self.client.get(root + "/other-consumer-artifact/download").status_code)
+
+    def test_engine_artifact_retrieval_rejects_incorrect_task_project(self):
+        provider = Mock()
+        provider.discover_artifacts.return_value = {
+            "schema_version": "1.0", "artifacts": [{
+                "artifact_id": "engine-artifact-002", "artifact_version": 1,
+                "task_id": "engine-task-002", "project_id": self.project.id,
+                "consumer": "chimera", "content_kind": "structured"}]}
+        provider.task_status.return_value = {"project_id": "unrelated-project",
+                                              "consumer": "chimera", "artifact_id": "engine-artifact-002"}
+        with patch.object(main, "_pythia_provider", return_value=provider):
+            route = f"/api/projects/{self.project.id}/pythia-engine-artifacts/engine-artifact-002/download"
+            self.assertEqual(404, self.client.get(route).status_code)
+        provider.artifact.assert_not_called()
+
+
+
 if __name__ == "__main__":
     unittest.main()

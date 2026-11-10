@@ -56,6 +56,8 @@ from .storage import update_project_background, update_project_relationship, Pro
 from .question_import import parse_questions, question_template, question_spreadsheet
 from .pythia_connection import LocalEngineConnection, configured_engine_url, local_engine_url, save_engine_url
 from . import pythia_talk
+from . import consultation_artifacts
+from . import pythia_native_retrieval
 from . import pythia_hosted
 from . import experience_treatments
 from .experience_models import ExperienceDesignRequest, ExperienceReview
@@ -74,6 +76,13 @@ ROUTE_ACTIONS = {
     "post_pythia_action": "enhancement.proposal.create",
     "decide_pythia_action": "enhancement.proposal.decide",
     "get_pythia_conversation": "enhancement.job.create",
+    "get_consultation_artifacts": "project.view",
+    "download_consultation_artifact": "project.export",
+    "export_consultation_answer": "project.export",
+    "import_pythia_native_artifact": "project.import",
+    "get_pythia_native_files": "project.view",
+    "generate_pythia_native_image": "media.manage",
+    "promote_pythia_native_media": "media.manage",
     "post_pythia_conversation": "enhancement.job.create",
     "preview_pythia_capacity": "enhancement.job.create",
     "reset_pythia_conversation": "enhancement.job.create",
@@ -132,7 +141,10 @@ ROUTE_ACTIONS = {
     "post_pythia_course_review": "enhancement.proposal.create",
     "patch_pythia_course_finding": "review.comment.resolve",
     "get_pythia_task": "project.view", "cancel_pythia_task": "enhancement.job.manage",
-    "get_pythia_artifact": "project.view", "get_pythia_analysis_proposals": "project.view",
+    "get_pythia_artifact": "project.view",
+    "get_pythia_engine_artifacts": "project.view",
+    "download_pythia_engine_artifact": "project.export",
+    "download_pythia_original_media": "project.export", "get_pythia_analysis_proposals": "project.view",
     "post_pythia_analysis_proposal": "enhancement.proposal.create",
     "post_pythia_analysis_proposal_decision": "enhancement.proposal.decide",
     "get_pythia_transform_proposals": "project.view",
@@ -179,6 +191,13 @@ def _hosted_request_action(request: Request) -> str:
         return "workspace.view"
     if path.startswith(("/api/ai-connection", "/api/narration-connections")):
         return "identity.self" if request.method == "GET" else "admin.policy.manage"
+    if "/consultation-artifacts/exports/" in path:
+        return "project.export"
+    if request.method == "GET" and "/generated-candidates/" in path and path.endswith("/pythia-original"):
+        return "project.export"
+    if request.method == "GET" and ("/consultation-artifacts/" in path and path.endswith("/download")
+                                    or "/pythia-engine-artifacts/" in path and path.endswith("/download")):
+        return "project.export"
     if "/shared-media" in path:
         return "media.manage"
     if path.endswith("/pythia-analysis") and request.method == "POST":
@@ -1174,6 +1193,58 @@ def submit_pythia_course_review(project_id: str) -> dict[str, object]:
     return {**task, "source_revision": project.storyboard.revision, "course_ref": inventory["course_ref"]}
 
 
+@app.get("/api/projects/{project_id}/pythia-engine-artifacts", name="get_pythia_engine_artifacts")
+def get_pythia_engine_artifacts(project_id: str) -> dict[str, object]:
+    """Read-only discovery of project-associated Engine drafts, separate from consultations."""
+    try:
+        project = read_project(project_id)
+        result = _pythia_provider().discover_artifacts(project.id)
+        if result.get("schema_version") != "1.0" or not isinstance(result.get("artifacts"), list):
+            raise HTTPException(502, "Pythia returned an invalid artifact catalog")
+        visible = [item for item in result["artifacts"]
+                   if item.get("project_id") == project.id and item.get("consumer") == "chimera"
+                   and item.get("content_kind") == "structured"]
+        return {"artifacts": visible, "hasMore": result.get("has_more", False)}
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+
+
+@app.get("/api/projects/{project_id}/pythia-engine-artifacts/{artifact_id}/download", name="download_pythia_engine_artifact")
+def download_pythia_engine_artifact(project_id: str, artifact_id: str) -> Response:
+    """Return Engine JSON, never confuse its structured envelope with generated binary media."""
+    try:
+        project = read_project(project_id)
+        provider = _pythia_provider()
+        listing = provider.discover_artifacts(project.id)
+        descriptor = next((item for item in listing.get("artifacts", [])
+                           if item.get("artifact_id") == artifact_id
+                           and item.get("project_id") == project.id
+                           and item.get("consumer") == "chimera"
+                           and item.get("content_kind") == "structured"), None)
+        if descriptor is None:
+            raise HTTPException(404, "Pythia artifact not found in this project")
+        task = provider.task_status(descriptor["task_id"])
+        if task.get("project_id") != project.id or task.get("consumer") != "chimera" or task.get("artifact_id") != artifact_id:
+            raise HTTPException(404, "Pythia artifact does not belong to this Chimera project")
+        envelope = provider.artifact(artifact_id)
+        if (not isinstance(envelope.get("artifact"), dict)
+                or envelope["artifact"].get("id") != artifact_id
+                or envelope["artifact"].get("version") != descriptor["artifact_version"]):
+            raise HTTPException(409, "Artifact version changed; refresh the catalog")
+        raw = json.dumps(envelope, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8")
+        if len(raw) > 2_000_000:
+            raise HTTPException(413, "Engine artifact exceeds the current JSON export limit")
+        return Response(raw, media_type="application/json", headers={
+            "Content-Disposition": f'attachment; filename="pythia-engine-{hashlib.sha256(artifact_id.encode()).hexdigest()[:12]}.json"',
+            "X-Content-Type-Options": "nosniff", "Cache-Control": "no-store"})
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+
+
 @app.get("/api/projects/{project_id}/pythia-tasks/{task_id}", name="get_pythia_task")
 def get_pythia_task(project_id: str, task_id: str) -> dict[str, object]:
     try:
@@ -2052,6 +2123,138 @@ def _talk_operation(project_id: str, operation):
         raise HTTPException(404, "Project not found") from error
 
 
+@app.post("/api/projects/{project_id}/consultation-artifacts/exports/{turn_id}", name="export_consultation_answer")
+def export_consultation_answer(project_id: str, turn_id: str, request: Request):
+    _require_ai_origin(request)
+    try:
+        return _talk_operation(project_id, lambda actor:
+            consultation_artifacts.export_answer_markdown(project_id, actor, turn_id))
+    except KeyError as error:
+        raise HTTPException(404, "Completed consultation answer not found") from error
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+
+
+class NativePythiaImageRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=2000)
+    outputFormat: Literal["svg", "gif"]
+    frameCount: int | None = Field(default=None, ge=2, le=16)
+    frameDurationMs: int | None = Field(default=None, ge=20, le=2000)
+    confirmPaid: Literal[True]
+
+
+@app.post("/api/projects/{project_id}/pythia-native-images", name="generate_pythia_native_image")
+def generate_pythia_native_image(project_id: str, request: Request, data: NativePythiaImageRequest):
+    """One explicit paid generation request. Subsequent discovery/import is read-only."""
+    _require_ai_origin(request)
+    if data.outputFormat != "gif" and (data.frameCount is not None or data.frameDurationMs is not None):
+        raise HTTPException(422, "GIF frame settings cannot be used with SVG")
+    try:
+        project = read_project(project_id)
+        provider = _pythia_provider()
+        status = provider.image_status()
+        if (not status.get("configured")
+                or data.outputFormat not in status.get("output_formats", [])):
+            raise HTTPException(409, "Connected Pythia image model does not support this format")
+        operation_id = "chimera-native-" + uuid4().hex
+        body = {"request_id": operation_id, "project_id": project.id,
+                "prompt": data.prompt.strip(), "width": 1024, "height": 1024,
+                "output_format": data.outputFormat,
+                "expected_revision": status["revision"]}
+        if data.outputFormat == "gif":
+            body["frame_count"] = data.frameCount if data.frameCount is not None else 9
+            body["frame_duration_ms"] = data.frameDurationMs if data.frameDurationMs is not None else 200
+        result = provider.generate_image(body)
+        if (result.get("format") != "pythia-native-generation-result-v1"
+                or result.get("request_id") != operation_id
+                or result.get("media_type") != ("image/svg+xml" if data.outputFormat == "svg" else "image/gif")
+                or not result.get("native_artifact_id")):
+            raise HTTPException(502, "Pythia native generation response failed verification")
+        return {"artifactId": result["native_artifact_id"], "requestId": operation_id,
+                "mimeType": result["media_type"], "sha256": result["sha256"],
+                "model": result.get("model"), "cost": "provider-billed"}
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+
+
+@app.get("/api/projects/{project_id}/pythia-native-files", name="get_pythia_native_files")
+def get_pythia_native_files(project_id: str):
+    try:
+        project = read_project(project_id)
+        result = _pythia_provider().discover_native_files(project.id)
+        records = result.get("artifacts", [])
+        if not isinstance(records, list):
+            raise HTTPException(502, "Invalid native Pythia artifact catalog")
+        return {"artifacts": [item for item in records if isinstance(item, dict)
+                and item.get("project_id") == project.id
+                and item.get("format") == "pythia-native-file-v1"
+                and item.get("mime_type") in {"image/svg+xml", "image/gif"}]}
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+
+
+@app.post("/api/projects/{project_id}/consultation-artifacts/{artifact_id}/promote",
+          name="promote_pythia_native_media")
+def promote_pythia_native_media(project_id: str, artifact_id: str, request: Request,
+                                if_match: Annotated[str | None, Header()] = None):
+    _require_ai_origin(request)
+    if if_match is None:
+        raise HTTPException(428, "An If-Match storyboard revision is required")
+    try:
+        revision = _expected_revision(if_match)
+        if revision is None:
+            raise HTTPException(428, "An If-Match storyboard revision is required")
+        return _talk_operation(project_id, lambda actor:
+            consultation_artifacts.promote_native_media(project_id, actor, artifact_id, revision))
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except (FileNotFoundError, KeyError) as error:
+        raise HTTPException(404, "Native artifact not found") from error
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+
+
+@app.post("/api/projects/{project_id}/consultation-artifacts/native/{native_id}",
+          name="import_pythia_native_artifact")
+def import_pythia_native_artifact(project_id: str, native_id: str, request: Request):
+    """Import an existing registered Pythia SVG/GIF into the project shelf."""
+    _require_ai_origin(request)
+    try:
+        return _talk_operation(project_id, lambda actor:
+            consultation_artifacts.import_native_from_pythia(project_id, actor, native_id))
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+
+
+@app.get("/api/projects/{project_id}/consultation-artifacts", name="get_consultation_artifacts")
+def get_consultation_artifacts(project_id: str, session_id: str | None = None):
+    return _talk_operation(project_id, lambda actor:
+        consultation_artifacts.list_artifacts(project_id, actor, session_id))
+
+
+@app.get("/api/projects/{project_id}/consultation-artifacts/{artifact_id}/download", name="download_consultation_artifact")
+def download_consultation_artifact(project_id: str, artifact_id: str):
+    try:
+        descriptor, content = _talk_operation(project_id, lambda actor:
+            consultation_artifacts.get_artifact(project_id, actor, artifact_id))
+    except KeyError as error:
+        raise HTTPException(404, "Artifact not found") from error
+    except (OSError, ValueError) as error:
+        raise HTTPException(409, "Saved artifact is unavailable or damaged") from error
+    return Response(content, media_type="application/octet-stream" if descriptor["mimeType"] == "image/svg+xml" else descriptor["mimeType"], headers={
+        "Content-Disposition": f'attachment; filename="{descriptor["filename"]}"',
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "sandbox",
+    })
+
+
 @app.get("/api/projects/{project_id}/pythia-conversation", name="get_pythia_conversation")
 def get_pythia_conversation(project_id: str):
     return _talk_operation(project_id, lambda actor: pythia_talk.get_conversation(project_id, actor))
@@ -2328,6 +2531,26 @@ def post_generated_candidate_regeneration(project_id: str, candidate_id: str) ->
         raise HTTPException(status_code=409, detail=str(error)) from error
     except RuntimeError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.get("/api/projects/{project_id}/generated-candidates/{candidate_id}/pythia-original",
+         name="download_pythia_original_media")
+def download_pythia_original_media(project_id: str, candidate_id: str) -> Response:
+    """Recover original Pythia bytes only for an existing project-owned candidate."""
+    try:
+        candidate, raw = pythia_native_retrieval.recover_candidate(project_id, candidate_id)
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Source candidate not found") from error
+    except pythia_native_retrieval.SourceConflict as error:
+        raise HTTPException(409, str(error)) from error
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+    extension = ".png" if candidate.kind == "image" else ".mp3"
+    return Response(raw, media_type=candidate.contentType, headers={
+        "Content-Disposition": f'attachment; filename="pythia-original-{candidate.id}{extension}"',
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-store",
+    })
 
 
 @app.get("/api/projects/{project_id}/generated-candidates/{candidate_id}/asset")
