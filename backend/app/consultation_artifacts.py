@@ -180,7 +180,7 @@ def _inspect_native_asset(media_type, data):
         raise ValueError("Native file outside byte allowance")
     if media_type == "image/svg+xml":
         import xml.etree.ElementTree as ET
-        if re.search(rb"<!\\s*(?:DOCTYPE|ENTITY)|<\\?", data, flags=re.I):
+        if re.search(rb"<!\s*(?:DOCTYPE|ENTITY)|<\?", data, flags=re.I):
             raise ValueError("Unsafe XML constructs")
         try:
             root = ET.fromstring(data)
@@ -232,7 +232,7 @@ def import_native_from_pythia(project_id, actor, native_id, provider=None):
         index, root = _reconcile(project_id, actor)
         state_path, _ = _paths(project_id, actor)
         session_id = pythia_talk.read_state(state_path)["sessionId"]
-        key = hashlib.sha256(f"{session_id}\\0native\\0{native_id}\\0{source_digest}".encode()).hexdigest()
+        key = hashlib.sha256(f"{session_id}\0native\0{native_id}\0{source_digest}".encode()).hexdigest()
         descriptor = {"id": key, "sessionId": session_id, "sourceId": source_id,
                       "turnId": None, "type": inspected["type"],
                       "title": "Pythia native " + ("SVG vector" if media_type == "image/svg+xml" else "GIF image"),
