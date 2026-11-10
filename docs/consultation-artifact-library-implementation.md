@@ -62,3 +62,9 @@ Synthetic and actual-byte fixtures (non-sensitive), MIME/signature verification,
 ## Release guardrails
 
 No direct commits to default branches; coordinated feature PRs and contract version bump as appropriate. Do not update submodule pins until exact version compatibility passes. Do not deploy to Hostinger/Render or enable production release automatically. Verify workflow triggers before any merge. Production needs a separate authorization and sign-off.
+
+## First runtime slice (feature branch, 2026-11-10)
+
+Chimera now has a private consultation artifact catalog that snapshots completed advice and content drafts into verified JSON, survives consultation resets, and offers download endpoints and an Artifacts shelf in Consult Pythia. It also adds a **per-answer Export Markdown** action. Desktop uses Pythia's new `pythia_export_text` local MCP capability to retrieve real base64-encoded file bytes, validates hash and length, then saves a private immutable project/actor copy. Hosted Chimera produces a deterministic Markdown export from its retained Pythia advice with clearly different provenance; this does not imply the hosted engine supports binary generation.
+
+This is a bounded vertical slice, not full Pythia-generated file discovery. PDF/DOCX/audio/image/ZIP, durable multi-server object storage, actor/tenant authorization qualification, and the new shared exchange contract remain open. Tests and CI must pass before marking the slice delivered; no default-branch merge or deployment is authorized.
