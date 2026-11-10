@@ -4,6 +4,7 @@ import type { Project, Scene } from "./App";
 import { EditorDialog } from "./EditorDialog";
 import { PythiaActionReview } from "./PythiaActionReview";
 import { PythiaProcessing } from "./PythiaProcessing";
+import { ConsultationArtifacts } from "./ConsultationArtifacts";
 import type { PythiaAction } from "./PythiaActionReview";
 import pythiaIcon from "./assets/pythia-talk/pythia.png";
 import userIcon from "./assets/pythia-talk/user.png";
@@ -273,6 +274,7 @@ export function PythiaTalkPanel({ project, scene, onClose, onProjectUpdated, emb
     {loading && <p role="status">Loading your Pythia conversation…</p>}
     {conversation?.configured === false && <p role="alert">{conversation.message}</p>}
     <div className="pythia-talk-connection"><button className="button button-outline" type="button" disabled={checking || loading || mutating || pending} onClick={() => void checkConnection()}>{checking ? "Checking local Pythia…" : "Check connection"}</button>{connection && <p role="status">{connection}</p>}</div>
+    {conversation && <ConsultationArtifacts projectId={project.id} sessionId={conversation.sessionId} refreshKey={JSON.stringify([conversation.turns.map(t => [t.id, t.status]), conversation.actions?.map(a => [a.id, a.status])])} />}
     <section className="pythia-talk-history" aria-label="Pythia conversation history">
       {(conversation?.turns.length || 0) > 1 && <div className="pythia-history-controls"><button type="button" className="button button-outline" onClick={() => setExpandedTurns(Object.fromEntries(conversation!.turns.map(turn => [turn.id, true])))}>Expand all exchanges</button><button type="button" className="button button-outline" onClick={() => setExpandedTurns({})}>Roll up prior exchanges</button></div>}
       {!loading && conversation?.turns.length === 0 && <p>Ask a question, discuss an idea, or challenge Pythia's advice. Your conversation is saved privately in this Chimera installation.</p>}
