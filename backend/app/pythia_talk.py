@@ -253,6 +253,8 @@ def reset_conversation(project_id, actor):
         current = read_state(path)
         if any(turn["status"] == "running" for turn in current["turns"]) or any(a["status"] in {"drafting", "applying"} for a in current.get("actions", [])):
             raise TalkError("Wait for the current Pythia response before starting a new conversation.", 409)
+        from . import consultation_artifacts
+        consultation_artifacts.retain_current_before_reset(project_id, actor)
         write_state(path, {"sessionId": uuid4().hex, "turns": []})
     return get_conversation(project_id, actor)
 
