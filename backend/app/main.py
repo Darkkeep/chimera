@@ -136,7 +136,9 @@ ROUTE_ACTIONS = {
     "post_pythia_course_review": "enhancement.proposal.create",
     "patch_pythia_course_finding": "review.comment.resolve",
     "get_pythia_task": "project.view", "cancel_pythia_task": "enhancement.job.manage",
-    "get_pythia_artifact": "project.view", "get_pythia_analysis_proposals": "project.view",
+    "get_pythia_artifact": "project.view",
+    "get_pythia_engine_artifacts": "project.view",
+    "download_pythia_engine_artifact": "project.export", "get_pythia_analysis_proposals": "project.view",
     "post_pythia_analysis_proposal": "enhancement.proposal.create",
     "post_pythia_analysis_proposal_decision": "enhancement.proposal.decide",
     "get_pythia_transform_proposals": "project.view",
@@ -1178,6 +1180,56 @@ def submit_pythia_course_review(project_id: str) -> dict[str, object]:
     if task.get("task_id") != task_id or task.get("status") != "submitted":
         raise HTTPException(status_code=502, detail="Pythia did not accept the course review task")
     return {**task, "source_revision": project.storyboard.revision, "course_ref": inventory["course_ref"]}
+
+
+@app.get("/api/projects/{project_id}/pythia-engine-artifacts", name="get_pythia_engine_artifacts")
+def get_pythia_engine_artifacts(project_id: str) -> dict[str, object]:
+    """Read-only discovery of project-associated Engine drafts, separate from consultations."""
+    try:
+        project = read_project(project_id)
+        result = _pythia_provider().discover_artifacts(project.id)
+        if result.get("schema_version") != "1.0" or not isinstance(result.get("artifacts"), list):
+            raise HTTPException(502, "Pythia returned an invalid artifact catalog")
+        visible = [item for item in result["artifacts"]
+                   if item.get("project_id") == project.id and item.get("content_kind") == "structured"]
+        return {"artifacts": visible, "hasMore": result.get("has_more", False)}
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+
+
+@app.get("/api/projects/{project_id}/pythia-engine-artifacts/{artifact_id}/download", name="download_pythia_engine_artifact")
+def download_pythia_engine_artifact(project_id: str, artifact_id: str) -> Response:
+    """Return Engine JSON, never confuse its structured envelope with generated binary media."""
+    try:
+        project = read_project(project_id)
+        provider = _pythia_provider()
+        listing = provider.discover_artifacts(project.id)
+        descriptor = next((item for item in listing.get("artifacts", [])
+                           if item.get("artifact_id") == artifact_id
+                           and item.get("project_id") == project.id
+                           and item.get("content_kind") == "structured"), None)
+        if descriptor is None:
+            raise HTTPException(404, "Pythia artifact not found in this project")
+        task = provider.task_status(descriptor["task_id"])
+        if task.get("project_id") != project.id or task.get("consumer") != "chimera" or task.get("artifact_id") != artifact_id:
+            raise HTTPException(404, "Pythia artifact does not belong to this Chimera project")
+        envelope = provider.artifact(artifact_id)
+        if (not isinstance(envelope.get("artifact"), dict)
+                or envelope["artifact"].get("id") != artifact_id
+                or envelope["artifact"].get("version") != descriptor["artifact_version"]):
+            raise HTTPException(409, "Artifact version changed; refresh the catalog")
+        raw = json.dumps(envelope, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8")
+        if len(raw) > 2_000_000:
+            raise HTTPException(413, "Engine artifact exceeds the current JSON export limit")
+        return Response(raw, media_type="application/json", headers={
+            "Content-Disposition": f'attachment; filename="pythia-engine-{hashlib.sha256(artifact_id.encode()).hexdigest()[:12]}.json"',
+            "X-Content-Type-Options": "nosniff", "Cache-Control": "no-store"})
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
 
 
 @app.get("/api/projects/{project_id}/pythia-tasks/{task_id}", name="get_pythia_task")
