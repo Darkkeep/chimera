@@ -147,6 +147,41 @@ class NativeArtifactTests(unittest.TestCase):
             self.assertEqual(ANIMATED_GIF, archive.read(assets[0].path))
             self.assertEqual(VECTOR, archive.read(assets[1].path))
 
+    def test_explicit_billable_native_generation_registers_source_without_auto_import(self):
+        provider = Mock()
+        provider.image_status.return_value = {"configured": True,
+            "revision": "model-revision-a", "output_formats": ["png", "svg", "gif"]}
+        provider.generate_image.side_effect = lambda request: {
+            "format": "pythia-native-generation-result-v1",
+            "request_id": request["request_id"], "model": "gpt-image-2.6-sunburst",
+            "media_type": "image/svg+xml", "sha256": hashlib.sha256(VECTOR).hexdigest(),
+            "native_artifact_id": "generated-svg-12345"}
+        route = f"/api/projects/{self.project.id}/pythia-native-images"
+        with patch.object(main, "_pythia_provider", return_value=provider):
+            response = self.client.post(route, json={"prompt": "Draw a passive circular icon",
+                "outputFormat": "svg", "confirmPaid": True}, headers=self.headers)
+        self.assertEqual(200, response.status_code, response.text)
+        self.assertEqual("generated-svg-12345", response.json()["artifactId"])
+        request = provider.generate_image.call_args.args[0]
+        self.assertEqual("svg", request["output_format"])
+        self.assertEqual(self.project.id, request["project_id"])
+        self.assertEqual("model-revision-a", request["expected_revision"])
+        self.assertEqual([], self.client.get(self.root).json()["artifacts"])
+
+    def test_native_image_generation_requires_explicit_paid_confirmation(self):
+        provider = Mock()
+        provider.image_status.return_value = {"configured": True, "revision": "r",
+                                              "output_formats": ["png"]}
+        route = f"/api/projects/{self.project.id}/pythia-native-images"
+        with patch.object(main, "_pythia_provider", return_value=provider):
+            self.assertEqual(422, self.client.post(route, json={
+                "prompt": "A moving ball", "outputFormat": "gif"
+            }, headers=self.headers).status_code)
+            self.assertEqual(409, self.client.post(route, json={
+                "prompt": "A moving ball", "outputFormat": "gif", "confirmPaid": True
+            }, headers=self.headers).status_code)
+        provider.generate_image.assert_not_called()
+
     def test_source_cannot_be_imported_into_unrelated_project(self):
         provider = self.fake(VECTOR, "image/svg+xml", "different-project")
         with patch("backend.app.learning_intelligence.PythiaProvider", return_value=provider):
