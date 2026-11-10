@@ -103,7 +103,7 @@ def get_artifact(project_id, actor, artifact_id):
         if artifact_id not in index:
             raise KeyError("Artifact not found")
         descriptor = index[artifact_id]
-        extension = ".md" if descriptor["mimeType"] == "text/markdown" else ".json"
+        extension = {"text/markdown": ".md", "image/svg+xml": ".svg", "image/gif": ".gif"}.get(descriptor["mimeType"], ".json")
         data = (root / (artifact_id + extension)).read_bytes()
         if hashlib.sha256(data).hexdigest() != descriptor["sha256"]:
             raise ValueError("Saved artifact checksum failed")
@@ -171,4 +171,85 @@ def export_answer_markdown(project_id, actor, turn_id):
             _atomic_write(root / (key + ".md"), data)
             index[key] = descriptor
             _atomic_write(root / "index.json", json.dumps(index, ensure_ascii=False, sort_keys=True).encode("utf-8"))
+        return descriptor
+
+
+def _inspect_native_asset(media_type, data):
+    """Validate native bytes without transforming the original or executing SVG."""
+    if not 0 < len(data) <= 8 * 1024 * 1024:
+        raise ValueError("Native file outside byte allowance")
+    if media_type == "image/svg+xml":
+        import xml.etree.ElementTree as ET
+        if re.search(rb"<!\\s*(?:DOCTYPE|ENTITY)|<\\?", data, flags=re.I):
+            raise ValueError("Unsafe XML constructs")
+        try:
+            root = ET.fromstring(data)
+        except ET.ParseError as error:
+            raise ValueError("Invalid SVG") from error
+        if root.tag != "{http://www.w3.org/2000/svg}svg":
+            raise ValueError("Not an SVG document")
+        return {"type": "vector", "animated": False, "previewSafe": False, "suffix": ".svg"}
+    if media_type == "image/gif":
+        from io import BytesIO
+        from PIL import Image, UnidentifiedImageError
+        try:
+            with Image.open(BytesIO(data)) as image:
+                if image.format != "GIF" or not 0 < image.width <= 4096 or not 0 < image.height <= 4096:
+                    raise ValueError("GIF dimensions invalid")
+                frames = image.n_frames
+                if frames < 1 or frames > 240 or frames * image.width * image.height > 100_000_000:
+                    raise ValueError("GIF workload allowance exceeded")
+                # Bound decoding of each frame without ever changing the source bytes.
+                duration = 0
+                for frame in range(frames):
+                    image.seek(frame)
+                    duration += image.info.get("duration", 0)
+                return {"type": "animated-gif" if frames > 1 else "gif",
+                        "animated": frames > 1, "frameCount": frames,
+                        "durationMs": duration, "previewSafe": True, "suffix": ".gif"}
+        except (OSError, UnidentifiedImageError, EOFError) as error:
+            raise ValueError("Invalid GIF stream") from error
+    raise ValueError("Unsupported source format")
+
+
+def import_native_from_pythia(project_id, actor, native_id, provider=None):
+    """Import a Pythia registered original into a private Chimera project shelf.
+
+    No generation or automatic canonical authoring changes occur.
+    """
+    if not isinstance(native_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{7,119}", native_id):
+        raise ValueError("Invalid native source ID")
+    from .learning_intelligence import PythiaProvider
+    provider = provider or PythiaProvider()
+    data, media_type, source_digest, source_id = provider.native_file(native_id)
+    if (not isinstance(data, bytes) or not re.fullmatch(r"[a-f0-9]{64}", source_digest)
+            or hashlib.sha256(data).hexdigest() != source_digest
+            or not isinstance(source_id, str)
+            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{7,119}", source_id)):
+        raise ValueError("Pythia native source integrity or provenance mismatch")
+    inspected = _inspect_native_asset(media_type, data)
+    with storage.storyboard_transaction():
+        index, root = _reconcile(project_id, actor)
+        state_path, _ = _paths(project_id, actor)
+        session_id = pythia_talk.read_state(state_path)["sessionId"]
+        key = hashlib.sha256(f"{session_id}\\0native\\0{native_id}\\0{source_digest}".encode()).hexdigest()
+        descriptor = {"id": key, "sessionId": session_id, "sourceId": source_id,
+                      "turnId": None, "type": inspected["type"],
+                      "title": "Pythia native " + ("SVG vector" if media_type == "image/svg+xml" else "GIF image"),
+                      "filename": "pythia-native-" + key[:12] + inspected["suffix"],
+                      "mimeType": media_type, "byteSize": len(data),
+                      "sha256": source_digest, "status": "ready",
+                      "origin": "Pythia registered source " + native_id,
+                      "animated": inspected["animated"], "previewSafe": inspected["previewSafe"]}
+        if media_type == "image/gif":
+            descriptor["frameCount"] = inspected["frameCount"]
+            descriptor["durationMs"] = inspected["durationMs"]
+        target = root / (key + inspected["suffix"])
+        if key in index:
+            if not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest() != source_digest:
+                raise ValueError("Retained source bytes failed integrity verification")
+            return index[key]
+        _atomic_write(target, data)
+        index[key] = descriptor
+        _atomic_write(root / "index.json", json.dumps(index, ensure_ascii=False, sort_keys=True).encode("utf-8"))
         return descriptor
