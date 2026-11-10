@@ -40,14 +40,26 @@ class PythiaProvider:
         if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password or parsed.query or parsed.fragment:
             raise ValueError("CHIMERA_PYTHIA_BASE_URL must be an HTTP(S) URL without credentials, query, or fragment")
         self.base_url = configured_url.rstrip("/")
+        native_url = os.environ.get("CHIMERA_PYTHIA_NATIVE_BASE_URL", "").strip()
+        if native_url:
+            native = urlsplit(native_url)
+            if (native.scheme != "https" or not native.netloc or native.username or native.password
+                    or native.query or native.fragment
+                    or not native.path.rstrip("/").endswith("/v1/chimera-engine")):
+                raise ValueError("Hosted native bridge must use an HTTPS /v1/chimera-engine endpoint")
+        self.native_base_url = native_url.rstrip("/") if native_url else self.base_url
 
     def _request(self, method: str, path: str, body: dict[str, object] | None = None, *, timeout: float = 10.0) -> dict[str, object]:
         try:
             request_options: dict[str, object] = {"json": body, "timeout": timeout}
-            api_key = os.environ.get("CHIMERA_PYTHIA_API_KEY", "").strip()
+            native_route = path.startswith("/media/native-files") or path == "/media/images" or path == "/media/images/status"
+            native_bridge = native_route and self.native_base_url != self.base_url
+            api_key = os.environ.get("CHIMERA_PYTHIA_NATIVE_API_KEY" if native_bridge else "CHIMERA_PYTHIA_API_KEY", "").strip()
+            if native_bridge and not api_key:
+                raise ValueError("CHIMERA_PYTHIA_NATIVE_API_KEY is required for the native bridge")
             if api_key:
                 request_options["headers"] = {"Authorization": f"Bearer {api_key}"}
-            response = httpx.request(method, f"{self.base_url}{path}", **request_options)
+            response = httpx.request(method, f"{self.native_base_url if native_route else self.base_url}{path}", **request_options)
             response.raise_for_status()
             result = response.json()
         except httpx.HTTPStatusError as error:
@@ -71,10 +83,13 @@ class PythiaProvider:
             raise ValueError("Invalid Pythia native artifact ID")
         try:
             headers = {}
-            api_key = os.environ.get("CHIMERA_PYTHIA_API_KEY", "").strip()
+            native_bridge = self.native_base_url != self.base_url
+            api_key = os.environ.get("CHIMERA_PYTHIA_NATIVE_API_KEY" if native_bridge else "CHIMERA_PYTHIA_API_KEY", "").strip()
+            if native_bridge and not api_key:
+                raise ValueError("CHIMERA_PYTHIA_NATIVE_API_KEY is required for the native bridge")
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
-            with httpx.stream("GET", f"{self.base_url}/media/native-files/{quote(artifact_id, safe='')}",
+            with httpx.stream("GET", f"{self.native_base_url}/media/native-files/{quote(artifact_id, safe='')}",
                               headers=headers, timeout=30.0, follow_redirects=False) as response:
                 response.raise_for_status()
                 declared_length = response.headers.get("content-length")
