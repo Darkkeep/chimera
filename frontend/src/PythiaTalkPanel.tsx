@@ -12,7 +12,8 @@ import "./pythia-talk.css";
 type Advice = { content: string; kind: "answer" | "clarification"; rationale: string; limits: string[]; producer_id: string; stopping_boundary: "advisory-only" };
 type Turn = { id: string; question: string; direction?: string; outlineItemCount?: number; status: "running" | "completed" | "failed" | "interrupted"; result: Advice | null; error: string | null; context: { sceneId: string | null; sourceIds: string[] } };
 type Planning = { stage: "consulting" | "designing"; brief: string; turnId: string | null };
-type Conversation = { sessionId: string; turns: Turn[]; authorDirection?: string; actions?: PythiaAction[]; configured?: boolean; message?: string; planning?: Planning };
+type Capacity = { used: { contextChars: number; messageChars: number; historyMessages: number; requestBytes: number; modelInputTokens?: number }; limits: { contextChars: number; messageChars: number; historyMessages: number; requestBytes: number; modelInputTokens?: number; verified: boolean }; status: "available" | "warning" | "full"; exceeded: string[] };
+type Conversation = { sessionId: string; turns: Turn[]; authorDirection?: string; actions?: PythiaAction[]; configured?: boolean; mode?: string; capacity?: Capacity; message?: string; planning?: Planning };
 type Source = { id: string; title: string; currentVersion: string; versions: { version: string; extractionStatus: string; passages: { locator: string; text: string }[] }[] };
 type Payload = { sessionId: string; message: string; direction: string; sceneId: string | null; sourceIds: string[] };
 
@@ -52,6 +53,10 @@ export function PythiaTalkPanel({ project, scene, onClose, onProjectUpdated, emb
   const [loading, setLoading] = useState(true);
   const [mutating, setMutating] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [capacityPreview, setCapacityPreview] = useState<Capacity | null>(null);
+  const [capacityPending, setCapacityPending] = useState(false);
+  const [capacityError, setCapacityError] = useState("");
+  const [capacityCheck, setCapacityCheck] = useState(0);
   const [connection, setConnection] = useState("");
   const [error, setError] = useState("");
   const [brief, setBrief] = useState("");
@@ -90,6 +95,13 @@ export function PythiaTalkPanel({ project, scene, onClose, onProjectUpdated, emb
   }, [base, project.id]);
 
   useEffect(() => {
+    if (!conversation || conversation.capacity || conversation.configured === false) return;
+    const controller = new AbortController();
+    fetch(base, { signal: controller.signal }).then(readJson).then(setConversation).catch(() => {});
+    return () => controller.abort();
+  }, [base, conversation?.sessionId, Boolean(conversation?.capacity), conversation?.configured]);
+
+  useEffect(() => {
     if (sourceVersion.current === sourcesVersion) return;
     sourceVersion.current = sourcesVersion;
     const controller = new AbortController();
@@ -115,6 +127,25 @@ export function PythiaTalkPanel({ project, scene, onClose, onProjectUpdated, emb
     return () => { active = false; clearTimeout(timer); controller.abort(); };
   }, [base, pending]);
 
+  useEffect(() => {
+    if (!conversation?.capacity || !draft.trim() || pending) {
+      setCapacityPreview(null); setCapacityPending(false); setCapacityError(""); return;
+    }
+    let active = true;
+    const controller = new AbortController();
+    setCapacityPending(true); setCapacityError("");
+    const timer = setTimeout(() => {
+      fetch(base + "/capacity", { method: "POST", signal: controller.signal,
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+          requestId: "capacity-preview", sessionId: conversation.sessionId,
+          message: draft, direction, sceneId: includeScene ? scene?.id || null : null, sourceIds,
+        }) }).then(readJson).then(result => { if (active) setCapacityPreview(result); })
+        .catch(issue => { if (active && issue.name !== "AbortError") setCapacityError("Could not check conversation capacity. Check the connection or try the capacity check again."); })
+        .finally(() => { if (active) setCapacityPending(false); });
+    }, 400);
+    return () => { active = false; clearTimeout(timer); controller.abort(); };
+  }, [base, conversation?.sessionId, conversation?.capacity, draft, direction, includeScene, scene?.id, sourceIds, sourcesVersion, project.storyboard.revision, pending, capacityCheck]);
+
   async function send(payload: Payload) {
     if (pending || mutating || locked || !payload.message.trim()) return;
     setMutating(true); setError("");
@@ -136,7 +167,8 @@ export function PythiaTalkPanel({ project, scene, onClose, onProjectUpdated, emb
     try {
       const result = await fetch(base + "/check", { method: "POST" }).then(readJson);
       if (result.consultation !== true) throw new Error("This Pythia connection does not advertise consultation.");
-      setConnection("Local Pythia consultation tools verified. Sending a question calls its configured model provider.");
+      setConnection(`${result.mode === "hosted-text" ? "Hosted" : "Local"} Pythia consultation tools verified. Sending a question calls its configured model provider.`);
+      setConversation(await fetch(base).then(readJson));
     } catch (issue) { setError(issue instanceof Error ? issue.message : "Could not check Pythia."); }
     finally { setChecking(false); }
   }
@@ -219,8 +251,10 @@ export function PythiaTalkPanel({ project, scene, onClose, onProjectUpdated, emb
   }
 
   const disabled = loading || mutating || locked || pending || conversation?.configured === false || !conversation;
+  const capacity = capacityPreview || conversation?.capacity;
+  const draftChars = [...draft].length;
   const content = <>
-    <header className="pythia-talk-heading"><img src={pythiaIcon} alt="" width={56} height={56} /><div><h2 id="pythia-talk-title">{planning ? "Plan with Pythia" : "Consult Pythia"}</h2><p>Direct advice from your local Pythia · {project.title}</p></div>{!embedded && <button type="button" className="icon-button" aria-label="Close Pythia conversation" disabled={mutating} onClick={onClose}><X size={18} /></button>}</header>
+    <header className="pythia-talk-heading"><img src={pythiaIcon} alt="" width={56} height={56} /><div><h2 id="pythia-talk-title">{planning ? "Plan with Pythia" : "Consult Pythia"}</h2><p>Direct advice from {conversation?.mode === "hosted-text" ? "hosted" : "your local"} Pythia · {project.title}</p></div>{!embedded && <button type="button" className="icon-button" aria-label="Close Pythia conversation" disabled={mutating} onClick={onClose}><X size={18} /></button>}</header>
     <section className="pythia-action-builder" aria-label="Consultation and design brief">
       <h3>{designing ? "Explore the learning design" : "Consult first. Design together."}</h3>
       <p>{designing ? "Your brief is agreed for exploration, not final approval. Discuss the learner experience, sequence, pacing, and scene boundaries with Pythia. Only request a content draft when the design feels right." : "Understand the sources, audience, purpose, and gaps with Pythia. Explore approaches and challenge assumptions. There is no required interview or number of exchanges, and a numbered reply does not move you into scene production."}</p>
@@ -241,7 +275,7 @@ export function PythiaTalkPanel({ project, scene, onClose, onProjectUpdated, emb
     <div className="pythia-talk-connection"><button className="button button-outline" type="button" disabled={checking || loading || mutating || pending} onClick={() => void checkConnection()}>{checking ? "Checking local Pythia…" : "Check connection"}</button>{connection && <p role="status">{connection}</p>}</div>
     <section className="pythia-talk-history" aria-label="Pythia conversation history">
       {(conversation?.turns.length || 0) > 1 && <div className="pythia-history-controls"><button type="button" className="button button-outline" onClick={() => setExpandedTurns(Object.fromEntries(conversation!.turns.map(turn => [turn.id, true])))}>Expand all exchanges</button><button type="button" className="button button-outline" onClick={() => setExpandedTurns({})}>Roll up prior exchanges</button></div>}
-      {!loading && conversation?.turns.length === 0 && <p>Ask a question, discuss an idea, or challenge Pythia's advice. Your conversation is saved privately in this local Chimera installation.</p>}
+      {!loading && conversation?.turns.length === 0 && <p>Ask a question, discuss an idea, or challenge Pythia's advice. Your conversation is saved privately in this Chimera installation.</p>}
       {conversation?.turns.map((turn, index) => {
         const hasActiveDraft = conversation.actions?.some(action => action.turnId === turn.id && (action.status === "drafting" || action.status === "pending"));
         const expanded = expandedTurns[turn.id] ?? (index === conversation.turns.length - 1 || turn.status === "running" || Boolean(hasActiveDraft));
@@ -277,7 +311,17 @@ export function PythiaTalkPanel({ project, scene, onClose, onProjectUpdated, emb
         return <label key={source.id}><input type="checkbox" disabled={disabled || !readable} checked={sourceIds.includes(source.id)} onChange={event => setSourceIds(current => event.target.checked ? [...current, source.id] : current.filter(id => id !== source.id))} />{source.title}{readable ? "" : " · no usable text"}</label>;
       })}</details>
       <div className="pythia-talk-question"><label htmlFor="pythia-talk-message">Your message</label><textarea id="pythia-talk-message" rows={4} maxLength={8000000} value={draft} disabled={disabled} required placeholder="Ask Pythia a question…" onChange={event => setDraft(event.target.value)} /></div>
-      <div className="pythia-talk-send"><small>{draft.length.toLocaleString()} / 8,000,000 characters</small><button type="submit" className="button button-accent" disabled={disabled || !draft.trim()}><Send size={16} />{mutating ? "Sending…" : "Send to Pythia"}</button></div>
+      {capacity && <section className="pythia-capacity" aria-label="Conversation capacity">
+        <p className="field-hint">Conversation text: {capacity.used.contextChars.toLocaleString()} / {capacity.limits.contextChars.toLocaleString()} characters. Earlier messages: {capacity.used.historyMessages} / {capacity.limits.historyMessages}.</p>
+        {capacity.used.modelInputTokens !== undefined && capacity.limits.modelInputTokens !== undefined && <p className="field-hint">Estimated model capacity: {Math.ceil(100 * capacity.used.modelInputTokens / capacity.limits.modelInputTokens)}% of the configured input budget. This cautious estimate includes instructions and formatting; different kinds of text can use more space.</p>}
+        <p className="field-hint">Includes your draft, selected source text, author direction and saved conversation. Pythia also checks its configured model budget before making a model call. History is never silently removed.</p>
+        {!capacity.limits.verified && <p className="field-hint">This older engine uses the original pilot allowance. The larger capacity requires the coordinated Pythia update.</p>}
+        {capacityPending && <p role="status">Checking capacity…</p>}
+        {!capacityPending && capacity.status === "warning" && <p role="status">This conversation is nearing its capacity. Plan a new conversation before adding more material.</p>}
+        {!capacityPending && capacity.status === "full" && <p role="alert">This request exceeds the connection capacity. Select fewer sources, shorten the message, or start a new conversation. Your draft is preserved.</p>}
+        {capacityError && <p role="alert">{capacityError} <button type="button" className="button button-outline" onClick={() => setCapacityCheck(value => value + 1)}>Check capacity again</button></p>}
+      </section>}
+      <div className="pythia-talk-send"><small>{draftChars.toLocaleString()} / {(capacity?.limits.messageChars || 8000000).toLocaleString()} message characters</small><button type="submit" className="button button-accent" disabled={disabled || !draft.trim() || capacityPending || Boolean(capacityError) || capacity?.status === "full"}><Send size={16} />{mutating ? "Sending…" : "Send to Pythia"}</button></div>
     </form>
     <footer className="pythia-talk-note">Your message, author direction, selected text, and successful prior exchanges go to Pythia's configured model provider. Calls may incur its normal API charges. Content drafts change scenes only when you choose Apply changes. This conversation is separate from ChatGPT and Manteion history.</footer>
   </>;

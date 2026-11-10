@@ -221,8 +221,12 @@ remain under Chimera's existing authoring/review flow.
 
 Allowances: 8,000,000 characters per message plus selected context and across
 consultation history; 64,000,000 serialized characters for authoring drafts;
-32 preceding history messages, 32 recorded consultation attempts, and 20 draft
-attempts per conversation. Identical selected-source context appears once per
+100 preceding history messages and 20 draft attempts per conversation. The
+transport ceiling is not a promise of producer capacity: the updated Pythia
+producer defaults to 200,000 total characters, 100,000 per message and a separate
+conservative model budget. Hosted connections negotiate these limits; see
+[capacity configuration](consultation-capacity.md). The independent 32-attempt
+restriction is removed. Identical selected-source context appears once per
 request, with later copies referencing the retained text. Unique source text is
 never silently dropped. The selected model's token window is checked separately,
 including prompt/schema text and room for the response. The configured GPT-4.1
