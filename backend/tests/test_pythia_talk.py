@@ -416,9 +416,9 @@ class PythiaTalkTests(unittest.TestCase):
             self.assertEqual(self.send().status_code, 202)
             completed = self.finished()
         turn_id = completed["turns"][-1]["id"]
-        data = ("# Pythia consultation answer\\n\\n" + ADVICE["content"] +
-                "\\n\\n## Rationale\\n\\n" + ADVICE["rationale"] +
-                "\\n\\n## Limits\\n\\n- " + ADVICE["limits"][0] + "\\n").encode()
+        data = ("# Pythia consultation answer\n\n" + ADVICE["content"] +
+                "\n\n## Rationale\n\n" + ADVICE["rationale"] +
+                "\n\n## Limits\n\n- " + ADVICE["limits"][0] + "\n").encode()
         export = {"format": "pythia-text-export-v1", "filename": "pythia-consultation-answer.md",
                   "mime_type": "text/markdown", "size_bytes": len(data),
                   "sha256": hashlib.sha256(data).hexdigest(),
