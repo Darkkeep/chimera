@@ -83,7 +83,9 @@
 .pythia-artifacts-heading h3 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 16px; }
 .pythia-artifacts-heading p { margin: 6px 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .pythia-artifacts-count { padding: 2px 8px; border-radius: 12px; background: var(--chimera-pythia-link, #7f5cff); color: #fff; font-size: 12px; }
-.pythia-artifacts-filter { display: inline-flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 12px; color: var(--muted); }
+.pythia-artifacts-filter { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0; font-size: 12px; color: var(--muted); max-width: 100%; min-width: 0; white-space: normal; }
+.pythia-artifacts-filter > input { flex: 0 0 auto; width: auto; margin-top: 2px; }
+.pythia-artifacts-filter > span { flex: 1 1 0; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .pythia-artifact-item { border-top: 1px solid var(--line); display: flex; align-items: center; gap: 12px; padding: 12px 0; }
 .pythia-artifact-item > div { display: grid; gap: 4px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .pythia-artifact-item small { color: var(--muted); font-size: 12px; }
