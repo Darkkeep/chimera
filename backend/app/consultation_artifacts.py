@@ -3,6 +3,7 @@
 This is a consumer-side JSON export, not an assertion that the engine made a file.
 No model, media, external request or automatic storyboard mutation occurs here.
 """
+import base64
 import hashlib
 import json
 import re
@@ -102,7 +103,8 @@ def get_artifact(project_id, actor, artifact_id):
         if artifact_id not in index:
             raise KeyError("Artifact not found")
         descriptor = index[artifact_id]
-        data = (root / (artifact_id + ".json")).read_bytes()
+        extension = ".md" if descriptor["mimeType"] == "text/markdown" else ".json"
+        data = (root / (artifact_id + extension)).read_bytes()
         if hashlib.sha256(data).hexdigest() != descriptor["sha256"]:
             raise ValueError("Saved artifact checksum failed")
         return descriptor, data
@@ -111,3 +113,62 @@ def get_artifact(project_id, actor, artifact_id):
 def retain_current_before_reset(project_id, actor):
     # Called under the same transaction before replacing a conversation session.
     _reconcile(project_id, actor)
+
+
+
+def export_answer_markdown(project_id, actor, turn_id):
+    """Export one completed private consultation answer; no new model request."""
+    with storage.storyboard_transaction():
+        state = pythia_talk.read_state(pythia_talk.state_path(project_id, actor))
+        turn = next((item for item in state.get("turns", [])
+                     if item.get("id") == turn_id and item.get("status") == "completed"), None)
+        if turn is None or not isinstance(turn.get("result"), dict):
+            raise KeyError("Completed answer not found")
+        result = turn["result"]
+        title = "Pythia consultation answer"
+        body = result.get("content", "").strip()
+        if not body:
+            raise ValueError("Answer has no exportable text")
+        if result.get("rationale"):
+            body += "\\n\\n## Rationale\\n\\n" + result["rationale"]
+        if result.get("limits"):
+            body += "\\n\\n## Limits\\n\\n" + "\\n".join("- " + str(value) for value in result["limits"])
+        session_id = state["sessionId"]
+    if pythia_talk.pythia_hosted.active():
+        # Chimera may export its own retained hosted advice, without claiming
+        # that the hosted Pythia engine supports remote file generation.
+        safe_title = title.strip().replace("\\r", " ").replace("\\n", " ")
+        stem = re.sub(r"[^a-z0-9]+", "-", safe_title.lower()).strip("-")[:64] or "consultation"
+        data = f"# {safe_title}\\n\\n{body.rstrip()}\\n".encode("utf-8")
+        export = {"filename": stem + ".md", "mime_type": "text/markdown",
+                  "size_bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+        origin = "Chimera Markdown export of hosted Pythia answer"
+    else:
+        export = pythia_talk.local_mcp(export_request={"title": title, "content": body})
+        if not isinstance(export, dict) or export.get("format") != "pythia-text-export-v1":
+            raise ValueError("Unsupported Pythia export response")
+        if export.get("mime_type") != "text/markdown":
+            raise ValueError("Unsupported Pythia export type")
+        try:
+            data = base64.b64decode(export["data_base64"], validate=True)
+        except (KeyError, ValueError):
+            raise ValueError("Invalid Pythia export bytes") from None
+        origin = "Pythia Markdown export via local MCP"
+    if len(data) > MAX_RECORD_BYTES or len(data) == 0:
+        raise ValueError("Export exceeds file allowance")
+    digest = hashlib.sha256(data).hexdigest()
+    if export.get("size_bytes") != len(data) or export.get("sha256") != digest:
+        raise ValueError("Pythia export integrity check failed")
+    key = hashlib.sha256(f"{session_id}\\0markdown\\0{turn_id}\\0{digest}".encode()).hexdigest()
+    descriptor = {"id": key, "sessionId": session_id, "sourceId": turn_id,
+                  "turnId": turn_id, "type": "markdown", "title": "Consultation answer",
+                  "filename": "pythia-consultation-" + key[:12] + ".md",
+                  "mimeType": "text/markdown", "byteSize": len(data),
+                  "sha256": digest, "status": "ready", "origin": origin}
+    with storage.storyboard_transaction():
+        index, root = _reconcile(project_id, actor)
+        if key not in index:
+            _atomic_write(root / (key + ".md"), data)
+            index[key] = descriptor
+            _atomic_write(root / "index.json", json.dumps(index, ensure_ascii=False, sort_keys=True).encode("utf-8"))
+        return descriptor
