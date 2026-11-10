@@ -62,6 +62,12 @@ roles revokes in-flight and future turns without waiting for session expiry.
 
 ## Operational notes
 
+- Completed hosted answers include the contract's `answer_sha256` integrity
+  field. Chimera verifies the checksum before adapting the answer to its shared
+  advice display model. Unknown fields and unsupported answer content remain
+  rejected. A rejected answer retains the accepted wire revision and is never
+  retried automatically.
+
 - Rotate the service, callback and signing credentials together with the
   engine operator; the engine requires distinct tokens of at least 32
   characters and refuses weak configurations at startup.
