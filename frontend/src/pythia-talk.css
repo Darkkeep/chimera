@@ -95,3 +95,8 @@
 .pythia-native-import-controls { display: flex; gap: 8px; flex-wrap: wrap; }
 .pythia-native-import-controls input { min-width: 180px; flex: 1; padding: 8px 10px; color: inherit; background: var(--theme-panel, var(--surface)); border: 1px solid var(--line); border-radius: 6px; }
 .pythia-native-import small { color: var(--muted); line-height: 1.45; }
+
+.pythia-native-import textarea { width: 100%; min-height: 72px; resize: vertical; box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px; color: inherit; background: var(--theme-panel, var(--surface)); font: inherit; }
+.pythia-native-import-controls select { min-width: 175px; flex: 1; padding: 8px; border: 1px solid var(--line); border-radius: 6px; color: inherit; background: var(--theme-panel, var(--surface)); }
+.pythia-native-import-controls input[type=number] { flex: 0 0 72px; min-width: 72px; max-width: 90px; }
+.pythia-native-import-controls label { align-self: center; }
