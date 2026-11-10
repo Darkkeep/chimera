@@ -28,6 +28,17 @@ type EngineArtifact = {
   status: string;
 };
 
+type PythiaCandidate = {
+  id: string;
+  jobId: string;
+  provider: string | null;
+  kind: "image" | "audio" | "video";
+  status: "pending" | "approved" | "rejected";
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+};
+
 async function getArtifacts(projectId: string, signal?: AbortSignal): Promise<Artifact[]> {
   const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/consultation-artifacts`, { signal });
   if (!response.ok) throw new Error("Could not retrieve consultation artifacts. Check your project access and try again.");
@@ -48,6 +59,8 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
   const [exporting, setExporting] = useState<string | null>(null);
   const [engineArtifacts, setEngineArtifacts] = useState<EngineArtifact[]>([]);
   const [engineStatus, setEngineStatus] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [mediaCandidates, setMediaCandidates] = useState<PythiaCandidate[]>([]);
+  const [mediaStatus, setMediaStatus] = useState<"loading" | "ready" | "unavailable">("loading");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -69,6 +82,22 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
       })
       .then(data => { setEngineArtifacts(data.artifacts); setEngineStatus("ready"); })
       .catch(() => { if (!controller.signal.aborted) { setEngineArtifacts([]); setEngineStatus("unavailable"); } });
+    return () => controller.abort();
+  }, [projectId, revision]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setMediaStatus("loading");
+    fetch(`/api/projects/${encodeURIComponent(projectId)}/generated-candidates`, { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error("Candidate lookup unavailable");
+        return await response.json() as PythiaCandidate[];
+      })
+      .then(items => {
+        setMediaCandidates(items.filter(item => item.provider === "Pythia" && (item.kind === "image" || item.kind === "audio")));
+        setMediaStatus("ready");
+      })
+      .catch(() => { if (!controller.signal.aborted) { setMediaCandidates([]); setMediaStatus("unavailable"); } });
     return () => controller.abort();
   }, [projectId, revision]);
 
@@ -113,6 +142,20 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
     {engineStatus === "ready" && engineArtifacts.map(item => <div className="pythia-artifact-item" key={item.artifact_id}>
       <div><strong>{item.artifact_type.replaceAll("-", " ")}</strong><small>Engine draft · {item.status} · Version {item.artifact_version} · JSON envelope</small></div>
       <a className="button button-outline" href={`/api/projects/${encodeURIComponent(projectId)}/pythia-engine-artifacts/${encodeURIComponent(item.artifact_id)}/download`} download aria-label={`Download ${item.artifact_type} structured JSON`}><Download size={15} /> JSON</a>
+    </div>)}
+    <div className="pythia-artifacts-heading"><div><h3>Generated media <span className="pythia-artifacts-count">{mediaCandidates.length}</span></h3>
+      <p>Existing Pythia-generated candidates. Recover original PNG or MP3 bytes only when the source is still retained and its checksum matches.</p></div></div>
+    {mediaStatus === "loading" && <p role="status">Checking generated media…</p>}
+    {mediaStatus === "unavailable" && <p>Media candidates are unavailable on this connection.</p>}
+    {mediaStatus === "ready" && mediaCandidates.length === 0 && <p>No Pythia media candidates found for this project.</p>}
+    {mediaStatus === "ready" && mediaCandidates.map(item => <div className="pythia-artifact-item" key={item.id}>
+      <div><strong>{item.filename}</strong><small>{item.kind === "audio" ? "AI narration" : "Image"} · {item.status} · {Math.ceil(item.sizeBytes / 1024)} KB</small></div>
+      <a className="button button-outline"
+         href={`/api/projects/${encodeURIComponent(projectId)}/generated-candidates/${encodeURIComponent(item.id)}/asset`}
+         download={item.filename} aria-label={`Download retained ${item.filename}`}><Download size={15} /> Saved copy</a>
+      <a className="button button-outline"
+         href={`/api/projects/${encodeURIComponent(projectId)}/generated-candidates/${encodeURIComponent(item.id)}/pythia-original`}
+         download aria-label={`Recover Pythia source for ${item.filename}`}><Download size={15} /> Original</a>
     </div>)}
   </section>;
 }
