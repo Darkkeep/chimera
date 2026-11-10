@@ -31,6 +31,17 @@ type EngineArtifact = {
   status: string;
 };
 
+type NativeIncoming = {
+  format: "pythia-native-file-v1";
+  artifact_id: string;
+  source_id: string;
+  project_id: string;
+  mime_type: "image/svg+xml" | "image/gif";
+  byte_size: number;
+  animated: boolean;
+  frame_count?: number;
+};
+
 type PythiaCandidate = {
   id: string;
   jobId: string;
@@ -66,6 +77,8 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
   const [mediaStatus, setMediaStatus] = useState<"loading" | "ready" | "unavailable">("loading");
   const [nativeSourceId, setNativeSourceId] = useState("");
   const [importingNative, setImportingNative] = useState(false);
+  const [incoming, setIncoming] = useState<NativeIncoming[]>([]);
+  const [incomingStatus, setIncomingStatus] = useState<"loading" | "ready" | "unavailable">("loading");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -106,6 +119,21 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
     return () => controller.abort();
   }, [projectId, revision]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    setIncomingStatus("loading");
+    fetch(`/api/projects/${encodeURIComponent(projectId)}/pythia-native-files`, { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error("Native file discovery is unavailable");
+        return await response.json() as { artifacts: NativeIncoming[] };
+      })
+      .then(result => { setIncoming(result.artifacts); setIncomingStatus("ready"); })
+      .catch(() => {
+        if (!controller.signal.aborted) { setIncoming([]); setIncomingStatus("unavailable"); }
+      });
+    return () => controller.abort();
+  }, [projectId, revision]);
+
   async function exportMarkdown(turnId: string) {
     setExporting(turnId);
     setError("");
@@ -121,8 +149,8 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
     } finally { setExporting(null); }
   }
 
-  async function importNativeSource() {
-    const source = nativeSourceId.trim();
+  async function importNativeSource(artifactId?: string) {
+    const source = (artifactId ?? nativeSourceId).trim();
     if (!/^[A-Za-z0-9][A-Za-z0-9_-]{7,119}$/.test(source)) {
       setError("Enter a valid Pythia native artifact ID.");
       return;
@@ -150,6 +178,19 @@ export function ConsultationArtifacts({ projectId, sessionId, refreshKey }: {
       <button type="button" className="button button-outline" onClick={() => setRevision(value => value + 1)} disabled={loading} aria-label="Refresh artifacts"><RefreshCw size={15} /> Refresh</button>
     </div>
     <label className="pythia-artifacts-filter"><input type="checkbox" checked={showAll} onChange={event => setShowAll(event.target.checked)} /> Include previous consultations in this project</label>
+    <div className="pythia-artifacts-heading"><div>
+      <h3>Incoming from Pythia <span className="pythia-artifacts-count">{incoming.length}</span></h3>
+      <p>Verified native SVG and GIF sources registered for this project. Retain a private original copy before authoring reuse.</p>
+    </div></div>
+    {incomingStatus === "loading" && <p role="status">Checking Pythia's native files…</p>}
+    {incomingStatus === "unavailable" && <p>Native-file discovery is unavailable on this connection.</p>}
+    {incomingStatus === "ready" && incoming.length === 0 && <p>No registered native files for this project yet.</p>}
+    {incomingStatus === "ready" && incoming.map(item => <div className="pythia-artifact-item" key={item.artifact_id}>
+      <div><strong>{item.mime_type === "image/svg+xml" ? "SVG vector" : item.animated ? "Animated GIF" : "GIF image"}</strong>
+        <small>{item.artifact_id} · {Math.ceil(item.byte_size / 1024)} KB{item.frame_count ? ` · ${item.frame_count} frames` : ""}</small></div>
+      <button type="button" className="button button-outline" disabled={importingNative}
+        onClick={() => void importNativeSource(item.artifact_id)}>Retain in project</button>
+    </div>)}
     <form className="pythia-native-import" onSubmit={event => { event.preventDefault(); void importNativeSource(); }}>
       <label htmlFor="pythia-native-source-id">Retrieve registered Pythia SVG / GIF original</label>
       <div className="pythia-native-import-controls">
