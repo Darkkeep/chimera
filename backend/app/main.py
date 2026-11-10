@@ -57,6 +57,7 @@ from .question_import import parse_questions, question_template, question_spread
 from .pythia_connection import LocalEngineConnection, configured_engine_url, local_engine_url, save_engine_url
 from . import pythia_talk
 from . import consultation_artifacts
+from . import pythia_native_retrieval
 from . import pythia_hosted
 from . import experience_treatments
 from .experience_models import ExperienceDesignRequest, ExperienceReview
@@ -138,7 +139,8 @@ ROUTE_ACTIONS = {
     "get_pythia_task": "project.view", "cancel_pythia_task": "enhancement.job.manage",
     "get_pythia_artifact": "project.view",
     "get_pythia_engine_artifacts": "project.view",
-    "download_pythia_engine_artifact": "project.export", "get_pythia_analysis_proposals": "project.view",
+    "download_pythia_engine_artifact": "project.export",
+    "download_pythia_original_media": "project.export", "get_pythia_analysis_proposals": "project.view",
     "post_pythia_analysis_proposal": "enhancement.proposal.create",
     "post_pythia_analysis_proposal_decision": "enhancement.proposal.decide",
     "get_pythia_transform_proposals": "project.view",
@@ -186,6 +188,8 @@ def _hosted_request_action(request: Request) -> str:
     if path.startswith(("/api/ai-connection", "/api/narration-connections")):
         return "identity.self" if request.method == "GET" else "admin.policy.manage"
     if "/consultation-artifacts/exports/" in path:
+        return "project.export"
+    if request.method == "GET" and "/generated-candidates/" in path and path.endswith("/pythia-original"):
         return "project.export"
     if request.method == "GET" and ("/consultation-artifacts/" in path and path.endswith("/download")
                                     or "/pythia-engine-artifacts/" in path and path.endswith("/download")):
@@ -2425,6 +2429,26 @@ def post_generated_candidate_regeneration(project_id: str, candidate_id: str) ->
         raise HTTPException(status_code=409, detail=str(error)) from error
     except RuntimeError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.get("/api/projects/{project_id}/generated-candidates/{candidate_id}/pythia-original",
+         name="download_pythia_original_media")
+def download_pythia_original_media(project_id: str, candidate_id: str) -> Response:
+    """Recover original Pythia bytes only for an existing project-owned candidate."""
+    try:
+        candidate, raw = pythia_native_retrieval.recover_candidate(project_id, candidate_id)
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Source candidate not found") from error
+    except pythia_native_retrieval.SourceConflict as error:
+        raise HTTPException(409, str(error)) from error
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
+    extension = ".png" if candidate.kind == "image" else ".mp3"
+    return Response(raw, media_type=candidate.contentType, headers={
+        "Content-Disposition": f'attachment; filename="pythia-original-{candidate.id}{extension}"',
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-store",
+    })
 
 
 @app.get("/api/projects/{project_id}/generated-candidates/{candidate_id}/asset")
