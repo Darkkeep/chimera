@@ -80,6 +80,7 @@ ROUTE_ACTIONS = {
     "download_consultation_artifact": "project.export",
     "export_consultation_answer": "project.export",
     "import_pythia_native_artifact": "project.import",
+    "get_pythia_native_files": "project.view",
     "post_pythia_conversation": "enhancement.job.create",
     "preview_pythia_capacity": "enhancement.job.create",
     "reset_pythia_conversation": "enhancement.job.create",
@@ -2130,6 +2131,24 @@ def export_consultation_answer(project_id: str, turn_id: str, request: Request):
         raise HTTPException(404, "Completed consultation answer not found") from error
     except ValueError as error:
         raise HTTPException(422, str(error)) from error
+
+
+@app.get("/api/projects/{project_id}/pythia-native-files", name="get_pythia_native_files")
+def get_pythia_native_files(project_id: str):
+    try:
+        project = read_project(project_id)
+        result = _pythia_provider().discover_native_files(project.id)
+        records = result.get("artifacts", [])
+        if not isinstance(records, list):
+            raise HTTPException(502, "Invalid native Pythia artifact catalog")
+        return {"artifacts": [item for item in records if isinstance(item, dict)
+                and item.get("project_id") == project.id
+                and item.get("format") == "pythia-native-file-v1"
+                and item.get("mime_type") in {"image/svg+xml", "image/gif"}]}
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+    except PythiaUnavailableError as error:
+        raise _pythia_error(error) from error
 
 
 @app.post("/api/projects/{project_id}/consultation-artifacts/native/{native_id}",
