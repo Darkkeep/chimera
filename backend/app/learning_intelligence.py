@@ -19,6 +19,8 @@ class LearningIntelligenceProvider(Protocol):
 
     def artifact(self, artifact_id: str) -> dict[str, object]: ...
 
+    def discover_artifacts(self, project_id: str) -> dict[str, object]: ...
+
     def cancel_task(self, task_id: str) -> dict[str, object]: ...
 
 
@@ -101,6 +103,9 @@ class PythiaProvider:
 
     def task_status(self, task_id: str) -> dict[str, object]:
         return self._request("GET", f"/tasks/{quote(task_id, safe='')}")
+
+    def discover_artifacts(self, project_id: str) -> dict[str, object]:
+        return self._request("GET", f"/artifacts?project_id={quote(project_id, safe='')}&limit=100")
 
     def artifact(self, artifact_id: str) -> dict[str, object]:
         return self._request("GET", f"/artifacts/{quote(artifact_id, safe='')}")
