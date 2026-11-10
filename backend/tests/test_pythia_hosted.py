@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from backend.app import main, pythia_hosted as hosted, pythia_talk as talk, storage
 from backend.app.models import ProjectCreate
 from backend.app.platform import LOCAL_ACTOR
+from backend.app.references import extract_reference_passages
 
 
 KEY = Ed25519PrivateKey.generate()
@@ -30,6 +31,7 @@ HOSTED_ENV = {
 ADVICE = {"kind": "answer", "content": "Hosted advisory answer.", "rationale": "Fictional test.",
           "limits": [], "citations": [], "producer_id": "live-hosted-chimera-text-v1",
           "stopping_boundary": "advisory-only"}
+WIRE_ADVICE = {**ADVICE, "answer_sha256": hosted.digest(ADVICE)}
 
 
 def decode_part(part):
@@ -123,7 +125,7 @@ class ConsultTransportTests(unittest.TestCase):
         if request.url.path.endswith("/cancel"):
             return httpx.Response(200, json=self.operation(self.submitted, "cancelled", "op-1"))
         status = self.status_sequence.pop(0)
-        result = dict(ADVICE) if status == "completed" else None
+        result = dict(WIRE_ADVICE) if status == "completed" else None
         return httpx.Response(200, json=self.operation(self.submitted, status, "op-1", result))
 
     def consult(self, **overrides):
@@ -134,7 +136,7 @@ class ConsultTransportTests(unittest.TestCase):
     def test_submit_poll_and_exact_thread_continuation(self):
         with self.transport(self.engine):
             outcome = self.consult()
-        self.assertEqual(outcome["advice"], ADVICE)
+        self.assertEqual(outcome["advice"], WIRE_ADVICE)
         self.assertIsNone(outcome["error"])
         self.assertEqual(outcome["revision"], 1)
         self.assertEqual(outcome["appended"], [
@@ -286,16 +288,16 @@ class HostedTalkFlowTests(unittest.TestCase):
             time.sleep(.01)
         self.fail("Hosted consultation did not settle")
 
-    def send(self, message, request_id):
+    def send(self, message, request_id, **options):
         session = talk.get_conversation(self.project.id, LOCAL_ACTOR)["sessionId"]
-        data = talk.TalkRequest(message=message, requestId=request_id, sessionId=session)
+        data = talk.TalkRequest(message=message, requestId=request_id, sessionId=session, **options)
         return talk.submit(self.project.id, LOCAL_ACTOR, data, lambda: None)
 
     def test_submit_consults_hosted_engine_and_continues_exact_thread(self):
         def outcome(config, scope, *, message_id, idempotency_key, revision, messages, question, **_):
             self.consulted = {"scope": scope, "revision": revision, "messages": list(messages),
                               "question": question, "idempotency_key": idempotency_key}
-            return {"advice": dict(ADVICE), "error": None, "revision": revision + 1,
+            return {"advice": dict(WIRE_ADVICE), "error": None, "revision": revision + 1,
                     "appended": [{"message_id": message_id, "role": "user", "content": question},
                                  {"message_id": "op-1", "role": "assistant", "content": ADVICE["content"]}]}
         with patch.object(hosted, "consult", side_effect=outcome):
@@ -325,7 +327,7 @@ class HostedTalkFlowTests(unittest.TestCase):
         self.assertEqual(state["turns"][0]["status"], "failed")
         def succeeding(config, scope, *, message_id, revision, messages, question, **_):
             self.followup = {"revision": revision, "messages": list(messages)}
-            return {"advice": dict(ADVICE), "error": None, "revision": revision + 1,
+            return {"advice": dict(WIRE_ADVICE), "error": None, "revision": revision + 1,
                     "appended": [{"message_id": message_id, "role": "user", "content": question},
                                  {"message_id": "op-2", "role": "assistant", "content": ADVICE["content"]}]}
         with patch.object(hosted, "consult", side_effect=succeeding):
@@ -334,13 +336,82 @@ class HostedTalkFlowTests(unittest.TestCase):
         self.assertEqual(self.followup["revision"], 1)
         self.assertEqual([m["role"] for m in self.followup["messages"]], ["user"])
 
+    def test_real_transport_accepts_checksummed_reply_and_preserves_reload_and_followup(self):
+        submissions = []
+        source_text = b"# Learning Chimera\nBuild a course with practical tutorials."
+        passages, status, error = extract_reference_passages("course-outline.txt", source_text)
+        source = storage.save_reference_resource(self.project.id, "course-outline.txt", "Course outline",
+            "supporting-document", False, [], source_text, "text/plain", passages, status, error)
+
+        def engine(request):
+            if request.method == "POST":
+                submissions.append(json.loads(request.content))
+            body = submissions[-1]
+            operation = {"schema_version": "1.0", "operation_id": f"op-{len(submissions)}",
+                         "scope": body["scope"], "message_id": body["message_id"],
+                         "request_sha256": hosted.request_digest(body),
+                         "context_sha256": body["context_sha256"],
+                         "context_revision": body["expected_context_revision"] + 1,
+                         "status": "completed", "answer_revision": 1,
+                         "result": dict(WIRE_ADVICE), "error_code": None}
+            return httpx.Response(202 if request.method == "POST" else 200, json=operation)
+
+        real = httpx.Client
+        with patch.object(hosted.httpx, "Client",
+                          side_effect=lambda **kw: real(transport=httpx.MockTransport(engine), **kw)):
+            self.send("Read my fictional course outline", "request-first", sourceIds=[source.id])
+            state = self.settle()
+            self.assertEqual(state["turns"][0]["status"], "completed")
+            self.assertEqual(state["turns"][0]["result"], ADVICE)
+            self.assertIn("Build a course with practical tutorials.", submissions[0]["message"])
+            reloaded = talk.get_conversation(self.project.id, LOCAL_ACTOR)
+            self.assertEqual(reloaded["turns"][0]["result"], ADVICE)
+            self.send("Now refine the practical exercises", "request-second")
+            self.assertEqual(self.settle()["turns"][-1]["status"], "completed")
+        self.assertEqual(len(submissions), 2)
+        self.assertEqual(submissions[1]["expected_context_revision"], 1)
+        self.assertEqual([m["role"] for m in submissions[1]["context"]["messages"]],
+                         ["user", "assistant"])
+        self.assertEqual(submissions[1]["context"]["messages"][-1]["content"], ADVICE["content"])
+
+    def test_invalid_hosted_advice_fails_without_retry_and_retains_accepted_wire_revision(self):
+        def checksummed(**changes):
+            advice = {**ADVICE, **changes}
+            return {**advice, "answer_sha256": hosted.digest(advice)}
+
+        cases = {
+            "missing-checksum": dict(ADVICE),
+            "wrong-checksum": {**WIRE_ADVICE, "answer_sha256": "0" * 64},
+            "non-string-checksum": {**WIRE_ADVICE, "answer_sha256": 123},
+            "changed-content": {**WIRE_ADVICE, "content": "Changed after hashing."},
+            "unknown-field": checksummed(unexpected="not supported"),
+            "unsupported-citations": checksummed(citations=[{"source_id": "invented"}]),
+        }
+        for label, advice in cases.items():
+            with self.subTest(label=label):
+                talk.reset_conversation(self.project.id, LOCAL_ACTOR)
+                outcome = {"advice": advice, "error": None, "revision": 1,
+                           "appended": [{"message_id": "m-1", "role": "user", "content": "Q"},
+                                        {"message_id": "op-1", "role": "assistant",
+                                         "content": advice["content"]}]}
+                with patch.object(hosted, "consult", return_value=outcome) as consult:
+                    self.send("Fictional question", "request-invalid")
+                    state = self.settle()
+                    self.assertEqual(consult.call_count, 1)
+                self.assertEqual(state["turns"][0]["status"], "failed")
+                self.assertIsNone(state["turns"][0]["result"])
+                self.assertIn("unsupported consultation result", state["turns"][0]["error"])
+                persisted = json.loads(talk.state_path(self.project.id, LOCAL_ACTOR).read_text(encoding="utf-8"))
+                self.assertEqual(persisted["hostedThread"]["revision"], 1)
+                self.assertEqual(len(persisted["hostedThread"]["messages"]), 2)
+
     def test_pre_acceptance_errors_do_not_advance_the_thread(self):
         with patch.object(hosted, "consult", side_effect=hosted.HostedError("Engine unavailable", 503)):
             self.send("Unreachable question", "request-first")
             state = self.settle()
         self.assertEqual(state["turns"][0]["status"], "failed")
         with patch.object(hosted, "consult") as consult:
-            consult.return_value = {"advice": dict(ADVICE), "error": None, "revision": 1,
+            consult.return_value = {"advice": dict(WIRE_ADVICE), "error": None, "revision": 1,
                                     "appended": [{"message_id": "m", "role": "user", "content": "Q"}]}
             self.send("Retry question", "request-second")
             self.settle()
@@ -349,7 +420,7 @@ class HostedTalkFlowTests(unittest.TestCase):
     def test_reset_starts_a_fresh_hosted_session_and_thread(self):
         def outcome(config, scope, *, message_id, revision, question, **_):
             self.scope = scope
-            return {"advice": dict(ADVICE), "error": None, "revision": revision + 1,
+            return {"advice": dict(WIRE_ADVICE), "error": None, "revision": revision + 1,
                     "appended": [{"message_id": message_id, "role": "user", "content": question},
                                  {"message_id": "op-1", "role": "assistant", "content": ADVICE["content"]}]}
         with patch.object(hosted, "consult", side_effect=outcome):

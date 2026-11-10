@@ -429,7 +429,13 @@ def _finish_hosted(path, project_id, session_id, turn, messages, authorize):
         raise TalkError(str(error), error.status) from None
     if outcome["advice"] is not None:
         try:
-            outcome["advice"] = PythiaAdvice.model_validate(outcome["advice"]).model_dump()
+            # Hosted operations add a required integrity field to the desktop
+            # advice shape. Verify it before projecting to the shared UI model.
+            advice = dict(outcome["advice"])
+            answer_sha256 = advice.pop("answer_sha256")
+            if not isinstance(answer_sha256, str) or answer_sha256 != pythia_hosted.digest(advice):
+                raise ValueError("Hosted answer checksum mismatch")
+            outcome["advice"] = PythiaAdvice.model_validate(advice).model_dump()
         except Exception:
             outcome.update(advice=None, error="Pythia returned an unsupported consultation result. Retry explicitly; this turn is excluded from the advice context.")
     # The turn is durably accepted: record the advanced wire thread even when the
