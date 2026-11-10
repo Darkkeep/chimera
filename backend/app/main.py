@@ -77,6 +77,7 @@ ROUTE_ACTIONS = {
     "get_pythia_conversation": "enhancement.job.create",
     "get_consultation_artifacts": "project.view",
     "download_consultation_artifact": "project.view",
+    "export_consultation_answer": "project.export",
     "post_pythia_conversation": "enhancement.job.create",
     "preview_pythia_capacity": "enhancement.job.create",
     "reset_pythia_conversation": "enhancement.job.create",
@@ -182,6 +183,8 @@ def _hosted_request_action(request: Request) -> str:
         return "workspace.view"
     if path.startswith(("/api/ai-connection", "/api/narration-connections")):
         return "identity.self" if request.method == "GET" else "admin.policy.manage"
+    if "/consultation-artifacts/exports/" in path:
+        return "project.export"
     if "/shared-media" in path:
         return "media.manage"
     if path.endswith("/pythia-analysis") and request.method == "POST":
@@ -2055,6 +2058,18 @@ def _talk_operation(project_id: str, operation):
         raise HTTPException(404, "Project not found") from error
 
 
+@app.post("/api/projects/{project_id}/consultation-artifacts/exports/{turn_id}", name="export_consultation_answer")
+def export_consultation_answer(project_id: str, turn_id: str, request: Request):
+    _require_ai_origin(request)
+    try:
+        return _talk_operation(project_id, lambda actor:
+            consultation_artifacts.export_answer_markdown(project_id, actor, turn_id))
+    except KeyError as error:
+        raise HTTPException(404, "Completed consultation answer not found") from error
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+
+
 @app.get("/api/projects/{project_id}/consultation-artifacts", name="get_consultation_artifacts")
 def get_consultation_artifacts(project_id: str, session_id: str | None = None):
     return _talk_operation(project_id, lambda actor:
@@ -2070,7 +2085,7 @@ def download_consultation_artifact(project_id: str, artifact_id: str):
         raise HTTPException(404, "Artifact not found") from error
     except (OSError, ValueError) as error:
         raise HTTPException(409, "Saved artifact is unavailable or damaged") from error
-    return Response(content, media_type="application/json", headers={
+    return Response(content, media_type=descriptor["mimeType"], headers={
         "Content-Disposition": f'attachment; filename="{descriptor["filename"]}"',
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
