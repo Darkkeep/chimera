@@ -458,5 +458,49 @@ class PythiaTalkTests(unittest.TestCase):
 
 
 
+    def test_engine_draft_discovery_filters_non_chimera_consumers_and_downloads_json(self):
+        provider = Mock()
+        descriptor = {"artifact_id": "engine-artifact-001", "artifact_version": 1,
+                      "artifact_type": "storyboard-analysis", "task_id": "engine-task-001",
+                      "project_id": self.project.id, "consumer": "chimera",
+                      "capability": "storyboard.analyze", "status": "draft",
+                      "content_kind": "structured", "retrieval": "json-envelope",
+                      "downloadable_file": False}
+        other = {**descriptor, "artifact_id": "other-consumer-artifact", "consumer": "manteion"}
+        provider.discover_artifacts.return_value = {
+            "schema_version": "1.0", "artifacts": [descriptor, other], "has_more": False}
+        provider.task_status.return_value = {"task_id": descriptor["task_id"],
+                                              "project_id": self.project.id,
+                                              "consumer": "chimera", "artifact_id": descriptor["artifact_id"]}
+        provider.artifact.return_value = {"schema_version": "1.0", "artifact": {
+            "id": descriptor["artifact_id"], "type": "storyboard-analysis", "version": 1},
+            "status": "draft", "payload": {"example": "test"}}
+        root = f"/api/projects/{self.project.id}/pythia-engine-artifacts"
+        with patch.object(main, "_pythia_provider", return_value=provider):
+            listing = self.client.get(root)
+            self.assertEqual(listing.status_code, 200, listing.text)
+            self.assertEqual([descriptor], listing.json()["artifacts"])
+            download = self.client.get(root + "/engine-artifact-001/download")
+            self.assertEqual(download.status_code, 200, download.text)
+            self.assertEqual("application/json", download.headers["content-type"])
+            self.assertEqual(descriptor["artifact_id"], download.json()["artifact"]["id"])
+            self.assertEqual(404, self.client.get(root + "/other-consumer-artifact/download").status_code)
+
+    def test_engine_artifact_retrieval_rejects_incorrect_task_project(self):
+        provider = Mock()
+        provider.discover_artifacts.return_value = {
+            "schema_version": "1.0", "artifacts": [{
+                "artifact_id": "engine-artifact-002", "artifact_version": 1,
+                "task_id": "engine-task-002", "project_id": self.project.id,
+                "consumer": "chimera", "content_kind": "structured"}]}
+        provider.task_status.return_value = {"project_id": "unrelated-project",
+                                              "consumer": "chimera", "artifact_id": "engine-artifact-002"}
+        with patch.object(main, "_pythia_provider", return_value=provider):
+            route = f"/api/projects/{self.project.id}/pythia-engine-artifacts/engine-artifact-002/download"
+            self.assertEqual(404, self.client.get(route).status_code)
+        provider.artifact.assert_not_called()
+
+
+
 if __name__ == "__main__":
     unittest.main()
