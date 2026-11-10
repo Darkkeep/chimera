@@ -156,6 +156,72 @@ def assert_contract_schema(test_case: unittest.TestCase, schema_name: str, docum
 
 
 class LearningIntelligenceTests(unittest.TestCase):
+    def test_native_bridge_isolated_https_configuration(self):
+        with patch.dict(os.environ, {
+            "CHIMERA_PYTHIA_NATIVE_BASE_URL": "https://pythia-showcase.example/v1/chimera-engine",
+            "CHIMERA_PYTHIA_NATIVE_API_KEY": "chimera-public-bridge-token",
+            "CHIMERA_PYTHIA_API_KEY": "unrelated-engine-token",
+        }):
+            provider = PythiaProvider("http://127.0.0.1:8000")
+            response = Mock()
+            response.json.return_value = {"artifacts": []}
+            response.raise_for_status.return_value = None
+            with patch("backend.app.learning_intelligence.httpx.request", return_value=response) as mocked:
+                self.assertEqual([], provider.discover_native_files("project-1234")["artifacts"])
+                self.assertEqual("https://pythia-showcase.example/v1/chimera-engine/media/native-files?project_id=project-1234&limit=100",
+                                 mocked.call_args.args[1])
+                self.assertEqual("Bearer chimera-public-bridge-token",
+                                 mocked.call_args.kwargs["headers"]["Authorization"])
+                provider.health()
+                self.assertEqual("http://127.0.0.1:8000/health", mocked.call_args.args[1])
+                self.assertEqual("Bearer unrelated-engine-token",
+                                 mocked.call_args.kwargs["headers"]["Authorization"])
+
+    def test_native_bridge_fails_closed_on_invalid_origin_or_missing_token(self):
+        for native in ("http://remote.example/v1/chimera-engine",
+                       "https://remote.example/anything",
+                       "https://user:pw@remote.example/v1/chimera-engine",
+                       "https://remote.example/v1/chimera-engine?token=leak"):
+            with patch.dict(os.environ, {"CHIMERA_PYTHIA_NATIVE_BASE_URL": native}):
+                with self.subTest(url=native), self.assertRaises(ValueError):
+                    PythiaProvider("http://127.0.0.1:8000")
+        with patch.dict(os.environ, {
+            "CHIMERA_PYTHIA_NATIVE_BASE_URL": "https://pythia-showcase.example/v1/chimera-engine",
+            "CHIMERA_PYTHIA_NATIVE_API_KEY": "",
+        }):
+            provider = PythiaProvider("http://127.0.0.1:8000")
+            with self.assertRaises(PythiaUnavailableError):
+                provider.discover_native_files("project-1234")
+
+    def test_native_bridge_stream_preserves_original_byte_digest_and_metadata(self):
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>'
+        import hashlib
+        response = Mock()
+        response.headers = {
+            "content-length": str(len(svg)),
+            "X-Pythia-Source-Mime": "image/svg+xml",
+            "X-Pythia-Source-SHA256": hashlib.sha256(svg).hexdigest(),
+            "X-Pythia-Source-ID": "source-123456",
+            "X-Pythia-Project-ID": "project-123456",
+        }
+        response.iter_bytes.return_value = [svg]
+        response.raise_for_status.return_value = None
+        cm = Mock()
+        cm.__enter__ = Mock(return_value=response)
+        cm.__exit__ = Mock(return_value=False)
+        with patch.dict(os.environ, {
+            "CHIMERA_PYTHIA_NATIVE_BASE_URL": "https://pythia-showcase.example/v1/chimera-engine",
+            "CHIMERA_PYTHIA_NATIVE_API_KEY": "native-scoped-token",
+        }), patch("backend.app.learning_intelligence.httpx.stream", return_value=cm) as stream:
+            data = PythiaProvider("http://127.0.0.1:8000").native_file("asset-123456")
+        self.assertEqual(svg, data[0])
+        self.assertEqual("image/svg+xml", data[1])
+        self.assertEqual("project-123456", data[4])
+        self.assertEqual("https://pythia-showcase.example/v1/chimera-engine/media/native-files/asset-123456",
+                         stream.call_args.args[1])
+        self.assertEqual("Bearer native-scoped-token",
+                         stream.call_args.kwargs["headers"]["Authorization"])
+
     def test_provider_defaults_to_local_engine_api(self):
         with patch.dict("os.environ", {}, clear=True):
             provider = PythiaProvider()
