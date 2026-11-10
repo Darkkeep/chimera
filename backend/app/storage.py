@@ -1498,6 +1498,7 @@ def create_enhancement_job(
         timestamp = now_iso()
         job = EnhancementJob(
             id=f"enhancement-{uuid.uuid4().hex[:12]}",
+            actorId=get_actor_context().actorId,
             projectId=project_id,
             sourceRevision=project.storyboard.revision,
             scope=data.scope,
@@ -1768,7 +1769,8 @@ def _proposal_value(value: object) -> object:
 
 def _snapshot_proposal_change(project: ProjectDetail, change: EnhancementProposalChangeCreate) -> EnhancementProposalChange:
     if change.field == "additionalScenes":
-        if not change.targetSceneId or not any(scene.id == change.targetSceneId for scene in project.storyboard.scenes):
+        initial = change.targetSceneId is None and not project.storyboard.scenes
+        if not initial and (not change.targetSceneId or not any(scene.id == change.targetSceneId for scene in project.storyboard.scenes)):
             raise ValueError("Additional scenes require an existing anchor scene")
         if not isinstance(change.proposedValue, list) or not 1 <= len(change.proposedValue) <= 40:
             raise ValueError("Propose 1-40 additional scenes per anchor")
@@ -1878,7 +1880,10 @@ def _apply_proposal_changes(project: ProjectDetail, changes: list[EnhancementPro
     storyboard = project.storyboard
     for change in changes:
         if change.field == "additionalScenes":
-            anchor = next((index for index, scene in enumerate(scenes) if scene.id == change.targetSceneId), None)
+            initial = change.targetSceneId is None
+            if initial and not change.beforeValue and scenes:
+                raise EnhancementProposalConflict('Initial scenes can only be added to an empty storyboard')
+            anchor = -1 if initial else next((index for index, scene in enumerate(scenes) if scene.id == change.targetSceneId), None)
             if anchor is None:
                 raise EnhancementProposalConflict("The anchor scene no longer exists")
             if change.beforeValue:

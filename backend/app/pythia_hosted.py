@@ -204,6 +204,8 @@ def _failure(response):
             return HostedError("Pythia's configured model or conversation capacity would be exceeded. "
                 "Select fewer sources, shorten the message, or start a new conversation. "
                 "No model call was made and the saved history is unchanged.", 422)
+        if isinstance(error, dict) and error.get('code') == 'authoring_capacity_exceeded':
+            return HostedError('The selected draft context is invalid or exceeds the hosted model budget. Select fewer sources or a smaller section. No model call was made and nothing was applied.', 422)
         return HostedError("Pythia rejected this consultation request. Shorten the question or "
                            "start a new conversation.", 422)
     return HostedError("The hosted Pythia engine is unavailable. Retry explicitly; no failed turn "
@@ -368,8 +370,16 @@ def capacity_error(usage):
 
 
 def check(config):
-    allowance = limits(config, refresh=True)
-    return {"mode": "hosted-text", "consultation": True, "authoring_drafts": False,
+    metadata = _capabilities(config)
+    key = (config.base_url, hashlib.sha256(config.service_token.encode()).hexdigest())
+    _CAPACITY_CACHE[key] = (time.monotonic(), metadata.get('consultationLimits'))
+    allowance = limits(config)
+    authoring = metadata.get('authoring', {})
+    if not isinstance(authoring, dict):
+        raise HostedError('Pythia advertised invalid authoring capabilities.', 503)
+    return {"mode": "hosted-text", "consultation": True, "authoring_drafts": authoring.get('contentDrafts') is True,
+            'storyboard_enhancements': authoring.get('storyboardEnhancements') is True,
+            'authoring_orchestration': False, 'web_research': False,
             'consultationLimits': allowance,
             "attachments": False, "private_history_access": False, "exports": False,
             "media_tools": False, "approval_authority": False,
@@ -396,4 +406,135 @@ def turn_access_allowed(claims) -> bool:
     roles = account_roles(values["actor_id"])
     if roles is None or not roles & ENTITLED_ROLES:
         return False
-    return hmac.compare_digest(values["policy_revision"], policy_revision(roles))
+    if not hmac.compare_digest(values["policy_revision"], policy_revision(roles)):
+        return False
+    if claims.get('aud') == 'pythia-authoring':
+        return authoring_access_allowed(claims)
+    return True
+
+
+def authoring_bytes(document):
+    return json.dumps(document, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(',', ':')).encode('utf-8')
+
+
+def authoring_digest(document):
+    return hashlib.sha256(authoring_bytes(document)).hexdigest()
+
+
+def _authoring_proof(config, document, action, operation_id=None):
+    now = int(time.time())
+    claims = {'iss': CONSUMER_ID, 'aud': 'pythia-authoring', 'sub': document['scope']['actor_id'],
+        'iat': now - 1, 'exp': now + 120, 'jti': uuid4().hex, 'scope': document['scope'],
+        'action': action, 'request_sha256': authoring_digest(document) if action == 'draft:submit' else None,
+        'operation_id': operation_id, 'source_sha256': [],
+        **{k: document[k] for k in ('project_id', 'source_revision', 'request_id', 'kind')}}
+    signing = _b64url(authoring_bytes({'alg': 'EdDSA', 'kid': config.key_id, 'typ': 'JWT'})) + '.' + _b64url(authoring_bytes(claims))
+    return signing + '.' + _b64url(config.key.sign(signing.encode('ascii')))
+
+
+def author(config, actor, project_id, revision, request_id, kind, payload):
+    """One durable, idempotent hosted draft; no scene is applied here."""
+    scope = conversation_scope(config, actor.actorId, 'draft-' + authoring_digest([project_id, request_id]))
+    document = {'version': 1, 'scope': scope, 'project_id': project_id, 'source_revision': revision,
+                'request_id': request_id, 'kind': kind, 'payload': payload}
+    raw = authoring_bytes(document)
+    if len(raw) > 1048576:
+        raise HostedError('The selected draft context exceeds 1 MiB. Select fewer sources; no text was removed.', 422)
+    capability = 'contentDrafts' if kind == 'content' else 'storyboardEnhancements'
+    metadata = _capabilities(config).get('authoring', {})
+    if not isinstance(metadata, dict) or metadata.get(capability) is not True:
+        raise HostedError('This hosted Pythia engine does not yet support the requested storyboard drafting. Update the engine first.', 503)
+    advertised_bytes = metadata.get('requestBytes', 1048576)
+    if type(advertised_bytes) is not int or advertised_bytes < 4096:
+        raise HostedError('Pythia advertised invalid authoring capacity.', 503)
+    if len(raw) > min(1048576, advertised_bytes):
+        raise HostedError('The selected draft exceeds the hosted request allowance. Select fewer sources; no text was removed.', 422)
+    expected = authoring_digest(document)
+
+    def validate(response, status, operation_id=None):
+        if response.status_code != status:
+            raise _failure(response)
+        if len(response.content) > MAX_RESPONSE_BYTES:
+            raise HostedError('Pythia returned an oversized draft.', 502)
+        result = response.json()
+        if (not isinstance(result, dict) or result.get('request_sha256') != expected or
+                not isinstance(result.get('operation_id'), str) or
+                not _IDENTITY.fullmatch(result['operation_id']) or
+                (operation_id is not None and result['operation_id'] != operation_id) or
+                result.get('status') not in {'accepted', 'completed', 'failed', 'cancelled'}):
+            raise HostedError('Pythia returned a draft for a different request.', 502)
+        return result
+
+    try:
+        with httpx.Client(base_url=config.base_url, timeout=20, trust_env=False, follow_redirects=False) as client:
+            def headers(action, operation=None):
+                return {'Authorization': 'Bearer ' + config.service_token,
+                        'X-Pythia-Authoring-Access': _authoring_proof(config, document, action, operation),
+                        'Content-Type': 'application/json'}
+            result = validate(client.post('/authoring/drafts', content=raw, headers=headers('draft:submit')), 202)
+            operation = result['operation_id']
+            deadline = time.monotonic() + DEADLINE_SECONDS
+            while result['status'] == 'accepted':
+                if time.monotonic() > deadline:
+                    validate(client.post(f'/authoring/operations/{operation}/cancel', headers=headers('draft:cancel', operation)), 200, operation)
+                    raise HostedError('Drafting timed out. Nothing was applied; retry explicitly.', 503)
+                time.sleep(POLL_SECONDS)
+                result = validate(client.get('/authoring/operations/' + operation, headers=headers('draft:read', operation)), 200, operation)
+            if result['status'] != 'completed':
+                raise HostedError('Pythia could not complete this draft. Nothing was applied; retry explicitly.', 503)
+            if not isinstance(result.get('result'), dict) or authoring_digest(result['result']) != result.get('result_sha256'):
+                raise HostedError('Pythia returned an unverified draft. Nothing was applied.', 502)
+            return result['result']
+    except HostedError:
+        raise
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        raise HostedError('Hosted drafting was interrupted. No automatic retry was made and nothing was applied.', 503) from None
+
+
+def authoring_access_allowed(claims):
+    """Recheck project membership, revision and source access on every draft call."""
+    from . import storage, pythia_talk as talk
+    from .identity import LocalIdentityDirectory
+    from .main import get_authorization_policy
+    from .password_auth import HostedAuthorizationPolicy, public_origin
+    from .platform import ActorContext
+    try:
+        project_id = claims['project_id']
+        if not isinstance(project_id, str) or not _IDENTITY.fullmatch(project_id):
+            return False
+        policy = get_authorization_policy()
+        if isinstance(policy, HostedAuthorizationPolicy):
+            installation, mode = public_origin(), 'team'
+        else:
+            snapshot = LocalIdentityDirectory(storage.ROOT).snapshot()
+            installation, mode = snapshot.actor.installationId, snapshot.policy.deploymentMode
+        actor = ActorContext(actorId=claims['scope']['actor_id'], actorDisplayName='Hosted author',
+            installationId=installation, deploymentMode=mode)
+        if any(not policy.allows(actor, action, project_id) for action in ('project.view', 'enhancement.job.create')):
+            return False
+        if storage.read_project(project_id).storyboard.revision != claims['source_revision']:
+            return False
+        if claims['kind'] == 'enhancement':
+            job = storage.read_enhancement_job(project_id, claims['request_id'])
+            if job.actorId != actor.actorId or job.sourceRevision != claims['source_revision']:
+                return False
+            if job.cancelRequested:
+                return claims['action'] == 'draft:cancel'
+            if job.status not in {'queued', 'running', 'completed'}:
+                return False
+            from .enhancement_jobs import _load_job_context
+            _load_job_context(job)  # Selected immutable source versions must still exist/read.
+        elif claims['kind'] == 'content':
+            state = talk.read_state(talk.state_path(project_id, actor))
+            action_id = claims['request_id'].split('.')[0]
+            action = next(a for a in state.get('actions', []) if a['id'] == action_id)
+            if action['status'] not in {'drafting', 'pending'} or action['sourceRevision'] != claims['source_revision']:
+                return False
+            if state.get('planning', {}).get('stage') != 'designing':
+                return False
+            talk.check_binding(project_id, action['binding'])
+        else:
+            return False
+        return True
+    except (ValueError, KeyError, TypeError, FileNotFoundError, StopIteration, OSError):
+        return False

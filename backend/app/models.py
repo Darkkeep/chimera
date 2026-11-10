@@ -1018,6 +1018,7 @@ class EnhancementResearchSource(BaseModel):
 
 class EnhancementJob(BaseModel):
     id: str
+    actorId: str | None = None
     actualUsage: dict[str, int] | None = None
     projectId: str
     sourceRevision: int

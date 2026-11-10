@@ -129,7 +129,22 @@ class LocalPythiaEnhancementProvider:
             talk.CAPACITY.release()
 
 
+class HostedPythiaEnhancementProvider:
+    name = 'Pythia hosted drafting'
+    model = 'engine-managed'
+
+    def generate(self, payload):
+        from . import pythia_hosted as hosted
+        from .platform import get_actor_context
+        return hosted.author(hosted.configuration(), get_actor_context(), payload['projectId'],
+            payload['sourceRevision'], payload['jobId'], 'enhancement',
+            {key: value for key, value in payload.items() if key != 'jobId'})
+
+
 def _provider() -> EnhancementProvider:
+    from . import pythia_hosted
+    if pythia_hosted.active():
+        return HostedPythiaEnhancementProvider()
     from .platform import get_actor_context
     if get_actor_context().deploymentMode == "single-user":
         return LocalPythiaEnhancementProvider()
@@ -173,6 +188,7 @@ def _load_job_context(job: EnhancementJob) -> tuple[dict[str, object], dict[tupl
     allowed_fields = [field for field in get_args(EnhancementField) if job.scope == "whole-course" or field not in global_fields]
     scene_schema = SceneUpdate.model_json_schema()
     payload: dict[str, object] = {
+        'jobId': job.id,
         "projectId": job.projectId,
         "goal": job.goal,
         "sourceRevision": job.sourceRevision,
@@ -232,8 +248,14 @@ def preview_enhancement_submission(project_id: str, data: EnhancementJobCreate) 
     estimated_tokens = max(1, len(serialized_payload) // 4)
     tool_catalog = []
     web_research = False
+    provider = None
     try:
-        if isinstance(_provider(), LocalPythiaEnhancementProvider):
+        provider = _provider()
+        if isinstance(provider, HostedPythiaEnhancementProvider):
+            from . import pythia_hosted as hosted
+            capabilities = hosted.check(hosted.configuration())
+            engine_configured = capabilities.get('storyboard_enhancements') is True and not data.useTools and not data.allowWebResearch
+        elif isinstance(provider, LocalPythiaEnhancementProvider):
             from . import pythia_talk as talk
             capabilities = talk.local_mcp()
             engine_configured = capabilities.get("storyboard_enhancements") is True
@@ -262,6 +284,8 @@ def preview_enhancement_submission(project_id: str, data: EnhancementJobCreate) 
         "tools": tool_catalog,
         "webResearchAvailable": web_research,
         "maxProviderRequests": 7 if data.useTools else 1,
+        'unavailableReason': ('Hosted drafting supports scene text and new scenes. Turn off specialist tools and public web research for this connection.'
+            if isinstance(provider, HostedPythiaEnhancementProvider) and (data.useTools or data.allowWebResearch) else None),
     }
 
 
@@ -299,7 +323,8 @@ def _validate_provider_proposals(
             target_scene_id = raw_change.get("targetSceneId")
             if target_scene_id is not None and target_scene_id not in valid_scene_ids:
                 raise ValueError("Provider referenced a scene outside the submitted selection")
-            if target_scene_id is None and raw_change.get("field") not in {"sceneOrder", "storyboardTitle", "completionSettings"}:
+            initial_scenes = target_scene_id is None and raw_change.get('field') == 'additionalScenes' and not job.sceneIds and job.scope == 'whole-course'
+            if target_scene_id is None and raw_change.get("field") not in {"sceneOrder", "storyboardTitle", "completionSettings"} and not initial_scenes:
                 raise ValueError("Provider returned a global change for a scene-only field")
             if target_scene_id is None and job.scope != "whole-course":
                 raise ValueError("Selected-scene runs cannot propose whole-course changes")
@@ -386,6 +411,12 @@ def recover_enhancement_jobs() -> None:
     for project in storage.list_projects():
         for job in storage.list_enhancement_jobs(project.id):
             if job.status in {"queued", "running"}:
+                from . import pythia_hosted
+                if pythia_hosted.active():
+                    storage.update_enhancement_job(project.id, job.id, status='failed', progress=100,
+                        message='Interrupted hosted drafting was not replayed',
+                        error='The server restarted before drafting completed. Retry explicitly; no automatic model request was made.')
+                    continue
                 if job.useTools:
                     storage.update_enhancement_job(
                         project.id, job.id, status="failed", progress=100,
@@ -506,7 +537,9 @@ def _run_job(project_id: str, job_id: str) -> None:
     except Exception as error:
         try:
             current = storage.read_enhancement_job(project_id, job_id)
-            if current.status not in {"cancelled", "completed"}:
+            if current.cancelRequested and current.status not in {'cancelled', 'completed'}:
+                storage.update_enhancement_job(project_id, job_id, status='cancelled', progress=100, message='Cancelled; no proposals were applied')
+            elif current.status not in {"cancelled", "completed"}:
                 storage.update_enhancement_job(project_id, job_id, status="failed", progress=100, message="Enhancement failed", error=str(error)[:2000])
         except Exception:
             pass

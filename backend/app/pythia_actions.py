@@ -1,4 +1,4 @@
-"""Convert completed local Pythia advice into revision-bound author-reviewed edits."""
+"""Convert Pythia advice into revision-bound author-reviewed edits."""
 import hashlib
 import json
 from threading import Thread
@@ -82,7 +82,10 @@ class ActionDecision(BaseModel):
 
 
 def submit(project_id, actor, data, authorize):
-    talk.checkout()
+    if not talk.pythia_hosted.active():
+        talk.checkout()
+    else:
+        talk.hosted_configuration()
     authorize()
     with storage.storyboard_transaction():
         path = talk.state_path(project_id, actor)
@@ -138,7 +141,8 @@ def submit(project_id, actor, data, authorize):
             if not titles:
                 raise talk.TalkError("Choose the answer containing the expanded outline. Use top-level numbered items or Markdown headings to identify the topics to cover.")
             payload["outlineTopics"] = titles
-        if len(history) > 32 or len(json.dumps(payload, ensure_ascii=False)) > MAX_AUTHORING_CHARS:
+        hosted = talk.pythia_hosted.active()
+        if len(history) > (100 if hosted else 32) or len(json.dumps(payload, ensure_ascii=False).encode('utf-8')) > (1048576 if hosted else MAX_AUTHORING_CHARS):
             raise talk.TalkError("The authoring context exceeds the local Pythia allowance. Start a smaller conversation; no text was silently omitted.")
         if not talk.CAPACITY.acquire(blocking=False):
             raise talk.TalkError("Two Pythia operations are already active. Try again when one finishes.", 429)
@@ -151,31 +155,36 @@ def submit(project_id, actor, data, authorize):
         state["authorDirection"] = data.direction.strip()
         try:
             talk.write_state(path, state)
-            Thread(target=finish, args=(path, project_id, state["sessionId"], action, payload, authorize), daemon=True).start()
+            Thread(target=finish, args=(path, project_id, state["sessionId"], action, payload, authorize, actor), daemon=True).start()
         except Exception:
             talk.CAPACITY.release()
             raise
         return talk.public_state(state)
 
 
-def finish(path, project_id, session_id, action, payload, authorize):
+def finish(path, project_id, session_id, action, payload, authorize, actor=None):
     try:
         authorize()
         talk.check_binding(project_id, action["binding"])
         topics = payload.get("outlineTopics", [])
+        def generate(request, batch=''):
+            if talk.pythia_hosted.active():
+                return talk.pythia_hosted.author(talk.hosted_configuration(), actor, project_id,
+                    action['sourceRevision'], action['id'] + batch, 'content', request)
+            return talk.local_mcp(authoring_request=request)
         if topics:
             scenes = []
-            for topic in topics:
+            for index, topic in enumerate(topics):
                 authorize()
                 talk.check_binding(project_id, action["binding"])
-                batch = DraftResult.model_validate(talk.local_mcp(authoring_request={**payload, "outlineTopics": [topic]}))
+                batch = DraftResult.model_validate(generate({**payload, "outlineTopics": [topic]}, f'.{index}'))
                 if batch.mode != "add-scenes":
                     raise talk.TalkError("Pythia returned a different action scope. Nothing was applied.")
                 scenes.extend(batch.scenes)
             result = DraftResult(mode="add-scenes", rationale=f"{len(scenes)} learner-sized scenes drafted across {len(topics)} planning topics, in topic order. Review topic coverage, scene boundaries, and pacing before applying.", changes=[], scenes=scenes,
                 producer_id="live-chimera-authoring-v1", stopping_boundary="draft-only")
         else:
-            result = DraftResult.model_validate(talk.local_mcp(authoring_request=payload))
+            result = DraftResult.model_validate(generate(payload))
         if result.mode != action["mode"]:
             raise talk.TalkError("Pythia returned a different action scope. Nothing was applied.")
         if result.mode == "update-scene":
@@ -188,7 +197,7 @@ def finish(path, project_id, session_id, action, payload, authorize):
             talk.check_binding(project_id, action["binding"])
             persist(path, session_id, action["id"], status="pending", result=result.model_dump())
     except Exception as error:
-        message = str(error) if isinstance(error, talk.TalkError) else "Pythia could not produce a valid content draft. Nothing was applied. Give clearer direction and draft again."
+        message = str(error) if isinstance(error, (talk.TalkError, talk.pythia_hosted.HostedError)) else "Pythia could not produce a valid content draft. Nothing was applied. Give clearer direction and draft again."
         with storage.storyboard_transaction():
             persist(path, session_id, action["id"], status="failed", error=message)
     finally:
