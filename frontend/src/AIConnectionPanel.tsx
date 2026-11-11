@@ -23,7 +23,7 @@ export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { 
   const { catalog, error: catalogError } = useMediaConnections();
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [textModel, setTextModel] = useState("gpt-4.1-mini");
-  const [imageModel, setImageModel] = useState("gpt-image-1");
+  const [imageModel, setImageModel] = useState("gpt-image-2.6-sunburst");
   const [audioModel, setAudioModel] = useState("gpt-4o-mini-tts");
   const [apiKey, setApiKey] = useState("");
   const [dailyLimit, setDailyLimit] = useState(20);
@@ -120,7 +120,8 @@ export function AIConnectionPanel({ onClose, onboardingScope = "workspace" }: { 
         <fieldset disabled={!editable || working} className="ai-connection-fields" aria-label="Media generation provider settings">
           <label>Provider<select value="openai" onChange={() => {}}><option value="openai">OpenAI</option></select></label>
           <label>API key<input type="password" autoComplete="new-password" value={apiKey} maxLength={512} onChange={event => setApiKey(event.target.value)} placeholder={status.keyConfigured ? "Leave blank to keep the configured key" : "Enter API key"} /></label>
-          <label>Image model<select value={imageModel} onChange={event => setImageModel(event.target.value)}>{status.imageModels.map(model => <option key={model}>{model}</option>)}</select></label>
+          <label>Image generation mode<select aria-describedby="image-generation-mode-help" value={imageModel} onChange={event => setImageModel(event.target.value)}>{status.imageModels.map(model => <option key={model} value={model}>{model === "gpt-image-2.6-sunburst" ? "Quality · GPT-Image 2.6 Sunburst" : model === "gpt-image-2.6-flare" ? "Speed · GPT-Image 2.6 Flare" : `${model} (legacy)`}</option>)}</select></label>
+          <p id="image-generation-mode-help" className="ai-connection-notice">Quality prioritizes detailed instructional graphics and consistent edits. Speed prioritizes fast storyboard iterations. Saved model choices remain unchanged until you save a different mode.</p>
           <label>Audio model<select value={audioModel} onChange={event => setAudioModel(event.target.value)}>{status.audioModels.map(model => <option key={model}>{model}</option>)}</select></label>
           <label>Daily request limit<input type="number" min={1} max={1000} value={dailyLimit} onChange={event => setDailyLimit(Number(event.target.value))} /></label>
           <label>Concurrent request limit<input type="number" min={1} max={4} value={concurrentLimit} onChange={event => setConcurrentLimit(Number(event.target.value))} /></label>

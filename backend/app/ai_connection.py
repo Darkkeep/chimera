@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 
 TEXT_MODELS = ("gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini")
-IMAGE_MODELS = ("gpt-image-1",)
+IMAGE_MODELS = ("gpt-image-2.6-sunburst", "gpt-image-2.6-flare", "gpt-image-1")
 AUDIO_MODELS = ("gpt-4o-mini-tts", "tts-1")
 OPENAI_URL = "https://api.openai.com/v1"
 _usage_lock = threading.RLock()
@@ -28,7 +28,7 @@ class ConnectionUpdate(BaseModel):
     expectedRevision: str
     provider: Literal["openai"] = "openai"
     textModel: Literal["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini"] = "gpt-4.1-mini"
-    imageModel: Literal["gpt-image-1"] = "gpt-image-1"
+    imageModel: Literal["gpt-image-2.6-sunburst", "gpt-image-2.6-flare", "gpt-image-1"] = "gpt-image-2.6-sunburst"
     audioModel: Literal["gpt-4o-mini-tts", "tts-1"] = "gpt-4o-mini-tts"
     apiKey: SecretStr | None = Field(default=None, max_length=512)
     maxRequestsPerDay: int = Field(default=20, ge=1, le=1000)
