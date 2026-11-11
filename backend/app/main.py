@@ -105,6 +105,7 @@ ROUTE_ACTIONS = {
     "post_reference_ocr_accept": "reference.create",
     "health": "identity.view", "auth_config": "identity.view", "login": "identity.view",
     "logout": "identity.view", "reset_password": "identity.view", "darkrogue_login": "identity.view", "pythia_turn_access": "identity.view", "get_accounts": "admin.policy.manage",
+    "owner_suite_projects": "project.membership.manage",
     "get_identity_context": "identity.view", "get_identity_policy": "identity.view",
     "get_installation_config": "identity.view", "patch_identity_policy": "admin.policy.manage",
     "get_project_members": "project.membership.manage", "post_project_member": "project.membership.manage",
