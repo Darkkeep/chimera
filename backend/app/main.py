@@ -17,12 +17,15 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 from pydantic import BaseModel, Field, SecretStr
 from starlette.concurrency import run_in_threadpool
+from starlette.background import BackgroundTask
 from PIL import Image, UnidentifiedImageError
 from pptx import Presentation
 
 from .ingest import extract_presentation
 from .content_generation import generate_course_draft, generate_scene_draft
 from .auth import resolve_actor_context
+from .export_analytics import capture_scorm_export
+from .owner_suite import run_owner_action, verify_assertion
 from .backup import build_project_archive, restore_project_archive
 from .enhancement_jobs import cancel_enhancement_job, preview_enhancement_submission, recover_enhancement_jobs, retry_enhancement_job, start_enhancement_job
 from .identity import IdentitySnapshot, LocalIdentityDirectory, OrganizationPolicy, ProjectMembership, ProjectMembershipCreate, RoleBasedAuthorizationPolicy
@@ -67,7 +70,7 @@ from . import pythia_actions
 
 
 HOSTED_ACCOUNT_PROVIDERS = {"builtin", "darkrogue"}
-PUBLIC_API_PATHS = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password", "/api/auth/darkrogue", "/api/internal/pythia/turn-access"}
+PUBLIC_API_PATHS = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password", "/api/auth/darkrogue", "/api/internal/pythia/turn-access", "/api/internal/owner-suite/projects"}
 
 
 ROUTE_ACTIONS = {
@@ -102,6 +105,7 @@ ROUTE_ACTIONS = {
     "post_reference_ocr_accept": "reference.create",
     "health": "identity.view", "auth_config": "identity.view", "login": "identity.view",
     "logout": "identity.view", "reset_password": "identity.view", "darkrogue_login": "identity.view", "pythia_turn_access": "identity.view", "get_accounts": "admin.policy.manage",
+    "owner_suite_projects": "project.membership.manage",
     "get_identity_context": "identity.view", "get_identity_policy": "identity.view",
     "get_installation_config": "identity.view", "patch_identity_policy": "admin.policy.manage",
     "get_project_members": "project.membership.manage", "post_project_member": "project.membership.manage",
@@ -545,6 +549,14 @@ async def pythia_turn_access(request: Request) -> JSONResponse:
         return respond(await run_in_threadpool(pythia_hosted.turn_access_allowed, claims))
     except Exception:
         return respond(False, 503)
+
+
+@app.post("/api/internal/owner-suite/projects")
+def owner_suite_projects(request: Request) -> dict:
+    assertion = verify_assertion(request)
+    if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider != "darkrogue":
+        raise HTTPException(404, "Owner Suite integration is disabled")
+    return run_owner_action(assertion, _account_store(), get_authorization_policy())
 
 
 @app.get("/api/accounts")
@@ -2679,6 +2691,7 @@ def export_scorm_2004(project_id: str) -> Response:
         content=package,
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        background=BackgroundTask(capture_scorm_export, get_actor_context(), "scorm2004"),
     )
 
 
@@ -2696,6 +2709,7 @@ def export_scorm_12(project_id: str) -> Response:
         content=package,
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        background=BackgroundTask(capture_scorm_export, get_actor_context(), "scorm12"),
     )
 
 

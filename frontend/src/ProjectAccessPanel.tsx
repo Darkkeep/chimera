@@ -13,7 +13,7 @@ async function checked<T>(response: Response): Promise<T> {
   return body as T;
 }
 
-export function ProjectAccessPanel({ project, onClose }: { project: Project; onClose: () => void }) {
+export function ProjectAccessPanel({ project, onClose }: { project: Pick<Project, "id" | "title">; onClose: () => void }) {
   const { session } = useSession();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -28,7 +28,7 @@ export function ProjectAccessPanel({ project, onClose }: { project: Project; onC
   useEffect(() => {
     let alive = true;
     title.current?.focus();
-    Promise.all([fetch("/api/accounts").then(checked<Account[]>), fetch(`${base}/members`).then(checked<Member[]>), fetch(`${base}/review-links`).then(checked<ReviewLink[]>)]).then(([a,m,l]) => { if (alive) { setAccounts(a); setMembers(m); setLinks(l); } }).catch(issue => { if (alive) setError(issue instanceof Error ? issue.message : "Project access is unavailable."); });
+    Promise.all([fetch("/api/accounts").then(checked<Account[]>), fetch(`${base}/members`).then(checked<Member[]>), fetch(`${base}/review-links`).then(response => response.status === 403 ? [] : checked<ReviewLink[]>(response))]).then(([a,m,l]) => { if (alive) { setAccounts(a); setMembers(m); setLinks(l); } }).catch(issue => { if (alive) setError(issue instanceof Error ? issue.message : "Project access is unavailable."); });
     return () => { alive = false; };
   }, [base]);
 

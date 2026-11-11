@@ -91,6 +91,7 @@ export function App() {
   const { session, logout } = useSession();
   const [reviewToken, setReviewToken] = useState(() => location.hash.startsWith("#review=") ? location.hash.slice(8) : "");
   const [showProjectAccess, setShowProjectAccess] = useState(false);
+  const [linkedAccessProject, setLinkedAccessProject] = useState<Pick<Project, "id" | "title"> | null>(null);
   const [permissions, setPermissions] = useState({ canEdit: !session, canExport: !session, canManageMembers: false, canEnhance: !session });
   const [project, setProject] = useState<Project>(emptyProject);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -338,18 +339,30 @@ export function App() {
   }
 
   useEffect(() => {
-    const requestedProjectId = new URLSearchParams(window.location.search).get("project_id");
+    const parameters = new URLSearchParams(window.location.search);
+    const requestedProjectId = parameters.get("project_id");
+    const requestedAccess = parameters.get("view") === "access" && requestedProjectId && /^[a-zA-Z0-9_-]{1,120}$/.test(requestedProjectId);
     fetch("/api/projects").then(async (response) => {
       if (!response.ok) throw new Error("Project list could not be loaded.");
       return response.json() as Promise<ProjectSummary[]>;
     }).then(async (availableProjects) => {
       setProjects(availableProjects);
+      if (requestedAccess && requestedProjectId) {
+        const response = await fetch(`/api/projects/${requestedProjectId}/permissions`);
+        if (!response.ok || (await response.json()).canManageMembers !== true) {
+          setDeepLinkError("You do not have permission to manage this project's access.");
+          return;
+        }
+        setLinkedAccessProject({ id: requestedProjectId, title: availableProjects.find(item => item.id === requestedProjectId)?.title ?? requestedProjectId });
+        setShowManagement(false);
+        setShowProjectAccess(true);
+        return;
+      }
       if (availableProjects.length === 0) {
         if (requestedProjectId)
           setDeepLinkError("The linked project is unavailable or not accessible.");
         return;
       }
-      const parameters = new URLSearchParams(window.location.search);
       const requestedObjectId = parameters.get("object_id");
       const linkedProject = requestedProjectId
         ? availableProjects.find((item) => item.id === requestedProjectId)
@@ -1316,7 +1329,7 @@ export function App() {
     {showProjectBackground && <ProjectBackgroundPanel key={project.id} project={project} onClose={() => setShowProjectBackground(false)} onProjectUpdated={applyProject} />}
     <main className="main-content" id="workspace-content" tabIndex={-1}>
       {deepLinkError && <div className="notice" role="alert"><span>{deepLinkError}</span><button className="icon-button" onClick={() => setDeepLinkError("")} aria-label="Dismiss deep link error"><X size={16} /></button></div>}
-      {showManagement ? <ManagementView busy={busy || restoringProject || hasOpenForm} canCreateProject={canCreateProject} onCreateProject={beginProjectCreate} canResume={Boolean(project.id)} onOpenProject={(projectId) => switchProject(projectId, true)} onProjectTrashed={handleProjectTrashed} onProjectsRestored={handleProjectsRestored} onRelationshipUpdated={handleRelationshipUpdated} onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} /> : showProjectAccess ? <ProjectAccessPanel project={project} onClose={() => setShowProjectAccess(false)} /> : !permissions.canEdit && session && project.id ? <section className="project-access-panel"><h1>{project.title}</h1><p>You have review access to this project.</p><button className="button button-dark" onClick={() => setShowPreview(true)}>Open course review</button></section> : <>
+      {showManagement ? <ManagementView busy={busy || restoringProject || hasOpenForm} canCreateProject={canCreateProject} onCreateProject={beginProjectCreate} canResume={Boolean(project.id)} onOpenProject={(projectId) => switchProject(projectId, true)} onProjectTrashed={handleProjectTrashed} onProjectsRestored={handleProjectsRestored} onRelationshipUpdated={handleRelationshipUpdated} onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} /> : showProjectAccess ? <ProjectAccessPanel project={linkedAccessProject ?? project} onClose={() => { if (linkedAccessProject) { setLinkedAccessProject(null); setShowManagement(true); } setShowProjectAccess(false); }} /> : !permissions.canEdit && session && project.id ? <section className="project-access-panel"><h1>{project.title}</h1><p>You have review access to this project.</p><button className="button button-dark" onClick={() => setShowPreview(true)}>Open course review</button></section> : <>
       <header className="topbar">
         <div className="project-heading">{project.parentProjectId && <nav className="project-breadcrumb" aria-label="Project hierarchy">{parentProject ? <button type="button" disabled={busy || hasOpenForm} onClick={() => void switchProject(parentProject.id, true)}>{parentProject.title}</button> : <span>Parent project unavailable</span>}<span aria-hidden="true"> / </span><span aria-current="page">{project.title}</span></nav>}<p className="eyebrow">COURSE AUTHORING / {activeView === "storyboard" ? "STORYBOARD" : activeView === "media" ? "MEDIA LIBRARY" : "TEMPLATES"}</p><h1 title={project.title}>{project.title || "Your workspace"}</h1></div>
         <div className="top-actions"><span className="save-state" role="status">{busy ? "Working…" : project.id ? <><Check size={14} /> Saved locally</> : "Local authoring"}</span><button className="button button-outline" onClick={() => setShowPreview(true)} disabled={!project.id || !scenes.length || busy}><Play size={15} /> Preview course</button><button className="button button-accent" onClick={() => setShowExport(true)} disabled={!project.id || busy}><Download size={15} /> Export</button></div>
