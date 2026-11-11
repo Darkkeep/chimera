@@ -33,7 +33,7 @@ type EnhancementProposal = {
   sourceTaskId?: string | null;
   sourceArtifactId?: string | null;
   sourceCapability?: string | null;
-  sourceArtifact?: { payload?: {
+  sourceArtifact?: { storyboard?: HandoffStoryboard; provenance?: HandoffProvenance; payload?: {
     alignment?: { objective_id: string; evidence: string; method: string; scoring: string; fairness: string }[];
     assumptions?: string[];
     limitations?: string[];
@@ -45,6 +45,59 @@ type EnhancementProposal = {
   decidedAt: string | null;
   decisionHistory: { decision: string; decidedAt: string; expectedRevision: number }[];
 };
+
+type HandoffStoryboard = {
+  title: string;
+  objectives: { id: string; statement: string; source_ids: string[] }[];
+  media: { id: string; kind: string; label: string; reference: string; accessibility_notes: string; source_ids: string[] }[];
+  scenes: {
+    id: string; title: string; action_description: string; objective_ids: string[]; media_ids: string[]; source_ids: string[];
+    interactions: { id: string; kind: string; prompt: string; feedback: string }[];
+    assessment: { prompt: string; choices: { id: string; text: string }[]; correct_choice_id: string; correct_feedback: string; incorrect_feedback: string } | null;
+  }[];
+};
+
+type HandoffProvenance = {
+  project_id: string;
+  artifact_id: string;
+  sources: { id: string; title: string; locator: string }[];
+};
+
+function HandoffDetails({ board, provenance }: { board: HandoffStoryboard; provenance: HandoffProvenance }) {
+  return <details className="enhancement-proposal-citations">
+    <summary>Objectives, assessment, interactions, media and sources</summary>
+    <p>Pythia project {provenance.project_id} · source artifact {provenance.artifact_id}</p>
+    <p>Media and interactions are design references for production review.</p>
+    {board.objectives.length > 0 && <><h4>Objectives</h4><ul>{board.objectives.map(item =>
+      <li key={item.id}>{item.id} · {item.statement}{item.source_ids.length > 0 && ` · Sources ${item.source_ids.join(", ")}`}</li>
+    )}</ul></>}
+    {board.media.length > 0 && <><h4>Media references</h4><ul>{board.media.map(item =>
+      <li key={item.id}>{item.id} · {item.kind} · {item.label} · {item.reference}
+        {item.accessibility_notes && <p>{item.accessibility_notes}</p>}
+        {item.source_ids.length > 0 && <p>Sources {item.source_ids.join(", ")}</p>}
+      </li>
+    )}</ul></>}
+    {provenance.sources.length > 0 && <><h4>Sources</h4><ul>{provenance.sources.map(item =>
+      <li key={item.id}>{item.id} · {item.title} · {item.locator}</li>
+    )}</ul></>}
+    {board.scenes.map(scene => <section key={scene.id}>
+      <h4>{scene.title} · {scene.id}</h4>
+      {scene.action_description && <p>{scene.action_description}</p>}
+      {scene.objective_ids.length > 0 && <p>Objectives {scene.objective_ids.join(", ")}</p>}
+      {scene.media_ids.length > 0 && <p>Media {scene.media_ids.join(", ")}</p>}
+      {scene.source_ids.length > 0 && <p>Sources {scene.source_ids.join(", ")}</p>}
+      {scene.interactions.map(item => <p key={item.id}>{item.kind} · {item.prompt}{item.feedback && ` · ${item.feedback}`}</p>)}
+      {scene.assessment && <div>
+        <p>{scene.assessment.prompt}</p>
+        <ul>{scene.assessment.choices.map(choice => <li key={choice.id}>
+          {choice.text}{choice.id === scene.assessment?.correct_choice_id && " (correct answer)"}
+        </li>)}</ul>
+        {scene.assessment.correct_feedback && <p>Correct response feedback · {scene.assessment.correct_feedback}</p>}
+        {scene.assessment.incorrect_feedback && <p>Incorrect response feedback · {scene.assessment.incorrect_feedback}</p>}
+      </div>}
+    </section>)}
+  </details>;
+}
 
 type EnhancementProposalResult = { proposal: EnhancementProposal; project: Project | null };
 type PythiaAnalysisProposal = {
@@ -169,11 +222,12 @@ function ToolExecutionDetails({ job }: { job: EnhancementJob }) {
 
 type EnhancementReviewViewProps = {
   project: Project;
+  firstProposalId?: string;
   onClose: () => void;
   onProjectUpdated: (project: Project) => void;
 };
 
-export function EnhancementReviewView({ project, onClose, onProjectUpdated }: EnhancementReviewViewProps) {
+export function EnhancementReviewView({ project, onClose, onProjectUpdated, firstProposalId }: EnhancementReviewViewProps) {
   const [proposals, setProposals] = useState<EnhancementProposal[]>([]);
   const [pythiaProposals, setPythiaProposals] = useState<PythiaAnalysisProposal[]>([]);
   const [transformProposals, setTransformProposals] = useState<PythiaTransformProposal[]>([]);
@@ -480,6 +534,10 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
   const pendingCount = proposals.filter((proposal) => proposal.status === "pending").length
     + pythiaProposals.filter((proposal) => proposal.status === "pending").length
     + transformProposals.filter((proposal) => proposal.status === "pending").length;
+  const orderedProposals = firstProposalId
+    ? [...proposals].sort((left, right) => Number(right.id === firstProposalId) - Number(left.id === firstProposalId))
+    : proposals;
+
   function displayValue(value: unknown): string {
     if (typeof value === "string") return value || "Empty";
     return JSON.stringify(value, null, 2) ?? "Empty";
@@ -612,7 +670,7 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
             {proposal.status === "stale" && <p className="enhancement-resource-warning">The storyboard changed after this proposal was created. Run a new transformation before accepting.</p>}
           </article>;
         })}</div>}
-        {proposals.length > 0 && <div className="enhancement-proposal-list">{proposals.map((proposal) => {
+        {proposals.length > 0 && <div className="enhancement-proposal-list">{orderedProposals.map((proposal) => {
           const targetScene = project.storyboard.scenes.find((scene) => scene.id === proposal.targetSceneId);
             const assessmentBlueprint = proposal.sourceCapability?.startsWith("assessment.") ? proposal.sourceArtifact?.payload : undefined;
             const relevantAlignment = assessmentBlueprint?.alignment?.filter((item) => proposal.affectedIds.includes(item.objective_id)) ?? [];
@@ -622,11 +680,14 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated }: En
             beforeValue: proposal.beforeValue,
             proposedValue: proposal.proposedValue,
           }];
+          const isHandoff = proposal.sourceCapability === "production.handoff.v1";
           const addsScenes = proposalChanges.some(change => change.field === "additionalScenes");
           return <article className={`enhancement-proposal ${proposal.status}`} key={proposal.id}>
             <div className="enhancement-proposal-heading"><div><span className="enhancement-proposal-status">{proposal.status}</span><h3>{targetScene?.title ?? (proposal.targetSceneId ? "Scene no longer exists" : "Storyboard change")}</h3><span className="enhancement-proposal-field">{proposalChanges.length} change{proposalChanges.length === 1 ? "" : "s"} · source revision {proposal.sourceRevision}{proposal.dependencyGroupId ? ` · group ${proposal.dependencyGroupId}` : ""}</span></div><span className="enhancement-proposal-origin">{proposal.origin === "ai" ? `AI suggestion · ${proposal.referenceCitations.length ? "source-backed" : "ungrounded"}` : "Author suggestion"}{proposal.provider ? ` · ${proposal.provider}` : ""}{proposal.model ? ` / ${proposal.model}` : ""}</span></div>
             <p className="enhancement-proposal-rationale">{proposal.rationale}</p>
             {proposal.sourceTaskId && <p className="enhancement-proposal-field">Pythia {proposal.sourceCapability} · task {proposal.sourceTaskId} · artifact {proposal.sourceArtifactId}</p>}
+            {isHandoff && proposal.sourceArtifact?.storyboard && proposal.sourceArtifact.provenance && <HandoffDetails board={proposal.sourceArtifact.storyboard} provenance={proposal.sourceArtifact.provenance} />}
+            {isHandoff && proposal.status === "stale" && <p className="enhancement-resource-warning">The storyboard changed. Export a new handoff with a new ID before importing it again.</p>}
             {relevantAlignment.length > 0 && <section className="enhancement-proposal-change"><div className="enhancement-proposal-field">Objective alignment</div><ul>{relevantAlignment.map((alignment) => <li key={`${alignment.objective_id}-${alignment.method}`}><strong>{alignment.objective_id}</strong><p>{alignment.evidence} · {alignment.method}</p><p>Scoring: {alignment.scoring}</p><p>Fairness: {alignment.fairness}</p></li>)}</ul></section>}
             {assessmentBlueprint && <details className="enhancement-proposal-citations"><summary>Blueprint assumptions and review notes</summary><p>{assessmentBlueprint.ai_use_boundaries}</p>{assessmentBlueprint.assumptions?.map((item, index) => <p key={`assessment-assumption-${index}`}>{item}</p>)}{assessmentBlueprint.limitations?.map((item, index) => <p key={`assessment-limitation-${index}`}>{item}</p>)}{assessmentBlueprint.review_questions?.map((item, index) => <p key={`assessment-question-${index}`}>{item}</p>)}</details>}
             {proposalChanges.map((change, index) => <section className="enhancement-proposal-change" key={`${change.targetSceneId ?? "storyboard"}-${change.field}-${index}`}>

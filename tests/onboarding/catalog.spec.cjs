@@ -471,9 +471,9 @@ test('restore guides retain confirmation and advance after successful JSON and Z
   await choose(page, 'Restore storyboard JSON');
   page.once('dialog', d => d.dismiss());
   const file = { name: 'restore.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(p.storyboard)) };
-  await page.getByLabel('Restore JSON', { exact: true }).setInputFiles(file); await expectStep(page, 'Restore storyboard JSON');
+  await page.getByLabel('Import JSON', { exact: true }).setInputFiles(file); await expectStep(page, 'Restore storyboard JSON');
   expect((await readProject(page, id)).storyboard.revision).toBe(p.storyboard.revision);
-  page.once('dialog', d => d.accept()); await page.getByLabel('Restore JSON', { exact: true }).setInputFiles(file); await finish(page);
+  page.once('dialog', d => d.accept()); await page.getByLabel('Import JSON', { exact: true }).setInputFiles(file); await finish(page);
   await page.getByRole('button', { name: 'Close export', exact: true }).click();
   const backup = await page.request.get(`/api/projects/${id}/backup.zip`); expect(backup.ok()).toBe(true);
   await choose(page, 'Restore Chimera storyboard'); page.once('dialog', d => d.accept());

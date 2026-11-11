@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from starlette.concurrency import run_in_threadpool
 from starlette.background import BackgroundTask
 from PIL import Image, UnidentifiedImageError
@@ -27,6 +27,8 @@ from .auth import resolve_actor_context
 from .export_analytics import capture_scorm_export
 from .owner_suite import run_owner_action, verify_assertion
 from .backup import build_project_archive, restore_project_archive
+from . import production_handoff
+from .handoff_contract.production_handoff import MAX_BYTES as MAX_HANDOFF_BYTES
 from .enhancement_jobs import cancel_enhancement_job, preview_enhancement_submission, recover_enhancement_jobs, retry_enhancement_job, start_enhancement_job
 from .identity import IdentitySnapshot, LocalIdentityDirectory, OrganizationPolicy, ProjectMembership, ProjectMembershipCreate, RoleBasedAuthorizationPolicy
 from .media_generation import cancel_media_generation_job, recover_media_generation_jobs, regenerate_candidate, retry_media_generation_job, start_media_generation_job
@@ -163,7 +165,8 @@ ROUTE_ACTIONS = {
     "export_scorm_2004": "project.export", "export_scorm_12": "project.export", "get_scorm_report": "project.export",
     "export_storyboard": "project.export", "export_project_backup": "project.export", "import_project_backup": "project.restore",
     "export_storyboard_docx": "project.export", "export_sme_storyboard_docx": "project.export", "export_full_storyboard_docx": "project.export",
-    "import_storyboard": "project.import", "post_project_asset": "media.manage",
+    "import_storyboard": "project.import", "import_production_handoff": "project.import",
+    "post_project_asset": "media.manage",
     "post_html5_import": "project.import",
     "get_project_asset": "project.view", "get_slide_render": "project.view", "post_scene": "scene.manage",
     "patch_scene": "scene.manage", "delete_project_scene": "scene.manage", "extract_scene_layout": "scene.manage",
@@ -1884,6 +1887,8 @@ def post_review_comment_decision(
 
 @app.post("/api/projects/{project_id}/enhancement-proposals", response_model=EnhancementProposal, status_code=201)
 def post_enhancement_proposal(project_id: str, data: EnhancementProposalCreate) -> EnhancementProposal:
+    if data.sourceCapability == production_handoff.CAPABILITY:
+        raise HTTPException(status_code=422, detail="Use Import JSON to queue a production handoff")
     try:
         return create_enhancement_proposal(project_id, data)
     except FileNotFoundError as error:
@@ -2812,8 +2817,41 @@ def export_full_storyboard_docx(project_id: str, include_answer_key: bool = Fals
     return _export_template_storyboard(project_id, include_answer_key, full=True)
 
 
+@app.post("/api/projects/{project_id}/storyboard/import", response_model=EnhancementProposal, status_code=201)
+async def import_production_handoff(
+    project_id: str, request: Request, if_match: Annotated[str | None, Header()] = None,
+) -> EnhancementProposal:
+    revision = _expected_revision(if_match)
+    if revision is None:
+        raise HTTPException(status_code=428, detail="An If-Match storyboard revision is required")
+    raw = bytearray()
+    async for chunk in request.stream():
+        if len(raw) + len(chunk) > MAX_HANDOFF_BYTES:
+            raise HTTPException(status_code=413, detail="Pythia handoff JSON must be 1 MB or smaller")
+        raw.extend(chunk)
+    try:
+        return await run_in_threadpool(production_handoff.queue, project_id, raw, revision)
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail="Project not found") from error
+    except EnhancementProposalConflict as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+class StoryboardRestore(Storyboard):
+    @model_validator(mode="before")
+    @classmethod
+    def require_native_storyboard(cls, data):
+        if isinstance(data, dict) and data.get("format") == production_handoff.FORMAT:
+            raise ValueError("Pythia handoffs must be imported for review")
+        return data
+
+
 @app.put("/api/projects/{project_id}/storyboard/import", response_model=ProjectDetail)
-def import_storyboard(project_id: str, data: Storyboard, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
+def import_storyboard(project_id: str, data: StoryboardRestore, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
     try:
         return replace_storyboard(project_id, data, _expected_revision(if_match))
     except StoryboardRevisionConflict as error:

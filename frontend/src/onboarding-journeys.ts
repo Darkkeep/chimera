@@ -98,7 +98,7 @@ const tasks: Task[] = [
     ['word', 'Export an editable Word storyboard', 'Choose SME Master or Full storyboard, then Download Word document. Answer keys are authoring material and excluded by default.'],
     ['qti-test', 'Export a QTI assessment test', 'Download QTI test packages at least two authored questions. Chimera retry/pass settings are not included in item XML.'],
     ['threshold', 'Set the package size warning', 'Change Warn when a package exceeds (1–4096 MB), then leave the field to save.'],
-    ['restore-json', 'Restore storyboard JSON', 'Use Restore JSON with compatible data. Referenced assets/templates must already exist. Read the replacement confirmation; the guide never confirms it. Practice in a disposable project or skip.'],
+    ['restore-json', 'Restore storyboard JSON', 'Use Import JSON with compatible Chimera backup data. Referenced assets/templates must already exist. Read the replacement confirmation; the guide never confirms it. Practice in a disposable project or skip.'],
     ['restore-backup', 'Restore Chimera storyboard', 'Choose Restore Chimera storyboard and read the replacement confirmation. The archive must validate before replacement. Practice in a disposable project or skip.'],
   ].map(([id, title, copy]) => [`export-${id}`, title, 'export.panel', copy, `export.${id}`, id === 'qti-test' ? (c: Context) => Number(c.questionCount) >= 2 : project] as Task)),
   ['qti-item', 'Export a QTI question', 'assessment.editor', 'Save the question first, then Export QTI item. This exports one QTI 2.1 item. Retry/pass settings remain Chimera settings.', 'question.exported', assessment],

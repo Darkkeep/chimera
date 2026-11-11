@@ -566,11 +566,21 @@ class EnhancementSceneDraft(BaseModel):
     narration: str = Field(default="", max_length=10000)
     actionDescription: str = Field(default="", max_length=5000)
     notes: str = Field(default="", max_length=10000)
-
     @model_validator(mode="after")
     def bounded_content(self):
         if not self.title.strip() or any(not text.strip() or len(text) > 2000 for text in self.extractedText):
             raise ValueError("New scenes require a title and nonempty paragraphs of at most 2000 characters")
+        return self
+
+
+class HandoffSceneDraft(EnhancementSceneDraft):
+    sceneType: Literal["content", "title", "summary", "question"] = "content"
+    assessmentItem: SingleChoiceAssessment | None = None
+
+    @model_validator(mode="after")
+    def question_scope(self):
+        if (self.sceneType == "question") != (self.assessmentItem is not None):
+            raise ValueError("Question drafts require an assessment item")
         return self
 
 

@@ -83,6 +83,23 @@ class PlatformAccessTests(unittest.TestCase):
         self.assertEqual(self.get(f'/api/projects/{self.other.id}/question-import/template.csv').status_code, 403)
         self.assertEqual(self.get(base + '/question-import/template.csv', 'reviewer').status_code, 200)
 
+    def test_handoff_import_and_accept_use_project_permissions(self):
+        base = f'/api/projects/{self.project.id}'
+        raw = (Path(__file__).with_name('fixtures') / 'production-handoff-v1.json').read_bytes()
+        revision = str(self.project.storyboard.revision)
+        for actor in ('reviewer', 'other'):
+            denied = self.client.post(base + '/storyboard/import', content=raw,
+                                      headers={'X-Test-Actor': actor, 'If-Match': revision})
+            self.assertEqual(denied.status_code, 403)
+        queued = self.client.post(base + '/storyboard/import', content=raw,
+                                  headers={'X-Test-Actor': 'author', 'If-Match': revision})
+        self.assertEqual(queued.status_code, 201, queued.text)
+        decision = base + '/enhancement-proposals/' + queued.json()['id'] + '/decision'
+        denied = self.client.post(decision, json={'decision': 'accept'},
+                                  headers={'X-Test-Actor': 'reviewer', 'If-Match': revision})
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(storage.read_project(self.project.id).storyboard, self.project.storyboard)
+
     def test_project_and_installation_isolation_filter_management_views(self):
         self.assertEqual(self.get(f'/api/projects/{self.other.id}').status_code, 403)
         self.assertEqual(self.get(f'/api/projects/{self.project.id}', **{'X-Test-Installation': 'foreign'}).status_code, 403)
