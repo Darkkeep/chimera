@@ -1767,14 +1767,17 @@ def _proposal_value(value: object) -> object:
     return value.model_dump(mode="json") if hasattr(value, "model_dump") else value
 
 
-def _snapshot_proposal_change(project: ProjectDetail, change: EnhancementProposalChangeCreate) -> EnhancementProposalChange:
+def _snapshot_proposal_change(
+    project: ProjectDetail, change: EnhancementProposalChangeCreate,
+    scene_draft: type[EnhancementSceneDraft] = EnhancementSceneDraft,
+) -> EnhancementProposalChange:
     if change.field == "additionalScenes":
         initial = change.targetSceneId is None and not project.storyboard.scenes
         if not initial and (not change.targetSceneId or not any(scene.id == change.targetSceneId for scene in project.storyboard.scenes)):
             raise ValueError("Additional scenes require an existing anchor scene")
         if not isinstance(change.proposedValue, list) or not 1 <= len(change.proposedValue) <= 40:
             raise ValueError("Propose 1-40 additional scenes per anchor")
-        drafts = [EnhancementSceneDraft.model_validate(value) for value in change.proposedValue]
+        drafts = [scene_draft.model_validate(value) for value in change.proposedValue]
         from .authoring import native_layout
         additions = []
         for draft in drafts:
@@ -1815,7 +1818,10 @@ def _snapshot_proposal_change(project: ProjectDetail, change: EnhancementProposa
     )
 
 
-def create_enhancement_proposal(project_id: str, data: EnhancementProposalCreate) -> EnhancementProposal:
+def create_enhancement_proposal(
+    project_id: str, data: EnhancementProposalCreate, *,
+    scene_draft: type[EnhancementSceneDraft] = EnhancementSceneDraft,
+) -> EnhancementProposal:
     with storyboard_transaction():
         if data.jobId:
             existing = next((item for item in list_enhancement_proposals(project_id) if item.jobId == data.jobId), None)
@@ -1832,7 +1838,7 @@ def create_enhancement_proposal(project_id: str, data: EnhancementProposalCreate
         change_keys = [(change.targetSceneId, change.field) for change in requested_changes]
         if len(set(change_keys)) != len(change_keys):
             raise ValueError("A proposal cannot change the same field more than once")
-        changes = [_snapshot_proposal_change(project, change) for change in requested_changes]
+        changes = [_snapshot_proposal_change(project, change, scene_draft) for change in requested_changes]
         first_change = changes[0]
         affected_ids = list(dict.fromkeys([*data.affectedIds, *(change.targetSceneId for change in changes if change.targetSceneId)]))
         if any(change.field == "sceneOrder" for change in changes):

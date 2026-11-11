@@ -1,0 +1,116 @@
+{
+  "format": "pythia-chimera-production-handoff",
+  "version": "1.0",
+  "handoff_id": "alarm-handoff-r1",
+  "review_state": "pending",
+  "validation_state": "passed",
+  "provenance": {
+    "producer": "pythia",
+    "project_id": "evacuation",
+    "artifact_id": "alarm-design-r1",
+    "sources": [
+      {
+        "id": "site-guide",
+        "title": "Site evacuation guide",
+        "locator": "Section 2, alarm response"
+      }
+    ]
+  },
+  "storyboard": {
+    "id": "alarm-storyboard",
+    "title": "Respond to a fire alarm",
+    "objectives": [
+      {
+        "id": "identify-exit",
+        "statement": "Choose the nearest marked exit when an alarm sounds.",
+        "source_ids": [
+          "site-guide"
+        ]
+      }
+    ],
+    "media": [
+      {
+        "id": "exit-map",
+        "kind": "image",
+        "label": "Floor exit map",
+        "reference": "asset-catalog:evacuation/exit-map",
+        "accessibility_notes": "Identify the nearest exit and alternate route in text.",
+        "source_ids": [
+          "site-guide"
+        ]
+      }
+    ],
+    "scenes": [
+      {
+        "id": "alarm-response",
+        "kind": "content",
+        "title": "Leave by a marked exit",
+        "screen_text": [
+          "Follow the nearest marked exit."
+        ],
+        "narration": {
+          "script": "When the alarm sounds, leave by the nearest marked exit."
+        },
+        "action_description": "Show a diagram of two marked exits.",
+        "production_notes": "Use the map for the training site.",
+        "objective_ids": [
+          "identify-exit"
+        ],
+        "media_ids": [
+          "exit-map"
+        ],
+        "source_ids": [
+          "site-guide"
+        ],
+        "interactions": [
+          {
+            "id": "exit-reflection",
+            "kind": "reflection",
+            "prompt": "Which route would you take from your desk?",
+            "feedback": "Use the nearest safe marked exit."
+          }
+        ],
+        "assessment": null
+      },
+      {
+        "id": "alarm-check",
+        "kind": "question",
+        "title": "Check your understanding",
+        "screen_text": [
+          "Choose one response."
+        ],
+        "narration": {
+          "script": ""
+        },
+        "action_description": "",
+        "production_notes": "",
+        "objective_ids": [
+          "identify-exit"
+        ],
+        "media_ids": [],
+        "source_ids": [
+          "site-guide"
+        ],
+        "interactions": [],
+        "assessment": {
+          "id": "choose-exit",
+          "type": "single-choice",
+          "prompt": "What do you do when the alarm sounds?",
+          "choices": [
+            {
+              "id": "exit",
+              "text": "Leave by the nearest marked exit."
+            },
+            {
+              "id": "wait",
+              "text": "Wait for a second alarm."
+            }
+          ],
+          "correct_choice_id": "exit",
+          "correct_feedback": "Correct.",
+          "incorrect_feedback": "Leave when the alarm sounds."
+        }
+      }
+    ]
+  }
+}

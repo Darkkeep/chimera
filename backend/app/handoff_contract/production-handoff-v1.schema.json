@@ -1,0 +1,424 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pythia → Chimera Production Handoff v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "pythia-chimera-production-handoff"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "handoff_id": {
+      "$ref": "#/$defs/id"
+    },
+    "review_state": {
+      "const": "pending"
+    },
+    "validation_state": {
+      "const": "passed"
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "producer": {
+          "const": "pythia"
+        },
+        "project_id": {
+          "$ref": "#/$defs/id"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/id"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source"
+          },
+          "maxItems": 100
+        }
+      },
+      "required": [
+        "producer",
+        "project_id",
+        "artifact_id",
+        "sources"
+      ]
+    },
+    "storyboard": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "objectives": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/objective"
+          },
+          "maxItems": 50
+        },
+        "media": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/media"
+          },
+          "maxItems": 100
+        },
+        "scenes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scene"
+          },
+          "maxItems": 40,
+          "minItems": 1
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "objectives",
+        "media",
+        "scenes"
+      ]
+    }
+  },
+  "required": [
+    "format",
+    "version",
+    "handoff_id",
+    "review_state",
+    "validation_state",
+    "provenance",
+    "storyboard"
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z]",
+      "not": {
+        "pattern": "[^A-Za-z0-9_-]"
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "locator": {
+          "type": "string",
+          "maxLength": 1000,
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "locator"
+      ]
+    },
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "statement": {
+          "type": "string",
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "maxItems": 20,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "statement",
+        "source_ids"
+      ]
+    },
+    "media": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "image",
+            "audio",
+            "video"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "reference": {
+          "type": "string",
+          "maxLength": 1000,
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "accessibility_notes": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "maxItems": 20,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "label",
+        "reference",
+        "accessibility_notes",
+        "source_ids"
+      ]
+    },
+    "interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "reflection",
+            "discussion",
+            "practice"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "maxLength": 5000,
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "feedback": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "prompt",
+        "feedback"
+      ]
+    },
+    "choice": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 1000,
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "id",
+        "text"
+      ]
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "single-choice"
+        },
+        "prompt": {
+          "type": "string",
+          "maxLength": 5000,
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "choices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/choice"
+          },
+          "maxItems": 10,
+          "minItems": 2
+        },
+        "correct_choice_id": {
+          "$ref": "#/$defs/id"
+        },
+        "correct_feedback": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "incorrect_feedback": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "prompt",
+        "choices",
+        "correct_choice_id",
+        "correct_feedback",
+        "incorrect_feedback"
+      ]
+    },
+    "scene": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "title",
+            "content",
+            "summary",
+            "question"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "screen_text": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "maxItems": 12,
+          "minItems": 1
+        },
+        "narration": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "script": {
+              "type": "string",
+              "maxLength": 10000
+            }
+          },
+          "required": [
+            "script"
+          ]
+        },
+        "action_description": {
+          "type": "string",
+          "maxLength": 5000
+        },
+        "production_notes": {
+          "type": "string",
+          "maxLength": 10000
+        },
+        "objective_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "maxItems": 50,
+          "uniqueItems": true
+        },
+        "media_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "maxItems": 20,
+          "uniqueItems": true
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "maxItems": 20,
+          "uniqueItems": true
+        },
+        "interactions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/interaction"
+          },
+          "maxItems": 10
+        },
+        "assessment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/assessment"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "title",
+        "screen_text",
+        "narration",
+        "action_description",
+        "production_notes",
+        "objective_ids",
+        "media_ids",
+        "source_ids",
+        "interactions",
+        "assessment"
+      ]
+    }
+  }
+}

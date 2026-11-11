@@ -127,6 +127,7 @@ export function App() {
   const [showCompletionSettings, setShowCompletionSettings] = useState(false);
   const [showAssessments, setShowAssessments] = useState(false);
   const [showEnhancementReview, setShowEnhancementReview] = useState(false);
+  const [importedHandoffId, setImportedHandoffId] = useState<string>();
   const [showPythiaAnalysis, setShowPythiaAnalysis] = useState(false);
   const [showPythiaTransform, setShowPythiaTransform] = useState(false);
   const [showSceneExperience, setShowSceneExperience] = useState(false);
@@ -936,31 +937,42 @@ export function App() {
       input.value = "";
       return;
     }
-    const confirmed = window.confirm(`Replace the storyboard for "${project.title}"? The current version will be saved to history. JSON does not contain media files; all referenced assets and templates must already be available in this project.`);
-    if (!confirmed) {
-      input.value = "";
-      return;
-    }
     setBusy(true);
     setError("");
     setFeedback("");
     try {
+      const raw = await file.text();
       let storyboard: unknown;
       try {
-        storyboard = JSON.parse(await file.text());
+        storyboard = JSON.parse(raw);
       } catch {
         throw new Error("The selected file is not valid JSON.");
       }
+      const isHandoff = storyboard !== null && typeof storyboard === "object"
+        && "format" in storyboard && storyboard.format === "pythia-chimera-production-handoff";
+      if (isHandoff && file.size > 1_000_000) {
+        throw new Error("Pythia handoff JSON must be 1 MB or smaller.");
+      }
+      if (!isHandoff && !window.confirm(`Replace the storyboard for "${project.title}"? The current version will be saved to history. JSON does not contain media files; all referenced assets and templates must already be available in this project.`)) {
+        return;
+      }
       const response = await fetch(`/api/projects/${project.id}/storyboard/import`, {
-        method: "PUT",
+        method: isHandoff ? "POST" : "PUT",
         headers: storyboardWriteHeaders(project.storyboard.revision),
-        body: JSON.stringify(storyboard),
+        body: isHandoff ? file : JSON.stringify(storyboard),
       });
       if (!response.ok) {
         const detail = await response.json().catch(() => null) as { detail?: unknown } | null;
         const conflictMessage = revisionConflictMessage(response.status);
         if (conflictMessage) throw new Error(conflictMessage);
         throw new Error(typeof detail?.detail === "string" ? detail.detail : "Import failed. Check the storyboard schema and referenced assets.");
+      }
+      if (isHandoff) {
+        const proposal: { id: string } = await response.json();
+        setImportedHandoffId(proposal.id);
+        setShowExport(false);
+        setShowEnhancementReview(true);
+        return;
       }
       const updatedProject: Project = await response.json();
       applyProject(updatedProject);
@@ -1400,7 +1412,7 @@ export function App() {
         <div className="export-actions report-actions"><button className="button button-outline" onClick={() => void downloadScormReport("scorm2004")} disabled={busy}>Report 2004 <Download size={14} /></button><button className="button button-outline" onClick={() => void downloadScormReport("scorm12")} disabled={busy}>Report 1.2 <Download size={14} /></button></div>
       </section>
       <section className="export-section"><h3>Standalone course</h3><div className="export-actions"><button className="button button-outline" onClick={() => void exportStandalone()} disabled={busy}><Download size={15} /> Download standalone ZIP</button></div></section>
-      <section className="export-section"><h3>Chimera storyboard</h3><p>Save or restore the complete project, including media, review records, and history.</p><div className="export-actions"><button className="button button-outline" onClick={() => void exportStoryboard()} disabled={busy}><Download size={15} /> Download JSON</button><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`}><img src={restoreIcon} alt="" width="16" height="16" /> Restore JSON<input type="file" aria-label="Restore JSON" accept="application/json,.json" onChange={importStoryboard} disabled={busy} /></label></div><div className="export-actions"><button className="button button-accent" onClick={() => void exportProjectBackup()} disabled={busy}><Download size={15} /> Download Chimera storyboard</button><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`}><Upload size={15} /> Restore Chimera storyboard<input type="file" aria-label="Restore Chimera storyboard" accept="application/zip,.zip" onChange={importProjectBackup} disabled={busy} /></label></div></section>
+      <section className="export-section"><h3>Chimera storyboard</h3><p>Restore a Chimera JSON backup or import a Pythia handoff for review. Use the Chimera storyboard archive to include media and history.</p><div className="export-actions"><button className="button button-outline" onClick={() => void exportStoryboard()} disabled={busy}><Download size={15} /> Download JSON</button><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`}><img src={restoreIcon} alt="" width="16" height="16" /> Import JSON<input type="file" aria-label="Import JSON" accept="application/json,.json" onChange={importStoryboard} disabled={busy} /></label></div><div className="export-actions"><button className="button button-accent" onClick={() => void exportProjectBackup()} disabled={busy}><Download size={15} /> Download Chimera storyboard</button><label className={`button button-outline upload-control ${busy ? "disabled" : ""}`}><Upload size={15} /> Restore Chimera storyboard<input type="file" aria-label="Restore Chimera storyboard" accept="application/zip,.zip" onChange={importProjectBackup} disabled={busy} /></label></div></section>
       <section className="export-section"><h3>Editable Word storyboard</h3><p>Choose a slide-like SME Master or the integrated Full storyboard.</p><label className="word-answer-key word-format-select"><span>Format</span><select aria-label="Word storyboard format" value={wordExportFormat} onChange={(event) => setWordExportFormat(event.target.value as "sme" | "full")} disabled={busy}><option value="sme">SME Master</option><option value="full">Full storyboard</option></select></label><label className="word-answer-key"><input type="checkbox" checked={includeWordAnswerKey} onChange={(event) => setIncludeWordAnswerKey(event.target.checked)} disabled={busy} /><span>Include answer keys (authoring material)</span></label><label className="word-answer-key"><input type="checkbox" checked={includeWordComments} onChange={(event) => setIncludeWordComments(event.target.checked)} disabled={busy} /><span>Include review discussion (authoring material)</span></label><button className="button button-outline" onClick={() => void exportWordStoryboard()} disabled={busy}><FileText size={15} /> Download Word document</button></section>
       {assessmentItemCount >= 2 && <section className="export-section"><h3>Assessment test</h3><p>Export all authored questions together as a QTI 2.1 test.</p><button className="button button-outline" onClick={() => void exportAssessmentTest()} disabled={busy}><ClipboardList size={15} /> Download QTI test</button></section>}
       {error && <p className="export-error" role="alert">{error}</p>}{feedback && <p className="export-feedback" role="status">{feedback}</p>}{busy && <p role="status">Working…</p>}
@@ -1416,7 +1428,7 @@ export function App() {
       const index = (updatedProject ?? project).storyboard.scenes.findIndex(candidate => candidate.id === sceneId);
       if (index >= 0) { setSelectedScene(index); setShowAssessments(false); setShowAssessmentEditor(true); }
     }} />}
-    {showEnhancementReview && <EnhancementReviewView project={project} onClose={() => setShowEnhancementReview(false)} onProjectUpdated={applyProject} />}
+    {showEnhancementReview && <EnhancementReviewView project={project} firstProposalId={importedHandoffId} onClose={() => { setImportedHandoffId(undefined); setShowEnhancementReview(false); }} onProjectUpdated={applyProject} />}
     {showValidation && <ValidationView projectId={project.id} onClose={() => setShowValidation(false)} onOpenScene={(sceneId, issueCode) => { const index = scenes.findIndex((item) => item.id === sceneId); setShowValidation(false); if (index >= 0) setSelectedScene(index); if (issueCode === "missing-image-alt-text") setShowAccessibility(true); else if (issueCode === "missing-assessment-item") setShowAssessmentEditor(true); else setActiveView("storyboard"); }} />}
     {showAccessibility && <AccessibilityView projectId={project.id} revision={project.storyboard.revision} scenes={scenes} assets={project.storyboard.assets} onClose={() => setShowAccessibility(false)} onProjectUpdated={applyProject} />}
     {showGoldenPath && <GoldenPathView walkthroughStatuses={Object.fromEntries(Object.entries(guides).map(([id, guide]) => [id, guide.controller.snapshot().status]))} onStartWalkthrough={() => startOnboarding()} onSelectWalkthrough={id => startOnboarding(id)} project={project} onClose={() => setShowGoldenPath(false)} onCreateProject={() => { setShowGoldenPath(false); beginProjectCreate(); }} onOpenStoryboard={() => { setShowGoldenPath(false); setActiveView("storyboard"); }} onOpenMedia={() => { setShowGoldenPath(false); setActiveView("media"); }} onOpenAccessibility={() => { setShowGoldenPath(false); setShowAccessibility(true); }} onOpenPreview={() => { setShowGoldenPath(false); if (project.id) setShowPreview(true); }} onRunValidation={() => { setShowGoldenPath(false); setShowValidation(true); }} onOpenPythiaAnalysis={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaAnalysis(true); }} onOpenPythiaTransform={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaTransform(true); }} onOpenPythiaAssessment={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaAssessmentDesign(true); }} onOpenSuggestions={() => { setShowGoldenPath(false); setShowManagement(false); setShowEnhancementReview(true); }} onOpenCourseReview={() => { setShowGoldenPath(false); setShowManagement(false); setShowPythiaCourseReview(true); }} onOpenManagement={() => { setShowGoldenPath(false); setShowManagement(true); }} onOpenExport={() => { setShowGoldenPath(false); setShowManagement(false); setShowExport(true); }} />}
