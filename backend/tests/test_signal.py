@@ -1,5 +1,7 @@
 """Contract tests for the first Signal intake endpoint."""
 import sqlite3
+import os
+import httpx
 import tempfile
 import unittest
 from pathlib import Path
@@ -60,6 +62,29 @@ class SignalIntakeTests(unittest.TestCase):
     def test_anonymous_rate_limit(self):
         statuses = [self.client.post("/api/signal/reports", json=self.body).status_code for _ in range(11)]
         self.assertEqual(statuses, [201] * 10 + [429])
+
+    def test_gateway_forwarding_returns_central_receipt_without_local_copy(self):
+        gateway = "https://darkrogue.io/api/internal/signal/intake"
+        with patch.dict(os.environ, {
+            "SIGNAL_GATEWAY_URL": gateway,
+            "SIGNAL_GATEWAY_SECRET": "fake-test-token-with-at-least-thirty-two-characters",
+        }), patch.object(signal.httpx, "post", return_value=httpx.Response(
+            201, json={"id": "SIG-CENTRAL123", "status": "received"},
+        )) as post:
+            response = self.client.post("/api/signal/reports", json=self.body)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["id"], "SIG-CENTRAL123")
+        self.assertEqual(post.call_args.args[0], gateway)
+        self.assertNotIn("signal-reports.sqlite3",
+                         [p.name for p in Path(self.temp.name).rglob("*")])
+
+    def test_invalid_gateway_configuration_fails_closed(self):
+        with patch.dict(os.environ, {
+            "SIGNAL_GATEWAY_URL": "http://untrusted.example/api/internal/signal/intake",
+            "SIGNAL_GATEWAY_SECRET": "fake-test-token-with-at-least-thirty-two-characters",
+        }):
+            response = self.client.post("/api/signal/reports", json=self.body)
+        self.assertEqual(response.status_code, 503)
 
     def test_follow_up_not_offered_until_supported(self):
         response = self.client.post("/api/signal/reports", json={
