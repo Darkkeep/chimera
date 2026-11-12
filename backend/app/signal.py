@@ -7,6 +7,7 @@ consultation text, URLs with query strings, stack traces, or credentials.
 import hashlib
 import os
 import sqlite3
+import httpx
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -75,10 +76,39 @@ def submit_signal(report: SignalReport, request: Request):
         host = urlsplit(str(request.base_url))
         if incoming.netloc != request.headers.get("host", host.netloc):
             raise HTTPException(status_code=403, detail="Cross-origin feedback is not accepted")
+    if report.product != "chimera":
+        raise HTTPException(status_code=422, detail="Invalid reporting product")
     if report.followUpRequested:
         # Don't imply contact is possible until an authenticated reporter/consent
         # mechanism is connected.
         raise HTTPException(status_code=422, detail="Follow-up is not available yet")
+    # Hosted opt-in: forward to the central DARKROGUE gateway, never from the browser.
+    gateway = os.environ.get("SIGNAL_GATEWAY_URL", "").strip()
+    gateway_secret = os.environ.get("SIGNAL_GATEWAY_SECRET", "")
+    if gateway:
+        from urllib.parse import urlsplit
+        parsed = urlsplit(gateway)
+        if (parsed.scheme != "https" or parsed.netloc != "darkrogue.io"
+                or parsed.path != "/api/internal/signal/intake" or parsed.query or parsed.fragment
+                or len(gateway_secret) < 32):
+            raise HTTPException(status_code=503, detail="Signal gateway is not configured correctly")
+        try:
+            response = httpx.post(
+                gateway,
+                json=report.model_dump(exclude_none=True),
+                headers={"Authorization": f"Bearer {gateway_secret}"},
+                timeout=5.0,
+                follow_redirects=False,
+            )
+            if response.status_code == 201:
+                receipt = response.json()
+                if isinstance(receipt, dict) and isinstance(receipt.get("id"), str):
+                    return {"id": receipt["id"], "status": "received"}
+            if response.status_code == 429:
+                raise HTTPException(status_code=429, detail="Too many reports. Try again later.")
+        except httpx.HTTPError:
+            pass
+        raise HTTPException(status_code=503, detail="Feedback service is unavailable; please retry later")
     now = datetime.now(timezone.utc)
     hour = now.strftime("%Y-%m-%dT%H")
     # Hash remote address with a deployment-specific secret; store no raw IP.
