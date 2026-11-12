@@ -24,6 +24,7 @@ import { CompletionSettingsEditor } from "./CompletionSettingsEditor";
 import { EnhancementReviewView } from "./EnhancementReviewView";
 import { EditorDialog } from "./EditorDialog";
 import { AppearanceSelector } from "./AppearanceSelector";
+import { SignalFeedback } from "./SignalFeedback";
 import { BrandMark } from "./BrandMark";
 import { revisionConflictMessage, storyboardWriteHeaders } from "./revision";
 import restoreIcon from "./assets/cutout-56-a86a43163042.png";
@@ -1323,6 +1324,7 @@ export function App() {
         </div>}
       </div>
       <div className="sidebar-bottom">
+        <SignalFeedback />
         <button className="nav-item settings-toggle" aria-expanded={showSettings} aria-controls="workspace-settings" onClick={() => setShowSettings((open) => !open)}><Settings2 size={18} /><span>Settings</span><ChevronDown size={15} className={showSettings ? "expanded" : ""} /></button>
         {showSettings && <div id="workspace-settings" className="workspace-settings">
           <AppearanceSelector />

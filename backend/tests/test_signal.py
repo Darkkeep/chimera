@@ -1,0 +1,160 @@
+"""Contract tests for the first Signal intake endpoint."""
+import sqlite3
+import os
+import httpx
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from backend.app import signal
+
+
+class SignalIntakeTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root_patch = patch.object(signal, "ROOT", Path(self.temp.name))
+        self.root_patch.start()
+        app = FastAPI()
+        app.include_router(signal.router)
+        self.client = TestClient(app)
+        self.body = {"product": "chimera", "kind": "problem",
+                     "description": "My SCORM export did not complete."}
+
+    def tearDown(self):
+        self.client.close()
+        self.root_patch.stop()
+        self.temp.cleanup()
+
+    def test_submission_returns_receipt_and_persists_without_technical_context(self):
+        response = self.client.post("/api/signal/reports", json={
+            **self.body, "page": "/private/project", "browser": "Browser",
+            "includeTechnicalContext": False,
+        })
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertTrue(response.json()["id"].startswith("SIG-"))
+        with sqlite3.connect(Path(self.temp.name) / "signal" / "signal-reports.sqlite3") as db:
+            rows = db.execute("SELECT description,page,browser,status FROM reports").fetchall()
+        self.assertEqual(rows, [(self.body["description"], None, None, "new")])
+
+    def test_explicit_metadata_consent(self):
+        response = self.client.post("/api/signal/reports", json={
+            **self.body, "page": "/editor", "browser": "Browser",
+            "includeTechnicalContext": True,
+        })
+        self.assertEqual(response.status_code, 201)
+        with sqlite3.connect(Path(self.temp.name) / "signal" / "signal-reports.sqlite3") as db:
+            stored = db.execute("SELECT page,browser FROM reports").fetchone()
+        self.assertEqual(stored, ("/editor", "Browser"))
+
+    def test_bad_payload_rejected(self):
+        response = self.client.post("/api/signal/reports", json={**self.body, "description": "short"})
+        self.assertEqual(response.status_code, 422)
+
+    def test_cross_origin_rejected(self):
+        response = self.client.post("/api/signal/reports", json=self.body,
+                                    headers={"Origin": "https://other.example"})
+        self.assertEqual(response.status_code, 403)
+
+    def test_anonymous_rate_limit(self):
+        statuses = [self.client.post("/api/signal/reports", json=self.body).status_code for _ in range(11)]
+        self.assertEqual(statuses, [201] * 10 + [429])
+
+    def test_whitespace_only_report_is_rejected(self):
+        response = self.client.post("/api/signal/reports", json={
+            **self.body, "description": "                   ",
+        })
+        self.assertEqual(response.status_code, 422)
+
+    def test_unknown_fields_and_query_paths_are_rejected(self):
+        for change in (
+            {"rawTranscript": "private consultation"},
+            {"page": "/editor?access_token=private"},
+            {"page": "https://example.com/editor"},
+        ):
+            with self.subTest(change=change):
+                response = self.client.post("/api/signal/reports", json={**self.body, **change})
+                self.assertEqual(response.status_code, 422)
+
+    def test_same_site_different_origin_is_rejected(self):
+        response = self.client.post("/api/signal/reports", json=self.body,
+                                    headers={"Origin": "http://testserver.attacker.test"})
+        self.assertEqual(response.status_code, 403)
+        response = self.client.post("/api/signal/reports", json=self.body,
+                                    headers={"Sec-Fetch-Site": "cross-site"})
+        self.assertEqual(response.status_code, 403)
+
+    def test_gateway_strips_metadata_without_opt_in(self):
+        gateway = "https://darkrogue.io/api/internal/signal/intake"
+        with patch.dict(os.environ, {
+            "SIGNAL_GATEWAY_URL": gateway,
+            "SIGNAL_GATEWAY_SECRET": "fake-test-token-with-at-least-thirty-two-characters",
+        }), patch.object(signal.httpx, "post", return_value=httpx.Response(
+            201, json={"id": "SIG-CENTRAL123", "status": "received"},
+        )) as post:
+            response = self.client.post("/api/signal/reports", json={
+                **self.body, "version": "1.2.0", "page": "/editor",
+                "browser": "a browser", "includeTechnicalContext": False,
+            })
+        self.assertEqual(response.status_code, 201)
+        body = post.call_args.kwargs["json"]
+        for field in ("version", "page", "browser", "correlationId"):
+            self.assertNotIn(field, body)
+
+    def test_gateway_forwarding_returns_central_receipt_without_local_copy(self):
+        gateway = "https://darkrogue.io/api/internal/signal/intake"
+        with patch.dict(os.environ, {
+            "SIGNAL_GATEWAY_URL": gateway,
+            "SIGNAL_GATEWAY_SECRET": "fake-test-token-with-at-least-thirty-two-characters",
+        }), patch.object(signal.httpx, "post", return_value=httpx.Response(
+            201, json={"id": "SIG-CENTRAL123", "status": "received"},
+        )) as post:
+            response = self.client.post("/api/signal/reports", json=self.body)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["id"], "SIG-CENTRAL123")
+        self.assertEqual(post.call_args.args[0], gateway)
+        self.assertNotIn("followUpRequested", post.call_args.kwargs["json"])
+        self.assertNotIn("signal-reports.sqlite3",
+                         [p.name for p in Path(self.temp.name).rglob("*")])
+
+    def test_explicit_darkrogue_staging_host_can_be_qualified(self):
+        gateway = "https://staging.darkrogue.io/api/internal/signal/intake"
+        with patch.dict(os.environ, {
+            "SIGNAL_GATEWAY_URL": gateway,
+            "SIGNAL_GATEWAY_HOST": "staging.darkrogue.io",
+            "SIGNAL_GATEWAY_SECRET": "fake-test-token-with-at-least-thirty-two-characters",
+        }), patch.object(signal.httpx, "post", return_value=httpx.Response(
+            201, json={"id": "SIG-STAGING123", "status": "received"},
+        )):
+            response = self.client.post("/api/signal/reports", json=self.body)
+        self.assertEqual(response.status_code, 201)
+
+    def test_gateway_refuses_external_configured_host(self):
+        with patch.dict(os.environ, {
+            "SIGNAL_GATEWAY_URL": "https://external.example/api/internal/signal/intake",
+            "SIGNAL_GATEWAY_HOST": "external.example",
+            "SIGNAL_GATEWAY_SECRET": "fake-test-token-with-at-least-thirty-two-characters",
+        }):
+            response = self.client.post("/api/signal/reports", json=self.body)
+        self.assertEqual(response.status_code, 503)
+
+    def test_invalid_gateway_configuration_fails_closed(self):
+        with patch.dict(os.environ, {
+            "SIGNAL_GATEWAY_URL": "http://untrusted.example/api/internal/signal/intake",
+            "SIGNAL_GATEWAY_SECRET": "fake-test-token-with-at-least-thirty-two-characters",
+        }):
+            response = self.client.post("/api/signal/reports", json=self.body)
+        self.assertEqual(response.status_code, 503)
+
+    def test_follow_up_not_offered_until_supported(self):
+        response = self.client.post("/api/signal/reports", json={
+            **self.body, "followUpRequested": True,
+        })
+        self.assertEqual(response.status_code, 422)
+
+
+if __name__ == "__main__":
+    unittest.main()

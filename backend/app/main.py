@@ -69,13 +69,16 @@ from .experience_models import ExperienceDesignRequest, ExperienceReview
 from . import video_treatments
 from .models import ReviewedVideoTreatment
 from . import pythia_actions
+from .signal import router as signal_router
 
 
 HOSTED_ACCOUNT_PROVIDERS = {"builtin", "darkrogue"}
-PUBLIC_API_PATHS = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password", "/api/auth/darkrogue", "/api/internal/pythia/turn-access", "/api/internal/owner-suite/projects"}
+PUBLIC_API_PATHS = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password", "/api/auth/darkrogue", "/api/internal/pythia/turn-access", "/api/internal/owner-suite/projects", "/api/signal/reports"}
 
 
 ROUTE_ACTIONS = {
+    # Public feedback intake bypasses actor auth; keep the route registered in the deny-by-default inventory.
+    "submit_signal": "identity.self",
     "get_scene_experience": "project.view", "post_scene_experience": "enhancement.proposal.create",
     "save_scene_experience": "enhancement.proposal.create", "apply_scene_experience": "enhancement.proposal.decide",
     "post_pythia_action": "enhancement.proposal.create",
@@ -348,6 +351,7 @@ async def _require_request_access(
 
 app = FastAPI(title="Chimera API", version="1.2.0", dependencies=[Depends(_require_request_access)])
 app.include_router(media_router)
+app.include_router(signal_router)
 
 
 @app.exception_handler(RequestValidationError)
