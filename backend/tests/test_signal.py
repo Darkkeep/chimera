@@ -75,6 +75,7 @@ class SignalIntakeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["id"], "SIG-CENTRAL123")
         self.assertEqual(post.call_args.args[0], gateway)
+        self.assertNotIn("followUpRequested", post.call_args.kwargs["json"])
         self.assertNotIn("signal-reports.sqlite3",
                          [p.name for p in Path(self.temp.name).rglob("*")])
 
