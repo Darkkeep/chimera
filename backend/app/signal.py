@@ -73,7 +73,7 @@ def submit_signal(report: SignalReport, request: Request):
         from urllib.parse import urlsplit
         incoming = urlsplit(origin)
         host = urlsplit(str(request.base_url))
-        if (incoming.scheme, incoming.netloc) != (host.scheme, host.netloc):
+        if incoming.netloc != request.headers.get("host", host.netloc):
             raise HTTPException(status_code=403, detail="Cross-origin feedback is not accepted")
     if report.followUpRequested:
         # Don't imply contact is possible until an authenticated reporter/consent
