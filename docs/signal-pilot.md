@@ -34,3 +34,6 @@ Expected: 201, a SIG-prefixed receipt. Also test invalid payload (422), invalid 
 2. Move the protocol and database to `Darkkeep/signal` when repo provisioning is available.
 3. Add consent-based authenticated follow-up and reporting from error surfaces.
 4. Package the UI client and migrate other constellation products.
+
+## Central gateway (optional, qualified hosts only)
+In a hosted environment, set `SIGNAL_GATEWAY_URL` to the exact HTTPS `/api/internal/signal/intake` endpoint on `darkrogue.io`, plus the matching server-side `SIGNAL_GATEWAY_SECRET` (at least 32 characters). To qualify a staging hostname within the DARKROGUE domain, also set `SIGNAL_GATEWAY_HOST` to its exact hostname (for example a verified `staging.darkrogue.io`). The named staging host is an example and must exist and be verified before use. The URL and configured host must agree; unrelated domains and redirects are refused. Without a gateway URL, Chimera remains local-only.
