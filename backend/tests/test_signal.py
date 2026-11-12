@@ -63,6 +63,47 @@ class SignalIntakeTests(unittest.TestCase):
         statuses = [self.client.post("/api/signal/reports", json=self.body).status_code for _ in range(11)]
         self.assertEqual(statuses, [201] * 10 + [429])
 
+    def test_whitespace_only_report_is_rejected(self):
+        response = self.client.post("/api/signal/reports", json={
+            **self.body, "description": "                   ",
+        })
+        self.assertEqual(response.status_code, 422)
+
+    def test_unknown_fields_and_query_paths_are_rejected(self):
+        for change in (
+            {"rawTranscript": "private consultation"},
+            {"page": "/editor?access_token=private"},
+            {"page": "https://example.com/editor"},
+        ):
+            with self.subTest(change=change):
+                response = self.client.post("/api/signal/reports", json={**self.body, **change})
+                self.assertEqual(response.status_code, 422)
+
+    def test_same_site_different_origin_is_rejected(self):
+        response = self.client.post("/api/signal/reports", json=self.body,
+                                    headers={"Origin": "http://testserver.attacker.test"})
+        self.assertEqual(response.status_code, 403)
+        response = self.client.post("/api/signal/reports", json=self.body,
+                                    headers={"Sec-Fetch-Site": "cross-site"})
+        self.assertEqual(response.status_code, 403)
+
+    def test_gateway_strips_metadata_without_opt_in(self):
+        gateway = "https://darkrogue.io/api/internal/signal/intake"
+        with patch.dict(os.environ, {
+            "SIGNAL_GATEWAY_URL": gateway,
+            "SIGNAL_GATEWAY_SECRET": "fake-test-token-with-at-least-thirty-two-characters",
+        }), patch.object(signal.httpx, "post", return_value=httpx.Response(
+            201, json={"id": "SIG-CENTRAL123", "status": "received"},
+        )) as post:
+            response = self.client.post("/api/signal/reports", json={
+                **self.body, "version": "1.2.0", "page": "/editor",
+                "browser": "a browser", "includeTechnicalContext": False,
+            })
+        self.assertEqual(response.status_code, 201)
+        body = post.call_args.kwargs["json"]
+        for field in ("version", "page", "browser", "correlationId"):
+            self.assertNotIn(field, body)
+
     def test_gateway_forwarding_returns_central_receipt_without_local_copy(self):
         gateway = "https://darkrogue.io/api/internal/signal/intake"
         with patch.dict(os.environ, {
