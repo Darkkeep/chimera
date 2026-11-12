@@ -24,10 +24,11 @@ export function SignalFeedback({ product = "chimera", version = "1.2.0" }: { pro
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          product, version, kind, description: description.trim(),
+          product, kind, description: description.trim(),
           includeTechnicalContext: technical,
           ...(technical ? {
             // Keep only pathname, never query/hash or document content.
+            version,
             page: window.location.pathname,
             browser: navigator.userAgent.slice(0, 120),
           } : {}),
