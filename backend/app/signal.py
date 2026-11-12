@@ -95,7 +95,7 @@ def submit_signal(report: SignalReport, request: Request):
         try:
             response = httpx.post(
                 gateway,
-                json=report.model_dump(exclude_none=True),
+                json=report.model_dump(exclude_none=True, exclude={"followUpRequested"}),
                 headers={"Authorization": f"Bearer {gateway_secret}"},
                 timeout=5.0,
                 follow_redirects=False,
