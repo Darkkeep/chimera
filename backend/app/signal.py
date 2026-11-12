@@ -7,22 +7,25 @@ consultation text, URLs with query strings, stack traces, or credentials.
 import hashlib
 import os
 import sqlite3
+from urllib.parse import urlsplit
+
 import httpx
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .storage import ROOT
 
 router = APIRouter()
-KINDS = {"problem", "confusing", "idea", "praise"}
 _DB_NAME = "signal-reports.sqlite3"
 
 
 class SignalReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     product: str = Field(min_length=2, max_length=32, pattern=r"^[a-zA-Z0-9_-]+$")
     kind: str = Field(pattern=r"^(problem|confusing|idea|praise)$")
     description: str = Field(min_length=10, max_length=4000)
@@ -33,6 +36,21 @@ class SignalReport(BaseModel):
     includeTechnicalContext: bool = False
     followUpRequested: bool = False
     # No email or free-form attachments until privacy and follow-up are implemented.
+
+    @field_validator("description")
+    @classmethod
+    def description_must_contain_text(cls, value: str) -> str:
+        value = value.strip()
+        if len(value) < 10:
+            raise ValueError("Describe what happened using at least ten characters")
+        return value
+
+    @field_validator("page")
+    @classmethod
+    def page_is_path_only(cls, value: str | None) -> str | None:
+        if value is not None and (not value.startswith("/") or "?" in value or "#" in value):
+            raise ValueError("Page must be a pathname without query or fragment")
+        return value
 
 
 def _connection():
@@ -68,14 +86,19 @@ def _connection():
 
 @router.post("/api/signal/reports", status_code=201)
 def submit_signal(report: SignalReport, request: Request):
-    # JSON-only submissions plus same-origin checks limit casual cross-site abuse.
+    # Browser Origin and Fetch Metadata checks. Native/local clients may omit Origin.
+    if request.headers.get("sec-fetch-site") in {"cross-site", "same-site"}:
+        raise HTTPException(status_code=403, detail="Cross-origin feedback is not accepted")
     origin = request.headers.get("origin")
     if origin:
-        from urllib.parse import urlsplit
-        incoming = urlsplit(origin)
-        host = urlsplit(str(request.base_url))
-        if incoming.netloc != request.headers.get("host", host.netloc):
+        parsed_origin = urlsplit(origin)
+        host = request.headers.get("host", "")
+        if (parsed_origin.scheme not in {"https", "http"} or
+                origin != f"{parsed_origin.scheme}://{host}" or
+                parsed_origin.username or parsed_origin.password):
             raise HTTPException(status_code=403, detail="Cross-origin feedback is not accepted")
+    if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+        raise HTTPException(status_code=415, detail="Feedback must be sent as JSON")
     if report.product != "chimera":
         raise HTTPException(status_code=422, detail="Invalid reporting product")
     if report.followUpRequested:
@@ -86,7 +109,6 @@ def submit_signal(report: SignalReport, request: Request):
     gateway = os.environ.get("SIGNAL_GATEWAY_URL", "").strip()
     gateway_secret = os.environ.get("SIGNAL_GATEWAY_SECRET", "")
     if gateway:
-        from urllib.parse import urlsplit
         parsed = urlsplit(gateway)
         # An explicitly configured DARKROGUE staging host is allowed, never arbitrary URLs.
         allowed_host = os.environ.get("SIGNAL_GATEWAY_HOST", "darkrogue.io").strip().lower()
@@ -99,14 +121,23 @@ def submit_signal(report: SignalReport, request: Request):
         try:
             response = httpx.post(
                 gateway,
-                json=report.model_dump(exclude_none=True, exclude={"followUpRequested"}),
+                json={
+                    **report.model_dump(exclude_none=True, exclude={
+                        "followUpRequested", "page", "version", "browser", "correlationId",
+                    }),
+                    **(report.model_dump(
+                        include={"page", "version", "browser", "correlationId"},
+                        exclude_none=True,
+                    ) if report.includeTechnicalContext else {}),
+                },
                 headers={"Authorization": f"Bearer {gateway_secret}"},
                 timeout=5.0,
                 follow_redirects=False,
             )
             if response.status_code == 201:
                 receipt = response.json()
-                if isinstance(receipt, dict) and isinstance(receipt.get("id"), str):
+                if (isinstance(receipt, dict) and isinstance(receipt.get("id"), str)
+                        and receipt["id"].startswith("SIG-") and len(receipt["id"]) <= 32):
                     return {"id": receipt["id"], "status": "received"}
             if response.status_code == 429:
                 raise HTTPException(status_code=429, detail="Too many reports. Try again later.")
