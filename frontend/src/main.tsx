@@ -13,12 +13,11 @@ import "./production-kit/components.css";
 import "./production-brand.css";
 import { initializeAppearance } from "./AppearanceSelector";
 import { AuthGate } from "./AuthGate";
-import { SignalFeedback } from "./SignalFeedback";
 
 initializeAppearance();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <AuthGate><App /><SignalFeedback /></AuthGate>
+    <AuthGate><App /></AuthGate>
   </StrictMode>,
 );
