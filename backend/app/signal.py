@@ -88,7 +88,11 @@ def submit_signal(report: SignalReport, request: Request):
     if gateway:
         from urllib.parse import urlsplit
         parsed = urlsplit(gateway)
-        if (parsed.scheme != "https" or parsed.netloc != "darkrogue.io"
+        # An explicitly configured DARKROGUE staging host is allowed, never arbitrary URLs.
+        allowed_host = os.environ.get("SIGNAL_GATEWAY_HOST", "darkrogue.io").strip().lower()
+        if (not allowed_host or
+                (allowed_host != "darkrogue.io" and not allowed_host.endswith(".darkrogue.io")) or
+                parsed.scheme != "https" or parsed.netloc != allowed_host
                 or parsed.path != "/api/internal/signal/intake" or parsed.query or parsed.fragment
                 or len(gateway_secret) < 32):
             raise HTTPException(status_code=503, detail="Signal gateway is not configured correctly")
