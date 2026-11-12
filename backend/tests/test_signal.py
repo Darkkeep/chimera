@@ -79,6 +79,27 @@ class SignalIntakeTests(unittest.TestCase):
         self.assertNotIn("signal-reports.sqlite3",
                          [p.name for p in Path(self.temp.name).rglob("*")])
 
+    def test_explicit_darkrogue_staging_host_can_be_qualified(self):
+        gateway = "https://staging.darkrogue.io/api/internal/signal/intake"
+        with patch.dict(os.environ, {
+            "SIGNAL_GATEWAY_URL": gateway,
+            "SIGNAL_GATEWAY_HOST": "staging.darkrogue.io",
+            "SIGNAL_GATEWAY_SECRET": "fake-test-token-with-at-least-thirty-two-characters",
+        }), patch.object(signal.httpx, "post", return_value=httpx.Response(
+            201, json={"id": "SIG-STAGING123", "status": "received"},
+        )):
+            response = self.client.post("/api/signal/reports", json=self.body)
+        self.assertEqual(response.status_code, 201)
+
+    def test_gateway_refuses_external_configured_host(self):
+        with patch.dict(os.environ, {
+            "SIGNAL_GATEWAY_URL": "https://external.example/api/internal/signal/intake",
+            "SIGNAL_GATEWAY_HOST": "external.example",
+            "SIGNAL_GATEWAY_SECRET": "fake-test-token-with-at-least-thirty-two-characters",
+        }):
+            response = self.client.post("/api/signal/reports", json=self.body)
+        self.assertEqual(response.status_code, 503)
+
     def test_invalid_gateway_configuration_fails_closed(self):
         with patch.dict(os.environ, {
             "SIGNAL_GATEWAY_URL": "http://untrusted.example/api/internal/signal/intake",
