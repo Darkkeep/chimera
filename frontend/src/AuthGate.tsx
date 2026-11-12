@@ -169,6 +169,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
         <button className="auth-link" type="button" disabled={busy} onClick={() => { if (mode === "reset") { resetToken.current = ""; history.replaceState(null, "", location.pathname+location.search); setMode("login"); } else setMode("recovery"); setError(""); }}>{mode === "reset" ? "Back to sign in" : "Forgot password?"}</button>
         <p className="auth-footnote">{mode === "reset" ? "Reset links expire after 15 minutes and can be used once." : "Account access is managed by your administrator."}</p>
       </form>}
+      <p className="auth-footnote">
+        Trouble accessing Chimera? <a href="https://darkrogue.io/signal/report?product=chimera" target="_blank" rel="noopener noreferrer">Report a problem</a>.
+      </p>
     </section>
   </main>;
 }
