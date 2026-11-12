@@ -1,0 +1,21 @@
+.signal-root{position:fixed;right:18px;bottom:18px;z-index:1100;font-family:inherit}
+.signal-launcher{display:flex;align-items:center;gap:9px;border:1px solid #9f83d8;border-radius:999px;padding:11px 16px;background:#281b44;color:#f7f1ff;font:600 13px inherit;box-shadow:0 6px 28px #0007;cursor:pointer}
+.signal-launcher:hover,.signal-launcher:focus-visible{background:#503279;outline:2px solid #d4aaff;outline-offset:2px}
+.signal-panel{position:absolute;bottom:57px;right:0;width:min(380px,calc(100vw - 30px));max-height:min(76vh,660px);overflow:auto;background:#181625;color:#f7f4ff;border:1px solid #645783;border-radius:16px;box-shadow:0 18px 60px #000a;padding:20px}
+.signal-panel-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid #3b3450;padding-bottom:13px}
+.signal-eyebrow{font-size:10px;font-weight:800;letter-spacing:.15em;color:#c49efb}
+.signal-panel h2{font-size:20px;margin:5px 0 0}
+.signal-close{color:#ded4ee;background:transparent;border:none;cursor:pointer;padding:5px}
+.signal-panel form{display:grid;gap:11px}
+.signal-intro,.signal-privacy{line-height:1.5;color:#cbc4d7;font-size:12px;margin:8px 0 0}
+.signal-panel label{font-size:12px;font-weight:700}
+.signal-panel select,.signal-panel textarea{box-sizing:border-box;width:100%;background:#272237;color:#fff;border:1px solid #675c7f;border-radius:8px;padding:10px;font:inherit;font-size:13px}
+.signal-panel select:focus-visible,.signal-panel textarea:focus-visible{outline:2px solid #c29afb;outline-offset:2px}
+.signal-check{display:flex;align-items:flex-start;gap:9px;line-height:1.4}
+.signal-check input{accent-color:#a87ced;margin-top:1px}
+.signal-error{font-size:12px;color:#ffb6bc;margin:0}
+.signal-submit,.signal-success button{border:0;border-radius:9px;background:#af82ef;color:#150b28;padding:11px 14px;font-weight:800;cursor:pointer}
+.signal-submit:disabled{opacity:.55;cursor:not-allowed}
+.signal-success p{line-height:1.5;font-size:13px}
+.signal-success code{color:#dfc5ff}
+@media(max-width:600px){.signal-root{right:12px;bottom:12px}.signal-panel{bottom:54px;max-height:75vh}.signal-launcher{padding:11px 13px}}
