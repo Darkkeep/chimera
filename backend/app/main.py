@@ -77,6 +77,8 @@ PUBLIC_API_PATHS = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/
 
 
 ROUTE_ACTIONS = {
+    # Public feedback intake bypasses actor auth; keep the route registered in the deny-by-default inventory.
+    "submit_signal": "identity.self",
     "get_scene_experience": "project.view", "post_scene_experience": "enhancement.proposal.create",
     "save_scene_experience": "enhancement.proposal.create", "apply_scene_experience": "enhancement.proposal.decide",
     "post_pythia_action": "enhancement.proposal.create",
