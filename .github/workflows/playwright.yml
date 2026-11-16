@@ -11,12 +11,22 @@ jobs:
   test:
     name: Backend, build, visual exports, and HTTPS auth
     timeout-minutes: 30
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
       with:
-        token: ${{ secrets.PYTHIA_CONTRACTS_READ_TOKEN || github.token }}
-        submodules: recursive
+        token: ${{ github.token }}
+        submodules: false
+    - name: Fetch pinned Pythia contracts submodule
+      env:
+        PYTHIA_CONTRACTS_TOKEN: ${{ secrets.PYTHIA_CONTRACTS_READ_TOKEN }}
+      run: |
+        if [ -z "$PYTHIA_CONTRACTS_TOKEN" ]; then
+          echo "::error::PYTHIA_CONTRACTS_READ_TOKEN is required for the private contracts submodule."
+          exit 1
+        fi
+        header="$(printf 'x-access-token:%s' "$PYTHIA_CONTRACTS_TOKEN" | base64 -w0)"
+        git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $header" submodule update --init --recursive
     - uses: actions/setup-node@v4
       with:
         node-version: '24.19.0'
@@ -65,7 +75,7 @@ jobs:
   browser:
     name: Browser (${{ matrix.browser }}, shard ${{ matrix.shard }}/3)
     timeout-minutes: 30
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -76,8 +86,18 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        token: ${{ secrets.PYTHIA_CONTRACTS_READ_TOKEN || github.token }}
-        submodules: recursive
+        token: ${{ github.token }}
+        submodules: false
+    - name: Fetch pinned Pythia contracts submodule
+      env:
+        PYTHIA_CONTRACTS_TOKEN: ${{ secrets.PYTHIA_CONTRACTS_READ_TOKEN }}
+      run: |
+        if [ -z "$PYTHIA_CONTRACTS_TOKEN" ]; then
+          echo "::error::PYTHIA_CONTRACTS_READ_TOKEN is required for the private contracts submodule."
+          exit 1
+        fi
+        header="$(printf 'x-access-token:%s' "$PYTHIA_CONTRACTS_TOKEN" | base64 -w0)"
+        git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $header" submodule update --init --recursive
     - uses: actions/setup-node@v4
       with:
         node-version: '24.19.0'

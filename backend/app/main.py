@@ -54,6 +54,7 @@ from .word_export import DOCX_MEDIA_TYPE, FULL_TEMPLATE_PATH, SME_TEMPLATE_PATH,
 from .deployment import cors_origins, darkrogue_origin, installation_policy, public_origin
 from .password_auth import AccountStore, COOKIE, HostedAuthorizationPolicy, LoginRequest, ResetPasswordRequest, ReviewInvitationRequest, SESSION_SECONDS, require_origin
 from . import darkrogue_auth
+from .admission import AdmissionStore
 from .models import AssessmentGroup, AssessmentGroupWrite, CourseDraftRequest, CourseContentDraft, SceneDraftRequest, SceneContentDraft
 from .storage import create_scenes, save_assessment_group
 from .models import ProjectBackgroundUpdate, ProjectRelationshipUpdate, ProjectRestore
@@ -73,6 +74,7 @@ from .signal import router as signal_router
 
 
 HOSTED_ACCOUNT_PROVIDERS = {"builtin", "darkrogue"}
+ADMISSION_PROBE_PATHS = {"/api/admission/status", "/api/identity/context"}
 PUBLIC_API_PATHS = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/auth/logout", "/api/auth/reset-password", "/api/auth/darkrogue", "/api/internal/pythia/turn-access", "/api/internal/owner-suite/projects", "/api/signal/reports"}
 
 
@@ -108,6 +110,7 @@ ROUTE_ACTIONS = {
     "put_scene_media": "media.manage", "get_shared_media": "media.manage", "publish_shared_media": "media.manage",
     "copy_shared_media": "media.manage", "delete_shared_media": "media.manage", "post_reference_ocr": "reference.create",
     "post_reference_ocr_accept": "reference.create",
+    "admission_status": "identity.view",
     "health": "identity.view", "auth_config": "identity.view", "login": "identity.view",
     "logout": "identity.view", "reset_password": "identity.view", "darkrogue_login": "identity.view", "pythia_turn_access": "identity.view", "get_accounts": "admin.policy.manage",
     "owner_suite_projects": "project.membership.manage",
@@ -373,6 +376,11 @@ async def private_response_headers(request: Request, call_next):
             actor = await run_in_threadpool(resolve_actor_context, request)
         except HTTPException as error:
             return JSONResponse({"detail": error.detail}, status_code=error.status_code, headers={"Cache-Control": "no-store"})
+        # Authentication is not admission: deny all private APIs until approved.
+        if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider == "darkrogue":
+            if request.url.path not in ADMISSION_PROBE_PATHS and not AdmissionStore(ROOT).admitted(actor.actorId):
+                return JSONResponse({"detail": "Chimera is currently invitation-only.", "code": "admission_required"},
+                                    status_code=403, headers={"Cache-Control": "no-store"})
         request.state.actor = actor
         token = REQUEST_ACTOR.set(actor)
     try:
@@ -564,6 +572,13 @@ def owner_suite_projects(request: Request) -> dict:
     if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider != "darkrogue":
         raise HTTPException(404, "Owner Suite integration is disabled")
     return run_owner_action(assertion, _account_store(), get_authorization_policy())
+
+
+@app.get("/api/admission/status")
+def admission_status(context: Annotated[ActorContext, Depends(resolve_actor_context)]) -> dict[str, bool]:
+    if installation_policy(LocalIdentityDirectory(ROOT)).identityProvider != "darkrogue":
+        return {"admitted": True}
+    return {"admitted": AdmissionStore(ROOT).admitted(context.actorId)}
 
 
 @app.get("/api/accounts")

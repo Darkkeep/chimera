@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type FormEvent,
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { BrandMark } from "./BrandMark";
 import "./authentication.css";
+import "./admission.css";
 
 export type Session = { actor: { actorId: string; actorDisplayName: string; deploymentMode: string }; memberships: { role: string }[]; policy: { reviewAccess: string } };
 const SessionContext = createContext<{ session: Session | null; logout: () => Promise<void> }>({ session: null, logout: async () => {} });
@@ -30,6 +31,7 @@ async function darkrogueHandoff(sessionUrl: string, fetcher: typeof fetch): Prom
 export function AuthGate({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<{ deploymentMode: string; identityProvider: string; passwordLoginAvailable: boolean; darkrogue?: { sessionUrl: string; signInUrl: string } } | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [admitted, setAdmitted] = useState<boolean | null>(null);
   const [checking, setChecking] = useState(true);
   const [mode, setMode] = useState<"login" | "recovery" | "reset">(() => location.hash.startsWith("#reset=") ? "reset" : location.hash === "#recovery" ? "recovery" : "login");
   const resetToken = useRef(location.hash.startsWith("#reset=") ? location.hash.slice(7) : "");
@@ -97,6 +99,18 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return () => { window.fetch = original; window.removeEventListener(AUTH_EXPIRED, expired); };
   }, [config?.passwordLoginAvailable, config?.identityProvider]);
 
+  useEffect(() => {
+    if (!session || config?.identityProvider !== "darkrogue") { setAdmitted(null); return; }
+    let active = true;
+    setAdmitted(null);
+    void nativeFetch.current("/api/admission/status").then(async response => {
+      if (!response.ok) throw new Error("Admission status unavailable");
+      return response.json() as Promise<{ admitted: boolean }>;
+    }).then(value => { if (active) setAdmitted(value.admitted === true); })
+      .catch(() => { if (active) setAdmitted(false); });
+    return () => { active = false; };
+  }, [session, config?.identityProvider]);
+
   useEffect(() => { titleRef.current?.focus(); }, [mode, checking, session]);
 
   async function submit(event: FormEvent) {
@@ -145,6 +159,26 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setSession(null); setMode("login"); setMessage("You have signed out.");
   }
 
+  if (!checking && session && config?.identityProvider === "darkrogue" && admitted !== true && mode !== "reset") {
+    const previous = document.referrer;
+    let returnUrl = "https://darkrogue.io/";
+    try {
+      const url = new URL(previous);
+      if (url.origin === "https://darkrogue.io") returnUrl = url.href;
+    } catch { /* The safe homepage is always available. */ }
+    return <main className="admission-screen">
+      <section className="admission-card" aria-labelledby="admission-title">
+        <div className="admission-eyebrow"><BrandMark className="admission-mark" /> CHIMERA <span>PRIVATE PREVIEW</span></div>
+        <div className="admission-symbol" aria-hidden="true">✦</div>
+        <h1 id="admission-title">{admitted === null ? "Checking the gates…" : "The Chimera is still in its lair."}</h1>
+        <p>{admitted === null ? "Confirming your invitation." : "Something powerful is taking shape behind these doors."}</p>
+        {admitted === false && <>
+          <p className="admission-subtext">Chimera is currently open by personal invitation only. Your DARKROGUE account is ready; the beast just isn't receiving visitors yet.</p>
+          <a className="admission-return" href={returnUrl}>← Return to DARKROGUE</a>
+        </>}
+      </section>
+    </main>;
+  }
   if (!checking && config?.identityProvider === "local" && config.deploymentMode === "single-user") return <SessionContext.Provider value={{ session: null, logout }}>{children}</SessionContext.Provider>;
   if (!checking && session && mode !== "reset") return <SessionContext.Provider value={{ session, logout }}>{children}</SessionContext.Provider>;
   const darkrogue = config?.identityProvider === "darkrogue" ? config.darkrogue : undefined;
