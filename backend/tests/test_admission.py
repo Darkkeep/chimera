@@ -5,8 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from app.admission import AdmissionStore
-from app.password_auth import AccountStore
+from backend.app.admission import AdmissionStore
+from backend.app.password_auth import AccountStore
 
 
 class AdmissionTests(unittest.TestCase):
