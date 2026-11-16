@@ -105,7 +105,12 @@ class DarkrogueSignInTests(unittest.TestCase):
         self.assertEqual(identity["policy"]["identityProvider"], "darkrogue")
         self.assertEqual({item["role"] for item in identity["memberships"]},
                          {"administrator", "author", "instructional-designer"})
-        self.assertEqual(self.client.post("/api/projects", json={"title": "Hosted"}, headers=self.origin).status_code, 201)
+        # A DARKROGUE administrator is authenticated, but not automatically admitted.
+        self.assertEqual(self.client.get("/api/admission/status").json(), {"admitted": False})
+        self.assertEqual(self.client.post("/api/projects", json={"title": "Denied"}, headers=self.origin).status_code, 403)
+        with patch.dict("os.environ", {"CHIMERA_FOUNDER_EMAIL": "darkkeep@gmail.com"}):
+            self.assertEqual(self.client.get("/api/admission/status").json(), {"admitted": True})
+            self.assertEqual(self.client.post("/api/projects", json={"title": "Hosted"}, headers=self.origin).status_code, 201)
 
     def test_handoff_token_is_one_time(self):
         token = mint()
