@@ -86,10 +86,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!config?.passwordLoginAvailable && config?.identityProvider !== "darkrogue") return;
     const original = window.fetch;
+    let confirming: Promise<boolean> | null = null;
+    // Only the identity endpoint can establish that a Chimera session has expired.
+    // An upstream integration might return 401 despite a valid Chimera session.
+    const sessionRejected = () => confirming ??= original("/api/identity/context", { credentials: "same-origin" })
+      .then(identity => identity.status === 401, () => false)
+      .finally(() => { confirming = null; });
     window.fetch = async (input, init) => {
       const response = await original(input, init);
       const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
-      if (response.status === 401 && url.origin === location.origin && url.pathname.startsWith("/api/") && !url.pathname.startsWith("/api/auth/")) {
+      if (response.status === 401 && url.origin === location.origin && url.pathname.startsWith("/api/") && !url.pathname.startsWith("/api/auth/")
+          && (url.pathname === "/api/identity/context" || await sessionRejected())) {
         window.dispatchEvent(new Event(AUTH_EXPIRED));
       }
       return response;
