@@ -937,10 +937,20 @@ def get_project(project_id: str) -> ProjectDetail:
 
 
 def _pythia_error(error: PythiaUnavailableError) -> HTTPException:
-    expected_statuses = {400, 401, 403, 404, 409, 413, 422, 429, 503}
+    headers = {"X-Pythia-Request-Id": error.request_id} if error.request_id else {}
+    if error.status_code in {401, 403}:
+        # Upstream Pythia credentials failed, not Chimera's browser session.
+        # Returning 401/403 here could falsely expire a healthy Chimera session.
+        headers["X-Chimera-Integration-Error"] = "pythia-authentication"
+        return HTTPException(
+            status_code=502, headers=headers, detail=(
+                f"Pythia Engine rejected Chimera's server credential (HTTP {error.status_code}). "
+                f"Your Chimera session is still valid; ask an administrator to check the Pythia connection. {error}"
+            )
+        )
+    expected_statuses = {400, 404, 409, 413, 422, 429, 503}
     status_code = error.status_code if error.status_code in expected_statuses else 503 if error.status_code is None else 502
-    headers = {"X-Pythia-Request-Id": error.request_id} if error.request_id else None
-    return HTTPException(status_code=status_code, detail=str(error), headers=headers)
+    return HTTPException(status_code=status_code, detail=str(error), headers=headers or None)
 
 
 def _pythia_provider() -> PythiaProvider:
