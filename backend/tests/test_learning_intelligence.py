@@ -327,10 +327,20 @@ class LearningIntelligenceTests(unittest.TestCase):
         self.assertEqual(translated.headers["X-Pythia-Request-Id"], "engine-request-123")
 
     def test_engine_auth_limit_and_capacity_statuses_remain_recoverable(self):
-        for status_code in (401, 403, 413, 422, 429, 503):
+        for status_code in (413, 422, 429, 503):
             with self.subTest(status_code=status_code):
                 translated = main._pythia_error(PythiaUnavailableError("Engine request failed", status_code))
                 self.assertEqual(status_code, translated.status_code)
+
+    def test_upstream_pythia_auth_error_does_not_expire_chimera_session(self):
+        for status_code in (401, 403):
+            with self.subTest(status_code=status_code):
+                error = PythiaUnavailableError("Engine request failed", status_code)
+                translated = main._pythia_error(error)
+                self.assertEqual(502, translated.status_code)
+                self.assertEqual("pythia-authentication", translated.headers["X-Chimera-Integration-Error"])
+                self.assertIn("session is still valid", translated.detail)
+                self.assertIn(str(status_code), translated.detail)
 
     def test_storyboard_analysis_envelope_must_match_scene_and_schema(self):
         envelope = {
