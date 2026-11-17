@@ -47,6 +47,8 @@ jobs:
       run: python -m unittest discover -s backend/tests
     - name: Verify pinned onboarding artifact
       run: npm run verify:onboarding:artifact
+    - name: Qualify Quiet Counsel pure detector rules
+      run: node --experimental-strip-types --test tests/quiet-counsel/detectors.test.mjs
     - name: Build frontend
       run: npm run build --prefix frontend
     - name: Qualify visual editing and exported rendering
@@ -61,7 +63,7 @@ jobs:
         CHIMERA_TEST_PYTHON: python
     - name: Qualify opt-in Studio 2.0 smoke on Chromium
       if: ${{ success() }}
-      run: npm run test:onboarding -- --project chromium studio.spec.cjs --workers 1
+      run: npm run test:onboarding -- studio.spec.cjs --project=chromium --workers=1
       env:
         CHIMERA_TEST_PYTHON: python
         VITE_CHIMERA_STUDIO_ENABLED: "true"
