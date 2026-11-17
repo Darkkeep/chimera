@@ -1,0 +1,38 @@
+name: Chimera Pythia compatibility qualification
+on:
+  push:
+    branches:
+      - integration/pythia-compatibility-gate1-20261116
+  pull_request:
+    paths:
+      - '.github/workflows/pythia-compatibility-gate1.yml'
+      - 'backend/app/learning_intelligence.py'
+      - 'backend/app/pythia_connection.py'
+      - 'backend/tests/test_learning_intelligence.py'
+      - 'deploy/pythia-native-bridge.env.example'
+permissions:
+  contents: read
+jobs:
+  client:
+    name: Chimera Engine and native media client tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r backend/requirements.txt
+      - name: Native media bridge contract and fail-closed tests
+        run: |
+          python -m unittest -v \
+            backend.tests.test_learning_intelligence.LearningIntelligenceTests.test_native_bridge_isolated_https_configuration \
+            backend.tests.test_learning_intelligence.LearningIntelligenceTests.test_native_bridge_fails_closed_on_invalid_origin_or_missing_token \
+            backend.tests.test_learning_intelligence.LearningIntelligenceTests.test_native_bridge_stream_preserves_original_byte_digest_and_metadata \
+            backend.tests.test_learning_intelligence.LearningIntelligenceTests.test_provider_defaults_to_local_engine_api \
+            backend.tests.test_learning_intelligence.LearningIntelligenceTests.test_provider_rejects_unsafe_base_urls \
+            backend.tests.test_learning_intelligence.LearningIntelligenceTests.test_submit_task_sends_contract_to_engine_api \
+            backend.tests.test_learning_intelligence.LearningIntelligenceTests.test_provider_sends_server_configured_authentication_to_engine \
+            backend.tests.test_learning_intelligence.LearningIntelligenceTests.test_http_errors_preserve_status_for_route_translation
