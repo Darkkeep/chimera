@@ -40,6 +40,7 @@ export function StudioShell({
   const stageScene = scene ? resolvedSceneBackground(project, scene) : null;
   const previewReady = Boolean(stageScene && (stageScene.visualLayout || stageScene.experience || stageScene.html5Activity || stageScene.assessmentItem));
   const inlineEditing = Boolean(editor && scene?.id === editingSceneId);
+  const nativeBlocked = Boolean(scene?.assessmentItem || scene?.html5Activity || scene?.visualLayout?.timeline);
 
   return <section className="studio-shell" aria-label="Chimera 2.0 Authoring Studio">
     <header className="studio-command">
@@ -112,7 +113,7 @@ export function StudioShell({
             <dt>Source</dt><dd>{scene.sourceSlide ? `PowerPoint slide ${scene.sourceSlide}` : "Authored natively"}</dd>
           </dl>
           <button type="button" className="studio-inspector-action" onClick={() => onEditScene(scene)} disabled={!canEdit || busy}><Pencil size={15} /> Edit scene properties</button>
-          <div className="studio-authoring-task"><strong>Make it interactive</strong><p>Create branching decisions, hotspots, sequencing and guided practice. Start manually, without Pythia.</p><button type="button" className="studio-inspector-action" onClick={onDesignExperience} disabled={!canEdit || busy || scene.sceneType === "question"}>{scene.experience ? "Edit learner interaction" : "Build learner interaction"}</button>{scene.sceneType === "question" && <small>Knowledge checks use the question editor below.</small>}</div>
+          <div className="studio-authoring-task"><strong>Make it interactive</strong><p>Create branching decisions, hotspots, sequencing and guided practice. Start manually, without Pythia.</p><button type="button" className="studio-inspector-action" onClick={onDesignExperience} disabled={!canEdit || busy || nativeBlocked || scene.sceneType === "question"}>{scene.experience ? "Edit learner interaction" : "Build learner interaction"}</button>{nativeBlocked && <small>Native interactions cannot replace a saved assessment, HTML5 activity, or timeline. Create a separate interaction scene to preserve that work.</small>}{scene.sceneType === "question" && <small>Knowledge checks use the question editor below.</small>}</div>
           {scene.sceneType === "question" && <button type="button" className="studio-inspector-action" onClick={onEditQuestion} disabled={!canEdit || busy}>Edit knowledge check</button>}
         </> : <p className="studio-empty-small">Select a scene to inspect its properties and editing options.</p>)}
         <div className="studio-intelligence-entry">
