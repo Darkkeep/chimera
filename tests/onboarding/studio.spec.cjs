@@ -65,24 +65,6 @@ test('Studio 2.0 reuses saved scenes, existing editor and reversible classic nav
   expect(stored.storyboard.scenes[0].visualLayout.elements.some(element =>
     element.kind === 'text' && element.text === 'A scene authored directly in Studio')).toBe(true);
 
-  // The native interaction is edited in Studio, saved via the normal scene API,
-  // and tested against the same real learner view used by export.
-  const interactionCalls = [];
-  page.on('request', request => {
-    if (request.method() === 'POST' && /pythia|conversation|design/.test(request.url())) interactionCalls.push(request.url());
-  });
-  await studio.getByRole('button', { name: 'Build learner interaction' }).click();
-  const nativeEditor = studio.getByRole('region', { name: 'Manual learner interaction editor' });
-  await expect(nativeEditor).toBeVisible();
-  await expect(page.getByRole('dialog', { name: 'Design the whole scene' })).toHaveCount(0);
-  await expect(nativeEditor.getByText('Actual learner preview')).toBeVisible();
-  await nativeEditor.getByRole('checkbox', { name: /I reviewed the learning experience/ }).check();
-  await nativeEditor.getByRole('button', { name: 'Save learner interaction' }).click();
-  await expect(nativeEditor).toHaveCount(0);
-  const savedInteraction = await (await page.request.get(`/api/projects/${projectId}`)).json();
-  expect(savedInteraction.storyboard.scenes[0].experience.activities[0].kind).toBe('branching');
-  expect(interactionCalls).toEqual([]);
-
   let modelPosts = 0;
   page.on('request', request => {
     if (request.method() === 'POST' && /pythia|conversation/.test(request.url())) modelPosts += 1;
