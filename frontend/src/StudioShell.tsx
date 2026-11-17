@@ -70,7 +70,7 @@ export function StudioShell({
         </div>
       </nav>
 
-      <main className="studio-stage" aria-label="Studio stage">
+      <section className="studio-stage" aria-label="Studio stage">
         <div className="studio-stage-toolbar">
           <span>{scene ? `SCENE ${selectedScene + 1} / ${scenes.length}` : "NO SCENE SELECTED"}</span>
           <div>
@@ -91,7 +91,7 @@ export function StudioShell({
             {scene && <button type="button" onClick={() => onEditScene(scene)} disabled={!canEdit || busy}>Open timeline in stage editor</button>}
           </div>}
         </div>
-      </main>
+      </section>
 
       <aside className="studio-inspector" aria-label="Scene inspector">
         <div className="studio-section-heading"><span>Inspector</span><button type="button" aria-label={detailsOpen ? "Collapse inspector" : "Expand inspector"} aria-expanded={detailsOpen} onClick={() => setDetailsOpen(v => !v)}><ChevronDown size={16} /></button></div>
