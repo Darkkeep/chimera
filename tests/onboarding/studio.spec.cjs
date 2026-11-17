@@ -45,7 +45,13 @@ test('Studio 2.0 reuses saved scenes, existing editor and reversible classic nav
 
   await expect(studio.getByRole('navigation', { name: 'Studio scenes' })).toBeVisible();
 
-  // Genuine canvas editing uses the existing editor and existing revision-guarded save.
+  // Selecting an element swaps the natural inspector from scene to text controls.
+  await editor.locator('.visual-editable').first().click();
+  await expect(editor.getByRole('textbox', { name: 'Studio selected text' })).toBeVisible();
+  await editor.getByRole('textbox', { name: 'Studio selected text' }).fill('An inspector-authored draft');
+  await expect(editor.getByRole('spinbutton', { name: 'Studio x' })).toBeVisible();
+
+  // Genuine canvas editing uses the same state and revision-guarded save.
   await editor.locator('.visual-editable').first().dblclick();
   const textEditor = editor.getByRole('textbox', { name: 'Edit canvas text' });
   await expect(textEditor).toBeVisible();
