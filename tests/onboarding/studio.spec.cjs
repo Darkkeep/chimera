@@ -18,6 +18,21 @@ test('Studio 2.0 reuses saved scenes, existing editor and reversible classic nav
   await expect(studio.getByRole('navigation', { name: 'Studio scenes' })).toBeVisible();
   await expect(studio.getByText('Verify the new authoring shell').first()).toBeVisible();
   await expect(studio.getByRole('button', { name: 'Edit on stage' })).toBeEnabled();
+  // Manual-first native interactions must be discoverable without a Pythia call.
+  const interactionCalls = [];
+  page.on('request', request => {
+    if (request.method() === 'POST' && /pythia|conversation|design/.test(request.url())) interactionCalls.push(request.url());
+  });
+  await studio.getByRole('button', { name: 'Build learner interaction' }).click();
+  const nativeEditor = page.getByRole('dialog', { name: 'Design the whole scene' });
+  await expect(nativeEditor).toBeVisible();
+  await nativeEditor.getByRole('button', { name: 'Start native experience without Pythia' }).click();
+  await expect(nativeEditor.getByRole('region', { name: 'Executable experience preview' })).toBeVisible();
+  expect(interactionCalls).toEqual([]);
+  await nativeEditor.getByRole('button', { name: 'Close', exact: true }).click();
+  await nativeEditor.getByRole('button', { name: 'Discard edits and close' }).click();
+  await expect(nativeEditor).toHaveCount(0);
+
 
   await studio.getByRole('button', { name: 'Edit on stage' }).click();
   const editor = studio.locator('.studio-inline-editor');
