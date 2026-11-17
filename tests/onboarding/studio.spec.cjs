@@ -23,6 +23,18 @@ test('Studio 2.0 reuses saved scenes, existing editor and reversible classic nav
   const editor = studio.locator('.studio-inline-editor');
   await expect(editor).toBeVisible();
   await expect(page.locator('.modal-backdrop .visual-editor')).toHaveCount(0);
+  // Essential editing remains visible; advanced tools don't overwhelm the canvas.
+  await expect(editor.getByRole('toolbar', { name: 'Essential canvas tools' })).toBeVisible();
+  await expect(editor.getByRole('toolbar', { name: 'Stage content tools' })).toHaveCount(0);
+  await editor.getByRole('button', { name: 'More tools' }).click();
+  await expect(editor.getByRole('toolbar', { name: 'Stage content tools' })).toBeVisible();
+  await editor.getByRole('button', { name: 'Fewer tools' }).click();
+  await expect(editor.getByRole('toolbar', { name: 'Stage content tools' })).toHaveCount(0);
+  await editor.getByRole('button', { name: 'Add text', exact: true }).click();
+  await expect(editor.locator('.visual-editable')).toHaveCount(3);
+  await editor.getByRole('button', { name: 'Undo canvas edit' }).click();
+  await expect(editor.locator('.visual-editable')).toHaveCount(2);
+
   await expect(studio.getByRole('navigation', { name: 'Studio scenes' })).toBeVisible();
 
   // Genuine canvas editing uses the existing editor and existing revision-guarded save.
