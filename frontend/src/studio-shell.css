@@ -116,3 +116,9 @@
 .studio-inline-editor .studio-inspector-toggle{display:flex;gap:6px;align-items:center;justify-content:space-between;width:100%;border:1px solid #726082;background:#2c2440;color:#f4e9fb;border-radius:8px;padding:9px 10px;font-size:12px;font-weight:700;text-align:left}
 .studio-inline-editor .studio-inspector-toggle[aria-expanded="true"] svg{transform:rotate(90deg)}
 .studio-inline-editor .studio-inspector-deep{display:grid;gap:10px;margin-top:10px}
+
+/* Obvious manual interaction entry without turning the inspector into another toolbar. */
+.studio-authoring-task{display:grid;gap:9px;margin-top:5px;padding:13px 10px;border:1px solid #694f83;border-radius:10px;background:#2a213a}
+.studio-authoring-task strong{font-size:12px;color:#f2d7f3}
+.studio-authoring-task p,.studio-authoring-task small{font-size:11px;line-height:1.55;color:#d0c1dc;margin:0}
+.studio-authoring-task .studio-inspector-action{width:100%;justify-content:center}
