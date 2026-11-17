@@ -61,6 +61,12 @@ test('three-scene no-AI course: author, preview and export both SCORM profiles',
   project = await response.json();
   const asset = project.storyboard.assets.find(item => item.filename === 'signal.png');
   expect(asset).toBeTruthy();
+  response = await request.patch(`/api/projects/${project.id}/assets/${asset.id}/attribution`, {
+    headers: { 'If-Match': `"${project.storyboard.revision}"` },
+    data: { attributionText: 'Original synthetic qualification image', attributionStatus: 'complete' },
+  });
+  expect(response.ok(), await response.text()).toBeTruthy();
+  project = await response.json();
 
   const first = project.storyboard.scenes[0];
   response = await request.patch(`/api/projects/${project.id}/scenes/${first.id}`, {
