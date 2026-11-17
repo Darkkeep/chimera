@@ -95,3 +95,24 @@
 .studio-inline-editor .visual-editor-tabs button{border-radius:7px}
 .studio-inline-editor .visual-editor-workspace{padding-top:12px}
 @media(max-width:760px){.studio-inline-editor .studio-contextual-hint{order:5;flex-basis:100%}.studio-inline-editor .studio-contextual-tools{gap:6px}}
+
+/* The author sees controls for the selection, not a wall of generic accordions. */
+.studio-inline-editor .studio-natural-inspector{display:grid;gap:12px;padding-bottom:14px;border-bottom:1px solid #56476d;margin-bottom:12px}
+.studio-inline-editor .studio-natural-heading{display:grid;gap:5px}
+.studio-inline-editor .studio-natural-kicker{font-size:10px;letter-spacing:.10em;color:#eab5df;font-weight:750}
+.studio-inline-editor .studio-natural-heading strong{font-size:14px;line-height:1.35;overflow-wrap:anywhere;color:#f6eeff}
+.studio-inline-editor .studio-natural-heading p{font-size:11px;line-height:1.5;color:#bbafcd;margin:0}
+.studio-inline-editor .studio-natural-fields{display:grid;gap:12px;border:0;padding:0;margin:0}
+.studio-inline-editor .studio-natural-fields label{display:grid;gap:5px;font-size:11px;color:#ded1e9}
+.studio-inline-editor .studio-natural-fields :is(input,select,textarea){width:100%;background:#292239;border:1px solid #665576;border-radius:8px;color:#faf5ff;padding:8px;box-sizing:border-box}
+.studio-inline-editor .studio-natural-fields input[type="color"]{height:34px;padding:3px}
+.studio-inline-editor .studio-natural-split{display:grid;grid-template-columns:minmax(0,1fr) 52px;gap:9px}
+.studio-inline-editor .studio-natural-format{display:flex;gap:6px;align-items:center}
+.studio-inline-editor .studio-natural-format button{border-radius:7px;min-width:36px;min-height:34px;border:1px solid #705e86;background:#342840;color:#f6eafa}
+.studio-inline-editor .studio-natural-format button[aria-pressed="true"]{background:#8d4c9f}
+.studio-inline-editor .studio-natural-divider{border-top:1px solid #50415e;padding-top:11px;color:#e6badf;font-size:11px;font-weight:700}
+.studio-inline-editor .studio-natural-geometry{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.studio-inline-editor .studio-natural-helper{font-size:11px;line-height:1.5;color:#bcb1cc;margin:0}
+.studio-inline-editor .studio-inspector-toggle{display:flex;gap:6px;align-items:center;justify-content:space-between;width:100%;border:1px solid #726082;background:#2c2440;color:#f4e9fb;border-radius:8px;padding:9px 10px;font-size:12px;font-weight:700;text-align:left}
+.studio-inline-editor .studio-inspector-toggle[aria-expanded="true"] svg{transform:rotate(90deg)}
+.studio-inline-editor .studio-inspector-deep{display:grid;gap:10px;margin-top:10px}
