@@ -72,7 +72,7 @@ function syncSceneText(layout: SceneLayout, scene: Scene, title: string, screenT
   return next;
 }
 
-export function SceneVisualEditor({ project, scene, templates, onClose, onSave, onExtract, onApplyTemplate, onGenerate, onProjectUpdated, canGenerate, initialPanel = "canvas" }: { project: Project; scene: Scene; templates: { id: string; title: string }[]; onClose: () => void; onSave: (layout: SceneLayout, settings: SceneEditSettings) => Promise<void>; onExtract: () => Promise<SceneLayout>; onApplyTemplate: (templateId: string, title: string, extractedText: string[]) => Promise<SceneLayout>; onGenerate: (prompt: string, currentScene: Partial<Scene>, connectionId?: string) => Promise<GeneratedSceneDraft>; onProjectUpdated: (project: Project) => void; canGenerate: boolean; initialPanel?: "canvas" | "details" }) {
+export function SceneVisualEditor({ project, scene, templates, onClose, onSave, onExtract, onApplyTemplate, onGenerate, onProjectUpdated, canGenerate, initialPanel = "canvas", embedded = false }: { project: Project; scene: Scene; templates: { id: string; title: string }[]; onClose: () => void; onSave: (layout: SceneLayout, settings: SceneEditSettings) => Promise<void>; onExtract: () => Promise<SceneLayout>; onApplyTemplate: (templateId: string, title: string, extractedText: string[]) => Promise<SceneLayout>; onGenerate: (prompt: string, currentScene: Partial<Scene>, connectionId?: string) => Promise<GeneratedSceneDraft>; onProjectUpdated: (project: Project) => void; canGenerate: boolean; initialPanel?: "canvas" | "details"; embedded?: boolean }) {
   const { catalog: mediaCatalog, error: connectionError } = useMediaConnections();
   const [connectionId, setConnectionId] = useState("");
   const sceneConnections = mediaCatalog?.connections.filter(item => item.readyFor.includes("scene")) ?? [];
@@ -107,6 +107,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
   const busy = saving || mediaWorking || placementWorking;
   const [error, setError] = useState("");
   const [panel, setPanel] = useState<"details" | "canvas" | "media">(initialPanel);
+  const [advancedTools, setAdvancedTools] = useState(false);
   const [canvasEdited, setCanvasEdited] = useState(false);
   const [sceneTextDirty, setSceneTextDirty] = useState(false);
   const [generatedLayoutApplied, setGeneratedLayoutApplied] = useState(false);
@@ -152,7 +153,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
     function onHistoryShortcut(event: KeyboardEvent) {
       if (event.defaultPrevented || event.isComposing || event.altKey || !(event.ctrlKey || event.metaKey)) return;
       const target = event.target;
-      if (!(target instanceof HTMLElement) || !target.closest('[role="dialog"]')?.classList.contains("visual-editor")) return;
+      if (!(target instanceof HTMLElement) || !target.closest(".visual-editor")) return;
       if (target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
       const key = event.key.toLowerCase();
       if (key !== "z" && key !== "y") return;
@@ -296,9 +297,15 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
     setSourceVisible(false);
     setPanel("canvas");
   }
-  return <EditorDialog className="visual-editor" labelledBy="visual-editor-title" busy={busy} onClose={onClose} onboardingTarget="scene.edit" onboardingJourney={panel === "canvas" ? "canvas" : "edit-scene"}>
+  const dirty = cursor !== 0 || sceneTextDirty || canvasEdited || generatedLayoutApplied || title !== scene.title || actionDescription !== scene.actionDescription || narration !== scene.narration || notes !== scene.notes || required !== scene.required || audioRequired !== scene.audioRequired || sceneType !== scene.sceneType || layoutMode !== scene.layoutMode || templateId !== (scene.templateId || "");
+  function cancelEditing() {
+    if (busy) return;
+    if (embedded && dirty && !window.confirm("Discard unsaved scene changes?")) return;
+    onClose();
+  }
+  const content = <>
     {scene.experience && <p role="status">This scene delivers a native experience instead of the underlying canvas. To edit its diagram, reveals and activities, close this editor and select Design experience. Canvas edits here are retained but are not the learner-facing stage.</p>}
-    <header className="visual-editor-header"><div><p className="eyebrow">SCENE EDITOR</p><h2 id="visual-editor-title">{title || scene.title}</h2></div><button type="button" className="icon-button" aria-label="Close scene editor" disabled={busy} onClick={onClose}><X size={18} /></button></header>
+    <header className="visual-editor-header"><div><p className="eyebrow">SCENE EDITOR</p><h2 id="visual-editor-title">{title || scene.title}</h2></div><button type="button" className="icon-button" aria-label="Close scene editor" disabled={busy} onClick={cancelEditing}><X size={18} /></button></header>
     <div className="visual-editor-tabs" role="tablist" aria-label="Scene editor sections">
       <button type="button" role="tab" aria-selected={panel === "canvas"} onClick={() => setPanel("canvas")}>Stage</button>
       <button type="button" role="tab" aria-selected={panel === "details"} onClick={() => setPanel("details")}>Details</button>
@@ -315,7 +322,17 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
         </fieldset>
       </div>
     </div>}
-    {panel === "canvas" && <div className="visual-editor-toolbar" role="toolbar" aria-label="Stage content tools">
+    {panel === "canvas" && <>
+      {embedded && <div className="studio-contextual-tools" role="toolbar" aria-label="Essential canvas tools">
+        <button type="button" className="button button-outline" title="Add editable text" disabled={busy || sourceVisible} onClick={() => { const element = newElement("text"); commit({ ...layout, elements: [...layout.elements, element] }); setSelection(element.id); }}><Plus size={17} /> Add text</button>
+        <button type="button" className="icon-button" title="Undo" aria-label="Undo canvas edit" disabled={busy || cursor === 0} onClick={() => restoreHistory(cursor - 1)}><Undo2 size={17} /></button>
+        <button type="button" className="icon-button" title="Redo" aria-label="Redo canvas edit" disabled={busy || cursor === history.length - 1} onClick={() => restoreHistory(cursor + 1)}><Redo2 size={17} /></button>
+        {scene.previewImage && scene.visualLayout && <button type="button" className="button button-outline" aria-pressed={sourceVisible} disabled={busy} onClick={() => { setMotionPreview(0); setSourceVisible(!sourceVisible); }}>{sourceVisible ? "Back to canvas" : "Original slide"}</button>}
+        {!scene.visualLayout && scene.sourceSlide && project.hasSourceDeck && <button type="button" className="button button-outline" disabled={busy} onClick={() => void extract()}>Prepare editable scene</button>}
+        <span className="studio-contextual-hint" role="status">{selected ? `Selected ${selected.kind} · edit in inspector` : "Select an object, or double-click text to edit"}</span>
+        <button type="button" className="studio-tools-toggle" aria-expanded={advancedTools} aria-controls="studio-stage-extra-tools" onClick={() => setAdvancedTools(value => !value)}>{advancedTools ? "Fewer tools" : "More tools"} <ChevronRight size={14} aria-hidden="true" /></button>
+      </div>}
+      {(!embedded || advancedTools) && <div id={embedded ? "studio-stage-extra-tools" : undefined} className="visual-editor-toolbar" role="toolbar" aria-label="Stage content tools">
       <button type="button" className="button button-outline" disabled={busy || sourceVisible} onClick={async () => {
         setBusy(true); setError("");
         try {
@@ -346,7 +363,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
       <span className="visual-editor-dimensions">{Math.round(layout.width)} x {Math.round(layout.height)}</span>
       {scene.previewImage && scene.visualLayout && <button type="button" className="button button-outline" disabled={busy} aria-pressed={sourceVisible} onClick={() => { setMotionPreview(0); setSourceVisible(!sourceVisible); }}>{sourceVisible ? "Return to scene" : "Compare with original"}</button>}
       {!scene.visualLayout && scene.sourceSlide && project.hasSourceDeck && <button type="button" className="button button-outline" disabled={busy} onClick={() => void extract()}>Prepare editable scene</button>}
-    </div>}
+    </div>}</>}
     {panel === "canvas" && sourceVisible && <p className="field-hint" role="status">Original slide reference. Comparing does not change your scene, preview, or exports.</p>}
     {generatedLayoutApplied && panel === "canvas" && <p className="scene-draft-unsaved" role="status">Generated scene layout · not saved</p>}
     {error && <p className="visual-editor-error" role="alert">{error}</p>}
@@ -428,6 +445,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
           </fieldset></InspectorSection>}
       </aside>
     </div> : null}
-    <footer className="modal-actions"><button type="button" className="button button-outline" disabled={busy} onClick={onClose}>Cancel</button><button type="button" className="button button-accent" disabled={busy || !title.trim() || Boolean((scene.sourceSlide || scene.previewImage) && !scene.visualLayout && !canvasEdited) || layoutMode === "template" && !templateId} onClick={() => void save()}><Check size={16} />{busy ? "Saving" : "Save scene"}</button></footer>
-  </EditorDialog>;
+    <footer className="modal-actions"><button type="button" className="button button-outline" disabled={busy} onClick={cancelEditing}>Cancel</button><button type="button" className="button button-accent" disabled={busy || !title.trim() || Boolean((scene.sourceSlide || scene.previewImage) && !scene.visualLayout && !canvasEdited) || layoutMode === "template" && !templateId} onClick={() => void save()}><Check size={16} />{busy ? "Saving" : "Save scene"}</button></footer>
+  </>;
+  return embedded ? <section className="visual-editor studio-inline-editor" aria-labelledby="visual-editor-title" data-onboarding="scene.edit">{content}</section> : <EditorDialog className="visual-editor" labelledBy="visual-editor-title" busy={busy} onClose={onClose} onboardingTarget="scene.edit" onboardingJourney={panel === "canvas" ? "canvas" : "edit-scene"}>{content}</EditorDialog>;
 }
