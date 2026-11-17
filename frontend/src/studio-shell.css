@@ -61,3 +61,22 @@
 @media(max-width:1180px){.studio-columns,.studio-columns.studio-with-pythia{grid-template-columns:minmax(155px,190px) minmax(0,1fr) minmax(180px,210px)}.studio-pythia{grid-column:1 / -1;border-left:0;border-top:1px solid var(--studio-border);max-height:530px}.studio-command{flex-wrap:wrap}}
 @media(max-width:760px){.studio-columns,.studio-columns.studio-with-pythia{display:flex;flex-direction:column}.studio-scenes,.studio-inspector{border:0;border-bottom:1px solid var(--studio-border)}.studio-scenes-list{max-height:190px}.studio-command{padding:16px}.studio-command-actions button{flex:1}.studio-stage{padding:12px}.studio-stage-toolbar{flex-wrap:wrap}.studio-stage-surface{min-height:180px}.studio-inspector dl{max-width:380px}.studio-scenes{gap:8px}}
 @media(prefers-reduced-motion:reduce){.studio-shell *{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+/* The visual editor remains the single editing engine, embedded in the Stage.
+   These rules are isolated to the development-only Studio layout. */
+.studio-columns.studio-editing{grid-template-columns:minmax(168px,200px) minmax(0,1fr)}
+.studio-columns.studio-editing.studio-with-pythia{grid-template-columns:minmax(168px,200px) minmax(0,1fr) minmax(230px,325px)}
+.studio-editor-host{min-width:0;width:100%}
+.studio-inline-editor{--ink:#f3ebff;--muted:#c0b2d1;--line:#55446e;--theme-panel:#231d34;--theme-raised:#30253f;--theme-input:#2e2640;--theme-selected:#59427a;--ui-danger:#ffa5bb;background:#1e192c;border:1px solid #56416d;border-radius:13px;padding:12px;min-width:0;color:#f3ebff}
+.studio-inline-editor .visual-editor-header{padding:0 0 8px}
+.studio-inline-editor .visual-editor-header h2{color:#f4ebff}
+.studio-inline-editor .visual-editor-tabs{margin-top:4px}
+.studio-inline-editor .visual-editor-workspace{grid-template-columns:minmax(0,1fr) minmax(200px,240px);gap:13px}
+.studio-inline-editor .visual-editor-canvas{min-width:0}
+.studio-inline-editor .visual-inspector{border-left:1px solid #55446e;padding-left:12px;min-width:0}
+.studio-inline-editor .modal-actions{position:sticky;bottom:0;background:#211a32;border-top:1px solid #5e4773;padding:10px 4px;margin-top:12px;z-index:15}
+.studio-inline-editor .visual-editor-toolbar{gap:6px}
+.studio-inline-editor .visual-editor-toolbar button{font-size:11px}
+.studio-scene-editing-note{font-size:11px;line-height:1.4;color:#e9c2e0;border:1px solid #765b7e;background:#3c2946;padding:9px;border-radius:8px;margin:0}
+@media(max-width:1120px){.studio-inline-editor .visual-editor-workspace{grid-template-columns:minmax(0,1fr)}.studio-inline-editor .visual-inspector{border-left:0;border-top:1px solid #55446e;padding:12px 0 0}}
+@media(max-width:760px){.studio-columns.studio-editing,.studio-columns.studio-editing.studio-with-pythia{display:flex;flex-direction:column}.studio-inline-editor{padding:8px}.studio-inline-editor .visual-editor-toolbar{flex-wrap:wrap}.studio-inline-editor .visual-editor-header h2{font-size:15px}}
