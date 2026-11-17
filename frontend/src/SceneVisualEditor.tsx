@@ -107,6 +107,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
   const busy = saving || mediaWorking || placementWorking;
   const [error, setError] = useState("");
   const [panel, setPanel] = useState<"details" | "canvas" | "media">(initialPanel);
+  const [advancedTools, setAdvancedTools] = useState(false);
   const [canvasEdited, setCanvasEdited] = useState(false);
   const [sceneTextDirty, setSceneTextDirty] = useState(false);
   const [generatedLayoutApplied, setGeneratedLayoutApplied] = useState(false);
@@ -321,7 +322,17 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
         </fieldset>
       </div>
     </div>}
-    {panel === "canvas" && <div className="visual-editor-toolbar" role="toolbar" aria-label="Stage content tools">
+    {panel === "canvas" && <>
+      {embedded && <div className="studio-contextual-tools" role="toolbar" aria-label="Essential canvas tools">
+        <button type="button" className="button button-outline" title="Add editable text" disabled={busy || sourceVisible} onClick={() => { const element = newElement("text"); commit({ ...layout, elements: [...layout.elements, element] }); setSelection(element.id); }}><Plus size={17} /> Add text</button>
+        <button type="button" className="icon-button" title="Undo" aria-label="Undo canvas edit" disabled={busy || cursor === 0} onClick={() => restoreHistory(cursor - 1)}><Undo2 size={17} /></button>
+        <button type="button" className="icon-button" title="Redo" aria-label="Redo canvas edit" disabled={busy || cursor === history.length - 1} onClick={() => restoreHistory(cursor + 1)}><Redo2 size={17} /></button>
+        {scene.previewImage && scene.visualLayout && <button type="button" className="button button-outline" aria-pressed={sourceVisible} disabled={busy} onClick={() => { setMotionPreview(0); setSourceVisible(!sourceVisible); }}>{sourceVisible ? "Back to canvas" : "Original slide"}</button>}
+        {!scene.visualLayout && scene.sourceSlide && project.hasSourceDeck && <button type="button" className="button button-outline" disabled={busy} onClick={() => void extract()}>Prepare editable scene</button>}
+        <span className="studio-contextual-hint" role="status">{selected ? `Selected ${selected.kind} · edit in inspector` : "Select an object, or double-click text to edit"}</span>
+        <button type="button" className="studio-tools-toggle" aria-expanded={advancedTools} aria-controls="studio-stage-extra-tools" onClick={() => setAdvancedTools(value => !value)}>{advancedTools ? "Fewer tools" : "More tools"} <ChevronRight size={14} aria-hidden="true" /></button>
+      </div>}
+      {(!embedded || advancedTools) && <div id={embedded ? "studio-stage-extra-tools" : undefined} className="visual-editor-toolbar" role="toolbar" aria-label="Stage content tools">
       <button type="button" className="button button-outline" disabled={busy || sourceVisible} onClick={async () => {
         setBusy(true); setError("");
         try {
@@ -352,7 +363,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
       <span className="visual-editor-dimensions">{Math.round(layout.width)} x {Math.round(layout.height)}</span>
       {scene.previewImage && scene.visualLayout && <button type="button" className="button button-outline" disabled={busy} aria-pressed={sourceVisible} onClick={() => { setMotionPreview(0); setSourceVisible(!sourceVisible); }}>{sourceVisible ? "Return to scene" : "Compare with original"}</button>}
       {!scene.visualLayout && scene.sourceSlide && project.hasSourceDeck && <button type="button" className="button button-outline" disabled={busy} onClick={() => void extract()}>Prepare editable scene</button>}
-    </div>}
+    </div>}</>}
     {panel === "canvas" && sourceVisible && <p className="field-hint" role="status">Original slide reference. Comparing does not change your scene, preview, or exports.</p>}
     {generatedLayoutApplied && panel === "canvas" && <p className="scene-draft-unsaved" role="status">Generated scene layout · not saved</p>}
     {error && <p className="visual-editor-error" role="alert">{error}</p>}
