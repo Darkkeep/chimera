@@ -20,9 +20,25 @@ test('Studio 2.0 reuses saved scenes, existing editor and reversible classic nav
   await expect(studio.getByRole('button', { name: 'Edit on stage' })).toBeEnabled();
 
   await studio.getByRole('button', { name: 'Edit on stage' }).click();
-  await expect(page.getByRole('dialog', { name: /Verify the new authoring shell/ })).toBeVisible();
-  await page.getByRole('button', { name: 'Close scene editor' }).click();
-  await expect(studio).toBeVisible();
+  const editor = studio.locator('.studio-inline-editor');
+  await expect(editor).toBeVisible();
+  await expect(page.locator('.modal-backdrop .visual-editor')).toHaveCount(0);
+  await expect(studio.getByRole('navigation', { name: 'Studio scenes' })).toBeVisible();
+
+  // Genuine canvas editing uses the existing editor and existing revision-guarded save.
+  await editor.locator('.visual-editable').first().dblclick();
+  const textEditor = editor.getByRole('textbox', { name: 'Edit canvas text' });
+  await expect(textEditor).toBeVisible();
+  await textEditor.fill('A scene authored directly in Studio');
+  await textEditor.press('Tab');
+  await editor.getByRole('button', { name: 'Save scene' }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(studio.getByText('A scene authored directly in Studio')).toBeVisible();
+
+  const projectId = await page.evaluate(() => localStorage.getItem('chimera.activeProjectId'));
+  const stored = await (await page.request.get(`/api/projects/${projectId}`)).json();
+  expect(stored.storyboard.scenes[0].visualLayout.elements.some(element =>
+    element.kind === 'text' && element.text === 'A scene authored directly in Studio')).toBe(true);
 
   let modelPosts = 0;
   page.on('request', request => {
