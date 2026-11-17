@@ -1269,6 +1269,9 @@ export function App() {
   const hasSceneStage = Boolean(previewScene && (previewScene.html5Activity || previewScene.experience || previewScene.visualLayout?.enabled || previewScene.assessmentItem));
   const canCreateProject = !session || session.memberships.some(item => ["author", "instructional-designer", "administrator"].includes(item.role));
   const parentProject = projects.find(parent => parent.id === project.parentProjectId);
+  const editorIsInline = studioAvailable && studioPreview && activeView === "storyboard" && !showManagement && !showProjectAccess;
+  const activeVisualScene = visualSceneId ? scenes.find(item => item.id === visualSceneId) : undefined;
+  const visualEditor = activeVisualScene ? <SceneVisualEditor key={`${project.id}:${activeVisualScene.id}`} initialPanel={sceneEditorPanel} embedded={editorIsInline} project={project} scene={activeVisualScene} templates={templates} onClose={() => setVisualSceneId(null)} onSave={saveVisualScene} onExtract={extractVisualScene} onApplyTemplate={previewSceneTemplate} onGenerate={generateSceneContentDraft} onProjectUpdated={applyProject} canGenerate={permissions.canEnhance} /> : null;
 
   function openCourseReviewObject(objectType: "course" | "scene" | "objective" | "assessment" | "asset", objectId: string) {
     setShowPythiaCourseReview(false);
@@ -1373,6 +1376,7 @@ export function App() {
         onEditQuestion={() => setShowAssessmentEditor(true)} onOpenSources={() => setShowSources(true)}
         onOpenMedia={() => setActiveView("media")} onPreview={() => setShowPreview(true)}
         onValidate={() => setShowValidation(true)} onExport={() => setShowExport(true)} onProjectUpdated={applyProject}
+        editingSceneId={editorIsInline ? visualSceneId : null} editor={editorIsInline ? visualEditor : null}
       /> : <><div className="work-area">
         <section data-onboarding="storyboard.list" className="scene-list" aria-label="Scene sequence">
           <div className="scene-list-tools"><div className="scene-list-title"><h2>Scenes <span className="count">{scenes.length}</span></h2><button className="icon-button" title="Add scene" aria-label="Add scene" onClick={beginSceneCreate} disabled={!project.id || busy}><Plus size={19} /></button></div>
@@ -1449,7 +1453,7 @@ export function App() {
     {showAccessibility && <AccessibilityView projectId={project.id} revision={project.storyboard.revision} scenes={scenes} assets={project.storyboard.assets} onClose={() => setShowAccessibility(false)} onProjectUpdated={applyProject} />}
     {showGoldenPath && <GoldenPathView walkthroughStatuses={Object.fromEntries(Object.entries(guides).map(([id, guide]) => [id, guide.controller.snapshot().status]))} onStartWalkthrough={() => startOnboarding()} onSelectWalkthrough={id => startOnboarding(id)} project={project} onClose={() => setShowGoldenPath(false)} onCreateProject={() => { setShowGoldenPath(false); beginProjectCreate(); }} onOpenStoryboard={() => { setShowGoldenPath(false); setActiveView("storyboard"); }} onOpenMedia={() => { setShowGoldenPath(false); setActiveView("media"); }} onOpenAccessibility={() => { setShowGoldenPath(false); setShowAccessibility(true); }} onOpenPreview={() => { setShowGoldenPath(false); if (project.id) setShowPreview(true); }} onRunValidation={() => { setShowGoldenPath(false); setShowValidation(true); }} onOpenPythiaAnalysis={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaAnalysis(true); }} onOpenPythiaTransform={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaTransform(true); }} onOpenPythiaAssessment={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaAssessmentDesign(true); }} onOpenSuggestions={() => { setShowGoldenPath(false); setShowManagement(false); setShowEnhancementReview(true); }} onOpenCourseReview={() => { setShowGoldenPath(false); setShowManagement(false); setShowPythiaCourseReview(true); }} onOpenManagement={() => { setShowGoldenPath(false); setShowManagement(true); }} onOpenExport={() => { setShowGoldenPath(false); setShowManagement(false); setShowExport(true); }} />}
     {showPreview && project.id && <CoursePreview project={project} onClose={() => setShowPreview(false)} canEnhance={permissions.canEnhance} />}
-    {visualSceneId && scenes.find(item => item.id === visualSceneId) && <SceneVisualEditor key={`${project.id}:${visualSceneId}`} initialPanel={sceneEditorPanel} project={project} scene={scenes.find(item => item.id === visualSceneId)!} templates={templates} onClose={() => setVisualSceneId(null)} onSave={saveVisualScene} onExtract={extractVisualScene} onApplyTemplate={previewSceneTemplate} onGenerate={generateSceneContentDraft} onProjectUpdated={applyProject} canGenerate={permissions.canEnhance} />}
+    {!editorIsInline && visualEditor}
     {showAssessmentEditor && project.id && scene?.sceneType === "question" && <AssessmentEditor projectId={project.id} projectTitle={project.title} revision={project.storyboard.revision} scene={scene} scenes={scenes}
       onClose={() => setShowAssessmentEditor(false)}
       onProjectUpdated={applyProject}
