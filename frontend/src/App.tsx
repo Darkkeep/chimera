@@ -1136,6 +1136,7 @@ export function App() {
     const sceneUpdate: Record<string, unknown> = {
       ...sceneSettings,
       templateId: settings.templateId || null,
+      imageAltText: settings.imageAltText,
       visualLayout: layout,
     };
     if (refreshSourceLayout) delete sceneUpdate.visualLayout;
