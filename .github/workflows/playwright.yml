@@ -59,6 +59,13 @@ jobs:
       run: npm run test:auth
       env:
         CHIMERA_TEST_PYTHON: python
+    - name: Qualify opt-in Studio 2.0 smoke on Chromium
+      if: ${{ success() }}
+      run: npm run test:onboarding -- --project chromium studio.spec.cjs --workers 1
+      env:
+        CHIMERA_TEST_PYTHON: python
+        VITE_CHIMERA_STUDIO_ENABLED: "true"
+        CHIMERA_STUDIO_TEST: "true"
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:
