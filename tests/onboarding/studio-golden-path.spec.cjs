@@ -134,6 +134,21 @@ test('three-scene no-AI course: author, preview and export both SCORM profiles',
     .toBe('Pause and collect relevant information');
   expect(saved.storyboard.scenes[2].assessmentItem.correctResponse).toBe('false');
 
+  // Change the scored knowledge check through Chimera's real question editor.
+  await studio.getByRole('navigation', { name: 'Studio scenes' })
+    .getByRole('button', { name: /Check your judgment/ }).click();
+  await studio.getByRole('button', { name: 'Edit knowledge check' }).click();
+  const questionEditor = page.getByRole('dialog', { name: 'Check your judgment' });
+  await expect(questionEditor).toBeVisible();
+  await questionEditor.getByRole('textbox', { name: 'Question prompt' })
+    .fill('Should you confirm what the warning means before acting?');
+  await questionEditor.getByRole('button', { name: 'Save question' }).click();
+  await questionEditor.getByRole('button', { name: 'Close question editor' }).click();
+
+  saved = await (await request.get(`/api/projects/${project.id}`)).json();
+  expect(saved.storyboard.scenes[2].assessmentItem.prompt)
+    .toBe('Should you confirm what the warning means before acting?');
+
   await studio.getByRole('button', { name: 'Learner preview' }).click();
   const preview = page.getByRole('dialog', { name: 'Studio manual golden path course preview' });
   await expect(preview).toBeVisible();
