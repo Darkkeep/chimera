@@ -152,7 +152,7 @@ test('three-scene no-AI course: author, preview and export both SCORM profiles',
   await studio.getByRole('button', { name: 'Learner preview' }).click();
   const preview = page.getByRole('dialog', { name: 'Studio manual golden path course preview' });
   await expect(preview).toBeVisible();
-  await expect(preview.getByText('Recognize the first signal')).toBeVisible();
+  await expect(preview.locator('.visual-text').getByText('Recognize the first signal')).toBeVisible();
   await preview.getByRole('button', { name: 'Close course preview' }).click();
 
   for (const profile of ['scorm-12', 'scorm-2004']) {
