@@ -26,6 +26,13 @@ test('Studio 2.0 reuses saved scenes, existing editor and reversible classic nav
   // Essential editing remains visible; advanced tools don't overwhelm the canvas.
   await expect(editor.getByRole('toolbar', { name: 'Essential canvas tools' })).toBeVisible();
   await expect(editor.getByRole('toolbar', { name: 'Stage content tools' })).toHaveCount(0);
+  await expect(editor.getByRole('region', { name: 'Contextual properties' })).toBeVisible();
+  await expect(editor.getByRole('textbox', { name: 'Studio scene title' })).toBeVisible();
+  await expect(editor.getByRole('button', { name: 'Advanced properties' })).toHaveAttribute('aria-expanded', 'false');
+  await editor.getByRole('button', { name: 'Advanced properties' }).click();
+  await expect(editor.getByRole('button', { name: 'Hide advanced properties' })).toBeVisible();
+  await editor.getByRole('button', { name: 'Hide advanced properties' }).click();
+  await expect(editor.getByRole('button', { name: 'Advanced properties' })).toBeVisible();
   await editor.getByRole('button', { name: 'More tools' }).click();
   await expect(editor.getByRole('toolbar', { name: 'Stage content tools' })).toBeVisible();
   await editor.getByRole('button', { name: 'Fewer tools' }).click();
