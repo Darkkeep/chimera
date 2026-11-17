@@ -122,3 +122,27 @@
 .studio-authoring-task strong{font-size:12px;color:#f2d7f3}
 .studio-authoring-task p,.studio-authoring-task small{font-size:11px;line-height:1.55;color:#d0c1dc;margin:0}
 .studio-authoring-task .studio-inspector-action{width:100%;justify-content:center}
+
+/* Native interaction authoring retains the real experience editor and player in Studio. */
+.studio-native-editor{display:grid;gap:14px;min-width:0;background:#1e192c;border:1px solid #59466c;border-radius:13px;padding:14px;color:#eee8f5}
+.studio-native-heading{display:flex;justify-content:space-between;align-items:start;gap:12px}
+.studio-native-heading h3{margin:3px 0 7px;font-size:17px;color:#f8eefe}
+.studio-native-heading p{font-size:11px;line-height:1.5;max-width:68ch;margin:0;color:#cec0de}
+.studio-native-heading button,.studio-native-actions button{border:1px solid #745989;border-radius:8px;background:#322642;color:#fff;padding:9px 12px;font-size:12px}
+.studio-native-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;min-width:0}
+.studio-native-authoring,.studio-native-learner{min-width:0;max-height:70vh;overflow:auto}
+.studio-native-authoring{background:#261f37;border:1px solid #574569;border-radius:10px;padding:12px}
+.studio-native-authoring fieldset{min-width:0;border:1px solid #54456a;border-radius:9px;margin:0 0 10px;padding:10px}
+.studio-native-authoring :is(label,textarea,input,select){min-width:0;box-sizing:border-box}
+.studio-native-authoring :is(textarea,input,select){max-width:100%}
+.studio-native-learner{background:#100f1b;border:1px solid #554466;border-radius:10px;padding:12px}
+.studio-native-learner h4{font-size:12px;color:#eac3e8;margin:0 0 10px}
+.studio-native-actions{display:grid;gap:12px;border-top:1px solid #574368;padding-top:12px}
+.studio-native-actions label{display:flex;align-items:flex-start;gap:8px;font-size:12px;line-height:1.45}
+.studio-native-actions label input{margin-top:2px}
+.studio-native-actions>div{display:flex;justify-content:flex-end;gap:8px}
+.studio-native-actions button:last-child{background:linear-gradient(95deg,#a145a9,#7049b6);border-color:#c986c8}
+.studio-native-actions button:disabled{opacity:.5;cursor:not-allowed}
+.studio-native-alert{border:1px solid #b36b7a;border-radius:8px;padding:10px;font-size:12px;color:#ffb1c4}
+@media(max-width:1250px){.studio-native-columns{grid-template-columns:minmax(0,1fr)}.studio-native-authoring,.studio-native-learner{max-height:none}}
+@media(max-width:760px){.studio-native-editor{padding:10px}.studio-native-heading{flex-wrap:wrap}.studio-native-actions>div{flex-wrap:wrap}}
