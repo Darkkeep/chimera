@@ -32,6 +32,15 @@ class AIConnectionTests(unittest.TestCase):
     def save(self, **kwargs):
         return ai_connection.save_connection(self.root, ai_connection.ConnectionUpdate(expectedRevision=ai_connection.connection_status(self.root)["revision"], apiKey=SecretStr("test-secret-only"), **kwargs))
 
+    def test_image_mode_defaults_and_existing_saved_choice(self):
+        self.assertEqual(ai_connection.connection_status(self.root)["imageModel"], "gpt-image-2.6-sunburst")
+        self.assertIn("gpt-image-2.6-flare", ai_connection.connection_status(self.root)["imageModels"])
+        self.assertEqual(self.save(imageModel="gpt-image-2.6-flare")["imageModel"], "gpt-image-2.6-flare")
+        self.assertEqual(ai_connection.resolve_connection(self.root).image_model, "gpt-image-2.6-flare")
+        self.assertEqual(self.save(imageModel="gpt-image-1")["imageModel"], "gpt-image-1")
+        with self.assertRaises(ValidationError):
+            ai_connection.ConnectionUpdate(expectedRevision="x", imageModel="unapproved-model")
+
     def test_key_never_persists_in_metadata_or_status(self):
         status = self.save()
         self.assertTrue(status["configured"])
@@ -129,7 +138,7 @@ class AIConnectionTests(unittest.TestCase):
         self.assertIsNone(enhancement.aiConnectionRevision)
         self.assertEqual(media.aiConnectionRevision, saved["revision"])
         self.assertEqual(enhancement_jobs._provider().name, "Pythia local live drafting")
-        self.assertEqual(media_generation._provider(saved["revision"]).image_model, "gpt-image-1")
+        self.assertEqual(media_generation._provider(saved["revision"]).image_model, "gpt-image-2.6-sunburst")
         with patch.object(pythia_talk, "local_mcp", return_value={"storyboard_enhancements": True}):
             self.assertTrue(enhancement_jobs.preview_enhancement_submission(
                 project.id, EnhancementJobCreate(scope="whole-course", goal="Check"),
