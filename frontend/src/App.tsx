@@ -1373,7 +1373,7 @@ export function App() {
         key={project.id} project={project} selectedScene={selectedScene} busy={busy || hasOpenForm}
         canEdit={permissions.canEdit} canEnhance={permissions.canEnhance}
         onSelectScene={setSelectedScene} onCreateScene={beginSceneCreate} onEditScene={(selected) => beginSceneEdit(selected)}
-        onEditQuestion={() => setShowAssessmentEditor(true)} onOpenSources={() => setShowSources(true)}
+        onEditQuestion={() => setShowAssessmentEditor(true)} onDesignExperience={() => setShowSceneExperience(true)} onOpenSources={() => setShowSources(true)}
         onOpenMedia={() => setActiveView("media")} onPreview={() => setShowPreview(true)}
         onValidate={() => setShowValidation(true)} onExport={() => setShowExport(true)} onProjectUpdated={applyProject}
         editingSceneId={editorIsInline ? visualSceneId : null} editor={editorIsInline ? visualEditor : null}
