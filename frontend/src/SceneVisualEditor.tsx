@@ -41,6 +41,7 @@ export type SceneEditSettings = {
   assessmentItem: Scene["assessmentItem"];
   assessmentSettings: Scene["assessmentSettings"];
   canvasEdited: boolean;
+  imageAltText: Record<string, string>;
 };
 
 export type GeneratedSceneDraft = {
@@ -120,6 +121,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
   const [pendingTemplateId, setPendingTemplateId] = useState(scene.templateId || "");
   const templateHistory = useRef([scene.templateId || ""]);
   const [screenText, setScreenText] = useState(scene.extractedText.join("\n"));
+  const [imageAltText, setImageAltText] = useState<Record<string, string>>(() => ({...scene.imageAltText}));
   const [actionDescription, setActionDescription] = useState(scene.actionDescription);
   const [narration, setNarration] = useState(scene.narration);
   const [notes, setNotes] = useState(scene.notes);
@@ -248,6 +250,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
         assessmentItem: sceneType === "question" ? assessmentItem : null,
         assessmentSettings: sceneType === "question" ? assessmentSettings : null,
         canvasEdited: canvasEdited || JSON.stringify(layout) !== JSON.stringify(initialLayout(scene)),
+        imageAltText,
       });
       setSavedMediaContext(mediaContextSignature);
       if (closeAfterSave) onClose();
@@ -299,7 +302,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
     setSourceVisible(false);
     setPanel("canvas");
   }
-  const dirty = cursor !== 0 || sceneTextDirty || canvasEdited || generatedLayoutApplied || title !== scene.title || actionDescription !== scene.actionDescription || narration !== scene.narration || notes !== scene.notes || required !== scene.required || audioRequired !== scene.audioRequired || sceneType !== scene.sceneType || layoutMode !== scene.layoutMode || templateId !== (scene.templateId || "");
+  const dirty = JSON.stringify(imageAltText) !== JSON.stringify(scene.imageAltText) || cursor !== 0 || sceneTextDirty || canvasEdited || generatedLayoutApplied || title !== scene.title || actionDescription !== scene.actionDescription || narration !== scene.narration || notes !== scene.notes || required !== scene.required || audioRequired !== scene.audioRequired || sceneType !== scene.sceneType || layoutMode !== scene.layoutMode || templateId !== (scene.templateId || "");
   function cancelEditing() {
     if (busy) return;
     if (embedded && dirty && !window.confirm("Discard unsaved scene changes?")) return;
@@ -410,6 +413,8 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
       <aside className="visual-inspector" aria-label="Element properties">
         {embedded && <StudioNaturalInspector element={selected} layout={layout} title={title} disabled={busy || sourceVisible}
           images={images}
+          imageAltText={imageAltText}
+          onImageAltTextChange={(assetId, text) => setImageAltText(current => ({...current, [assetId]: text}))}
           onTitleChange={value => { setTitle(value); setSceneTextDirty(true); }}
           onChange={update}
           onStageChange={changes => commit({ ...layout, ...changes })}
