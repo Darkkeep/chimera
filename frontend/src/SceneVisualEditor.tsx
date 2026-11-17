@@ -152,7 +152,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
     function onHistoryShortcut(event: KeyboardEvent) {
       if (event.defaultPrevented || event.isComposing || event.altKey || !(event.ctrlKey || event.metaKey)) return;
       const target = event.target;
-      if (!(target instanceof HTMLElement) || !target.closest('[role="dialog"]')?.classList.contains("visual-editor")) return;
+      if (!(target instanceof HTMLElement) || !target.closest(".visual-editor")) return;
       if (target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
       const key = event.key.toLowerCase();
       if (key !== "z" && key !== "y") return;
