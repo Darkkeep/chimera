@@ -88,12 +88,12 @@ test('three-scene no-AI course: author, preview and export both SCORM profiles',
   await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
   await page.getByRole('button', { name: 'Studio 2.0 preview' }).click();
   const studio = page.getByRole('region', { name: 'Chimera 2.0 Authoring Studio' });
-  await expect(studio.getByRole('navigation', { name: 'Studio scenes' }).getByRole('button')).toHaveCount(3);
+  await expect(studio.getByRole('navigation', { name: 'Studio scenes' }).locator('.studio-scene')).toHaveCount(3);
 
   await studio.getByRole('button', { name: 'Edit on stage' }).click();
   const canvas = studio.locator('.studio-inline-editor');
   await expect(canvas).toBeVisible();
-  await canvas.getByRole('button', { name: 'Lesson heading element' }).click();
+  await canvas.getByRole('button', { name: 'Recognize an unusual signal element' }).click();
   await canvas.getByRole('textbox', { name: 'Studio selected text' }).fill('Recognize the first signal');
   await canvas.getByRole('button', { name: 'Studio bold' }).click();
   await canvas.getByRole('button', { name: 'Signal image element' }).click();
@@ -136,7 +136,7 @@ test('three-scene no-AI course: author, preview and export both SCORM profiles',
 
   for (const profile of ['scorm-12', 'scorm-2004']) {
     const zipResponse = await request.get(`/api/projects/${project.id}/${profile}.zip`);
-    expect(zipResponse.ok(), await zipResponse.text().catch(() => '')).toBeTruthy();
+    expect(zipResponse.ok()).toBeTruthy();
     const archive = testInfo.outputPath(`${profile}.zip`);
     const directory = testInfo.outputPath(profile);
     await fs.writeFile(archive, await zipResponse.body());
