@@ -18,6 +18,7 @@ import { useMediaConnections } from "./media-connections";
 import { backgroundMode } from "./background";
 import { GeneratedMediaPanel } from "./GeneratedMediaPanel";
 import { MediaToolsPanel } from "./MediaToolsPanel";
+import { StudioNaturalInspector } from "./StudioNaturalInspector";
 
 function InspectorSection({ title, children }: { title: string; children: ReactNode }) {
   return <details className="visual-inspector-section">
@@ -406,6 +407,12 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
         {<SceneTimeline layout={layout} project={project} commit={commit} selection={selection} select={setSelection} time={timelineTime} setTime={setTimelineTime} playing={timelinePlaying} setPlaying={setTimelinePlaying} preview={timelinePreview} setPreview={setTimelinePreview} disabled={busy || sourceVisible} audition={audition} onAudition={setAudition} onDurationValidityChange={setDurationValid}/>}
       </div>
       <aside className="visual-inspector" aria-label="Element properties">
+        {embedded && <StudioNaturalInspector element={selected} layout={layout} title={title} disabled={busy || sourceVisible}
+          images={images}
+          onTitleChange={value => { setTitle(value); setSceneTextDirty(true); }}
+          onChange={update}
+          onStageChange={changes => commit({ ...layout, ...changes })}
+        />}
         {selected && <InspectorSection title="Appearance"><ElementAppearanceControls element={selected} onChange={update} disabled={busy || selected.locked || sourceVisible}/></InspectorSection>}
         {selected && <InspectorSection title="Animation">{multiSelection.length > 1 && <p className="field-hint">Animation changes apply to {animationTargets.length} selected unlocked objects. Settings shown are from {animationReference?.name || animationReference?.text.slice(0, 40) || "the active object"}.</p>}<AnimationControls animations={animationReference?.animations} onChange={animations => {
           if (busy || sourceVisible || !animationTargets.length) return;
