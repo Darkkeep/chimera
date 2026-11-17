@@ -53,6 +53,7 @@ import { PythiaCourseReviewView } from "./PythiaCourseReviewView";
 import { PythiaSceneActions } from "./PythiaSceneActions";
 import type { Experience } from "./NativeExperience";
 import { SceneExperiencePanel } from "./SceneExperiencePanel";
+import { StudioNativeExperienceEditor } from "./StudioNativeExperienceEditor";
 import { HTML5ActivityPanel } from "./HTML5ActivityPanel";
 import type { HTML5Activity } from "./HTML5Activity";
 import { ProjectBackgroundPanel } from "./ProjectBackgroundPanel";
@@ -120,6 +121,7 @@ export function App() {
   const [plannerSourcesVersion, setPlannerSourcesVersion] = useState(0);
   const [sceneDraft, setSceneDraft] = useState<SceneDraft | null>(null);
   const [visualSceneId, setVisualSceneId] = useState<string | null>(null);
+  const [studioInteractionSceneId, setStudioInteractionSceneId] = useState<string | null>(null);
   const [sceneEditorPanel, setSceneEditorPanel] = useState<"canvas" | "details">("canvas");
   const [templateDraft, setTemplateDraft] = useState<TemplateDraft | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -208,7 +210,7 @@ export function App() {
     showProjectBackground ? "storyboard.background" :
     showAccessibility ? "review.accessibility" : showValidation ? "review.validation" :
     showGoldenPath ? "catalog" : showManagement ? "workspace.management" : activeView;
-  const hasOpenForm = Boolean(showHTML5 || showSceneExperience || showPythiaTalk || showSources || visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showProjectBackground || showAccessibility || showValidation);
+  const hasOpenForm = Boolean(showHTML5 || showSceneExperience || studioInteractionSceneId || showPythiaTalk || showSources || visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showProjectBackground || showAccessibility || showValidation);
   const preparationAttempt = useRef("");
   useEffect(() => {
     if (!project.id || !permissions.canEdit || busy || hasOpenForm || !project.storyboard.scenes.some(item => !item.visualLayout)) return;
@@ -1373,10 +1375,10 @@ export function App() {
         key={project.id} project={project} selectedScene={selectedScene} busy={busy || hasOpenForm}
         canEdit={permissions.canEdit} canEnhance={permissions.canEnhance}
         onSelectScene={setSelectedScene} onCreateScene={beginSceneCreate} onEditScene={(selected) => beginSceneEdit(selected)}
-        onEditQuestion={() => setShowAssessmentEditor(true)} onDesignExperience={() => setShowSceneExperience(true)} onOpenSources={() => setShowSources(true)}
+        onEditQuestion={() => setShowAssessmentEditor(true)} onDesignExperience={() => { if (scene) setStudioInteractionSceneId(scene.id); }} onOpenSources={() => setShowSources(true)}
         onOpenMedia={() => setActiveView("media")} onPreview={() => setShowPreview(true)}
         onValidate={() => setShowValidation(true)} onExport={() => setShowExport(true)} onProjectUpdated={applyProject}
-        editingSceneId={editorIsInline ? visualSceneId : null} editor={editorIsInline ? visualEditor : null}
+        editingSceneId={editorIsInline ? visualSceneId || studioInteractionSceneId : null} editor={editorIsInline ? visualEditor || (studioInteractionSceneId && scene?.id === studioInteractionSceneId ? <StudioNativeExperienceEditor key={`${project.id}:${scene.id}`} project={project} scene={scene} onProjectUpdated={applyProject} onClose={() => setStudioInteractionSceneId(null)} /> : null) : null}
       /> : <><div className="work-area">
         <section data-onboarding="storyboard.list" className="scene-list" aria-label="Scene sequence">
           <div className="scene-list-tools"><div className="scene-list-title"><h2>Scenes <span className="count">{scenes.length}</span></h2><button className="icon-button" title="Add scene" aria-label="Add scene" onClick={beginSceneCreate} disabled={!project.id || busy}><Plus size={19} /></button></div>
