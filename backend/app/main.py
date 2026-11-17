@@ -71,6 +71,7 @@ from . import video_treatments
 from .models import ReviewedVideoTreatment
 from . import pythia_actions
 from .signal import router as signal_router
+from .build_information import runtime_build_information
 
 
 HOSTED_ACCOUNT_PROVIDERS = {"builtin", "darkrogue"}
@@ -111,7 +112,7 @@ ROUTE_ACTIONS = {
     "copy_shared_media": "media.manage", "delete_shared_media": "media.manage", "post_reference_ocr": "reference.create",
     "post_reference_ocr_accept": "reference.create",
     "admission_status": "identity.view",
-    "health": "identity.view", "auth_config": "identity.view", "login": "identity.view",
+    "health": "identity.view", "get_build_information": "admin.audit.view", "auth_config": "identity.view", "login": "identity.view",
     "logout": "identity.view", "reset_password": "identity.view", "darkrogue_login": "identity.view", "pythia_turn_access": "identity.view", "get_accounts": "admin.policy.manage",
     "owner_suite_projects": "project.membership.manage",
     "get_identity_context": "identity.view", "get_identity_policy": "identity.view",
@@ -200,6 +201,8 @@ def _hosted_request_action(request: Request) -> str:
         return "project.delete"
     if path.endswith("/restore") and request.method == "POST":
         return "project.restore"
+    if path == "/api/management/build-information":
+        return "admin.audit.view"
     if path == "/api/trash/projects":
         return "workspace.view"
     if path.startswith(("/api/ai-connection", "/api/narration-connections")):
@@ -456,6 +459,12 @@ def _check_expected_revision(expected_revision: int | None, actual_revision: int
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/management/build-information")
+def get_build_information() -> dict[str, object]:
+    """Admin-only non-sensitive build identity, never read from Git at request time."""
+    return runtime_build_information()
 
 
 def _password_store() -> AccountStore:
