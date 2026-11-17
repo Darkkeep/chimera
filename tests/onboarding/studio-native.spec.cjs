@@ -18,7 +18,8 @@ test('manual native interaction is authored, previewed and persisted inline with
   await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
   await page.goto('/');
   const resume = page.getByRole('button', { name: 'Resume authoring', exact: true });
-  if (await resume.isVisible()) await resume.click();
+  await expect(resume).toBeVisible();
+  await resume.click();
 
   await page.getByRole('button', { name: 'Studio 2.0 preview' }).click();
   const studio = page.getByRole('region', { name: 'Chimera 2.0 Authoring Studio' });
