@@ -30,10 +30,11 @@ test('Studio 2.0 reuses saved scenes, existing editor and reversible classic nav
   await expect(editor.getByRole('toolbar', { name: 'Stage content tools' })).toBeVisible();
   await editor.getByRole('button', { name: 'Fewer tools' }).click();
   await expect(editor.getByRole('toolbar', { name: 'Stage content tools' })).toHaveCount(0);
+  const originalCount = await editor.locator('.visual-editable').count();
   await editor.getByRole('button', { name: 'Add text', exact: true }).click();
-  await expect(editor.locator('.visual-editable')).toHaveCount(3);
+  await expect(editor.locator('.visual-editable')).toHaveCount(originalCount + 1);
   await editor.getByRole('button', { name: 'Undo canvas edit' }).click();
-  await expect(editor.locator('.visual-editable')).toHaveCount(2);
+  await expect(editor.locator('.visual-editable')).toHaveCount(originalCount);
 
   await expect(studio.getByRole('navigation', { name: 'Studio scenes' })).toBeVisible();
 
