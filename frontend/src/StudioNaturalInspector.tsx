@@ -7,7 +7,7 @@ import { defaultAppearance } from "./scene-timeline";
  * component does not own a competing draft, save path, or AI integration.
  */
 export function StudioNaturalInspector({
-  element, layout, title, onTitleChange, onChange, onStageChange, images, disabled,
+  element, layout, title, onTitleChange, onChange, onStageChange, images, imageAltText, onImageAltTextChange, disabled,
 }: {
   element: SceneElement | undefined;
   layout: SceneLayout;
@@ -16,6 +16,8 @@ export function StudioNaturalInspector({
   onChange: (changes: Partial<SceneElement>) => void;
   onStageChange: (changes: Partial<SceneLayout>) => void;
   images: { id: string; filename: string }[];
+  imageAltText: Record<string, string>;
+  onImageAltTextChange: (assetId: string, value: string) => void;
   disabled: boolean;
 }) {
   const locked = Boolean(element?.locked);
@@ -69,7 +71,13 @@ export function StudioNaturalInspector({
             {images.map(asset=><option value={asset.id} key={asset.id}>{asset.filename}</option>)}
           </select>
         </label>
-        <p className="studio-natural-helper">Drag handles to crop or resize using the existing canvas tools. Alternative text is managed in the scene's media/accessibility settings.</p>
+        {element.assetId && <label>Alternative text
+          <textarea aria-label="Studio image alternative text" rows={3} maxLength={2000}
+            placeholder="Describe the image's learning-relevant content."
+            value={imageAltText[element.assetId] || ""}
+            onChange={event=>onImageAltTextChange(element.assetId!,event.target.value)}/>
+        </label>}
+        <p className="studio-natural-helper">Describe what matters to the learner. Drag handles to crop or resize using the canvas tools.</p>
       </>}
       {element.kind === "shape" && <>
         <label>Shape fill
