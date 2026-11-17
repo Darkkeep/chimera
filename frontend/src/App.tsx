@@ -24,6 +24,7 @@ import { CompletionSettingsEditor } from "./CompletionSettingsEditor";
 import { EnhancementReviewView } from "./EnhancementReviewView";
 import { EditorDialog } from "./EditorDialog";
 import { AppearanceSelector } from "./AppearanceSelector";
+import { BuildInformation } from "./BuildInformation";
 import { SignalFeedback } from "./SignalFeedback";
 import { BrandMark } from "./BrandMark";
 import { revisionConflictMessage, storyboardWriteHeaders } from "./revision";
@@ -1331,6 +1332,7 @@ export function App() {
           <button type="button" className="nav-item" disabled={busy} onClick={() => setShowIntelligenceEngine(true)}>          <Sparkles size={16} />Pythia</button>
           <button type="button" className="nav-item" disabled={busy} onClick={event => { event.currentTarget.focus(); setShowAIConnection(true); }}><Sparkles size={16} />AI Connections</button>
           {session && permissions.canManageMembers && <button className="nav-item" disabled={!project.id} onClick={() => setShowProjectAccess(true)}>Project access</button>}
+          {(!session || session.memberships.some(m => /^(owner|admin|administrator)$/i.test(m.role))) && <BuildInformation />}
         </div>}
         {session && <div className="hosted-session"><span>{session.actor.actorDisplayName}</span><button onClick={() => { if (window.confirm("Sign out? Unsaved changes will be discarded.")) void logout().catch(issue => setError(issue instanceof Error ? issue.message : "Sign-out failed.")); }}>Sign out</button></div>}
         <div className="sidebar-footer"><span className="status-dot" />{session ? "Hosted workspace" : "Local workspace"}</div>
