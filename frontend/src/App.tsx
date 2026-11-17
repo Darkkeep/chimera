@@ -24,6 +24,8 @@ import { CompletionSettingsEditor } from "./CompletionSettingsEditor";
 import { EnhancementReviewView } from "./EnhancementReviewView";
 import { EditorDialog } from "./EditorDialog";
 import { AppearanceSelector } from "./AppearanceSelector";
+import { BuildInformation } from "./BuildInformation";
+import { StudioShell } from "./StudioShell";
 import { SignalFeedback } from "./SignalFeedback";
 import { BrandMark } from "./BrandMark";
 import { revisionConflictMessage, storyboardWriteHeaders } from "./revision";
@@ -87,6 +89,8 @@ type CourseSceneDraft = GeneratedSceneDraft & { included: boolean };
 
 const emptyProject: Project = { id: "", title: "", sceneCount: 0, updatedAt: "", hasSourceDeck: false, storyboard: { revision: 1, scenes: [], assets: [], completionSettings: { passingScore: 80, includeOptionalAssessments: false }, exportSettings: { packageWarningThresholdMB: 200 } } };
 const MAX_STORYBOARD_JSON_BYTES = 25 * 1024 * 1024;
+// Explicit opt-in for development builds; default-off in every existing deployment.
+const studioAvailable = import.meta.env.VITE_CHIMERA_STUDIO_ENABLED === "true";
 
 export function App() {
   const { session, logout } = useSession();
@@ -120,6 +124,7 @@ export function App() {
   const [templateDraft, setTemplateDraft] = useState<TemplateDraft | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [activeView, setActiveView] = useState<"storyboard" | "media" | "templates">("storyboard");
+  const [studioPreview, setStudioPreview] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const [showAccessibility, setShowAccessibility] = useState(false);
   const [showGoldenPath, setShowGoldenPath] = useState(false);
@@ -1306,6 +1311,7 @@ export function App() {
         <button className={`nav-item ${showPythiaTalk ? "active" : ""}`} onClick={() => setShowPythiaTalk(true)} disabled={!project.id || busy || hasOpenForm || !permissions.canEnhance}><Sparkles size={18} /><span>Consult Pythia</span></button>
         <button ref={managementButtonRef} className={`nav-item management-nav-item ${showManagement ? "active" : ""}`} aria-current={showManagement ? "page" : undefined} onClick={() => setShowManagement(true)}><ClipboardList size={18} /><span>My Work</span></button>
         <button className={`nav-item ${!showManagement && activeView === "storyboard" ? "active" : ""}`} aria-current={!showManagement && activeView === "storyboard" ? "page" : undefined} onClick={() => { setShowManagement(false); setActiveView("storyboard"); }}><Layers3 size={18} /><span>Storyboard</span></button>
+        {studioAvailable && <button type="button" className={`nav-item ${studioPreview ? "active" : ""}`} aria-pressed={studioPreview} disabled={!project.id || busy || hasOpenForm} onClick={() => { setStudioPreview(value => !value); setShowManagement(false); setActiveView("storyboard"); }}><Sparkles size={18} /><span>{studioPreview ? "Classic storyboard" : "Studio 2.0 preview"}</span></button>}
         <button className={`nav-item ${showSources ? "active" : ""}`} onClick={() => setShowSources(true)} disabled={!project.id || busy || hasOpenForm}><FileText size={18} /><span>Sources</span></button>
         <button className={`nav-item ${showAssessments ? "active" : ""}`} onClick={() => setShowAssessments(true)} disabled={!project.id || busy || !permissions.canEdit}><ClipboardList size={18} /><span>Assessments</span></button>
         <button className={`nav-item ${!showManagement && activeView === "media" ? "active" : ""}`} aria-current={!showManagement && activeView === "media" ? "page" : undefined} onClick={() => { setShowManagement(false); setActiveView("media"); }}><FileUp size={18} /><span>Media library</span></button>
@@ -1331,6 +1337,7 @@ export function App() {
           <button type="button" className="nav-item" disabled={busy} onClick={() => setShowIntelligenceEngine(true)}>          <Sparkles size={16} />Pythia</button>
           <button type="button" className="nav-item" disabled={busy} onClick={event => { event.currentTarget.focus(); setShowAIConnection(true); }}><Sparkles size={16} />AI Connections</button>
           {session && permissions.canManageMembers && <button className="nav-item" disabled={!project.id} onClick={() => setShowProjectAccess(true)}>Project access</button>}
+          {(!session || session.memberships.some(m => /^(owner|admin|administrator)$/i.test(m.role))) && <BuildInformation />}
         </div>}
         {session && <div className="hosted-session"><span>{session.actor.actorDisplayName}</span><button onClick={() => { if (window.confirm("Sign out? Unsaved changes will be discarded.")) void logout().catch(issue => setError(issue instanceof Error ? issue.message : "Sign-out failed.")); }}>Sign out</button></div>}
         <div className="sidebar-footer"><span className="status-dot" />{session ? "Hosted workspace" : "Local workspace"}</div>
@@ -1344,22 +1351,29 @@ export function App() {
     <main className="main-content" id="workspace-content" tabIndex={-1}>
       {deepLinkError && <div className="notice" role="alert"><span>{deepLinkError}</span><button className="icon-button" onClick={() => setDeepLinkError("")} aria-label="Dismiss deep link error"><X size={16} /></button></div>}
       {showManagement ? <ManagementView busy={busy || restoringProject || hasOpenForm} canCreateProject={canCreateProject} onCreateProject={beginProjectCreate} canResume={Boolean(project.id)} onOpenProject={(projectId) => switchProject(projectId, true)} onProjectTrashed={handleProjectTrashed} onProjectsRestored={handleProjectsRestored} onRelationshipUpdated={handleRelationshipUpdated} onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} /> : showProjectAccess ? <ProjectAccessPanel project={linkedAccessProject ?? project} onClose={() => { if (linkedAccessProject) { setLinkedAccessProject(null); setShowManagement(true); } setShowProjectAccess(false); }} /> : !permissions.canEdit && session && project.id ? <section className="project-access-panel"><h1>{project.title}</h1><p>You have review access to this project.</p><button className="button button-dark" onClick={() => setShowPreview(true)}>Open course review</button></section> : <>
-      <header className="topbar">
+      {!(studioAvailable && studioPreview && activeView === "storyboard") && <header className="topbar">
         <div className="project-heading">{project.parentProjectId && <nav className="project-breadcrumb" aria-label="Project hierarchy">{parentProject ? <button type="button" disabled={busy || hasOpenForm} onClick={() => void switchProject(parentProject.id, true)}>{parentProject.title}</button> : <span>Parent project unavailable</span>}<span aria-hidden="true"> / </span><span aria-current="page">{project.title}</span></nav>}<p className="eyebrow">COURSE AUTHORING / {activeView === "storyboard" ? "STORYBOARD" : activeView === "media" ? "MEDIA LIBRARY" : "TEMPLATES"}</p><h1 title={project.title}>{project.title || "Your workspace"}</h1></div>
         <div className="top-actions"><span className="save-state" role="status">{busy ? "Working…" : project.id ? <><Check size={14} /> Saved locally</> : "Local authoring"}</span><button className="button button-outline" onClick={() => setShowPreview(true)} disabled={!project.id || !scenes.length || busy}><Play size={15} /> Preview course</button><button className="button button-accent" onClick={() => setShowExport(true)} disabled={!project.id || busy}><Download size={15} /> Export</button></div>
-      </header>
-      <nav className="production-workflow" aria-label="Authoring workflow">
+      </header>}
+      {!(studioAvailable && studioPreview && activeView === "storyboard") && <nav className="production-workflow" aria-label="Authoring workflow">
         <button onClick={() => { setActiveView("storyboard"); setShowSources(true); }} disabled={!project.id || busy || !permissions.canEdit}><span>01</span> Source</button>
         <button aria-current={activeView === "storyboard" ? "step" : undefined} onClick={() => setActiveView("storyboard")}><span>02</span> Storyboard</button>
         <button onClick={() => setShowEnhancementReview(true)} disabled={!project.id || busy}><span>03</span> Enhance</button>
         <button onClick={() => setShowValidation(true)} disabled={!project.id || busy}><span>04</span> Verify</button>
         <button onClick={() => setShowExport(true)} disabled={!project.id || busy}><span>05</span> Deploy</button>
-      </nav>
+      </nav>}
       {error && <div className="notice" role="alert"><span>{error}</span><button className="icon-button" onClick={() => setError("")} aria-label="Dismiss error"><X size={16} /></button></div>}
       {feedback && <div className="notice success-notice" role="status"><span>{feedback}</span><button className="icon-button" onClick={() => setFeedback("")} aria-label="Dismiss message"><X size={16} /></button></div>}
       {readiness && <div className="readiness-strip" aria-label="Project readiness"><span className={readiness.publicationBlockers ? "blocked" : "clear"}>{readiness.publicationBlockers ? `${readiness.publicationBlockers} publication blocker${readiness.publicationBlockers === 1 ? "" : "s"}` : "Ready for publication checks"}</span><span>{readiness.pendingProposals} pending suggestion{readiness.pendingProposals === 1 ? "" : "s"}</span><span>{readiness.unresolvedComments} unresolved comment{readiness.unresolvedComments === 1 ? "" : "s"}</span>{readiness.outdatedComments > 0 && <span>{readiness.outdatedComments} outdated thread{readiness.outdatedComments === 1 ? "" : "s"}</span>}{readiness.missingMedia > 0 && <span>{readiness.missingMedia} missing media reference{readiness.missingMedia === 1 ? "" : "s"}</span>}</div>}
       {activeView === "media" && <GeneratedMediaPanel onEditScene={beginSceneEdit} key={project.id} project={project} scene={scene} busy={busy} onProjectUpdated={applyProject} />}
-      {activeView === "storyboard" ? <><div className="work-area">
+      {activeView === "storyboard" ? studioAvailable && studioPreview ? <StudioShell
+        key={project.id} project={project} selectedScene={selectedScene} busy={busy || hasOpenForm}
+        canEdit={permissions.canEdit} canEnhance={permissions.canEnhance}
+        onSelectScene={setSelectedScene} onCreateScene={beginSceneCreate} onEditScene={(selected) => beginSceneEdit(selected)}
+        onEditQuestion={() => setShowAssessmentEditor(true)} onOpenSources={() => setShowSources(true)}
+        onOpenMedia={() => setActiveView("media")} onPreview={() => setShowPreview(true)}
+        onValidate={() => setShowValidation(true)} onExport={() => setShowExport(true)} onProjectUpdated={applyProject}
+      /> : <><div className="work-area">
         <section data-onboarding="storyboard.list" className="scene-list" aria-label="Scene sequence">
           <div className="scene-list-tools"><div className="scene-list-title"><h2>Scenes <span className="count">{scenes.length}</span></h2><button className="icon-button" title="Add scene" aria-label="Add scene" onClick={beginSceneCreate} disabled={!project.id || busy}><Plus size={19} /></button></div>
             <label data-onboarding="storyboard.import" className={`button button-outline upload-control ${!project.id || busy ? "disabled" : ""}`}><FileUp size={15} /> Import PowerPoint<input type="file" aria-label="Import PowerPoint" accept=".pptx" onChange={uploadDeck} disabled={!project.id || busy} /></label>
