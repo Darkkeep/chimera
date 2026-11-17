@@ -16,6 +16,7 @@ type StudioShellProps = {
   onCreateScene: () => void;
   onEditScene: (scene: Scene) => void;
   onEditQuestion: () => void;
+  onDesignExperience: () => void;
   onOpenSources: () => void;
   onOpenMedia: () => void;
   onPreview: () => void;
@@ -28,7 +29,7 @@ type StudioShellProps = {
 
 export function StudioShell({
   project, selectedScene, busy, canEdit, canEnhance, onSelectScene, onCreateScene, onEditScene,
-  onEditQuestion, onOpenSources, onOpenMedia, onPreview, onValidate, onExport, onProjectUpdated,
+  onEditQuestion, onDesignExperience, onOpenSources, onOpenMedia, onPreview, onValidate, onExport, onProjectUpdated,
   editor, editingSceneId,
 }: StudioShellProps) {
   const [pythiaOpen, setPythiaOpen] = useState(false);
@@ -111,6 +112,7 @@ export function StudioShell({
             <dt>Source</dt><dd>{scene.sourceSlide ? `PowerPoint slide ${scene.sourceSlide}` : "Authored natively"}</dd>
           </dl>
           <button type="button" className="studio-inspector-action" onClick={() => onEditScene(scene)} disabled={!canEdit || busy}><Pencil size={15} /> Edit scene properties</button>
+          <div className="studio-authoring-task"><strong>Make it interactive</strong><p>Create branching decisions, hotspots, sequencing and guided practice. Start manually, without Pythia.</p><button type="button" className="studio-inspector-action" onClick={onDesignExperience} disabled={!canEdit || busy || scene.sceneType === "question"}>{scene.experience ? "Edit learner interaction" : "Build learner interaction"}</button>{scene.sceneType === "question" && <small>Knowledge checks use the question editor below.</small>}</div>
           {scene.sceneType === "question" && <button type="button" className="studio-inspector-action" onClick={onEditQuestion} disabled={!canEdit || busy}>Edit knowledge check</button>}
         </> : <p className="studio-empty-small">Select a scene to inspect its properties and editing options.</p>)}
         <div className="studio-intelligence-entry">
