@@ -8,7 +8,7 @@ export function MediaNameEditor({ asset, projectId, revision, canRename, onProje
   const [editing,setEditing] = useState(false),[name,setName] = useState(asset.displayName || ""),[busy,setBusy] = useState(false),[error,setError] = useState("");
   const openingRevision=useRef(revision),trigger=useRef<HTMLButtonElement>(null),input=useRef<HTMLInputElement>(null);
   useEffect(()=>{if(!editing)setName(asset.displayName || "");},[asset.displayName,editing]);
-  useEffect(()=>{if(editing)input.current?.focus();},[editing]);
+  useEffect(()=>{if(!editing)return;const frame=requestAnimationFrame(()=>input.current?.focus());return()=>cancelAnimationFrame(frame);},[editing]);
   function cancel(){if(busy)return;setEditing(false);setError("");setName(asset.displayName || "");requestAnimationFrame(()=>trigger.current?.focus());}
   async function save(){
     if(busy || !canRename)return;

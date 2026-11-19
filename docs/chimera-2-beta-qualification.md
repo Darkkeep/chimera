@@ -29,6 +29,14 @@ A focused Chromium run passed 106 of 109 cases; the three remaining cases were f
 
 The complete three-browser gate remains open. Source changes are versioned locally; pushing the feature branch to the existing draft PR #40 requires separate authorization under the handoff boundary. No merge/deployment is implied.
 
+## First hosted candidate run and retry
+
+Run [44512373454](https://github.com/Darkkeep/chimera/actions/runs/44512373454) tested `cd9eac90ada0ac29bca964ad327bfdc2a6fc2b04`. Its backend/build/visual/HTTPS-auth/expanded-Studio/classic job passed, as did Chromium shard 1 and Firefox shard 1. WebKit shard 2 passed 122 cases with three skips and reproduced one mobile media-rename focus failure. Six other jobs remained in browser dependency setup; live logs showed stalled downloads from the runner's regional Ubuntu package mirror.
+
+The rename input now receives focus on the next animation frame, after WebKit's click processing finishes. The same case failed locally before the correction. All 12 media-alias checks then passed across Chromium, Firefox and WebKit, and the frontend build passed. A remaining older guide fixture now explicitly opens the mobile drawer; all four guide cases passed locally.
+
+The retry configures bounded APT download retries/timeouts and the official main Ubuntu archive on ephemeral CI runners, with an eight-minute browser-install step limit. It does not change production or this computer's package configuration. This run is superseded by the correction commit's CI; no all-green cross-browser claim is made for the first run.
+
 ## Representative course and human gates
 
 Use the existing `studio-golden-path.spec.cjs` synthetic course to verify authored text/image alternative text, meaningful branching feedback, scored question, saved learner preview and both SCORM packages. Its automated result must be recorded against the candidate. This does not establish target-LMS or novice-author acceptance.

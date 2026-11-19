@@ -41,7 +41,14 @@ jobs:
       run: pip install -r backend/requirements-dev.txt
     - name: Verify retained qualification evidence
       run: python docs/qualification/support/verify.py
+    - name: Configure bounded Ubuntu package downloads
+      run: |
+        printf '%s\n' 'Acquire::Retries "2";' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/80-chimera-ci >/dev/null
+        if [ -f /etc/apt/apt-mirrors.txt ]; then
+          printf '%s\n' 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+        fi
     - name: Install Playwright Browsers
+      timeout-minutes: 8
       run: npx playwright install --with-deps chromium
     - name: Run backend checks
       run: python -m unittest discover -s backend/tests
@@ -124,7 +131,14 @@ jobs:
         npm ci
         npm ci --prefix frontend
         pip install -r backend/requirements-dev.txt
+    - name: Configure bounded Ubuntu package downloads
+      run: |
+        printf '%s\n' 'Acquire::Retries "2";' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/80-chimera-ci >/dev/null
+        if [ -f /etc/apt/apt-mirrors.txt ]; then
+          printf '%s\n' 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+        fi
     - name: Install selected browser and document renderer
+      timeout-minutes: 8
       # Word export always uses Chromium, including Firefox/WebKit test shards.
       run: npx playwright install --with-deps chromium ${{ matrix.browser }}
     - name: Provide audio output for Firefox playback
