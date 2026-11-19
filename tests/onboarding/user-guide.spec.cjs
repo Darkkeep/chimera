@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 
@@ -8,6 +9,7 @@ for (const theme of ['light', 'dark']) {
       await page.addInitScript(theme => localStorage.setItem('chimera.appearance', theme), theme);
       await page.route('**/api/projects', route => route.fulfill({ json: [] }));
       await page.goto('/');
+      await openWorkspaceMenu(page);
       const nav = page.getByRole('navigation', { name: 'Workspace', exact: true });
       const guide = nav.getByRole('link', { name: 'User guide (PDF, opens in a new tab)', exact: true });
       await expect(guide).toBeVisible();

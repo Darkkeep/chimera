@@ -1,3 +1,4 @@
+import { assetLabel } from "./asset-display";
 import { useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, ImageOff } from "lucide-react";
 import type { Project } from "./App";
@@ -22,10 +23,10 @@ export function BackgroundImagePicker({ project, value, onChange, label, allowIn
   const images = project.storyboard.assets.filter(asset => asset.kind === "image");
   const projectImage = images.find(asset => asset.id === (project.storyboard.backgroundAsset || fallbackAsset));
   const choices = [
-    ...(allowInherit ? [{ value: undefined, label: `Use project default (${projectImage?.filename || "None"})`, image: projectImage }] : []),
+    ...(allowInherit ? [{ value: undefined, label: `Use project default (${assetLabel(projectImage, "None")})`, image: projectImage }] : []),
     { value: null, label: "None", image: undefined },
     ...[...images.filter(asset => asset.role === "background"), ...images.filter(asset => asset.role !== "background")]
-      .map(image => ({ value: image.id, label: image.filename, image })),
+      .map(image => ({ value: image.id, label: assetLabel(image), image })),
   ];
   const selected = choices.find(choice => choice.value === value);
 

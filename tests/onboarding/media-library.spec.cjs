@@ -1,3 +1,4 @@
+const { openWorkspaceMenu, closeMobileWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const {mediaCapability} = require('./media-connection-fixtures.cjs');
 const AxeBuilder = require('@axe-core/playwright').default;
@@ -50,10 +51,13 @@ for (const status of ['configured', 'unconfigured', 'unavailable', 'denied']) {
       expect(submissions).toBe(0);
     }
     for (const theme of ['light', 'dark']) {
-      await page.getByRole('button', { name: 'Settings', exact: true }).click();
-      await page.getByRole('radio', { name: theme === 'light' ? 'Light' : 'Dark', exact: true }).check();
-      await page.getByRole('button', { name: 'Settings', exact: true }).click();
-      for (const width of [1440, 390]) {
+      await openWorkspaceMenu(page);
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      await page.getByRole('radio', { name: theme === 'light' ? 'Light Temple' : 'Classic Dark', exact: true }).check();
+      await openWorkspaceMenu(page);
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      await closeMobileWorkspaceMenu(page);
+    for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 1000 });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
         expect((await new AxeBuilder({ page }).include('.generated-media-panel').analyze()).violations).toEqual([]);
@@ -155,9 +159,12 @@ test('media project selector defaults to current project and keeps additions in 
   await expect(page.locator('.media-item-info')).toHaveCount(1);
   await expect(page.locator('.media-item-info')).toContainText('alpha.png');
   for (const theme of ['light', 'dark']) {
+    await openWorkspaceMenu(page);
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('radio', { name: theme === 'light' ? 'Light' : 'Dark', exact: true }).check();
+    await page.getByRole('radio', { name: theme === 'light' ? 'Light Temple' : 'Classic Dark', exact: true }).check();
+    await openWorkspaceMenu(page);
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await closeMobileWorkspaceMenu(page);
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1000 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

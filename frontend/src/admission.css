@@ -3,28 +3,27 @@
   display: grid;
   place-items: center;
   padding: clamp(1.25rem, 5vw, 4rem);
-  background: radial-gradient(ellipse at 70% 15%, #331349 0%, transparent 45%),
-              radial-gradient(ellipse at 20% 85%, #231331 0%, transparent 42%), #0b0912;
-  color: #f4eef9;
+  background:var(--theme-panel);
+  color: var(--ink);
 }
 .admission-card {
   width: min(100%, 660px);
   text-align: center;
   padding: clamp(2rem, 6vw, 4.5rem);
-  border: 1px solid rgba(211, 170, 241, .22);
+  border: 1px solid var(--line);
   border-radius: 1.5rem;
-  background: linear-gradient(150deg, rgba(37,24,53,.87), rgba(16,12,24,.92));
+  background: var(--theme-panel);
   box-shadow: 0 22px 100px rgba(0,0,0,.42);
 }
-.admission-eyebrow { display:flex; align-items:center; justify-content:center; gap:.65rem; color:#e6d8f6; letter-spacing:.18em; font-size:.76rem; font-weight:750; }
-.admission-eyebrow span { border:1px solid rgba(239,155,228,.45); color:#f0acd9; border-radius:99px; padding:.38rem .65rem; letter-spacing:.06em; font-size:.61rem; }
+.admission-eyebrow { display:flex; align-items:center; justify-content:center; gap:.65rem; color:var(--muted); letter-spacing:.18em; font-size:.76rem; font-weight:750; }
+.admission-eyebrow span { border:1px solid var(--line); color:var(--muted); border-radius:99px; padding:.38rem .65rem; letter-spacing:.06em; font-size:.61rem; }
 .admission-mark { width: 30px; height: 30px; }
-.admission-symbol { margin: 2rem auto 1.1rem; font-size: 4rem; color:#c76af5; line-height:1; text-shadow:0 0 60px rgba(222,81,255,.65); }
+.admission-symbol { margin: 2rem auto 1.1rem; font-size: 4rem; color:var(--ink); line-height:1; text-shadow:0 0 60px rgba(222,81,255,.65); }
 .admission-card h1 { font-size:clamp(2rem, 5vw, 3.3rem); line-height:1.08; letter-spacing:-.035em; margin:0 0 1.25rem; }
 .admission-card p { margin:.8rem auto; max-width:33rem; font-size:1.05rem; line-height:1.65; }
-.admission-card .admission-subtext { color:#c9b8d3; font-size:.93rem; }
-.admission-return { display:inline-flex; justify-content:center; margin-top:1.6rem; padding: .95rem 1.5rem; border-radius:.65rem; background:#be57e8; color:#130d1b; font-weight:750; text-decoration:none; }
-.admission-return:hover { background:#da80f1; }
-.admission-return:focus-visible { outline:3px solid #fff; outline-offset:4px; }
+.admission-card .admission-subtext { color:var(--ink); font-size:.93rem; }
+.admission-return { display:inline-flex; justify-content:center; margin-top:1.6rem; padding: .95rem 1.5rem; border-radius:.65rem; background:var(--theme-panel); color:var(--ink); font-weight:750; text-decoration:none; }
+.admission-return:hover { background:var(--theme-selected); }
+.admission-return:focus-visible { outline:3px solid var(--ui-focus); outline-offset:4px; }
 @media(prefers-reduced-motion: no-preference) { .admission-symbol { animation:admission-glow 4s ease-in-out infinite alternate; } }
 @keyframes admission-glow { from { opacity:.7; transform:scale(.98); } to { opacity:1; transform:scale(1.06); } }

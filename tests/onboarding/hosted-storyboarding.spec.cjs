@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const crypto = require('node:crypto');
 
@@ -32,8 +33,10 @@ for (const width of [1280, 390]) {
     });
     await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
     await page.goto('/');
-    await page.getByRole('button', { name: 'Review tools', exact: true }).click();
-    await page.getByRole('button', { name: 'Review suggestions', exact: true }).click();
+    await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'Review tools', exact: true }).click();
+    await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'Review suggestions', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('textbox', { name: 'Enhancement goal', exact: true }).fill('Storyboard the agreed external design.');
     await dialog.getByRole('button', { name: 'Preview submission', exact: true }).click();

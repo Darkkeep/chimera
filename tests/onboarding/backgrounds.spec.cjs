@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 const { execFileSync } = require('node:child_process');
@@ -92,7 +93,9 @@ test('original comparison never changes the authored previews or survives reopen
   const transcript = await preview.locator('.course-preview-transcript').boundingBox();
   const discussion = await preview.locator('.course-preview-review').boundingBox();
   expect(transcript.y).toBeGreaterThanOrEqual(navigation.y + navigation.height);
-  expect(discussion.y).toBeGreaterThan(transcript.y);
+  const presentation = await preview.locator('.course-preview-player-column').boundingBox();
+  if (page.viewportSize().width > 800) expect(discussion.x).toBeGreaterThanOrEqual(presentation.x + presentation.width);
+  else expect(discussion.y).toBeGreaterThan(transcript.y);
   await preview.getByRole('button', { name: 'Close course preview', exact: true }).click();
   await page.reload();
   await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
@@ -245,6 +248,7 @@ test('project background save reports stale revisions instead of overwriting', a
   const project = await seed(page, request);
   await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
   await page.goto('/');
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Storyboard', exact: true }).click();
   await page.getByRole('button', { name: 'Project background', exact: true }).click();
   await selectImage(page, 'Project background image', 'Project image.png');

@@ -69,15 +69,15 @@ test('animation authoring persists phases and Preview plays the scene timeline a
   await expect.poll(() => preview.locator(`[data-scene-element="${instruction.id}"]`).evaluate(node => node.getAnimations().length)).toBe(3);
   await preview.locator(`[data-scene-element="${instruction.id}"]`).evaluate(node => node.getAnimations().forEach(animation => animation.finish()));
   await expect(preview.locator(`[data-scene-element="${instruction.id}"]`)).toHaveCSS('opacity', '0');
-  await preview.getByRole('button', { name: 'Replay motion', exact: true }).click();
+  await preview.getByRole('button', { name: 'Restart', exact: true }).click();
   await expect.poll(() => preview.locator(`[data-scene-element="${instruction.id}"]`).evaluate(node => node.getAnimations().length)).toBe(3);
   expect(await preview.locator(`[data-scene-element="${instruction.id}"]`).evaluate(node => Math.max(...node.getAnimations().map(animation => Number(animation.currentTime))))).toBeLessThan(1500);
   const afterReplay = await (await request.get(`/api/projects/${project.id}`)).json();
   expect(afterReplay.storyboard.revision).toBe(saved.storyboard.revision);
-  await preview.getByRole('button', { name: 'Stop motion', exact: true }).click();
-  await expect.poll(() => preview.locator(`[data-scene-element="${instruction.id}"]`).evaluate(node => node.getAnimations().length)).toBe(0);
-  await expect(preview.locator(`[data-scene-element="${instruction.id}"]`)).toHaveCSS('opacity', '1');
-  await preview.getByRole('button', { name: 'Play motion', exact: true }).click();
+  await preview.getByRole('button', { name: 'Stop scene', exact: true }).click();
+  await expect(preview.getByRole('slider',{name:'Scene playback time'})).toHaveValue('0');
+  await expect.poll(() => preview.locator(`[data-scene-element="${instruction.id}"]`).evaluate(node => node.getAnimations().every(animation=>animation.currentTime===0))).toBe(true);
+  await preview.getByRole('button', { name: 'Play scene', exact: true }).click();
   await expect.poll(() => preview.locator(`[data-scene-element="${instruction.id}"]`).evaluate(node => node.getAnimations().length)).toBe(3);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect.poll(() => preview.locator(`[data-scene-element="${instruction.id}"]`).evaluate(node => node.getAnimations().length)).toBe(0);
@@ -86,7 +86,7 @@ test('animation authoring persists phases and Preview plays the scene timeline a
   await page.getByRole('button', { name: 'Preview course', exact: true }).click();
   preview = page.getByRole('dialog', { name: 'Animated course course preview', exact: true });
   expect(await preview.locator('[data-scene-element]').evaluateAll(nodes => nodes.flatMap(node => node.getAnimations()).length)).toBe(0);
-  await preview.getByRole('button', { name: 'Replay motion', exact: true }).click();
+  await preview.getByRole('button', { name: 'Restart', exact: true }).click();
   expect(await preview.locator('[data-scene-element]').evaluateAll(nodes => nodes.flatMap(node => node.getAnimations()).length)).toBe(0);
 });
 

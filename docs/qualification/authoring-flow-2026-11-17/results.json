@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-17",
+  "startingCommit": "dc21e48b56743c6f87572452a45742747e7212a3",
+  "projectId": "acceptance-synthetic-signal-response-2026-11-17-259d5cec",
+  "sceneCount": 3,
+  "modelPosts": [],
+  "keyboard": {
+    "tabCounts": {
+      "openEditor": 18,
+      "addText": 5,
+      "textInspector": 39,
+      "save": 13
+    },
+    "saved": true
+  },
+  "revisionConflict": {
+    "staleOverwriteAbsent": true
+  },
+  "restrictedUI": "simulated team configuration and permissions; backend enforcement separately tested"
+}

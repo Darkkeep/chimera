@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 
 const treatment = {
@@ -94,6 +95,7 @@ test('scene editor exposes scene-aware treatment requests without starting a ren
 
 async function openTreatment(page) {
   await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Media library', exact: true }).click();
   await page.locator('.generation-creator > summary').click();
   await expect(page.getByRole('combobox', { name: 'Video workflow', exact: true })).toHaveValue('design');

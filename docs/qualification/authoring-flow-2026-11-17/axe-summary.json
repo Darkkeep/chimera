@@ -1,0 +1,15 @@
+[
+  {
+    "id": "page-has-heading-one",
+    "impact": "moderate",
+    "description": "Ensure that the page, or at least one of its frames contains a level-one heading",
+    "nodes": [
+      {
+        "target": [
+          "html"
+        ],
+        "failureSummary": "Fix all of the following:\n  Page must have a level-one heading"
+      }
+    ]
+  }
+]
