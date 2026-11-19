@@ -107,3 +107,37 @@
 .pythia-native-import, .pythia-native-import-controls { min-width: 0; max-width: 100%; }
 .pythia-native-import-controls input, .pythia-native-import-controls select { box-sizing: border-box; max-width: 100%; min-width: 0; }
 .pythia-artifact-item, .pythia-artifact-item a { max-width: 100%; overflow-wrap: anywhere; }
+
+/* The production conversation is the entry point; secondary tools stay available. */
+.pythia-ready-draft { padding: 12px 0; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+.pythia-ready-draft p, .pythia-draft-decision p { margin: 8px 0; }
+.pythia-draft-decision { padding-bottom: 12px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+.pythia-workspace-view[hidden] { display: none !important; }
+.modal.pythia-talk-dialog { display: block; min-height: 0; padding: 20px; }
+.pythia-workspace-views { display: flex; gap: 4px; padding: 12px 0; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+.pythia-workspace-views button { min-height: 40px; padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
+.pythia-workspace-views button[aria-pressed=true] { border-bottom-color: var(--chimera-pythia-link, var(--ui-focus)); color: var(--ink); font-weight: 700; }
+.pythia-workspace-views button:focus-visible, .pythia-source-drop button:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+.pythia-workspace-view, .pythia-workspace-view > *, .pythia-talk-history, .pythia-talk-message > div { min-width: 0; max-width: 100%; }
+.pythia-talk-heading h2 { margin: 0; }
+.pythia-talk-history { gap: 12px; padding: 0 0 12px; }
+.pythia-talk-compose { gap: 12px; padding-top: 12px; }
+.pythia-source-drop { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px; border: 1px dashed var(--line); border-radius: 8px; background: var(--theme-panel, var(--surface)); }
+.pythia-source-drop.is-dragging { border-color: var(--ui-focus); outline: 2px solid var(--ui-focus); }
+.pythia-source-drop > div { flex: 1; min-width: 160px; }
+.pythia-source-drop strong, .pythia-source-drop span { display: block; }
+.pythia-source-drop span { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.pythia-talk-question textarea { min-height: 96px; max-height: 40dvh; padding: 12px; font: inherit; color: var(--ink); background: var(--theme-panel, var(--surface)); border: 1px solid var(--line); border-radius: 8px; }
+.pythia-attachments { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0; list-style: none; }
+.pythia-attachments li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; max-width: 100%; border: 1px solid var(--line); border-radius: 6px; }
+.pythia-attachments span { min-width: 0; overflow-wrap: anywhere; }
+.pythia-context-options, .pythia-conversation-options { min-width: 0; padding: 10px 0; border-top: 1px solid var(--line); }
+.pythia-context-options > summary, .pythia-conversation-options > summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.pythia-talk-sources { margin-top: 12px; }
+.pythia-talk-sources h3 { font-size: 13px; margin: 0; }
+.pythia-talk-note { margin-top: 12px; padding-top: 12px; }
+.pythia-consultation-artifacts { display: block; min-width: 0; min-height: 0; }
+.pythia-consultation-artifacts .pythia-artifacts-filter { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; width: 100%; height: auto; min-height: 0; }
+.pythia-artifacts-filter > input[type=checkbox] { width: 16px; height: 16px; padding: 0; margin: 2px 0 0; }
+.pythia-consultation-artifacts > form { min-width: 0; }
+@media (max-width: 600px) { .modal.pythia-talk-dialog { padding: 12px; } .pythia-source-drop { padding: 12px; } .pythia-workspace-views button { padding: 8px; } }

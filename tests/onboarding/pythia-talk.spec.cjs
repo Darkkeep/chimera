@@ -23,13 +23,13 @@ async function openConversation(page, request, title) {
   }, headers: { 'If-Match': `"${project.storyboard.revision}"` } });
   expect(response.ok()).toBeTruthy();
   project = await response.json();
-  await page.goto('/');
-  await page.getByRole('combobox', { name: 'Switch project', exact: true }).selectOption(project.id);
+  await page.goto(`/?project_id=${project.id}`);
+  await expect(page.getByRole('combobox', { name: 'Switch project', exact: true })).toHaveValue(project.id);
   await expect(page.getByRole('navigation', { name: 'Workspace', exact: true }).getByRole('button').first()).toHaveText('Consult Pythia');
   await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
-  await expect(dialog.getByLabel('Your message', { exact: true })).toBeEnabled();
+  await expect(dialog.getByLabel('What would you like to do?', { exact: true })).toBeEnabled();
   return { project, dialog };
 }
 
@@ -43,11 +43,11 @@ test('a failed Pythia submit preserves the draft and does not retry automaticall
     return route.fulfill({ json: { sessionId: 'failure-fixture', turns: [], actions: [], configured: true } });
   });
   const { dialog } = await openConversation(page, request, 'Pythia failure UI');
-  await dialog.getByLabel('Your message', { exact: true }).fill('A fictional test question.');
-  await dialog.getByRole('button', { name: 'Send to Pythia', exact: true }).click();
+  await dialog.getByLabel('What would you like to do?', { exact: true }).fill('A fictional test question.');
+  await dialog.getByRole('button', { name: /^(Start with Pythia|Send to Pythia)$/, exact: true }).click();
   await expect(dialog.getByRole('alert')).toContainText('Synthetic transport unavailable');
-  await expect(dialog.getByLabel('Your message', { exact: true })).toHaveValue('A fictional test question.');
-  await dialog.getByLabel('Your message', { exact: true }).fill('An edited question.');
+  await expect(dialog.getByLabel('What would you like to do?', { exact: true })).toHaveValue('A fictional test question.');
+  await dialog.getByLabel('What would you like to do?', { exact: true }).fill('An edited question.');
   expect(submissions).toBe(1);
   expect((await new AxeBuilder({ page }).include('.pythia-talk-dialog').analyze()).violations).toEqual([]);
 });
@@ -76,8 +76,8 @@ test('prior exchanges roll up and processing animates for consultations and draf
   await expect(dialog.getByText('Earlier answer retained.', { exact: true })).not.toBeVisible();
   await dialog.getByRole('button', { name: 'Expand all exchanges', exact: true }).click();
   await expect(dialog.getByText('Earlier answer retained.', { exact: true })).toBeVisible();
-  await dialog.getByLabel('Your message', { exact: true }).fill('Third question');
-  await dialog.getByRole('button', { name: 'Send to Pythia', exact: true }).click();
+  await dialog.getByLabel('What would you like to do?', { exact: true }).fill('Third question');
+  await dialog.getByRole('button', { name: /^(Start with Pythia|Send to Pythia)$/, exact: true }).click();
   const processing = dialog.getByRole('status').filter({ hasText: 'Pythia Processing' });
   await expect(processing).toBeVisible();
   expect(await processing.locator('.pythia-processing-orb').evaluate(el => getComputedStyle(el, '::before').animationName)).toBe('pythia-orbit');
@@ -98,10 +98,12 @@ test('prior exchanges roll up and processing animates for consultations and draf
     state = { ...state, planning: { stage: body.stage, brief: body.brief, turnId: body.turnId } };
     await route.fulfill({ json: state });
   });
+  await dialog.getByRole('button', { name: 'Design brief', exact: true }).click();
   await dialog.getByRole('button', { name: 'Review our design brief', exact: true }).click();
   await dialog.getByRole('textbox', { name: 'Design brief', exact: true }).fill('Help new operators navigate the approval queue. Clarify the existing title.');
   await dialog.getByRole('button', { name: 'Agree brief and explore scene design', exact: true }).click();
   await dialog.getByRole('button', { name: 'Prepare a content draft from this advice', exact: true }).last().click();
+  await dialog.getByText('Sources and instructions', { exact: true }).click();
   await dialog.getByLabel('Author direction', { exact: true }).fill('Make the title clearer.');
   await dialog.getByRole('button', { name: 'Generate content draft', exact: true }).click();
   await expect(processing).toBeVisible();
@@ -110,20 +112,129 @@ test('prior exchanges roll up and processing animates for consultations and draf
   expect((await new AxeBuilder({ page }).include('.pythia-talk-dialog').analyze()).violations).toEqual([]);
 });
 
+for (const stale of [false, true]) {
+  test(`saved draft has a clear slide handoff; stale=${stale}`, async ({ page, request }, testInfo) => {
+    let decisions = 0;
+    const action = { id: 'ready-draft', turnId: 'ready-turn', mode: 'add-scenes', sceneId: null,
+      direction: 'Use the reviewed draft', sourceRevision: 0, before: null, status: 'pending', error: null,
+      result: { rationale: 'A practical starting point', producer_id: 'live-fixture', changes: [], scenes: [
+        { title: 'Inspect first', sceneType: 'content', extractedText: ['Check before starting.'], narration: '', actionDescription: '', notes: '' },
+      ] } };
+    const state = { sessionId: 'handoff-session', configured: true, actions: [action], turns: [
+      { id: 'ready-turn', question: 'Prepare a starting draft', status: 'completed', context: { sceneId: null, sourceIds: [] },
+        result: { content: 'Here is your starting point.', kind: 'answer', rationale: '', limits: [], producer_id: 'live-fixture', stopping_boundary: 'advisory-only' } },
+    ] };
+    await page.route('**/pythia-conversation', async route => {
+      const projectPath = new URL(route.request().url()).pathname.replace('/pythia-conversation', '');
+      const project = await (await request.get(projectPath)).json();
+      action.sourceRevision = project.storyboard.revision - (stale ? 1 : 0);
+      await route.fulfill({ json: state });
+    });
+    await page.route('**/pythia-conversation/actions/ready-draft/decision', async route => {
+      decisions++;
+      const body = route.request().postDataJSON();
+      expect(body.decision).toBe('apply');
+      const projectPath = new URL(route.request().url()).pathname.split('/pythia-conversation')[0];
+      const response = await request.post(projectPath + '/scenes', { data: action.result.scenes[0], headers: { 'If-Match': `"${body.expectedRevision}"` } });
+      expect(response.ok()).toBeTruthy();
+      const project = await response.json();
+      action.status = 'applied'; action.appliedRevision = project.storyboard.revision;
+      await route.fulfill({ json: { conversation: state, project } });
+    });
+    const { dialog, project } = await openConversation(page, request, `Clear draft handoff ${stale}`);
+    if (stale) await page.setViewportSize({ width: 390, height: 844 });
+    await expect(dialog.getByRole('region', { name: 'Drafts ready for review' })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Files', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Review my draft', exact: true }).click();
+    const accept = dialog.getByRole('button', { name: 'Use this draft as my slides', exact: true });
+    await expect(accept).toBeVisible();
+    await expect(dialog.locator('.pythia-action-review')).toBeFocused();
+    expect(await dialog.evaluate(el => el.scrollWidth > el.clientWidth + 1)).toBe(false);
+    expect((await new AxeBuilder({ page }).include('.pythia-talk-dialog').analyze()).violations).toEqual([]);
+    await page.screenshot({ path: testInfo.outputPath('draft-handoff.png'), fullPage: true });
+    if (stale) {
+      await expect(accept).toBeDisabled();
+      await expect(dialog.getByRole('alert')).toContainText('Request a new draft');
+      expect(decisions).toBe(0);
+    } else {
+      await accept.click();
+      await expect(dialog.getByRole('status')).toContainText('editable slides');
+      await dialog.getByRole('button', { name: 'Open my slides', exact: true }).click();
+      await expect(dialog).not.toBeVisible();
+      const saved = await (await request.get(`/api/projects/${project.id}`)).json();
+      expect(saved.storyboard.scenes.map(scene => scene.title)).toEqual(['Fictional approval queue', 'Inspect first']);
+      expect(decisions).toBe(1);
+    }
+  });
+}
+
+for (const width of [390, 1100, 1440]) {
+  test(`work-first entry preserves sources and blocks unreadable uploads at ${width}px`, async ({ page, request }) => {
+    let uploads = 0, submissions = [], readable = true;
+    const sources = [];
+    await page.route('**/reference-resources', async route => {
+      if (route.request().method() !== 'POST') return route.fulfill({ json: sources });
+      uploads++;
+      const source = { id: `source-${uploads}`, title: readable ? 'Notes.txt' : 'Scanned.pdf', currentVersion: '1',
+        versions: [{ version: '1', extractionStatus: readable ? 'complete' : 'failed', passages: readable ? [{ locator: 'p1', text: 'Fictional source.' }] : [] }] };
+      sources.push(source);
+      await route.fulfill({ json: source });
+    });
+    await page.route('**/pythia-conversation', async route => {
+      if (route.request().method() === 'POST') {
+        submissions.push(route.request().postDataJSON());
+        return route.fulfill({ status: 503, json: { detail: 'Synthetic send failed. Prompt retained.' } });
+      }
+      await route.fulfill({ json: { sessionId: 'entry-session', configured: true, turns: [], actions: [] } });
+    });
+    const { dialog } = await openConversation(page, request, `Work first ${width}`);
+    await page.setViewportSize({ width, height: 900 });
+    const prompt = dialog.getByLabel('What would you like to do?', { exact: true });
+    await expect(dialog.locator('textarea:visible')).toHaveCount(1);
+    await prompt.fill('Improve these existing notes.');
+    await dialog.getByRole('button', { name: 'Design brief', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Conversation', exact: true }).click();
+    await expect(prompt).toHaveValue('Improve these existing notes.');
+    await dialog.getByLabel('Attach source files', { exact: true }).setInputFiles({ name: 'Notes.txt', mimeType: 'text/plain', buffer: Buffer.from('Fictional source.') });
+    expect(uploads).toBe(0);
+    await dialog.getByRole('button', { name: 'Start with Pythia', exact: true }).click();
+    await expect(dialog.getByRole('alert')).toContainText('Synthetic send failed');
+    await expect(prompt).toHaveValue('Improve these existing notes.');
+    expect(submissions[0].sourceIds).toEqual(['source-1']);
+    await dialog.getByRole('button', { name: 'Start with Pythia', exact: true }).click();
+    await expect.poll(() => submissions.length).toBe(2);
+    expect(uploads).toBe(1);
+    expect(submissions[1].sourceIds).toEqual(['source-1']);
+    readable = false;
+    await dialog.getByLabel('Attach source files', { exact: true }).setInputFiles({ name: 'Scanned.pdf', mimeType: 'application/pdf', buffer: Buffer.from('Unreadable fixture') });
+    await dialog.getByRole('button', { name: 'Start with Pythia', exact: true }).click();
+    await expect(dialog.getByRole('alert')).toContainText('has no readable text');
+    await dialog.getByRole('button', { name: 'Start with Pythia', exact: true }).click();
+    await expect(dialog.getByRole('alert')).toContainText('has no readable text');
+    expect(uploads).toBe(2);
+    expect(submissions).toHaveLength(2);
+    await expect(dialog.getByRole('button', { name: 'Remove Scanned.pdf', exact: true })).toBeVisible();
+    expect(await dialog.evaluate(el => el.scrollWidth > el.clientWidth + 1)).toBe(false);
+    expect((await new AxeBuilder({ page }).include('.pythia-talk-dialog').analyze()).violations).toEqual([]);
+  });
+}
+
 test('real local Pythia answers, revises and recovers browser history', async ({ page, request }, testInfo) => {
   test.skip(process.env.CHIMERA_PYTHIA_LIVE_BROWSER !== '1', 'Explicit opt-in for two real provider consultations');
   test.setTimeout(180000);
   const { project, dialog } = await openConversation(page, request, 'Fictional Pythia direct browser qualification');
+  await dialog.getByText('Connection and conversation details', { exact: true }).click();
   await dialog.getByRole('button', { name: 'Check connection', exact: true }).click();
   await expect(dialog.getByRole('status').filter({ hasText: 'tools verified' })).toBeVisible({ timeout: 20000 });
+  await dialog.getByText('Sources and instructions', { exact: true }).click();
   await dialog.getByLabel(/Include current scene text/).check();
-  await dialog.getByLabel('Your message', { exact: true }).fill('For this fictional case, should we begin by producing a training course? Give two short paragraphs of advice.');
-  await dialog.getByRole('button', { name: 'Send to Pythia', exact: true }).click();
+  await dialog.getByLabel('What would you like to do?', { exact: true }).fill('For this fictional case, should we begin by producing a training course? Give two short paragraphs of advice.');
+  await dialog.getByRole('button', { name: /^(Start with Pythia|Send to Pythia)$/, exact: true }).click();
   await expect(dialog.locator('.pythia-talk-answer')).toHaveCount(1, { timeout: 90000 });
-  await expect(dialog.getByRole('button', { name: 'Send to Pythia', exact: true })).toBeDisabled(); // Empty composer after acceptance.
+  await expect(dialog.getByRole('button', { name: /^(Start with Pythia|Send to Pythia)$/, exact: true })).toBeDisabled(); // Empty composer after acceptance.
   await dialog.getByLabel(/Include current scene text/).uncheck();
-  await dialog.getByLabel('Your message', { exact: true }).fill('Correction: observation now shows staff enter the wrong approval category because two labels are ambiguous. Revise your advice in two short paragraphs.');
-  await dialog.getByRole('button', { name: 'Send to Pythia', exact: true }).click();
+  await dialog.getByLabel('What would you like to do?', { exact: true }).fill('Correction: observation now shows staff enter the wrong approval category because two labels are ambiguous. Revise your advice in two short paragraphs.');
+  await dialog.getByRole('button', { name: /^(Start with Pythia|Send to Pythia)$/, exact: true }).click();
   await expect(dialog.locator('.pythia-talk-answer')).toHaveCount(2, { timeout: 90000 });
   const answers = await dialog.locator('.pythia-talk-answer > div > p').allTextContents();
   expect(answers[0].length).toBeGreaterThan(100);
