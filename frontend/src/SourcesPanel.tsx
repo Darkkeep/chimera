@@ -11,14 +11,17 @@ import "./sources.css";
 
 export type SourceKind = "document" | "text" | "web" | "pythia";
 export type PendingSource = { id: string; file: File; title: string; kind: SourceKind; sourceUrl?: string };
-type Source = Omit<OcrResource, "versions"> & { versions: (OcrResource["versions"][number] & { sourceKind?: SourceKind; sourceUrl?: string | null })[] };
+type Source = Omit<OcrResource, "versions"> & { sceneIds?: string[]; versions: (OcrResource["versions"][number] & { sourceKind?: SourceKind; sourceUrl?: string | null })[] };
 
-export function SourcesPanel({ projectId, projectTitle, canAdd, onClose, embedded = false, queued = [], onStage, onRemoveQueued, allowedKinds, locked = false, refreshVersion = 0, onBusyChange, onResourceSaved }: {
+export function SourcesPanel({ projectId, projectTitle, canAdd, onClose, embedded = false, queued = [], onStage, onRemoveQueued, allowedKinds, locked = false, refreshVersion = 0, onBusyChange, onResourceSaved, scenes = [] }: {
   projectId: string; projectTitle: string; canAdd: boolean; onClose: () => void; embedded?: boolean; queued?: PendingSource[];
   onStage?: (source: PendingSource) => void; onRemoveQueued?: (id: string) => void; allowedKinds?: SourceKind[]; locked?: boolean;
+  scenes?: { id: string; title: string }[];
   refreshVersion?: number;
   onBusyChange?: (busy: boolean) => void; onResourceSaved?: (source: Source) => void;
 }) {
+  const [sceneFilter, setSceneFilter] = useState("");
+  const [sourceSceneId, setSourceSceneId] = useState("");
   const [sources, setSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -66,6 +69,7 @@ export function SourcesPanel({ projectId, projectTitle, canAdd, onClose, embedde
       form.append("file", content);
       form.append("title", title.trim() || file?.name || "Supplied source");
       form.append("source_kind", kind);
+      form.append("scene_ids", JSON.stringify(sourceSceneId ? [sourceSceneId] : []));
       if (url.trim() && kind === "web") form.append("source_url", url.trim());
       const response = await fetch(`/api/projects/${projectId}/reference-resources`, { method: "POST", body: form });
       const result = await response.json();
@@ -79,6 +83,7 @@ export function SourcesPanel({ projectId, projectTitle, canAdd, onClose, embedde
     finally { setBusy(false); }
   }
 
+  const filteredSources = sources.filter(source => !sceneFilter || !source.sceneIds?.length || source.sceneIds.includes(sceneFilter));
   const options = [
     { kind: "document" as const, label: "Documents", hint: "PDF, DOCX, PPTX, TXT, or Markdown. Up to 100 MB each.", icon: documentsIcon },
     { kind: "text" as const, label: "Pasted text", hint: "Notes, excerpts, instructions, and other source text.", icon: textIcon },
@@ -86,12 +91,15 @@ export function SourcesPanel({ projectId, projectTitle, canAdd, onClose, embedde
     { kind: "pythia" as const, label: "Pythia conversations and outputs", hint: "Paste a selected conversation or output from your Pythia workspace.", icon: pythiaIcon },
   ];
   const content = <>
-    <div className="modal-head"><div><p className="eyebrow">{projectId ? "PROJECT SOURCES" : "ADDITIONAL SOURCE MATERIAL"}</p><h2 id="sources-title">{projectId ? "Sources" : "Text, links, and Pythia excerpts"}</h2>{projectId && <p>{projectTitle}</p>}</div>{!embedded && <button className="icon-button" aria-label="Close sources" disabled={busy} onClick={onClose}><X size={18} /></button>}</div>
+    <div className="modal-head"><div><p className="eyebrow">{projectId ? "COURSE SOURCES" : "ADDITIONAL SOURCE MATERIAL"}</p><h2 id="sources-title">{projectId ? "Sources" : "Text, links, and Pythia excerpts"}</h2>{projectId && <p>{projectTitle}</p>}</div>{!embedded && <button className="icon-button" aria-label="Close sources" disabled={busy} onClick={onClose}><X size={18} /></button>}</div>
     <p>{projectId ? "Add material to support authoring and reviewed suggestions. Sources do not change your scenes automatically." : "Queue source material here. It will be saved with your new project, independently of the AI connection."}</p>
-    {projectId && <section aria-label="Saved sources" className="saved-sources"><h3>Saved sources · {sources.length}</h3>
-      {loading ? <p role="status">Loading sources…</p> : sources.length === 0 ? <p>No sources yet. Add material below to make it available in this project.</p> : sources.map(source => {
+    {projectId && scenes.length > 0 && <label className="course-library-filter">Filter sources by scene<select aria-label="Filter sources by scene" value={sceneFilter} onChange={event => setSceneFilter(event.target.value)}><option value="">All scenes · whole course</option>{scenes.map(scene => <option key={scene.id} value={scene.id}>{scene.title}</option>)}</select></label>}
+    {projectId && sceneFilter && <p className="field-hint">Showing sources assigned to this scene and course-wide sources.</p>}
+    {projectId && <section aria-label="Saved sources" className="saved-sources"><h3>Saved sources · {filteredSources.length}{sceneFilter ? ` of ${sources.length}` : ""}</h3>
+      {loading ? <p role="status">Loading sources…</p> : sources.length === 0 ? <p>No sources yet. Add material below to make it available in this project.</p> : filteredSources.length === 0 ? <p>No sources assigned to this scene.</p> : filteredSources.map(source => {
         const version = source.versions.find(item => item.version === source.currentVersion);
         return <details key={source.id}><summary>{source.title} · {version?.sourceKind || "document"} · {version?.passages.length || 0} passages</summary>
+          <p>{source.sceneIds?.length ? `Scenes: ${source.sceneIds.map(id => scenes.find(scene => scene.id === id)?.title || id).join(", ")}` : "Course-wide source"}</p>
           <p>Version {source.currentVersion} · {version?.extractionStatus}</p>
           {version?.sourceUrl && /^https?:\/\//i.test(version.sourceUrl) && <a href={version.sourceUrl} target="_blank" rel="noopener noreferrer">Open source page (new tab)</a>}
           {version?.extractionMessage && <p>{version.extractionMessage}</p>}
@@ -105,6 +113,7 @@ export function SourcesPanel({ projectId, projectTitle, canAdd, onClose, embedde
         {options.filter(option => !allowedKinds || allowedKinds.includes(option.kind)).map(option => <div key={option.kind} className={`source-choice ${kind === option.kind ? "selected" : ""}`}>
           <button type="button" className="source-choice-heading" aria-expanded={kind === option.kind} aria-controls={kind === option.kind ? `source-input-${option.kind}` : undefined} onClick={() => { setKind(option.kind); setError(""); }}><img src={option.icon} alt="" width={48} height={48} /><span><strong>{option.label}</strong><small>{option.hint}</small></span></button>
           {kind === option.kind && <div id={`source-input-${option.kind}`} className="source-choice-body">
+            {projectId && scenes.length > 0 && <label>Source scope<select aria-label="Source scope" value={sourceSceneId} onChange={event => setSourceSceneId(event.target.value)}><option value="">Whole course</option>{scenes.map(scene => <option key={scene.id} value={scene.id}>{scene.title}</option>)}</select></label>}
             <label>Source title<input value={title} maxLength={200} required={kind !== "document"} onChange={event => setTitle(event.target.value)} /></label>
             {kind === "document" ? <label>Source document<input type="file" key={uploadKey} accept=".pdf,.docx,.pptx,.txt,.md" required onChange={event => setFile(event.target.files?.[0] || null)} /></label> : <>
               {kind === "web" && <><label>Page URL<input type="url" required maxLength={4000} placeholder="https://example.com/page" value={url} onChange={event => setUrl(event.target.value)} /></label><p className="field-hint">Chimera does not fetch this page. A link without pasted page text is saved for reference only.</p></>}
@@ -118,7 +127,7 @@ export function SourcesPanel({ projectId, projectTitle, canAdd, onClose, embedde
     </form>}
     {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
     {queued.length > 0 && <section className="saved-sources" aria-label="Queued sources"><h3>Queued sources · {queued.length}</h3>{queued.map(source => <div className="queued-source" key={source.id}><span>{source.title} · {source.kind}</span>{onRemoveQueued && <button type="button" className="button button-outline" disabled={locked || busy} aria-label={`Remove queued ${source.title}`} onClick={() => onRemoveQueued(source.id)}>Remove</button>}</div>)}</section>}
-    {projectId && canAdd && sources.some(source => source.versions.some(version => version.filename.toLowerCase().endsWith(".pdf"))) && <ReferenceOcrPanel projectId={projectId} resources={sources} onUpdated={updated => { setSources(current => current.map(source => source.id === updated.id ? updated as Source : source)); onResourceSaved?.(updated as Source); }} />}
+    {projectId && canAdd && filteredSources.some(source => source.versions.some(version => version.filename.toLowerCase().endsWith(".pdf"))) && <ReferenceOcrPanel projectId={projectId} resources={filteredSources} onUpdated={updated => { setSources(current => current.map(source => source.id === updated.id ? updated as Source : source)); onResourceSaved?.(updated as Source); }} />}
     {projectId && <p className="field-hint">Select readable source text in the Pythia conversation when you want to share it. Source material is supplied context and still needs author review.</p>}
   </>;
   return embedded ? <section className="sources-embedded" aria-labelledby="sources-title">{content}</section> : <EditorDialog labelledBy="sources-title" onClose={onClose} busy={busy} className="sources-dialog">{content}</EditorDialog>;

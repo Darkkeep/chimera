@@ -1,3 +1,5 @@
+import { MediaNameEditor } from "./MediaNameEditor";
+import { assetLabel } from "./asset-display";
 import { effectivePlacements } from "./media";
 import { useState } from "react";
 import { Check, CircleAlert } from "lucide-react";
@@ -13,11 +15,12 @@ type MediaLibraryItemProps = {
   selectedScene?: Scene;
   attached: boolean;
   canAttach: boolean;
+  canRename?: boolean;
   onAttach: () => void;
   onProjectUpdated: (project: Project) => void;
 };
 
-export function MediaLibraryItem({ project, projectId, revision, asset, scenes, selectedScene, attached, canAttach, onAttach, onProjectUpdated }: MediaLibraryItemProps) {
+export function MediaLibraryItem({ project, projectId, revision, asset, scenes, selectedScene, attached, canAttach, canRename = false, onAttach, onProjectUpdated }: MediaLibraryItemProps) {
   const [available, setAvailable] = useState<boolean | null>(null);
   const uses = scenes.flatMap((scene, index) => effectivePlacements(project, scene).some(p => p.assetId === asset.id) ? [{ scene, number: index + 1 }] : []);
   const described = asset.kind !== "image" || uses.every(({ scene }) => effectivePlacements(project, scene).some(p => p.assetId === asset.id && (p.decorative || Boolean(p.altText.trim()))));
@@ -33,11 +36,13 @@ export function MediaLibraryItem({ project, projectId, revision, asset, scenes, 
       : asset.kind === "video" ? <video controls playsInline preload="metadata" src={source} aria-label={`Video: ${asset.filename}`} onLoadedMetadata={() => setAvailable(true)} onError={() => setAvailable(false)} />
       : <audio controls preload="metadata" src={source} onLoadedMetadata={() => setAvailable(true)} onError={() => setAvailable(false)} />}</div>
     <div className="media-item-info">
-      <strong title={asset.filename}>{asset.filename}</strong>
+      <strong title={asset.filename}>{assetLabel(asset)}</strong>
+      {asset.displayName && <small className="media-original-name">Original file: {asset.filename}</small>}
       <small>{asset.kind} / {(asset.sizeBytes / 1024 / 1024).toFixed(2)} MB</small>
       <span className={`accessibility-media-status ${ready ? "ready" : "pending"}`} role="status" title="Media readiness only. Course release still requires production validation.">{ready ? <Check size={14} /> : <CircleAlert size={14} />}{status}</span>
       <small className="media-scene-references">{uses.length ? uses.map(({ scene, number }) => `Scene ${number}: ${scene.title || "Untitled scene"}`).join("; ") : "No scene references"}</small>
     </div>
+    <MediaNameEditor asset={asset} projectId={projectId} revision={revision} canRename={canRename} onProjectUpdated={onProjectUpdated}/>
     <MediaAttributionEditor projectId={projectId} revision={revision} asset={asset} scene={selectedScene} canAttach={canAttach} onDetach={onAttach} onProjectUpdated={onProjectUpdated} />
     {asset.kind !== "image" && <button className={`button ${attached ? "button-dark" : "button-outline"}`} onClick={onAttach} disabled={!canAttach}>{attached ? "Detach media" : "Attach to scene"}</button>}
   </article>;

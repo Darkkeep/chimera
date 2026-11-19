@@ -14,16 +14,16 @@
 .pythia-talk-turn[open] > summary::before { content: "▾"; }
 .pythia-talk-turn > summary > span { flex: 1; min-width: 0; }
 .pythia-talk-turn > summary > small { color: var(--muted); text-transform: capitalize; }
-.pythia-talk-turn > summary:focus-visible { outline: 2px solid var(--chimera-pythia-link, #7f5cff); outline-offset: 2px; border-radius: 12px; }
+.pythia-talk-turn > summary:focus-visible { outline: 2px solid var(--chimera-pythia-link, var(--ui-focus)); outline-offset: 2px; border-radius: 12px; }
 .pythia-talk-exchange { display: grid; gap: 16px; padding: 0 16px 16px; }
 .pythia-history-controls { display: flex; flex-wrap: wrap; gap: 8px; }
-.pythia-processing { display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid var(--chimera-pythia-link, #7f5cff); border-radius: 12px; }
+.pythia-processing { display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid var(--chimera-pythia-link, var(--line)); border-radius: 12px; }
 .pythia-processing > div { flex: 1; min-width: 0; }
 .pythia-processing p { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .pythia-processing-orb { position: relative; display: grid; place-items: center; width: 52px; height: 52px; flex-shrink: 0; }
 .pythia-processing-orb::before { content: ""; position: absolute; inset: 0; border: 2px solid var(--line); border-top-color: var(--chimera-pythia-link, #7f5cff); border-radius: 50%; animation: pythia-orbit 1.6s linear infinite; }
 .pythia-processing-dots { display: flex; gap: 4px; }
-.pythia-processing-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--chimera-pythia-link, #7f5cff); animation: pythia-dot 1.4s ease-in-out infinite; }
+.pythia-processing-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--chimera-pythia-link, var(--theme-panel)); animation: pythia-dot 1.4s ease-in-out infinite; }
 .pythia-processing-dots i:nth-child(2) { animation-delay: .2s; }
 .pythia-processing-dots i:nth-child(3) { animation-delay: .4s; }
 @keyframes pythia-orbit { to { transform: rotate(360deg); } }
@@ -34,7 +34,7 @@
 .pythia-talk-message > div { padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--theme-panel, var(--surface)); }
 .pythia-talk-message p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; margin: 12px 0 0; }
 .pythia-talk-message small { display: block; color: var(--muted); margin-top: 10px; }
-.pythia-talk-answer > div { border-color: var(--chimera-pythia-link, #7f5cff); }
+.pythia-talk-answer > div { border-color: var(--chimera-pythia-link, var(--line)); }
 .pythia-talk-answer-label { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .pythia-talk-answer-label span { font-size: 11px; padding: 4px 8px; background: var(--theme-raised, var(--surface)); border-radius: 12px; }
 .pythia-talk-answer details { margin-top: 16px; font-size: 12px; }
@@ -58,7 +58,7 @@
 .pythia-author-direction label { font-weight: 600; }
 .pythia-author-direction textarea { width: 100%; box-sizing: border-box; resize: vertical; }
 .pythia-author-direction p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
-.pythia-action-builder, .pythia-action-review { padding: 16px; margin: 12px 0; border: 1px solid var(--chimera-pythia-link, #7f5cff); border-radius: 12px; background: var(--theme-panel, var(--surface)); }
+.pythia-action-builder, .pythia-action-review { padding: 16px; margin: 12px 0; border: 1px solid var(--chimera-pythia-link, var(--line)); border-radius: 12px; background: var(--theme-panel, var(--surface)); }
 .pythia-action-builder { display: grid; gap: 12px; }
 .pythia-action-builder label { display: grid; gap: 8px; }
 .pythia-action-builder .button { justify-self: start; }
@@ -68,7 +68,7 @@
 .pythia-action-review summary { cursor: pointer; }
 .pythia-action-diff { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .pythia-action-diff > div { padding: 12px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
-.pythia-action-diff > div:last-child { border-color: var(--chimera-pythia-link, #7f5cff); }
+.pythia-action-diff > div:last-child { border-color: var(--chimera-pythia-link, var(--line)); }
 .pythia-action-buttons { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
 .pythia-action-new-scene { margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
 .pythia-draft-from-advice { justify-self: start; }
@@ -78,11 +78,11 @@
 .pythia-design-brief { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* Consultation artifact shelf: matches the existing Pythia dialog, without another toolbar. */
-.pythia-consultation-artifacts { margin: 14px 0 20px; border: 1px solid var(--chimera-pythia-link, #7f5cff); border-radius: 12px; padding: 14px 16px; background: var(--theme-panel, var(--surface)); }
+.pythia-consultation-artifacts { margin: 14px 0 20px; border: 1px solid var(--chimera-pythia-link, var(--line)); border-radius: 12px; padding: 14px 16px; background: var(--theme-panel, var(--surface)); }
 .pythia-artifacts-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 12px; }
 .pythia-artifacts-heading h3 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 16px; }
 .pythia-artifacts-heading p { margin: 6px 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
-.pythia-artifacts-count { padding: 2px 8px; border-radius: 12px; background: var(--chimera-pythia-link, #7f5cff); color: #fff; font-size: 12px; }
+.pythia-artifacts-count { padding: 2px 8px; border-radius: 12px; background: var(--chimera-pythia-link, var(--theme-panel)); color: var(--ink); font-size: 12px; }
 .pythia-artifacts-filter { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0; font-size: 12px; color: var(--muted); max-width: 100%; min-width: 0; white-space: normal; }
 .pythia-artifacts-filter > input { flex: 0 0 auto; width: auto; margin-top: 2px; }
 .pythia-artifacts-filter > span { flex: 1 1 0; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }

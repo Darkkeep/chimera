@@ -24,7 +24,7 @@ export function EditorDialog({ children, labelledBy, onClose, busy = false, dism
     const focusable = () => Array.from(dialog.current?.querySelectorAll<HTMLElement>(
       'button:not(:disabled), input:not(:disabled):not([type="hidden"]), select:not(:disabled), textarea:not(:disabled), summary, a[href], [tabindex="0"]',
     ) ?? []).filter((element) => element.getClientRects().length > 0);
-    const initial = dialog.current?.querySelector<HTMLElement>("input:not(:disabled), textarea:not(:disabled)");
+    const initial = focusable().find(element => element.matches("input, textarea"));
     (initial ?? focusable()[0] ?? dialog.current)?.focus();
 
     function onKeyDown(event: KeyboardEvent) {
@@ -51,7 +51,8 @@ export function EditorDialog({ children, labelledBy, onClose, busy = false, dism
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
-      if (previousFocus?.isConnected) previousFocus.focus();
+      if (previousFocus?.isConnected && previousFocus.getClientRects().length > 0 && !previousFocus.closest('[inert], [aria-hidden="true"]')) previousFocus.focus();
+      else document.querySelector<HTMLElement>(".workspace-menu-toggle, #workspace-content")?.focus();
     };
   }, []);
 

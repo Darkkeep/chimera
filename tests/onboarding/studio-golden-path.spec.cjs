@@ -96,17 +96,18 @@ test('three-scene no-AI course: author, preview and export both SCORM profiles',
   const studio = page.getByRole('region', { name: 'Chimera 2.0 Authoring Studio' });
   await expect(studio.getByRole('navigation', { name: 'Studio scenes' }).locator('.studio-scene')).toHaveCount(3);
 
-  await studio.getByRole('button', { name: 'Edit on stage' }).click();
+  await studio.getByRole('button', { name: 'Stage' }).click();
   const canvas = studio.locator('.studio-inline-editor');
   await expect(canvas).toBeVisible();
   await canvas.getByRole('button', { name: 'Recognize an unusual signal element' }).click();
+  await canvas.getByRole('button',{name:'Properties',exact:true}).click();
   await canvas.getByRole('textbox', { name: 'Studio selected text' }).fill('Recognize the first signal');
   await canvas.getByRole('button', { name: 'Studio bold' }).click();
   await canvas.getByRole('button', { name: 'Signal image element' }).click();
   await canvas.getByRole('textbox', { name: 'Studio image alternative text' })
     .fill('A small reference image illustrating a training signal.');
   await canvas.getByRole('button', { name: 'Save scene' }).click();
-  await expect(canvas).toHaveCount(0);
+  await expect(canvas).toHaveAttribute("data-dirty", "false");
 
   let saved = await (await request.get(`/api/projects/${project.id}`)).json();
   const content = saved.storyboard.scenes[0];
@@ -116,9 +117,10 @@ test('three-scene no-AI course: author, preview and export both SCORM profiles',
 
   await studio.getByRole('navigation', { name: 'Studio scenes' })
     .getByRole('button', { name: /Choose a response/ }).click();
-  await studio.getByRole('button', { name: 'Build learner interaction' }).click();
+  await studio.getByRole('button', { name: 'Interaction', exact: true }).click();
   const native = studio.getByRole('region', { name: 'Manual learner interaction editor' });
   await expect(native.getByText('Actual learner preview')).toBeVisible();
+  await native.getByRole('button',{name:'Activities',exact:true}).click();
   await native.getByLabel('Decision prompt').fill('A warning appears while work is underway. What should happen first?');
   await native.getByLabel('Choice label').nth(0).fill('Pause and collect relevant information');
   await native.getByLabel('Choice feedback').nth(0).fill('Good judgment begins with gathering the evidence.');
@@ -126,7 +128,8 @@ test('three-scene no-AI course: author, preview and export both SCORM profiles',
   await native.getByLabel('Choice feedback').nth(1).fill('Acting without context can introduce preventable risk.');
   await native.getByRole('checkbox', { name: /I reviewed the learning experience/ }).check();
   await native.getByRole('button', { name: 'Save learner interaction' }).click();
-  await expect(native).toHaveCount(0);
+  await expect(native).toBeVisible();
+  await expect(native.getByRole('checkbox', { name: /I reviewed the learning experience/ })).not.toBeChecked();
 
   saved = await (await request.get(`/api/projects/${project.id}`)).json();
   expect(saved.storyboard.scenes).toHaveLength(3);

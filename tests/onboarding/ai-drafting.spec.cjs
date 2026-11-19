@@ -53,6 +53,7 @@ test('course prompt uses uploaded references and persists only the reviewed draf
   await sceneEditor.getByRole('tab', { name: 'Details', exact: true }).click();
   await sceneEditor.getByRole('textbox', { name: 'Scene title' }).fill('Unsaved operator lesson');
   await sceneEditor.getByRole('textbox', { name: 'On-screen text', exact: true }).fill('Use this current editor wording.');
+  await sceneEditor.locator('.scene-ai-options > summary').click();
   await sceneEditor.getByLabel('Scene prompt').fill('Make this scene interactive and concise.');
   await sceneEditor.getByRole('button', { name: 'Generate scene + layout draft' }).click();
   await expect(sceneEditor.getByRole('tab', { name: 'Stage' })).toHaveAttribute('aria-selected', 'true');
@@ -94,6 +95,7 @@ test('course prompt uses uploaded references and persists only the reviewed draf
   await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
   const assessmentEditor = page.getByRole('dialog').last();
   await assessmentEditor.getByRole('tab', { name: 'Details', exact: true }).click();
+  await assessmentEditor.locator('.scene-ai-options > summary').click();
   await assessmentEditor.getByLabel('Scene prompt').fill('Turn this into a true-false knowledge check.');
   await assessmentEditor.getByRole('button', { name: 'Generate scene + layout draft' }).click();
   await expect(assessmentEditor.getByRole('tab', { name: 'Stage' })).toHaveAttribute('aria-selected', 'true');

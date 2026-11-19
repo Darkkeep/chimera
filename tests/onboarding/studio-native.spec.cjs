@@ -28,7 +28,7 @@ test('manual native interaction is authored, previewed and persisted inline with
     if (req.method() === 'POST' && /pythia|conversation|design|treatment/.test(req.url())) modelPosts.push(req.url());
   });
 
-  await studio.getByRole('button', { name: 'Build learner interaction' }).click();
+  await studio.getByRole('button', { name: 'Interaction', exact: true }).click();
   const editor = studio.getByRole('region', { name: 'Manual learner interaction editor' });
   await expect(editor).toBeVisible();
   await expect(page.locator('.modal-backdrop .experience-dialog')).toHaveCount(0);
@@ -37,7 +37,7 @@ test('manual native interaction is authored, previewed and persisted inline with
   await editor.getByRole('textbox', { name: 'Experience heading' }).fill('Choose a defensible next step');
   await editor.getByRole('checkbox', { name: /I reviewed the learning experience/ }).check();
   await editor.getByRole('button', { name: 'Save learner interaction' }).click();
-  await expect(editor).toHaveCount(0);
+  await expect(editor).toBeVisible();
 
   const saved = await (await request.get(`/api/projects/${project.id}`)).json();
   const native = saved.storyboard.scenes[0].experience;

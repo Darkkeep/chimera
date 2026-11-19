@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { ColorPicker } from "./ColorPicker";
 import type { SceneElement } from "./SceneSurface";
 import { defaultAppearance } from "./scene-timeline";
 import type { Appearance } from "./scene-timeline";
@@ -5,17 +7,20 @@ import type { Appearance } from "./scene-timeline";
 export function ElementAppearanceControls({
   element,
   onChange,
-  disabled,
+  disabled, compact = false, focusEffect,
 }: {
   element: SceneElement;
   onChange: (changes: Partial<SceneElement>) => void;
-  disabled: boolean;
+  disabled: boolean; compact?: boolean; focusEffect?: "shadow" | "bevel" | "emboss";
 }) {
+  const [activeEffect, setActiveEffect] = useState(focusEffect || "shadow");
+  useEffect(() => {if(focusEffect)setActiveEffect(focusEffect);},[focusEffect]);
   const value = element.appearance || defaultAppearance();
   const change = (patch: Partial<Appearance>) =>
     onChange({ appearance: { ...value, ...patch } });
   return (
     <fieldset disabled={disabled}>
+      {compact && <div className="effect-gallery" role="group" aria-label="Object effects">{(["shadow","bevel","emboss"] as const).map(effect=><button type="button" key={effect} aria-pressed={value[effect].enabled} onClick={()=>{setActiveEffect(effect);change({[effect]:{...value[effect],enabled:!value[effect].enabled}});}}>{effect==="shadow"?"Drop shadow":effect==="bevel"?"Bevel":"Emboss"}</button>)}</div>}
       <label className="timeline-checkbox">
         <input
           type="checkbox"
@@ -91,15 +96,7 @@ export function ElementAppearanceControls({
           </label>
           {(["fill", "stroke"] as const).map((field) => (
             <div key={field} className="visual-numbers">
-              <label>
-                {field === "fill" ? "Fill color" : "Outline color"}
-                <input
-                  aria-label={`${field} color`}
-                  type="color"
-                  value={value[field]}
-                  onChange={(event) => change({ [field]: event.target.value })}
-                />
-              </label>
+              <ColorPicker label={`${field} color`} value={value[field]} disabled={disabled} onChange={color => change({[field]:color})}/>
               <label>
                 {field} opacity (%)
                 <input
@@ -148,7 +145,7 @@ export function ElementAppearanceControls({
         </>
       )}
       {(["shadow", "bevel", "emboss"] as const).map((key) => (
-        <details key={key} className="visual-effect">
+        <details key={key} className="visual-effect" hidden={compact && activeEffect !== key} open={compact || undefined}>
           <summary>
             {key === "shadow"
               ? "Drop shadow"
@@ -168,16 +165,7 @@ export function ElementAppearanceControls({
             />
             Enabled
           </label>
-          <label>
-            Shadow color
-            <input
-              type="color"
-              value={value[key].color}
-              onChange={(event) =>
-                change({ [key]: { ...value[key], color: event.target.value } })
-              }
-            />
-          </label>
+          <ColorPicker label={`${key} color`} value={value[key].color} disabled={disabled} onChange={color => change({[key]:{...value[key],color}})}/>
           <div className="visual-numbers">
             {(["opacity", "size", "blur", "angle"] as const).map((field) => (
               <label key={field}>

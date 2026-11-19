@@ -1,20 +1,21 @@
 import { useEffect, useLayoutEffect, useState } from "react";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Sun, Palette } from "lucide-react";
 
-type Appearance = "light" | "dark" | "system";
+type Appearance = "purple" | "light" | "dark" | "system";
 const storageKey = "chimera.appearance";
 const systemQuery = "(prefers-color-scheme: dark)";
-const normalize = (value: string | null): Appearance => value === "light" || value === "dark" || value === "system" ? value : "dark";
+const normalize = (value: string | null): Appearance => value === "purple" || value === "light" || value === "dark" || value === "system" ? value : "purple";
 
 function readAppearance(): Appearance {
   try { return normalize(window.localStorage.getItem(storageKey)); }
-  catch { return "dark"; }
+  catch { return "purple"; }
 }
 
 function applyAppearance(preference: Appearance) {
   const resolved = preference === "system" ? (window.matchMedia(systemQuery).matches ? "dark" : "light") : preference;
-  document.documentElement.dataset.theme = resolved;
-  document.documentElement.style.colorScheme = resolved;
+  document.documentElement.dataset.appearance = resolved;
+  document.documentElement.dataset.theme = resolved === "light" ? "light" : "dark";
+  document.documentElement.style.colorScheme = resolved === "light" ? "light" : "dark";
 }
 
 // Called before React renders to avoid showing the wrong theme on startup.
@@ -41,13 +42,13 @@ export function AppearanceSelector() {
   return <fieldset data-onboarding="workspace.appearance" className="appearance-selector">
     <legend>Appearance</legend>
     <div className="appearance-options">
-      {([{ value: "light", label: "Light", Icon: Sun }, { value: "dark", label: "Dark", Icon: Moon }, { value: "system", label: "System", Icon: Monitor }] as const).map(({ value, label, Icon }) =>
+      {([{ value: "purple", label: "DARKROGUE", description: "Purple · Chimera 2.0 default", Icon: Palette }, { value: "dark", label: "Classic Dark", description: "Charcoal · Classic Chimera", Icon: Moon }, { value: "light", label: "Light Temple", description: "Ivory & blue · Manteion", Icon: Sun }, { value: "system", label: "System", description: "Follow device appearance", Icon: Monitor }] as const).map(({ value, label, description, Icon }) =>
         <label key={value} className={preference === value ? "is-active" : ""}>
-          <input type="radio" name="appearance" value={value} checked={preference === value} onChange={() => {
+          <input type="radio" name="appearance" aria-label={label} value={value} checked={preference === value} onChange={() => {
             setPreference(value);
             try { window.localStorage.setItem(storageKey, value); } catch { /* Still usable when browser storage is unavailable. */ }
           }} />
-          <Icon size={15} aria-hidden="true" /><span>{label}</span>
+          <Icon size={15} aria-hidden="true" /><span className="appearance-option-copy"><strong>{label}</strong><small>{description}</small></span>
         </label>,
       )}
     </div>

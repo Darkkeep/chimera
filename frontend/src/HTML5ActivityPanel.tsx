@@ -1,3 +1,4 @@
+import { assetLabel } from "./asset-display";
 import { useState } from "react";
 import type { Project, Scene } from "./App";
 import { EditorDialog } from "./EditorDialog";
@@ -74,7 +75,7 @@ export function HTML5ActivityPanel({ project, scene, onClose, onProjectUpdated }
         setCredit(project.storyboard.assets.find(asset => asset.id === event.target.value)?.attributionText ?? "");
       }}>
         <option value="">Select a package</option>
-        {project.storyboard.assets.filter(a => a.kind === "html5").map(a => <option key={a.id} value={a.id}>{a.filename}</option>)}
+        {project.storyboard.assets.filter(a => a.kind === "html5").map(a => <option key={a.id} value={a.id}>{assetLabel(a)}</option>)}
       </select></label>
       {value.assetId && <button type="button" onClick={() => void act(async () => {
         const response = await fetch(`/api/projects/${project.id}/assets/${value.assetId}/attribution`, {

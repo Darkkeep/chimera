@@ -343,6 +343,7 @@ class MediaPlacementsUpdate(BaseModel):
 
 class AssetMetadataUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    displayName: str = Field(default="", max_length=200)
     transcript: str = Field(default="", max_length=100000)
     captionsVtt: str = Field(default="", max_length=200000)
     language: str = Field(default="en", pattern=r"^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$")
@@ -1269,6 +1270,7 @@ class ExtractedAsset(BaseModel):
     id: str
     kind: Literal["image", "audio", "video", "html5"]
     role: Literal["content", "background"] = "content"
+    displayName: str = Field(default="", max_length=200)
     filename: str
     contentType: str
     sizeBytes: int

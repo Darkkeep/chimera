@@ -57,6 +57,20 @@ class PlatformAccessTests(unittest.TestCase):
     def audit(self):
         return [json.loads(line) for line in (storage.project_path(self.project.id) / 'audit/events.jsonl').read_text(encoding='utf-8').splitlines()]
 
+    def test_media_alias_requires_media_management_permission(self):
+        with action_context(self.actors['author']):
+            project = storage.add_project_asset(self.project.id, 'original.mp3', b'synthetic', 'audio')
+        asset = project.storyboard.assets[-1]
+        url = f'/api/projects/{project.id}/assets/{asset.id}/metadata'
+        headers = {'X-Test-Actor': 'reviewer', 'If-Match': f'"{project.storyboard.revision}"'}
+        response = self.client.patch(url, headers=headers, json={'displayName': 'Denied alias'})
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(storage.read_project(project.id).storyboard.revision, project.storyboard.revision)
+        headers['X-Test-Actor'] = 'author'
+        response = self.client.patch(url, headers=headers, json={'displayName': 'Approved alias'})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['storyboard']['assets'][-1]['displayName'], 'Approved alias')
+
     def test_reviewer_can_comment_but_cannot_edit_export_or_approve(self):
         base = f'/api/projects/{self.project.id}'
         headers = {'X-Test-Actor': 'reviewer'}

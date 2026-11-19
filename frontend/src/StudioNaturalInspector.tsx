@@ -1,3 +1,5 @@
+import { assetLabel } from "./asset-display";
+import { ColorPicker } from "./ColorPicker";
 import type { SceneElement, SceneLayout } from "./SceneSurface";
 import { defaultAppearance } from "./scene-timeline";
 
@@ -7,7 +9,7 @@ import { defaultAppearance } from "./scene-timeline";
  * component does not own a competing draft, save path, or AI integration.
  */
 export function StudioNaturalInspector({
-  element, layout, title, onTitleChange, onChange, onStageChange, images, imageAltText, onImageAltTextChange, disabled,
+  element, title, onTitleChange, onChange, images, imageAltText, onImageAltTextChange, disabled,
 }: {
   element: SceneElement | undefined;
   layout: SceneLayout;
@@ -15,7 +17,7 @@ export function StudioNaturalInspector({
   onTitleChange: (value: string) => void;
   onChange: (changes: Partial<SceneElement>) => void;
   onStageChange: (changes: Partial<SceneLayout>) => void;
-  images: { id: string; filename: string }[];
+  images: { id: string; filename: string; displayName?: string }[];
   imageAltText: Record<string, string>;
   onImageAltTextChange: (assetId: string, value: string) => void;
   disabled: boolean;
@@ -34,9 +36,6 @@ export function StudioNaturalInspector({
       <label>Scene title
         <input aria-label="Studio scene title" value={title} maxLength={120} onChange={event => onTitleChange(event.target.value)} />
       </label>
-      <label>Background color
-        <input aria-label="Studio scene background color" type="color" value={layout.backgroundColor} onChange={event => onStageChange({ backgroundColor: event.target.value })} />
-      </label>
       <p className="studio-natural-helper">Canvas size, background images, layers and timeline options remain available in the sections below.</p>
     </fieldset> : <fieldset className="studio-natural-fields" disabled={inactive}>
       {element.kind === "text" && <>
@@ -47,9 +46,7 @@ export function StudioNaturalInspector({
           <label>Font size
             <input aria-label="Studio font size" type="number" min={1} max={500} value={element.fontSize} onChange={event => {const number=event.target.valueAsNumber; if(Number.isFinite(number) && number>=1 && number<=500) onChange({fontSize:number});}}/>
           </label>
-          <label>Text color
-            <input aria-label="Studio text color" type="color" value={element.color} onChange={event=>onChange({color:event.target.value})}/>
-          </label>
+          <ColorPicker label="Studio text color" value={element.color} disabled={inactive} onChange={color=>onChange({color})}/>
         </div>
         <label>Typeface
           <select aria-label="Studio typeface" value={element.fontFamily} onChange={event=>onChange({fontFamily:event.target.value})}>
@@ -68,7 +65,7 @@ export function StudioNaturalInspector({
         <label>Image
           <select aria-label="Studio selected image" value={element.assetId || ""} onChange={event=>onChange({assetId:event.target.value || null})}>
             <option value="">Choose image</option>
-            {images.map(asset=><option value={asset.id} key={asset.id}>{asset.filename}</option>)}
+            {images.map(asset=><option value={asset.id} key={asset.id}>{assetLabel(asset)}</option>)}
           </select>
         </label>
         {element.assetId && <label>Alternative text
@@ -80,9 +77,7 @@ export function StudioNaturalInspector({
         <p className="studio-natural-helper">Describe what matters to the learner. Drag handles to crop or resize using the canvas tools.</p>
       </>}
       {element.kind === "shape" && <>
-        <label>Shape fill
-          <input aria-label="Studio shape fill" type="color" value={element.appearance?.fill || "#168da8"} onChange={event=>onChange({appearance:{...(element.appearance || defaultAppearance()),fill:event.target.value}})}/>
-        </label>
+        <ColorPicker label="Studio shape fill" value={element.appearance?.fill || "#168da8"} disabled={inactive} onChange={fill=>onChange({appearance:{...(element.appearance || defaultAppearance()),fill}})}/>
         <p className="studio-natural-helper">Stroke, shadows and effects are available in Appearance below.</p>
       </>}
       <div className="studio-natural-divider">Position and size</div>

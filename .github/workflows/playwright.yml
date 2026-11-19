@@ -61,11 +61,17 @@ jobs:
         CHIMERA_TEST_PYTHON: python
     - name: Qualify opt-in Studio 2.0 smoke on Chromium
       if: ${{ success() }}
-      run: npm run test:onboarding -- studio --project=chromium --workers=1
+      run: npm run test:onboarding -- studio authoring-menus compact-timeline course-libraries direct-stage header-save interface-themes media-alias preview-discussion-layout preview-player-controls scene-refinement.spec theme-surfaces timeline-layer-order windows-menu workspace-navigation --project=chromium --workers=1
       env:
         CHIMERA_TEST_PYTHON: python
         VITE_CHIMERA_STUDIO_ENABLED: "true"
         CHIMERA_STUDIO_TEST: "true"
+    - name: Qualify classic editor with Studio disabled
+      if: ${{ success() }}
+      run: npm run test:onboarding -- scene-refinement-classic --project=chromium --workers=1
+      env:
+        CHIMERA_TEST_PYTHON: python
+        VITE_CHIMERA_STUDIO_ENABLED: "false"
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:
@@ -90,6 +96,8 @@ jobs:
         shard: [1, 2, 3]
     env:
       CHIMERA_TEST_PYTHON: python
+      CHIMERA_STUDIO_TEST: "true"
+      VITE_CHIMERA_STUDIO_ENABLED: "true"
     steps:
     - uses: actions/checkout@v4
       with:
