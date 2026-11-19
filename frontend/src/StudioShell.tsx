@@ -1,3 +1,4 @@
+import { version as applicationVersion } from "../package.json";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { BookOpen, ChevronRight, ClipboardCheck, Download, Layers3, Maximize2, Pencil, Play, Plus, Sparkles, X } from "lucide-react";
@@ -48,7 +49,7 @@ export function StudioShell({
   return <section className="studio-shell" aria-label="Chimera 2.0 Authoring Studio">
     <header className="studio-command">
       <div className="studio-command-title">
-        <span className="studio-kicker">STUDIO 2.0 · DEVELOPMENT PREVIEW</span>
+        <span className="studio-kicker">STUDIO · {applicationVersion}</span>
         <h2>{project.title || "Untitled learning experience"}</h2>
         <span className="studio-command-subtitle">{scenes.length} scene{scenes.length === 1 ? "" : "s"} · Revision {project.storyboard.revision}</span>
       </div>

@@ -1,5 +1,12 @@
 # Chimera 2.0 Beta candidate qualification
 
+Current local candidate (November 19, 2026): application `2.0.0-beta.1` in
+`C:\inetpub\Chimera2`. See the [review packet](beta-1-review-packet.md) for the
+reconciled history and new candidate results. The sections below retain the
+original baseline qualification chronology and original runtime locations.
+Baseline `fdd7c72` subsequently passed hosted run 226; local post-baseline edits
+still require their own exact-candidate checks and hosted CI after authorization.
+
 Owner accepted the cumulative local Beta baseline on 2026-11-19. This candidate is on `feature/chimera-2-golden-path-qualification`, based on `dc21e48b56743c6f87572452a45742747e7212a3`. A candidate commit records implementation; it is not release approval. No production promotion, migration, new generation or Pythia operation is included.
 
 ## Automated gates

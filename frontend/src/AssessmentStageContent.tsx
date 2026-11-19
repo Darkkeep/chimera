@@ -13,6 +13,7 @@ export function AssessmentStageContent({ item }: { item: AssessmentItem }) {
     </div>)}
     {targets.length > 0 && <div>{targets.map(target => <span className="assessment-stage-target" key={target.identifier}>{target.text}</span>)}</div>}
     {item.type === "short-answer" && <input aria-label="Fill in the blank" disabled placeholder="Fill in the blank" />}
-    <button type="button" disabled>Check answer</button>
+    <button type="button" className="assessment-stage-check-answer" disabled
+      title="Use Preview to answer this question.">Check answer</button>
   </section>;
 }

@@ -37,6 +37,7 @@ from .platform import ActorContext, AuditEventPage, AuthorizationPolicy, Durable
 from .references import SUPPORTED_REFERENCE_EXTENSIONS, extract_reference_passages
 from .render import render_slides
 from .qti import assessment_item_xml, assessment_test_package
+from .version import __version__
 from .scorm import persist_scorm_12_build, persist_scorm_build, read_scorm_report
 from .standalone import build_standalone_course
 from .storage import ROOT, EnhancementProposalConflict, StoryboardRevisionConflict, add_project_asset, add_review_reply, approve_generated_candidate, create_enhancement_job, create_enhancement_proposal, create_media_generation_job, create_project, create_pythia_analysis_proposal, create_pythia_course_review, create_pythia_transform_proposal, create_review_comment, create_scene, create_template, decide_enhancement_proposal, decide_pythia_analysis_proposal, decide_pythia_course_finding, decide_pythia_transform_proposal, decide_review_comment, delete_scene, list_enhancement_jobs, list_enhancement_proposals, list_generated_candidates, list_media_generation_jobs, list_projects, list_pythia_analysis_proposals, list_pythia_course_reviews, list_pythia_transform_proposals, list_reference_resources, list_review_comments, list_templates, project_path, read_enhancement_job, read_generated_candidate, read_media_generation_job, read_project, read_template, persist_imported_assets, persist_slide_previews, reorder_scenes, replace_storyboard, replace_template_source, save_reference_resource, slugify, storyboard_transaction, update_from_import, update_project_asset_attribution, update_project_completion_settings, update_project_export_settings, update_generated_candidate, update_media_generation_job, update_scene, update_template, validate_visual_assets, write_project_metadata, write_storyboard, template_path
@@ -355,7 +356,7 @@ async def _require_request_access(
             ))
 
 
-app = FastAPI(title="Chimera API", version="1.2.0", dependencies=[Depends(_require_request_access)])
+app = FastAPI(title="Chimera API", version=__version__, dependencies=[Depends(_require_request_access)])
 app.include_router(media_router)
 app.include_router(signal_router)
 

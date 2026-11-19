@@ -14,6 +14,7 @@ export function EditorDialog({ children, labelledBy, onClose, busy = false, dism
   onboardingJourney?: string;
 }) {
   const dialog = useRef<HTMLElement>(null);
+  const backdropPress = useRef(false);
   const latest = useRef({ onClose, busy, dismissible });
   latest.current = { onClose, busy, dismissible };
 
@@ -56,8 +57,15 @@ export function EditorDialog({ children, labelledBy, onClose, busy = false, dism
     };
   }, []);
 
-  return <div className="modal-backdrop" onClick={(event) => {
-    if (event.target === event.currentTarget && !busy && dismissible) onClose();
+  return <div className="modal-backdrop" onPointerDown={(event) => {
+    // A text-selection drag can synthesize a backdrop click even when it began inside.
+    backdropPress.current = event.target === event.currentTarget;
+  }} onPointerUp={(event) => {
+    backdropPress.current = backdropPress.current && event.target === event.currentTarget;
+  }} onPointerCancel={() => { backdropPress.current = false; }} onClick={(event) => {
+    const dismiss = backdropPress.current && event.target === event.currentTarget;
+    backdropPress.current = false;
+    if (dismiss && !busy && dismissible) onClose();
   }}>
     <section ref={dialog} data-onboarding={onboardingTarget} data-onboarding-journey={onboardingJourney} className={`modal ${className}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy} tabIndex={-1}>
       {children}

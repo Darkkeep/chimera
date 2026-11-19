@@ -185,6 +185,30 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
     document.addEventListener("keydown", onHistoryShortcut);
     return () => document.removeEventListener("keydown", onHistoryShortcut);
   });
+  useEffect(() => {
+    function onDeleteShortcut(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey
+        || !["Delete", "Backspace"].includes(event.key)) return;
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const editor = target.closest<HTMLElement>(".visual-editor");
+      if (!editor || target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]')) return;
+      // WebKit can treat Backspace as browser Back. A locked object or empty
+      // selection must remain a no-op in the editor rather than leave the page.
+      event.preventDefault();
+      if (event.repeat || busy || sourceVisible || editingText) return;
+      const removable = new Set(layout.elements.filter(element => multiSelection.includes(element.id) && !element.locked).map(element => element.id));
+      if (!removable.size) return;
+      commit({ ...layout, elements: layout.elements.filter(element => !removable.has(element.id)) });
+      setSelection(null);
+      // Keep keyboard focus in the editor after removing the focused object/layer,
+      // so Undo remains available without another pointer action.
+      editor.tabIndex = -1;
+      editor.focus({ preventScroll: true });
+    }
+    document.addEventListener("keydown", onDeleteShortcut);
+    return () => document.removeEventListener("keydown", onDeleteShortcut);
+  });
   function commit(next: SceneLayout, appliedTemplate = templateId, previousLayout?: SceneLayout) {
     setMotionPreview(0); setTimelinePlaying(false);
     if(next.timeline){const endpoint=Math.max(next.timeline.durationMs,...next.elements.map(e=>Math.max(e.timing?.endMs||0,animationEndMs(e.animations))));if(endpoint>3600000){setError("Keep the complete scene within one hour.");return;}next={...next,timeline:{...next.timeline,durationMs:endpoint}};}
@@ -591,6 +615,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
         </Rnd>)}{sceneType === "question" && assessmentItem && <Rnd scale={scale} bounds="parent" position={{ x: questionRegion.x, y: questionRegion.y }} size={{ width: questionRegion.width, height: questionRegion.height }} minWidth={120} minHeight={80} disableDragging={busy} enableResizing={!busy && selection === "assessment-region"} onMouseDown={() => setSelection("assessment-region")} style={{ zIndex: 2001 }} onDragStop={(_, data) => commit({ ...layout, assessmentRegion: { ...questionRegion, x: data.x, y: data.y } })} onResizeStop={(_, __, reference, ___, position) => commit({ ...layout, assessmentRegion: { ...position, width: parseFloat(reference.style.width), height: parseFloat(reference.style.height) } })}>
           <div className="assessment-stage-region" aria-label="Assessment component" style={{ inset: 0, width: "100%", height: "100%" }}><AssessmentStageContent item={assessmentItem} /></div>
         </Rnd>}</>}</ScaledStage>}
+        {sceneType === "question" && assessmentItem && <p className="assessment-stage-preview-hint">Use Preview to answer this question. Answers are inactive while editing.</p>}
         {!embedded && imageContent}
 
         {<SceneTimeline initiallyOpen={!embedded} layout={layout} project={project} commit={commit} selection={selection} select={setSelection} time={timelineTime} setTime={setTimelineTime} playing={timelinePlaying} setPlaying={setTimelinePlaying} preview={timelinePreview} setPreview={setTimelinePreview} disabled={busy || sourceVisible} audition={audition} onAudition={setAudition} onDurationValidityChange={setDurationValid}/>}

@@ -17,7 +17,7 @@ class BuildInformationTests(TestCase):
             "CHIMERA_PYTHIA_CONTRACT_VERSION": "",
         }):
             result = runtime_build_information()
-        self.assertEqual(result["version"], "1.2.0")
+        self.assertEqual(result["version"], "2.0.0-beta.1")
         self.assertIsNone(result["backend"]["gitSha"])
         self.assertIsNone(result["frontend"]["gitSha"])
         self.assertIsNone(result["environment"])

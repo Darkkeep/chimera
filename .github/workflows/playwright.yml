@@ -68,7 +68,7 @@ jobs:
         CHIMERA_TEST_PYTHON: python
     - name: Qualify opt-in Studio 2.0 smoke on Chromium
       if: ${{ success() }}
-      run: npm run test:onboarding -- studio authoring-menus compact-timeline course-libraries direct-stage header-save interface-themes media-alias preview-discussion-layout preview-player-controls scene-refinement.spec theme-surfaces timeline-layer-order windows-menu workspace-navigation --project=chromium --workers=1
+      run: npm run test:onboarding -- studio authoring-menus compact-timeline course-libraries dialog-selection direct-stage header-save interface-themes keyboard-delete media-alias preview-discussion-layout preview-player-controls scene-refinement.spec theme-surfaces timeline-layer-order windows-menu workspace-navigation --project=chromium --workers=1
       env:
         CHIMERA_TEST_PYTHON: python
         VITE_CHIMERA_STUDIO_ENABLED: "true"

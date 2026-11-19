@@ -9,6 +9,9 @@ test('classic editor retains its tabs and shares dirty close/save protection',as
   await page.getByRole('button',{name:'Edit scene',exact:true}).click();
   const editor=page.locator('.modal.visual-editor');await editor.getByRole('tab',{name:'Details',exact:true}).click();
   await editor.getByRole('textbox',{name:'Scene title',exact:true}).fill('Classic saved with guard');
+  // Wait for the controlled draft to render, not just the input's DOM value,
+  // before exercising close/save on slower WebKit event processing.
+  await expect(editor.getByRole('heading',{name:'Classic saved with guard',exact:true})).toBeVisible();
   await editor.getByRole('button',{name:'Close scene editor'}).click();
   const guard=page.getByRole('dialog',{name:'Unsaved scene changes',exact:true});await expect(guard).toBeVisible();
   await page.keyboard.press('Escape');await expect(guard).toHaveCount(0);

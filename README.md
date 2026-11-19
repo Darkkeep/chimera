@@ -1,8 +1,19 @@
 # Chimera
 
-Repository context: **Chimera 1.2.0** | [MIT license](LICENSE) | [Release notes](docs/release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+Development candidate: **Chimera 2.0.0-beta.1** | [MIT license](LICENSE) | [Beta release notes](docs/release-2.0.0-beta.1.md) | [Product charter](CHIMERA_CHARTER.md).
 
-Chimera **1.2.0** is the hosted DARKROGUE SSO release. Use [hosted Chimera](https://chimera.darkrogue.io/) with a DARKROGUE account, or run the local authoring installation below. See [release notes](docs/release-1.2.0.md) for verified scope and open checks.
+For local Beta development, use `C:\inetpub\Chimera2\Chimera2.code-workspace`
+and its **Chimera Backend** / **Chimera Frontend** tasks. Open
+`http://127.0.0.1:5175` and enable **Studio 2.0 preview**. The backend uses port
+8002 and the existing local workspace. See [local setup](docs/local-workspace-relocation.md)
+and the [candidate review packet](docs/beta-1-review-packet.md).
+This candidate is not a production release. The charter is independently versioned
+2.0.0. Dated evidence and independently versioned assets/contracts retain their scope.
+
+Chimera **1.2.0** is the separately documented hosted DARKROGUE SSO release.
+The [hosted site](https://chimera.darkrogue.io/) is separate from this local Beta;
+its live deployment was not changed or verified by Beta preparation.
+See the [1.2.0 release notes](docs/release-1.2.0.md) for that release's scope.
 
 **Imported HTML5 activities** can now sit alongside native scene experiences.
 Import an offline HTML file or single-entry ZIP, review its isolated preview and

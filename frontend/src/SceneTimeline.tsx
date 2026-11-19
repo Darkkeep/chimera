@@ -541,6 +541,7 @@ export function SceneTimeline({
                       if(target)reorderLayer(element.id,target.id,event.key==="ArrowUp"?"before":"after");
                     }}
                     aria-pressed={selection === element.id}
+                    onFocus={() => select(element.id)}
                     onClick={() => {
                       select(element.id);
                       setClipId(null);

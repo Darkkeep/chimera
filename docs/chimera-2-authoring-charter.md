@@ -1,5 +1,11 @@
 # Chimera 2.0 | Authoring Experience Charter and First Vertical Slice
 
+Authority clarification (2026-11-18): [CHIMERA_CHARTER.md](../CHIMERA_CHARTER.md)
+is the governing product charter. This earlier proposed baseline retains compatible
+implementation guidance and acceptance gates; it does not independently amend
+product direction. Its restriction on advancing the application release to 2.0
+does not restrict the independently versioned product charter (2.0.0).
+
 Status: proposed design baseline, not an implemented feature or a release approval.
 Started: 2026-11-17
 Branch: `feature/chimera-2-authoring-foundation`
