@@ -104,3 +104,19 @@ test('inspectors and swatches return keyboard focus and expose accessible contro
  const AxeBuilder=require('@axe-core/playwright').default;const result=await new AxeBuilder({page}).include('.floating-inspector').include('.project-color-popup:popover-open').withTags(['wcag2a','wcag2aa']).analyze();expect(result.violations).toEqual([]);
  await page.keyboard.press('Escape');await expect(picker).toBeHidden();await expect(trigger).toBeFocused();await expect(panel).toBeVisible();await expect(editor).toHaveAttribute('data-dirty','false');
 });
+
+test('project swatches stay isolated without resetting the workspace', async ({page,request}) => {
+ let second=await(await request.post('/api/projects',{data:{title:'Second palette synthetic'}})).json();
+ second=await(await request.post(`/api/projects/${second.id}/scenes`,{headers:{'If-Match':`"${second.storyboard.revision}"`},data:{title:'Second palette scene'}})).json();
+ const {project,editor}=await setup(page,request);
+ const show=page.getByRole('button',{name:'Show workspace menu',exact:true});if(await show.isVisible())await show.click();
+ const selector=page.getByRole('combobox',{name:'Switch project',exact:true});
+ async function palette(){await command(editor,'Layers','Scene background…');const panel=page.getByRole('dialog',{name:'Background',exact:true});await panel.getByRole('button',{name:/^Background color #/}).click();return{panel,picker:page.getByRole('dialog',{name:'Background color picker',exact:true})};}
+ let {panel,picker}=await palette();await picker.getByRole('button',{name:'Save current color as swatch'}).click();await expect(picker.getByRole('button',{name:'Saved swatches #ffffff',exact:true})).toBeVisible();
+ await picker.getByRole('button',{name:'Close color picker'}).click();await panel.getByRole('button',{name:'Close scene controls'}).click();
+ await selector.selectOption(second.id);await expect(editor).toBeVisible();({panel,picker}=await palette());
+ await expect(picker.getByRole('group',{name:'Saved swatches',exact:true})).toHaveCount(0);
+ await picker.getByRole('button',{name:'Close color picker'}).click();await panel.getByRole('button',{name:'Close scene controls'}).click();
+ await selector.selectOption(project.id);await expect(editor).toBeVisible();({panel,picker}=await palette());
+ await expect(picker.getByRole('button',{name:'Saved swatches #ffffff',exact:true})).toBeVisible();await expect(editor).toHaveAttribute('data-dirty','false');
+});

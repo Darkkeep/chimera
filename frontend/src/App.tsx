@@ -1323,7 +1323,7 @@ export function App() {
 
   if (reviewToken && session) return <ReviewLinkView token={reviewToken} onClose={() => { history.replaceState(null, "", location.pathname+location.search); setReviewToken(""); }} />;
 
-  return <ProjectPalette key={project.id} projectId={project.id} value={project}><div className="app-shell">
+  return <ProjectPalette projectId={project.id} value={project}><div className="app-shell">
     <a className="skip-link" href="#workspace-content">Skip to workspace</a>
     <WorkspaceNavigation>
       <div className="brand"><BrandMark /><div className="brand-wordmark"><span>CHIMERA</span></div></div>

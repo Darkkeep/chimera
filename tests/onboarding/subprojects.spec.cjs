@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 
@@ -78,7 +79,8 @@ for (const [theme, width] of [['light', 1440], ['dark', 390]]) {
     expect(child.storyboard.assets).toEqual([]);
     expect(child.storyboard.backgroundAsset).toBeNull();
     await expect(page.getByRole('combobox', { name: 'Switch project' }).locator('optgroup').filter({ has: page.locator(`option[value="${activeId}"]`) })).toHaveAttribute('label', parent.title);
-    await page.getByRole('button', { name: 'My Work', exact: true }).click();
+    await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'My Work', exact: true }).click();
     await expect(row(parent)).toBeVisible();
     const parentExpand = page.getByRole('button', { name: `Subprojects of ${parent.title}`, exact: true });
     await parentExpand.click();

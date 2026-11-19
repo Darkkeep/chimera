@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 async function logDialogOverflow(dialog) {
   const report=await dialog.evaluate(el=>{
@@ -182,6 +183,7 @@ test('numbered advice stays in consultation until the author agrees a brief and 
   expect(draftRequests).toBe(0);
   await expect(planner.getByRole('heading', { name: 'Explore the learning design', exact: true })).toBeVisible();
   await planner.getByRole('button', { name: 'Open storyboard', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
   const resumed = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
   await expect(resumed.getByRole('heading', { name: 'Explore the learning design', exact: true })).toBeVisible();
@@ -252,6 +254,7 @@ test('New Project holds a real source-grounded conversation until the author req
   await page.screenshot({ path: testInfo.outputPath('new-project-live-rough-scenes.png'), fullPage: true });
   await planner.getByRole('button', { name: 'Open storyboard', exact: true }).click();
   await page.reload();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
   const restored = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
   await expect(restored.locator('.pythia-talk-answer')).toHaveCount(2);

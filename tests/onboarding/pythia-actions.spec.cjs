@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 
@@ -20,6 +21,7 @@ test('author direction drives real Pythia drafts that update and add scenes only
   const getProject = async () => (await request.get(`/api/projects/${project.id}`)).json();
   await page.goto('/');
   await page.getByRole('combobox', { name: 'Switch project', exact: true }).selectOption(project.id);
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
   await expect(dialog.getByLabel('Author direction', { exact: true })).toBeEnabled();
@@ -69,6 +71,7 @@ test('author direction drives real Pythia drafts that update and add scenes only
   await page.screenshot({ path: testInfo.outputPath('pythia-actions-desktop.png'), fullPage: true });
   await dialog.getByRole('button', { name: 'Close Pythia conversation', exact: true }).click();
   await page.reload();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
   const restored = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
   await expect(restored.getByText(/Applied to storyboard revision/)).toHaveCount(2);

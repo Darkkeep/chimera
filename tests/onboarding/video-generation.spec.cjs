@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 
 for (const provider of ['shotstack', 'synthesia']) {
@@ -34,7 +35,8 @@ for (const provider of ['shotstack', 'synthesia']) {
     if (surface === 'Scene editor') {
       await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
       await page.getByRole('tab', { name: 'Media', exact: true }).click();
-    } else await page.getByRole('button', { name: 'Media library', exact: true }).click();
+    } else await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'Media library', exact: true }).click();
     await page.locator('.generation-creator > summary').click();
     await expect(page.getByRole('combobox', { name: 'Media type', exact: true })).toHaveValue('video');
     await expect(page.getByRole('combobox', { name: 'AI connection', exact: true })).toHaveValue(connection.id);

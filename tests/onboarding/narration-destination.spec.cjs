@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 test('approved narration appears once for its intended scene', async ({ page, request }) => {
   let project = await (await request.post('/api/projects', { data: { title: 'Narration destination regression' } })).json();
@@ -13,6 +14,7 @@ test('approved narration appears once for its intended scene', async ({ page, re
   await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
   await page.goto('/');
   await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Media library', exact: true }).click();
   const current = page.getByRole('region', { name: 'Selected scene media', exact: true });
   await expect(current.locator('audio')).toHaveCount(1);

@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 
@@ -25,6 +26,7 @@ async function openConversation(page, request, title) {
   await page.goto('/');
   await page.getByRole('combobox', { name: 'Switch project', exact: true }).selectOption(project.id);
   await expect(page.getByRole('navigation', { name: 'Workspace', exact: true }).getByRole('button').first()).toHaveText('Consult Pythia');
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
   await expect(dialog.getByLabel('Your message', { exact: true })).toBeEnabled();
@@ -137,6 +139,7 @@ test('real local Pythia answers, revises and recovers browser history', async ({
   await page.screenshot({ path: testInfo.outputPath('pythia-live-desktop.png'), fullPage: true });
   await dialog.getByRole('button', { name: 'Close Pythia conversation', exact: true }).click();
   await page.reload();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
   const restored = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
   await expect(restored.locator('.pythia-talk-answer')).toHaveCount(2);

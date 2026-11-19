@@ -20,15 +20,38 @@ export function projectColors(value: unknown): string[] {
   }
   visit(value); return [...colors];
 }
+function readSwatches(key: string): string[] {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(raw) ? [...new Set(raw.filter((color): color is string => typeof color === "string").map(normalizeColor).filter((color): color is string => Boolean(color)))].slice(-32) : [];
+  } catch { return []; }
+}
 export function ProjectPalette({ projectId, value, children }: { projectId: string; value: unknown; children: ReactNode }) {
   const key = `chimera.swatches.${projectId}`;
-  const [saved, setSaved] = useState<string[]>(() => {
-    try { const raw: unknown = JSON.parse(localStorage.getItem(key) || "[]"); return Array.isArray(raw) ? [...new Set(raw.filter((c): c is string => typeof c === "string").map(normalizeColor).filter((c): c is string => Boolean(c)))].slice(0, 32) : []; } catch { return []; }
-  });
-  useEffect(() => { function sync() { try { const raw: unknown=JSON.parse(localStorage.getItem(key)||"[]");if(Array.isArray(raw))setSaved([...new Set(raw.filter((c):c is string=>typeof c==="string").map(normalizeColor).filter((c):c is string=>Boolean(c)))].slice(-32)); }catch{/* Keep working session swatches. */} } window.addEventListener("chimera:swatches",sync);window.addEventListener("storage",sync);return()=>{window.removeEventListener("chimera:swatches",sync);window.removeEventListener("storage",sync);}; },[key]);
+  const [state, setState] = useState(() => ({ key, colors: readSwatches(key) }));
+  // Never expose the previous project's swatches, even before effects run.
+  const saved = state.key === key ? state.colors : readSwatches(key);
+  useEffect(() => {
+    function sync(event?: Event) {
+      if (event instanceof StorageEvent && event.key !== null && event.key !== key) return;
+      setState({ key, colors: readSwatches(key) });
+    }
+    sync();
+    window.addEventListener("chimera:swatches", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("chimera:swatches", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, [key]);
   const colors = useMemo(() => projectColors(value), [value]);
   function save(color: string) {
-    const next=[...new Set([...saved,color])].slice(-32);setSaved(next);try {localStorage.setItem(key,JSON.stringify(next));window.dispatchEvent(new Event("chimera:swatches"));} catch {/* Swatches still work for this session. */}
+    const next = [...new Set([...saved, color])].slice(-32);
+    setState({ key, colors: next });
+    try {
+      localStorage.setItem(key, JSON.stringify(next));
+      window.dispatchEvent(new Event("chimera:swatches"));
+    } catch { /* Swatches still work for this session. */ }
   }
   return <PaletteContext.Provider value={{ colors, saved, save }}>{children}</PaletteContext.Provider>;
 }

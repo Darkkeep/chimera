@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 test('project planning resists accidental dismissal and isolates new project content', async ({ page }) => {
   await page.route('**/api/ai-connection', route => route.fulfill({ json: { configured: false, canManage: false } }));
@@ -18,9 +19,11 @@ test('project planning resists accidental dismissal and isolates new project con
   await page.keyboard.press('Escape');
   await expect(dialog.getByLabel('Your message', { exact: true })).toHaveValue('Unsent expanded outline');
   await dialog.getByRole('button', { name: 'Open storyboard', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
   await expect(page.getByLabel('Your message', { exact: true })).toHaveValue('Unsent expanded outline');
   await page.keyboard.press('Escape');
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Create project', exact: true }).click();
   dialog = page.getByRole('dialog');
   await expect(dialog.getByLabel('Course name', { exact: true })).toHaveValue('');

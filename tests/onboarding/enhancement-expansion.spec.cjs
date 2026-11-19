@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 
 async function openSuggestions(page, request, width) {
@@ -29,7 +30,9 @@ async function openSuggestions(page, request, width) {
   });
   await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
   await page.goto('/');
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Review tools', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Review suggestions', exact: true }).click();
   return { project, dialog: page.getByRole('dialog'), retries: () => retries };
 }
@@ -54,9 +57,12 @@ for (const width of [1280, 390]) {
     const refreshed = page.waitForResponse(response => response.url().endsWith(`/api/projects/${project.id}`) && response.request().method() === 'GET');
     await page.reload();
     await refreshed;
+    await openWorkspaceMenu(page);
     await expect(page.getByRole('button', { name: 'Consult Pythia', exact: true })).toBeEnabled();
-    await page.getByRole('button', { name: 'Review tools', exact: true }).click();
-    await page.getByRole('button', { name: 'Review suggestions', exact: true }).click();
+    await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'Review tools', exact: true }).click();
+    await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'Review suggestions', exact: true }).click();
     await page.getByRole('button', { name: 'Undo acceptance', exact: true }).click();
     await expect(page.locator('.enhancement-proposal-status')).toHaveText('reversed');
     const reversed = await (await request.get(`/api/projects/${project.id}`)).json();

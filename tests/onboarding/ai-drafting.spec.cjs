@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const {mockMediaConnections} = require('./media-connection-fixtures.cjs');
 test.beforeEach(async ({page}) => mockMediaConnections(page));
@@ -20,6 +21,7 @@ test('course prompt uses uploaded references and persists only the reviewed draf
   });
 
   await page.goto('/');
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Create project', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Name your course' });
   await dialog.getByRole('textbox', { name: 'Course name' }).fill(`Draft flow ${Date.now()}`);

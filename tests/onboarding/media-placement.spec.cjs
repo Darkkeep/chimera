@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 const fs = require('node:fs');
@@ -43,6 +44,7 @@ test('course-wide video, scene exclusions, captions, shared copies and revision 
   const video = project.storyboard.assets[0];
   await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
   await page.goto('/');
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Media library', exact: true }).click();
   const tools = page.getByRole('region', { name: 'Media placement and shared library', exact: true });
   await tools.getByText('Placement, captions, and shared media', { exact: true }).click();

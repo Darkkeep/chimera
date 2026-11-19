@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 
@@ -129,11 +130,13 @@ test('opens the remembered project and another project in authoring', async ({ p
   await page.getByRole('button', { name: 'Edit Alpha course', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Alpha course', exact: true })).toBeVisible();
   await expect(page.getByLabel('Add scene', { exact: true })).toBeEnabled();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'My Work', exact: true }).click();
   await page.getByRole('button', { name: 'Edit Beta course', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Beta course', exact: true })).toBeVisible();
   await expect(page.getByLabel('Add scene', { exact: true })).toBeEnabled();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'My Work', exact: true }).click();
   await page.locator('.health-row').first().locator('td').last().click();
   await expect(page.getByRole('heading', { name: 'Alpha course', exact: true })).toBeVisible();

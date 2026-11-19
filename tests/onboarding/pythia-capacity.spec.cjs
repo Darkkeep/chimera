@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 async function logDialogOverflow(dialog) {
   const report=await dialog.evaluate(el=>{
@@ -45,6 +46,7 @@ async function openCapacityFixture(page, request) {
   }] }));
   await page.goto('/');
   await page.getByRole('combobox', { name: 'Switch project', exact: true }).selectOption(project.id);
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
   await expect(dialog.getByLabel('Your message', { exact: true })).toBeEnabled();
