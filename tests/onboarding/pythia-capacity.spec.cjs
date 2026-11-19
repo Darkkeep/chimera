@@ -49,18 +49,19 @@ async function openCapacityFixture(page, request) {
   await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
-  await expect(dialog.getByLabel('Your message', { exact: true })).toBeEnabled();
+  await expect(dialog.getByLabel('What would you like to do?', { exact: true })).toBeEnabled();
+  await dialog.locator('.pythia-conversation-options > summary').click();
   return { dialog, capacity, submissions: () => submissions };
 }
 
 test('capacity includes sources, warns early and preserves an over-capacity draft', async ({ page, request }, testInfo) => {
   const fixture = await openCapacityFixture(page, request);
   const { dialog } = fixture;
-  const message = dialog.getByLabel('Your message', { exact: true });
-  const send = dialog.getByRole('button', { name: 'Send to Pythia', exact: true });
+  const message = dialog.getByLabel('What would you like to do?', { exact: true });
+  const send = dialog.getByRole('button', { name: /^(Start with Pythia|Send to Pythia)$/, exact: true });
   await message.fill('Plan this course.');
   await expect(send).toBeEnabled();
-  await dialog.getByText(/Select source text/).click();
+  await dialog.locator('.pythia-context-options > summary').click();
   await dialog.getByLabel('Fictional outline', { exact: true }).check();
   await expect(dialog.getByText(/nearing its capacity/)).toBeVisible();
   await message.fill('a'.repeat(30000));
@@ -97,11 +98,11 @@ test('a delayed preview cannot replace the capacity for a newer draft', async ({
     }
     await route.fulfill({ json: fixture.capacity(message, message === 'Earlier draft') }).catch(() => {});
   });
-  const field = fixture.dialog.getByLabel('Your message', { exact: true });
+  const field = fixture.dialog.getByLabel('What would you like to do?', { exact: true });
   await field.fill('Earlier draft');
   await expect.poll(() => firstSeen).toBe(true);
   await field.fill('New draft');
-  await expect(fixture.dialog.getByRole('button', { name: 'Send to Pythia', exact: true })).toBeEnabled();
+  await expect(fixture.dialog.getByRole('button', { name: /^(Start with Pythia|Send to Pythia)$/, exact: true })).toBeEnabled();
   await expect(fixture.dialog.getByText(/Conversation text:/)).toContainText('2,009');
   await page.waitForTimeout(1000);
   await expect(fixture.dialog.getByText(/nearing its capacity/)).toHaveCount(0);
