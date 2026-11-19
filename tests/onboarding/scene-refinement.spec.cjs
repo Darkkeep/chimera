@@ -80,7 +80,7 @@ test('undo to clean skips prompt; keyboard menus expose supported surfaces',asyn
 });
 test('native refresh protection retains dirty draft when cancelled',async({page,request})=>{
   const {editor}=await setup(page,request);await dirty(editor);
-  const dialog=page.waitForEvent('dialog');const reload=page.reload({timeout:2000}).catch(()=>{});
+  const dialog=page.waitForEvent('dialog');const reload=page.evaluate(()=>location.reload()).catch(()=>{});
   const native=await dialog;expect(native.type()).toBe('beforeunload');await native.dismiss();await reload;
   await expect(editor.getByRole('textbox',{name:'Studio selected text'})).toHaveValue('Draft must survive');
 });
