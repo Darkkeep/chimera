@@ -511,7 +511,9 @@ export function SceneTimeline({
               return (
                 <div className="timeline-row timeline-object-row" key={element.id} data-layer-id={element.id} data-drop-edge={layerDrop?.id===element.id?layerDrop.edge:undefined}
                   onDragOver={event=>{
-                    if(disabled || !event.dataTransfer.types.includes("application/x-chimera-layer"))return;
+                    // WebKit can strip custom drag MIME types across native
+                    // events. Trust only a drag begun by this mounted editor.
+                    if(disabled || !draggedLayer || !layout.elements.some(item=>item.id===draggedLayer&&!item.locked))return;
                     const id=draggedLayer;
                     if(id===element.id)return;
                     event.preventDefault();event.dataTransfer.dropEffect="move";
@@ -521,7 +523,7 @@ export function SceneTimeline({
                   onDrop={event=>{
                     event.preventDefault();
                     const bounds=event.currentTarget.getBoundingClientRect();
-                    reorderLayer(event.dataTransfer.getData("application/x-chimera-layer"),element.id,event.clientY<bounds.top+bounds.height/2?"before":"after");
+                    if(draggedLayer)reorderLayer(draggedLayer,element.id,event.clientY<bounds.top+bounds.height/2?"before":"after");
                     setDraggedLayer(null);setLayerDrop(null);
                   }}>
 

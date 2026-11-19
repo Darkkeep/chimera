@@ -15,6 +15,10 @@ and production release gates remain separate.
 - Scene, Insert, Format, Animate, Layers, View and Preview dropdowns expose
   established editing capabilities. Contextual floating inspectors support
   pinning, docking, collapsing and keyboard movement.
+- Keyboard-focus scrolling preserves the active menu under a stationary pointer.
+  Real pointer movement still switches menus. Native timeline dragging retains
+  its internal layer identity when a browser strips custom drag data; locked
+  objects and external drops remain guarded.
 - The compact timeline provides layer arrangement, animation controls and
   transport. Project color swatches, interface themes and non-destructive media
   display names are part of the recovered Beta baseline.

@@ -8,14 +8,23 @@ export function EditorDropdown({ label, commands, disabled = false }: { label: s
   const popup = useRef<HTMLDivElement>(null);
   const pointerOpened = useRef(false);
   const hoverOpened = useRef(false);
+  const pointerMoved = useRef(false);
   const [open, setOpen] = useState(false);
   useEffect(() => {
     const node = popup.current;
     const changed = () => setOpen(Boolean(node?.matches(":popover-open")));
     node?.addEventListener("toggle", changed);
     const dismiss = () => { if (node?.matches(":popover-open")) node.hidePopover(); };
+    let previousPointer: { x: number; y: number } | null = null;
+    const trackPointer = (event: PointerEvent) => {
+      pointerMoved.current = !previousPointer || event.clientX !== previousPointer.x || event.clientY !== previousPointer.y;
+      previousPointer = { x: event.clientX, y: event.clientY };
+    };
+    // Capture before React's trigger handler. WebKit may report movementX/Y as
+    // zero even for real movement, so compare actual client coordinates.
+    document.addEventListener("pointermove", trackPointer, true);
     window.addEventListener("resize", dismiss);
-    return () => { node?.removeEventListener("toggle", changed); window.removeEventListener("resize", dismiss); };
+    return () => { node?.removeEventListener("toggle", changed); window.removeEventListener("resize", dismiss); document.removeEventListener("pointermove", trackPointer, true); };
   }, []);
   function show() {
     const button = trigger.current, node = popup.current;
@@ -34,7 +43,10 @@ export function EditorDropdown({ label, commands, disabled = false }: { label: s
     <button ref={trigger} type="button" data-menu-trigger aria-haspopup="menu" aria-expanded={open} disabled={disabled} onPointerDown={() => { pointerOpened.current = Boolean(popup.current?.matches(":popover-open")) && !hoverOpened.current; hoverOpened.current = false; }} onClick={() => {
       if (pointerOpened.current) { popup.current?.hidePopover(); pointerOpened.current = false; }
       else show();
-    }} onPointerEnter={() => {
+    }} onPointerMove={() => {
+      // Keyboard focus can scroll a different trigger beneath a stationary
+      // pointer. Switch menus only when the pointer actually moves.
+      if (!pointerMoved.current) return;
       const bar = trigger.current?.closest('[data-scene-menubar]');
       if (bar?.querySelector('.editor-menu-popup:popover-open') && !popup.current?.matches(':popover-open')) { show(); hoverOpened.current = true; }
     }} onKeyDown={event => {

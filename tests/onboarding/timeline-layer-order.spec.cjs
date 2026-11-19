@@ -14,7 +14,14 @@ async function setup(page,request){
  if((page.viewportSize()?.width||1280)>760)await expect.poll(()=>page.locator('.workspace-navigation').evaluate(node=>Math.round(node.getBoundingClientRect().width))).toBe(52);
  return{project,editor};
 }
-async function command(editor,group,label){await editor.getByRole('toolbar',{name:'Scene menus'}).getByRole('button',{name:group,exact:true}).focus();await editor.getByRole('toolbar',{name:'Scene menus'}).getByRole('button',{name:group,exact:true}).press('ArrowDown');await editor.getByRole('menuitem',{name:label,exact:true}).click();}
+async function command(editor,group,label){
+ const trigger=editor.getByRole('toolbar',{name:'Scene menus'}).getByRole('button',{name:group,exact:true});
+ await trigger.focus();await trigger.press('ArrowDown');
+ const menu=editor.getByRole('menu',{name:`${group} menu`,exact:true});await expect(menu).toBeVisible();
+ // Keep this keyboard journey keyboard-only. Moving the pointer across another
+ // menu trigger legitimately switches the active native menu on narrow screens.
+ const item=menu.getByRole('menuitem',{name:label,exact:true});await item.focus();await expect(item).toBeFocused();await item.press('Enter');
+}
 
 async function prepared(page,request){
  const result=await setup(page,request),{editor}=result;
@@ -28,8 +35,22 @@ test('timeline drag changes canvas z-order, supports Undo/Redo and persists with
  const original=await(await request.get(`/api/projects/${project.id}`)).json();const elements=original.storyboard.scenes[0].visualLayout.elements;
  expect((await order(editor)).slice(0,3)).toEqual(['triangle','ellipse','rectangle']);
  const label=name=>editor.locator('.timeline-object-row').getByRole('button',{name,exact:true});
- await label('rectangle').dragTo(label('triangle'),{targetPosition:{x:20,y:4}});
- expect((await order(editor)).slice(0,3)).toEqual(['rectangle','triangle','ellipse']);
+ // Even a matching element ID supplied by an external drop cannot start a
+ // reorder: the editor must have observed its own native dragstart.
+ const rectangleId=await label('rectangle').locator('..').getAttribute('data-layer-id');
+ await label('triangle').evaluate((node,id)=>{
+  const event=new Event('drop',{bubbles:true,cancelable:true});
+  Object.defineProperties(event,{dataTransfer:{value:{getData:()=>id}},clientY:{value:node.getBoundingClientRect().top+1}});
+  node.dispatchEvent(event);
+ },rectangleId);
+ await expect(editor).toHaveAttribute('data-dirty','false');
+ expect((await order(editor)).slice(0,3)).toEqual(['triangle','ellipse','rectangle']);
+ // Native dragover needs a second move in WebKit; keep real pointer input.
+ // https://playwright.dev/docs/input#dragging-manually
+ await label('rectangle').hover();await page.mouse.down();
+ await label('triangle').hover({position:{x:20,y:4}});
+ await label('triangle').hover({position:{x:20,y:4}});await page.mouse.up();
+ await expect.poll(async()=>(await order(editor)).slice(0,3)).toEqual(['rectangle','triangle','ellipse']);
  await expect(editor).toHaveAttribute('data-dirty','true');
  const top=editor.getByRole('button',{name:'rectangle element',exact:true});expect(await top.evaluate(node=>Number(node.parentElement.style.zIndex))).toBe(elements.length*2-1);
  await editor.getByRole('button',{name:'Undo canvas edit'}).click();expect((await order(editor)).slice(0,3)).toEqual(['triangle','ellipse','rectangle']);await expect(editor).toHaveAttribute('data-dirty','false');

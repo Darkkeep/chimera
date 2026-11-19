@@ -19,6 +19,7 @@ async function command(editor, group, name) {
 }
 for(const width of [1440,1100,390])test(`native command lists overlay without moving the canvas at ${width}`,async({page,request},info)=>{
   await page.setViewportSize({width,height:1000});const {editor}=await setup(page,request);
+  await page.evaluate(() => document.fonts.ready);
   const canvas=editor.locator('.visual-stage-frame');const initial=await canvas.boundingBox();
   const bar=editor.getByRole('toolbar',{name:'Scene menus'});
   await expect(bar.getByRole('button',{name:'Background',exact:true})).toHaveCount(0);
@@ -36,6 +37,19 @@ for(const width of [1440,1100,390])test(`native command lists overlay without mo
   await expect(dialog.getByRole('button',{name:/^Background color #/})).toBeVisible();await dialog.getByRole('button',{name:'Close scene controls'}).click();
   await expect(canvas).toBeVisible();
 });
+test('real pointer movement switches an open command menu',async({page,request})=>{
+  const {editor}=await setup(page,request);
+  const bar=editor.getByRole('toolbar',{name:'Scene menus'});
+  await bar.getByRole('button',{name:'Scene',exact:true}).click();
+  await expect(editor.getByRole('menu',{name:'Scene menu',exact:true})).toBeVisible();
+  await bar.getByRole('button',{name:'Format',exact:true}).hover();
+  await expect(editor.getByRole('menu',{name:'Format menu',exact:true})).toBeVisible();
+  await bar.getByRole('button',{name:'Insert',exact:true}).hover();
+  await expect(editor.getByRole('menu',{name:'Insert menu',exact:true})).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(editor.getByRole('menu',{name:'Insert menu',exact:true})).toBeHidden();
+});
+
 test('keyboard commands, text insertion, Undo and scene properties reuse the existing draft',async({page,request})=>{
   const {editor}=await setup(page,request);const bar=editor.getByRole('toolbar',{name:'Scene menus'});
   const count=await editor.locator('.visual-editable').count();

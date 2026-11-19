@@ -137,8 +137,52 @@ recorded submodule pins. SHA-256 fingerprint:
 The verified file hashes are in
 `workspace/beta-preparation/candidate-manifest.json`. Documentation and generated
 build/test output are outside that fingerprint; logs and this packet record their
-scope separately. The charter approval status was updated after founder authorization;
-no further executable source changes followed verification.
+scope separately. This fingerprint identifies the initial approved local candidate;
+the subsequent hosted-CI menu correction and its separate identity are recorded below.
+
+## Hosted run 227 and menu correction
+
+[Run 227](https://github.com/Darkkeep/chimera/actions/runs/44565263925) tested
+`8c2136ae9043b1374f59d38f1f5db56cee3ac5a7`: eight jobs passed; Firefox and WebKit
+shard 3 failed the same 390px keyboard timeline/Lock-menu case on both attempts.
+Backend, build, exports, HTTPS authentication, expanded Studio smoke and classic
+mode passed. That run is retained as a failure, not reported as a qualified head.
+
+Local reproduction failed twice on Firefox before correction. The captured CI
+screenshot shows Scene open where the test expected Layers. Keyboard-focus
+scrolling can move another menu trigger underneath a stationary pointer; menu
+switching must ignore those synthetic zero-movement events. The correction tracks
+changed client coordinates for hover switching, since WebKit can report zero
+movementX/Y for real motion. Explicit clicks and keyboard navigation retain their
+existing behavior.
+
+The timeline keyboard fixture now opens its scoped menu and activates the command
+with Enter, asserting visibility and focus. Its drag-order assertion waits for
+the actual rendered order. The native drag follows
+[Playwright's documented two-move dragover sequence](https://playwright.dev/docs/input#dragging-manually).
+Local Windows WebKit diagnostics also showed custom MIME data at dragstart being
+absent at dragover. Timeline reordering now uses the existing in-memory identity
+of a drag begun by this editor; external payloads cannot supply that authority.
+Lock/disabled guards remain. The regression rejects a forged external ID before
+performing a real native drag, checking Undo/Redo and saved order/timing parity.
+
+The canvas-geometry fixture waits for fonts before capturing its reference bounds;
+its geometry assertions are unchanged. A separate pointer-hover regression verifies
+that real movement still switches menus.
+No test is skipped, forcibly clicked or assigned a larger timeout by this correction.
+
+Correction verification: **30 tests passed in one 3.3-minute run**, with retries
+disabled, across Chromium, Firefox and WebKit. These include all timeline order,
+lock, Undo/persistence, native menu geometry, real hover, keyboard and preview
+cases in the two affected suites. TypeScript/Vite build passed with the existing
+bundle warning. The exact follow-up hosted run is recorded in the PR, keeping
+that result separate from the failed original candidate run.
+
+Correction source/config/test fingerprint (456 files, parent `8c2136a`):
+`be33cd5373ee29c15611763f37a1e431700d2c88f8b5b81460a22951453f755c`.
+The manifest is retained under ignored `workspace/ci-227/candidate-manifest.json`.
+Original local reproduction and CI failure artifacts are retained under the same
+ignored evidence directory and in the linked hosted run.
 
 ## Approval boundary
 
