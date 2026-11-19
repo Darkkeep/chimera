@@ -1,5 +1,42 @@
 # Current work and handoff
 
+## November 19 — local work-first Pythia handoff
+
+The canonical local Beta now opens Pythia with source attachment and one prompt, with
+Design brief and Files as secondary views. Saved drafts have a prominent review shortcut,
+**Use this draft as my slides**, and **Open my slides** after acceptance. The founder
+reported "it fell right in" after the external-browser handoff. This confirms that narrow
+task in that session, not broader course-quality or release acceptance.
+
+The explicit local deployment profile accepts the canonical frontend on port 5175.
+Installed Pythia adapter contract compatibility and sanitized failure categories were
+repaired in `C:/inetpub/Pythia-chimera-sync`, commit `5c5aa2a`. That companion revision is
+needed for these local draft requests; it is not bundled or deployed by a Chimera commit.
+The original intake ZIP is retained under `workspace/intake-originals/`; local test evidence
+and runtime data remain ignored. See the [delivery plan](pythia-work-first-delivery-plan.md)
+for scoped evidence and remaining integration work. Hosted deployment, paid requalification,
+full-suite release qualification and the existing delivery gates remain separate.
+
+## Founder wish list — November 19, 2026
+
+Requested for future work; not implemented or qualified by this entry.
+
+- **A small collection of default scene backgrounds.** Add a modest starter collection
+  through the existing project/scene background controls. Preserve author choice,
+  inheritance and scene overrides; check contrast and preview/export consistency.
+  Supports the charter's familiar visual authoring.
+- **Bring the PowerPoint background with the PowerPoint.** Fix automatic extraction of
+  original backgrounds, including layout/master/theme inheritance and background artwork.
+  Preserve the author's design, attractive or otherwise; replacing it is their choice.
+  Do not ask the user to resubmit a PDF, image or other converted version to recover it.
+  Qualify representative fills, images and inherited artwork, and report unsupported
+  cases honestly. Supports faithful source ingestion and provenance in the existing model.
+- **Use original presentation fonts when installed on the user's system.** Retain source
+  font families and theme-font mappings; use available local fonts in authoring and
+  preview, with an explicit fallback when unavailable. Check browser, server-rendered and
+  export behavior separately: local availability does not guarantee availability on
+  learner devices or embedding rights. Supports faithful import and predictable rendering.
+
 Repository context: **Chimera 1.2.0** | [MIT license](../LICENSE) | [Release notes](release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
 
 ## November 8 - Chimera 1.2.0 and MIT licensing
