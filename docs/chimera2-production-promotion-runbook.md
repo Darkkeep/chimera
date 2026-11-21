@@ -155,8 +155,25 @@ Keep archive protections in place. A protected restore drill still requires its 
 
 ## Runtime qualification
 
-The release workflow builds the distributable with Python 3.12. Its independent Python
-3.14.4 job resolves a Linux x86-64 wheelhouse, installs it offline in an empty venv, checks
-dependencies and exercises the signed-in access routes. A passing 3.14 job qualifies that
-dependency resolution for the CI environment. A 3.14 release still needs to package those
-wheels and pass isolated host, export, restore and rollback checks before promotion.
+The x86-64 Linux artifact contains a relocatable CPython 3.14.4 interpreter, a
+hash-locked wheelhouse, Node 24.19.0, the locked Playwright renderer modules and
+its matching Chrome headless shell. The interpreter, Node and browser archives
+are pinned by SHA-256 in `scripts/release/runtime-inputs.txt`. The Linux wheel
+lock records the exact previously tested 3.14.4 resolution. The workflow builds
+twice from the same source and compares the archive bytes before publication.
+
+After approval for an isolated rehearsal, verify the independently recorded archive
+digest and extract at its final release path. From the release root, run
+`bash scripts/release/offline-install.sh /absolute/new/venv`. Use that venv's
+Python and put the release's `runtime/node/bin` first on PATH. Set
+`PLAYWRIGHT_BROWSERS_PATH` to the absolute `runtime/browser` directory. Preserve
+the release path for the lifetime of the venv. No system Python installation is
+involved. The wheel lock and runtime installer supersede the generic venv, wheel
+and npm installation steps above.
+
+LibreOffice Impress, suitable fonts and the browser's Linux shared libraries
+are host prerequisites. The CI verification image supplies these packages and
+disables networking before installing or running the artifact. It converts a
+real PPTX to PNG, renders an authored scene into DOCX, exercises both SCORM
+profiles, and runs backend and access tests against the extracted application.
+Recheck those operations with the actual service identity on approved staging.
