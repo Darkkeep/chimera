@@ -4,6 +4,7 @@ on:
     paths:
       - '.github/workflows/release-artifact.yml'
       - 'scripts/build-release.sh'
+      - 'frontend/src/App.tsx'
       - 'docs/chimera2-production-promotion-runbook.md'
   workflow_dispatch:
     inputs:
