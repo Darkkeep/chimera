@@ -52,3 +52,88 @@ STOP and request explicit authorization for the **exact candidate SHA/artifact**
 
 ## Success measure
 A subsequent small tested improvement ships through the same procedure without manual copying/rebuilding on the production server. Changes must remain separately authorized until the Owner changes this policy.
+
+## Track A evidence and operator checks
+
+Observed on November 21, 2026, via unauthenticated HTTPS GETs to the public
+origin. TLS certificate verification succeeded. The homepage and health route
+returned HTTP 200, and health returned `{"status":"ok"}`. The homepage
+advertised HSTS with max-age 31536000, frame denial, and a CSP with
+`frame-ancestors 'none'` and `connect-src 'self' https://darkrogue.io/api/chimera/session`.
+The public auth config reported team mode, DARKROGUE identity, and password
+login disabled. These observations establish edge behavior and advertised
+auth settings. Origin proxy details, real SSO login/logout and version remain
+unverified.
+
+| Unverified item | Read-only operator evidence to return |
+| --- | --- |
+| Host, active service and release | In Hostinger, identify the owning server or managed service. If systemd is in use, run `systemctl show "$UNIT" -p Id -p ActiveState -p MainPID -p FragmentPath -p WorkingDirectory -p User -p Group` for the identified unit. Resolve the working directory with `realpath -- "$ACTIVE_RELEASE"` and record the deployed manifest SHA or commit, plus dashboard build information if available. Compare frontend and backend identities independently. |
+| Proxy, TLS and CSP | In the hosting panel or proxy admin surface, record the public vhost's static root, upstream bind, TLS termination and expiry, cache behavior for HTML, build metadata and hashed assets, and sanitized effective CSP. Compare to the public headers and inspect the actual active route. |
+| SSO and roles | Record the allowed origin and callback from approved non-secret policy metadata. Confirm identity provider and login/logout with approved test identities on isolated staging. Check author, reviewer and administrator capabilities using the installation's supported role matrix. |
+| Workspace and permissions | Have the operator identify the configured workspace from approved non-secret metadata. Run `realpath -- "$WORKSPACE"`, `stat -c '%U %G %a %n' -- "$WORKSPACE"` and `findmnt --target "$WORKSPACE"`. Confirm it sits outside release directories and verify the prior release can read candidate-written fixture data. |
+| Backups and restore | In the backup dashboard, record snapshot timestamp, scope, retention, last successful job and last restore-test result. Verify coverage for workspace, identity, projects, media, policy, audit and connection metadata. Record the existing recovery procedure for external secrets as an owner-managed dependency. A new restore requires approval for an isolated target. |
+| Rollback and deployment constraints | Record current release pointer or equivalent, drain/reload mechanism, disk space (`df -h -- "$ACTIVE_RELEASE" "$WORKSPACE"`), OS/architecture, Python ABI, Node/Chromium, LibreOffice availability and the existing rollback release's checksum. Confirm the staging endpoint and isolated workspace with the operator. |
+
+Return a sanitized inventory and timestamps. Do not dump environment files,
+raw proxy configuration, process arguments, session material or keys. Use
+`python scripts/release-smoke.py https://chimera.darkrogue.io` for the public
+health check. The repository's sample service and Nginx configuration remain
+reference material.
+
+## Artifact and isolated rehearsal
+
+- GitHub Actions run [44638715006](https://github.com/Darkkeep/chimera/actions/runs/44638715006)
+  completed successfully for the exact Beta SHA. The release branch starts
+  with the runbook-only commit `cee304984a1d5205c23bd449beae79bd50f1c096`
+  directly above Beta. At audit time, `main` at `c9d07b700de82987cfb1eefbb3719b572ad6e464`
+  was an ancestor, 70 commits behind the release branch. A local
+  `git merge-tree --write-tree origin/main HEAD` found no conflicts.
+  Review Track A against PR #40's head branch
+  `feature/chimera-2-golden-path-qualification` while that stack is pending.
+  Recheck the merge base and integration diff after the Beta integration
+  method is approved, especially if the stack is squash-merged.
+- Build from the release tooling checkout with
+  `bash scripts/build-release.sh FULL_SHA false` for the classic rehearsal
+  and run again with `true` for the Studio rehearsal. The output bundles the
+  compiled frontend, backend source, runtime templates and Python wheelhouse
+  with a manifest and archive SHA-256. The manifest identifies the Pythia
+  contracts commit used for qualification. The private submodule is a test
+  input and is excluded from the runtime payload. The manual GitHub Actions
+  workflow requires registration on the default branch before GitHub accepts
+  its first dispatch. It has no deployment job.
+- Verify the downloaded archive with `sha256sum -c SHA256SUMS` from its
+  artifact directory. Match the digest to the approved CI run and inspect the
+  manifest before staging. The frontend lockfile pins npm inputs. The current
+  backend requirements can resolve different wheel versions on a later build.
+  Promote the exact verified artifact. Lock and hash the backend dependency
+  resolution and pin runtime prerequisites before claiming byte-for-byte rebuilds.
+- After isolated staging is authorized, unpack into a new release directory,
+  create its venv, install with `pip install --no-index --find-links backend/wheelhouse -r backend/requirements.txt`
+  from the release root, and provision export prerequisites using the existing
+  runtime instructions. In the candidate release root, install the locked Node
+  export renderer dependencies with `npm ci --omit=dev` and use the approved
+  Chromium and LibreOffice runtime. Set `CHIMERA_BUILD_SHA` and `CHIMERA_FRONTEND_BUILD_SHA` from
+  `sourceSha`, and `CHIMERA_BUILD_TIMESTAMP` and
+  `CHIMERA_FRONTEND_BUILD_TIMESTAMP` from `sourceTimestamp` and point `CHIMERA_WORKSPACE` at
+  the isolated restored workspace. Confirm the runner ABI and runtime
+  prerequisites match the host before using the bundled wheelhouse.
+- Run `python scripts/release-smoke.py "$STAGING_ORIGIN" --sha "$CANDIDATE_SHA"`
+  and compare backend build identity in the admin build-information UI.
+  Use a separate browser session and test identities to check login/logout,
+  project create/save/reopen, inline scene editing, questions and SCORM 1.2,
+  and Pythia connection with an approved stub or diagnostics-only setup.
+  Record restore results and repeat the project checks after reverting the
+  application release while retaining the candidate-written fixture data.
+  Preserve Classic as the rehearsal default until the Owner chooses the
+  production Studio setting and confirms the classic recovery path.
+- Supply the exact cutover and reversal commands for Owner review after A0.
+  For a confirmed same-filesystem Linux symlink layout, rehearse pointer
+  replacement using `ln -s -- "$CANDIDATE_RELEASE" "$PENDING_POINTER"`
+  followed by `mv -T -- "$PENDING_POINTER" "$ACTIVE_POINTER"` on isolated
+  staging. Reverse by targeting the recorded prior release with a fresh
+  pending pointer. Verify the expected starting pointer and serialize changes
+  before either invocation. The actual host may use a different mechanism.
+  Include any separately authorized service reload or route change, checks
+  for both static and API paths, and abort criteria in the reviewed command set.
+  Never point this rehearsal at the live workspace or restore an old backup
+  over newer user data during rollback.
