@@ -45,8 +45,8 @@ git archive "$sha" -- frontend scripts/release/runtime-inputs.txt scripts/releas
     [[ $(node --version) == v24.19.0 ]]
     unset NODE_ENV
     npm ci --omit=dev --ignore-scripts --no-audit --no-fund
-    browser_revision=$(node -p "require('./node_modules/playwright-core/browsers.json').browsers.find(b=>b.name==='chromium-headless-shell').revision")
-    unzip -q "$scratch/download/chrome-headless-shell-linux64.zip" -d "runtime/browser/chromium_headless_shell-$browser_revision"
+    browser_revision=$(node -p "require(require('path').join(require('path').dirname(require.resolve('playwright-core/package.json', {paths: [require.resolve('playwright')]})), 'browsers.json')).browsers.find(b=>b.name==='chromium-headless-shell').revision")
+    unzip -q "$scratch/download/chromium-1217.zip" -d "runtime/browser/chromium_headless_shell-$browser_revision"
     mkdir -p runtime/node/bin
     cp "$scratch/node/bin/node" runtime/node/bin/
     cp "$scratch/node/LICENSE" runtime/node/
