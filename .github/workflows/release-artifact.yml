@@ -5,6 +5,8 @@ on:
       - '.github/workflows/release-artifact.yml'
       - 'scripts/build-release.sh'
       - 'frontend/src/App.tsx'
+      - 'scripts/chimera-ssh-preflight.py'
+      - 'scripts/test_chimera_ssh_preflight.py'
       - 'docs/chimera2-production-promotion-runbook.md'
   workflow_dispatch:
     inputs:
@@ -32,6 +34,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Validate noninteractive SSH preflight contract
+        run: python scripts/test_chimera_ssh_preflight.py
       - name: Package exact checkout
         env:
           STUDIO_ENABLED: ${{ github.event_name == 'pull_request' && 'true' || inputs.studio_enabled }}
