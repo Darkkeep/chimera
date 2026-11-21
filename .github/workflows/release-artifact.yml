@@ -1,5 +1,10 @@
 name: Build Chimera release artifact
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/release-artifact.yml'
+      - 'scripts/build-release.sh'
+      - 'docs/chimera2-production-promotion-runbook.md'
   workflow_dispatch:
     inputs:
       studio_enabled:
@@ -27,11 +32,11 @@ jobs:
           python-version: '3.12'
       - name: Package exact checkout
         env:
-          STUDIO_ENABLED: ${{ inputs.studio_enabled }}
+          STUDIO_ENABLED: ${{ github.event_name == 'pull_request' && 'true' || inputs.studio_enabled }}
         run: bash scripts/build-release.sh "$GITHUB_SHA" "$STUDIO_ENABLED"
       - uses: actions/upload-artifact@v4
         with:
-          name: chimera-${{ github.sha }}-studio-${{ inputs.studio_enabled }}
+          name: chimera-${{ github.sha }}-studio-${{ github.event_name == 'pull_request' && 'true' || inputs.studio_enabled }}
           path: release-artifacts/*/*
           if-no-files-found: error
           retention-days: 30
