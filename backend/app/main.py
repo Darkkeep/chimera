@@ -194,6 +194,8 @@ def get_authorization_policy() -> AuthorizationPolicy:
 
 def _hosted_request_action(request: Request) -> str:
     path = request.url.path
+    if ROUTE_ACTIONS.get(getattr(request.scope.get("route"), "name", "")) == "project.export":
+        return "project.export"
     if "/question-import" in path:
         return "project.view" if request.method == "GET" else "project.import"
     if path.endswith(("/questions.csv", "/questions.xlsx")):
@@ -525,7 +527,13 @@ def darkrogue_login(data: DarkrogueLoginRequest, request: Request) -> JSONRespon
         claims = darkrogue_auth.verify_handoff(data.token.get_secret_value())
     except darkrogue_auth.HandoffError as error:
         raise HTTPException(401, str(error)) from error
-    token = AccountStore(ROOT).sso_login(claims, darkrogue_auth.ROLE_MAP[claims["role"]], request.cookies.get(COOKIE))
+    from . import central_access
+    decision = central_access.fetch_access(claims["sub"])
+    if not decision["allowed"] or "app.use" not in decision["capabilities"]:
+        raise HTTPException(403, "DARKROGUE access is restricted")
+    token = AccountStore(ROOT).sso_login(claims, central_access.roles_for_capabilities(decision["capabilities"]),
+                                         request.cookies.get(COOKIE), access_revision=decision["revision"])
+    central_access.acknowledge_revision(claims["sub"], decision["revision"])
     response = JSONResponse({"authenticated": True}, headers={"Cache-Control": "no-store"})
     response.set_cookie(COOKIE, token, max_age=SESSION_SECONDS, httponly=True, secure=True, samesite="strict", path="/")
     return response
