@@ -7,6 +7,7 @@ import { SceneSurface, resolvedSceneBackground } from "./SceneSurface";
 import { PythiaTalkPanel } from "./PythiaTalkPanel";
 import "./studio-shell.css";
 import { EditorDropdown, PreviewMenu } from "./EditorDropdown";
+import { ProgressiveAuthoringPanel } from "./ProgressiveAuthoringPanel";
 
 type StudioShellProps = {
   courseCommands?: {label:string;action:()=>void;disabled?:boolean}[];
@@ -31,12 +32,13 @@ type StudioShellProps = {
   onProjectUpdated: (project: Project) => void;
   editor?: ReactNode;
   editingSceneId?: string | null;
+  onReviewAction: (action: () => void) => void;
 };
 
 export function StudioShell({
   courseCommands = [], project, selectedScene, busy, canEdit, canEnhance, onSelectScene, onCreateScene, onEditScene,
   onEditQuestion, onDesignExperience, onEditHTML5, interactionEditing = false, onOpenSources, onOpenMedia, onPreview, onScenePreview, onValidate, onExport, onProjectUpdated,
-  editor, editingSceneId,
+  editor, editingSceneId, onReviewAction,
 }: StudioShellProps) {
   const [pythiaOpen, setPythiaOpen] = useState(false);
   const scenes = project.storyboard.scenes;
@@ -98,6 +100,7 @@ export function StudioShell({
         {inlineEditing ? <div className="studio-editor-host">{editor}</div> : stageScene && previewReady
           ? <div className="studio-stage-surface"><SceneSurface project={project} scene={stageScene} /></div>
           : <div className="studio-stage-empty"><Layers3 size={34} /><h3>{scene?.title || "Your learning experience begins here"}</h3><p>{scene ? "Preparing the editing stage. Your saved scene remains intact." : "Create a scene to begin authoring. Every scene remains editable without Pythia."}</p><button type="button" disabled={!canEdit || busy} onClick={() => scene ? onEditScene(scene) : onCreateScene()}><Plus size={16} /> {scene ? "Edit scene" : "Create first scene"}</button></div>}
+        {import.meta.env.VITE_CHIMERA_PROGRESSIVE_DEMO_ENABLED === "true" && <ProgressiveAuthoringPanel key={project.id} project={project} disabled={busy || !canEdit || !canEnhance} onProjectUpdated={onProjectUpdated} onReviewAction={onReviewAction} />}
       </section>
 
       {pythiaOpen && canEnhance && <aside className="studio-pythia" id="studio-pythia-panel" aria-label="Pythia consultation">

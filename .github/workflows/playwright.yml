@@ -3,7 +3,7 @@ on:
   push:
     branches: [ main, master ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, feature/chimera-2-golden-path-qualification ]
 concurrency:
   group: chimera-checks-${{ github.ref }}
   cancel-in-progress: true
@@ -56,6 +56,12 @@ jobs:
       run: npm run verify:onboarding:artifact
     - name: Build frontend
       run: npm run build --prefix frontend
+    - name: Qualify deterministic progressive scenes without providers
+      run: |
+        node --test tests/progressive/events.test.cjs
+        npx playwright test --config playwright.progressive.config.cjs --project chromium
+      env:
+        CHIMERA_TEST_PYTHON: python
     - name: Qualify visual editing and exported rendering
       if: ${{ success() || failure() }}
       run: npm run test:visual

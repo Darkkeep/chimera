@@ -1,6 +1,6 @@
 # Chimera2 progressive authoring: component event contract (draft v0.1)
 
-Status: engineering proposal; not evidence that upstream Pythia streams incrementally. Work tracked in #41 and #43. Candidate base: `9c35f2b853cc42b7ab21c9ce11c70b171330558f`.
+Status: version-1 deterministic local slice implemented; not evidence that upstream Pythia streams incrementally. Work tracked in #41 and #43. Candidate base: `9c35f2b853cc42b7ab21c9ce11c70b171330558f`. See [implementation, transport audit and demo](chimera2-progressive-authoring-evidence.md).
 
 ## Goal
 Display **complete, schema-validated draft scenes** while a generation job continues. Drafts must never silently mutate saved scenes. Start with simulated producer, then connect real Pythia only after verifying its transport.
@@ -8,6 +8,10 @@ Display **complete, schema-validated draft scenes** while a generation job conti
 ## Event envelope
 
 Transport candidate: authenticated same-origin SSE, with monotonic per-job event IDs and a read-only reconnect cursor. Do not send raw source text in URL parameters, analytics or logs.
+
+The first slice uses bounded same-origin polling (500 ms, 64 events/job, eight
+fixture jobs/project). SSE remains a future transport option, not a qualified
+hosting claim. The local demo is explicitly gated and unavailable to team profiles.
 
 ```json
 {
@@ -17,17 +21,25 @@ Transport candidate: authenticated same-origin SSE, with monotonic per-job event
   "jobId": "job-uuid",
   "projectId": "project-id",
   "sourceRevision": 12,
+  "projectRevision": 12,
   "sequence": 17,
   "componentId": "draft-scene-id",
   "componentRevision": 1,
   "orderHint": 4,
   "status": "proposed",
-  "payload": {"sceneType": "content", "title": "Example"},
-  "provenance": {"sourceIds": [], "locators": []}
+  "payload": {"sceneType": "content", "layoutMode": "native", "title": "Example", "extractedText": ["A complete instruction."]},
+  "provenance": {"producer": "deterministic-fixture-v1", "sourceIds": [], "locators": ["synthetic:inspection-basics"]}
 }
 ```
 
 Example types: `job.started`, `component.ready`, `component.revised`, `component.failed`, `job.progress`, `job.completed`, `job.failed`, `job.cancelled`. `component.ready` includes a complete validated payload matching an existing Chimera draft/scene model, not partial JSON fragments. `job.progress` may use completed/total counts, not fabricated percentages. Event IDs are durable and replay-safe; clients dedupe by (jobId, sequence).
+
+Implemented types are `job.started`, `component.ready`, `component.failed`,
+`component.accepted`, `component.rejected`, `job.completed`, `job.failed`, and
+`job.cancelled`. `component.revised`/`job.progress` are reserved, not accepted by
+this implementation. `sourceRevision` stays fixed; `projectRevision` advances
+only for this job's explicitly accepted insertions. Resume uses the response's
+numeric `cursor` as `?after=N`; replay is read-only and never restarts generation.
 
 ## State and guardrails
 - Separate **draft proposal store** and canonical persisted storyboard. Streaming is display-only until explicit accepted action.
