@@ -27,7 +27,7 @@ git archive "$sha" -- frontend docs/user-guide.pdf backend/app backend/bridges b
     cd "$scratch/src"
     unset NODE_ENV
     npm ci --prefix frontend
-    VITE_CHIMERA_STUDIO_ENABLED="$studio" VITE_CHIMERA_BUILD_SHA="$sha" \
+    VITE_CHIMERA_STUDIO_ENABLED="$studio" VITE_CHIMERA_STUDIO_DEFAULT="$studio" VITE_CHIMERA_BUILD_SHA="$sha" \
         VITE_CHIMERA_BUILD_TIMESTAMP="$stamp" VITE_CHIMERA_BUILD_ENVIRONMENT=release \
         npm run build --prefix frontend
     python -m pip download --only-binary=:all: -r backend/requirements.txt -d backend/wheelhouse
@@ -47,6 +47,7 @@ manifest = {
     "sourceTimestamp": stamp,
     "version": json.loads(Path("package.json").read_text())["version"],
     "studioEnabled": studio == "true",
+    "studioDefault": studio == "true",
     "pythiaContractsSha": contract,
     "node": subprocess.check_output(["node", "--version"], text=True).strip(),
     "python": platform.python_version(),
@@ -55,7 +56,7 @@ manifest = {
     "libc": platform.libc_ver(),
 }
 Path("release-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-identity = {key: manifest[key] for key in ("sourceSha", "version", "studioEnabled")}
+identity = {key: manifest[key] for key in ("sourceSha", "version", "studioEnabled", "studioDefault")}
 Path("frontend/dist/release-version.json").write_text(json.dumps(identity) + "\n")
 PY
     tar --sort=name --mtime="@$epoch" --owner=0 --group=0 --numeric-owner \
