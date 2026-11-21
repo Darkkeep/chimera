@@ -93,8 +93,10 @@ type CourseSceneDraft = GeneratedSceneDraft & { included: boolean };
 
 const emptyProject: Project = { id: "", title: "", sceneCount: 0, updatedAt: "", hasSourceDeck: false, storyboard: { revision: 1, scenes: [], assets: [], completionSettings: { passingScore: 80, includeOptionalAssessments: false }, exportSettings: { packageWarningThresholdMB: 200 } } };
 const MAX_STORYBOARD_JSON_BYTES = 25 * 1024 * 1024;
-// Explicit opt-in for development builds; default-off in every existing deployment.
+// Studio availability and initial mode are independent build-time decisions.
+// The 2.x release can start in Studio while preserving the Classic escape hatch.
 const studioAvailable = import.meta.env.VITE_CHIMERA_STUDIO_ENABLED === "true";
+const studioDefault = studioAvailable && import.meta.env.VITE_CHIMERA_STUDIO_DEFAULT === "true";
 
 export function App() {
   const sceneNavigation = useSceneNavigation();
@@ -131,7 +133,7 @@ export function App() {
   const [templateDraft, setTemplateDraft] = useState<TemplateDraft | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [activeView, setActiveView] = useState<"storyboard" | "media" | "templates">("storyboard");
-  const [studioPreview, setStudioPreview] = useState(false);
+  const [studioPreview, setStudioPreview] = useState(studioDefault);
   const [showValidation, setShowValidation] = useState(false);
   const [showAccessibility, setShowAccessibility] = useState(false);
   const [showGoldenPath, setShowGoldenPath] = useState(false);
@@ -1337,7 +1339,7 @@ export function App() {
         <button className={`nav-item ${showPythiaTalk ? "active" : ""}`} onClick={() => sceneNavigation.request(() => setShowPythiaTalk(true))} disabled={!project.id || busy || (hasOpenForm && !visualSceneId && !studioInteractionSceneId) || !permissions.canEnhance}><Sparkles size={18} /><span>Consult Pythia</span></button>
         <button ref={managementButtonRef} className={`nav-item management-nav-item ${showManagement ? "active" : ""}`} aria-current={showManagement ? "page" : undefined} onClick={() => sceneNavigation.request(() => setShowManagement(true))}><ClipboardList size={18} /><span>My Work</span></button>
         <button className={`nav-item ${!showManagement && activeView === "storyboard" ? "active" : ""}`} aria-current={!showManagement && activeView === "storyboard" ? "page" : undefined} onClick={() => sceneNavigation.request(() => { setShowManagement(false); setActiveView("storyboard"); })}><Layers3 size={18} /><span>Storyboard</span></button>
-        {studioAvailable && <button type="button" className={`nav-item ${studioPreview ? "active" : ""}`} aria-pressed={studioPreview} disabled={!project.id || busy || (hasOpenForm && !visualSceneId && !studioInteractionSceneId)} onClick={() => sceneNavigation.request(() => { setStudioPreview(value => !value); setShowManagement(false); setActiveView("storyboard"); })}><Sparkles size={18} /><span>{studioPreview ? "Classic storyboard" : "Studio 2.0 preview"}</span></button>}
+        {studioAvailable && <button type="button" className={`nav-item ${studioPreview ? "active" : ""}`} aria-pressed={studioPreview} disabled={!project.id || busy || (hasOpenForm && !visualSceneId && !studioInteractionSceneId)} onClick={() => sceneNavigation.request(() => { setStudioPreview(value => !value); setShowManagement(false); setActiveView("storyboard"); })}><Sparkles size={18} /><span>{studioPreview ? "Classic storyboard" : "Chimera2 Studio"}</span></button>}
         <button className={`nav-item ${showSources ? "active" : ""}`} onClick={() => sceneNavigation.request(() => setShowSources(true))} disabled={!project.id || busy || (hasOpenForm && !visualSceneId && !studioInteractionSceneId)}><FileText size={18} /><span>Sources</span></button>
         <button className={`nav-item ${showAssessments ? "active" : ""}`} onClick={() => sceneNavigation.request(() => setShowAssessments(true))} disabled={!project.id || busy || !permissions.canEdit}><ClipboardList size={18} /><span>Assessments</span></button>
         <button className={`nav-item ${!showManagement && activeView === "media" ? "active" : ""}`} aria-current={!showManagement && activeView === "media" ? "page" : undefined} onClick={() => sceneNavigation.request(() => { setShowManagement(false); setActiveView("media"); })}><FileUp size={18} /><span>Media library</span></button>
