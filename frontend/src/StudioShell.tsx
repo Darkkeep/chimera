@@ -30,13 +30,14 @@ type StudioShellProps = {
   onExport: () => void;
   onProjectUpdated: (project: Project) => void;
   editor?: ReactNode;
+  editorHostRef?: (node: HTMLDivElement | null) => void;
   editingSceneId?: string | null;
 };
 
 export function StudioShell({
   courseCommands = [], project, selectedScene, busy, canEdit, canEnhance, onSelectScene, onCreateScene, onEditScene,
   onEditQuestion, onDesignExperience, onEditHTML5, interactionEditing = false, onOpenSources, onOpenMedia, onPreview, onScenePreview, onValidate, onExport, onProjectUpdated,
-  editor, editingSceneId,
+  editor, editingSceneId, editorHostRef,
 }: StudioShellProps) {
   const [pythiaOpen, setPythiaOpen] = useState(false);
   const scenes = project.storyboard.scenes;
@@ -95,7 +96,7 @@ export function StudioShell({
             <PreviewMenu onScene={onScenePreview} onExperience={onPreview} disabled={!scenes.length || busy}/>
           </div>
         </div>
-        {inlineEditing ? <div className="studio-editor-host">{editor}</div> : stageScene && previewReady
+        {inlineEditing ? <div className="studio-editor-host" ref={editorHostRef}>{editor}</div> : stageScene && previewReady
           ? <div className="studio-stage-surface"><SceneSurface project={project} scene={stageScene} /></div>
           : <div className="studio-stage-empty"><Layers3 size={34} /><h3>{scene?.title || "Your learning experience begins here"}</h3><p>{scene ? "Preparing the editing stage. Your saved scene remains intact." : "Create a scene to begin authoring. Every scene remains editable without Pythia."}</p><button type="button" disabled={!canEdit || busy} onClick={() => scene ? onEditScene(scene) : onCreateScene()}><Plus size={16} /> {scene ? "Edit scene" : "Create first scene"}</button></div>}
       </section>

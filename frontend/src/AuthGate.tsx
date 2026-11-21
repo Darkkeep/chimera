@@ -187,7 +187,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     </main>;
   }
   if (!checking && config?.identityProvider === "local" && config.deploymentMode === "single-user") return <SessionContext.Provider value={{ session: null, logout }}>{children}</SessionContext.Provider>;
-  if (!checking && session && mode !== "reset") return <SessionContext.Provider value={{ session, logout }}>{children}</SessionContext.Provider>;
+  if (!checking && session && mode !== "reset") return <SessionContext.Provider key={session.actor.actorId} value={{ session, logout }}>{children}</SessionContext.Provider>;
   const darkrogue = config?.identityProvider === "darkrogue" ? config.darkrogue : undefined;
   const unavailable = !config?.passwordLoginAvailable && !darkrogue;
   return <main className="auth-screen">

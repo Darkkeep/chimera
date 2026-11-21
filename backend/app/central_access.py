@@ -95,7 +95,7 @@ def account_access(store, user_id: str, project_id: str | None = None) -> dict:
         if not current or current.get("disabled") or current.get("externalId") != account.get("externalId"):
             raise HTTPException(403, "Account link changed")
         if decision["revision"] < current.get("centralAccessRevision", -1):
-            raise HTTPException(403, "Access changed during this request; retry")
+            raise HTTPException(503, "Access changed during this request; retry")
         current["centralAccessRevision"] = decision["revision"]
         # Only application-wide results update organization roles. Project results are ceilings.
         if denied and project_id is None:

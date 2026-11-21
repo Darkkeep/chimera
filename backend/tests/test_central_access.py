@@ -117,8 +117,10 @@ class CentralAccessTests(unittest.TestCase):
         self.decision.update(revision=8)
         central_access.account_access(self.store, self.user["id"])
         self.decision.update(revision=7)
-        with self.assertRaises(HTTPException):
+        with self.assertRaises(HTTPException) as stale:
             central_access.account_access(self.store, self.user["id"])
+        self.assertEqual(stale.exception.status_code, 503)
+        self.assertIsNotNone(self.store.account_for_token(self.token))
         with patch.object(central_access, "fetch_access", side_effect=HTTPException(503, "Unavailable")):
             with self.assertRaises(HTTPException):
                 self.policy.allows(self.actor, "scene.manage", "course-one")
