@@ -23,6 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -33,10 +34,11 @@ jobs:
       - name: Package exact checkout
         env:
           STUDIO_ENABLED: ${{ github.event_name == 'pull_request' && 'true' || inputs.studio_enabled }}
-        run: bash scripts/build-release.sh "$GITHUB_SHA" "$STUDIO_ENABLED"
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bash scripts/build-release.sh "$SOURCE_SHA" "$STUDIO_ENABLED"
       - uses: actions/upload-artifact@v4
         with:
-          name: chimera-${{ github.sha }}-studio-${{ github.event_name == 'pull_request' && 'true' || inputs.studio_enabled }}
+          name: chimera-${{ github.event.pull_request.head.sha || github.sha }}-studio-${{ github.event_name == 'pull_request' && 'true' || inputs.studio_enabled }}
           path: release-artifacts/*/*
           if-no-files-found: error
           retention-days: 30
