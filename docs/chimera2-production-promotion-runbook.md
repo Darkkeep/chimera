@@ -137,3 +137,26 @@ reference material.
   for both static and API paths, and abort criteria in the reviewed command set.
   Never point this rehearsal at the live workspace or restore an old backup
   over newer user data during rollback.
+
+## Backup permission correction for Owner review
+
+The proposed host change applies only to the existing root-run backup writer and its archives.
+Before approval, identify legitimate backup readers and confirm the writer is idle. Inspect
+the destination and its parents with lstat. Require the verified root-owned directory,
+no symlink components, and root-owned regular single-link archives matching the writer’s
+two timestamped naming patterns. Stop on an unexpected owner, ACL, type or reader.
+
+After separate authorization, restrict the archive directory to 0700 first and its verified
+archives to 0600. Preserve a root-only copy of the writer, insert `umask 077` immediately
+after its shell shebang, syntax-check the replacement and preserve its owner and executable
+mode. Verify the unprivileged readability check now fails, then check the modes and successful
+completion of the next scheduled backup. Revert the writer from the private copy if it fails.
+Keep archive protections in place. A protected restore drill still requires its own target.
+
+## Runtime qualification
+
+The release workflow builds the distributable with Python 3.12. Its independent Python
+3.14.4 job resolves a Linux x86-64 wheelhouse, installs it offline in an empty venv, checks
+dependencies and exercises the signed-in access routes. A passing 3.14 job qualifies that
+dependency resolution for the CI environment. A 3.14 release still needs to package those
+wheels and pass isolated host, export, restore and rollback checks before promotion.

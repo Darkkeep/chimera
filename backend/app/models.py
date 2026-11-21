@@ -1186,6 +1186,7 @@ class MediaGenerationJobCreate(BaseModel):
 
 
 class MediaGenerationJob(BaseModel):
+    actorId: str | None = None
     connectionId: str | None = Field(default=None, pattern=r"^(?:pythia|legacy-openai|narration-[a-f0-9]{12})$")
     id: str
     projectId: str

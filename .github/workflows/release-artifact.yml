@@ -4,7 +4,9 @@ on:
     paths:
       - '.github/workflows/release-artifact.yml'
       - 'scripts/build-release.sh'
-      - 'frontend/src/App.tsx'
+      - 'backend/app/**'
+      - 'backend/tests/**'
+      - 'frontend/src/**'
       - 'scripts/chimera-ssh-preflight.py'
       - 'scripts/test_chimera_ssh_preflight.py'
       - 'docs/chimera2-production-promotion-runbook.md'
@@ -20,6 +22,25 @@ permissions:
   contents: read
 
 jobs:
+  python314:
+    name: Resolve and exercise a separate Python 3.14 wheelhouse
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14.4'
+      - run: |
+          python -m pip download --only-binary=:all: -r backend/requirements.txt -d "$RUNNER_TEMP/wheels314"
+          python -m venv "$RUNNER_TEMP/runtime314"
+          runtime="$RUNNER_TEMP/runtime314/bin/python"
+          "$runtime" -m pip install --no-index --find-links "$RUNNER_TEMP/wheels314" -r backend/requirements.txt
+          "$runtime" -m pip check
+          "$runtime" -m unittest backend.tests.test_central_access backend.tests.test_darkrogue_auth backend.tests.test_owner_suite
   package:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -36,6 +57,10 @@ jobs:
           python-version: '3.12'
       - name: Validate noninteractive SSH preflight contract
         run: python scripts/test_chimera_ssh_preflight.py
+      - name: Check hosted authorization with synthetic accounts
+        run: |
+          python -m pip install -r backend/requirements-dev.txt
+          python -m unittest backend.tests.test_central_access backend.tests.test_darkrogue_auth backend.tests.test_owner_suite
       - name: Package exact checkout
         env:
           STUDIO_ENABLED: ${{ github.event_name == 'pull_request' && 'true' || inputs.studio_enabled }}
@@ -60,6 +85,10 @@ jobs:
                   if stream is None:
                       raise ValueError(f"Missing artifact member: {name}")
                   return json.load(stream)
+              for name in ("central_access", "password_auth", "storage", "models", "main", "owner_suite",
+                           "pythia_hosted", "enhancement_jobs", "media_generation"):
+                  path = f"backend/app/{name}.py"
+                  assert tar.extractfile(path).read() == Path(path).read_bytes(), f"Packaged source mismatch: {path}"
               manifest = read_json("release-manifest.json")
               identity = read_json("frontend/dist/release-version.json")
           for document in (manifest, identity):

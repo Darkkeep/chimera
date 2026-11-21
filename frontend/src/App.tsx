@@ -174,9 +174,27 @@ export function App() {
   useEffect(() => {
     if (!session || !project.id) return;
     let alive = true;
-    setPermissions({ canEdit: false, canExport: false, canManageMembers: false, canEnhance: false });
-    fetch(`/api/projects/${project.id}/permissions`).then(async response => { if (!response.ok) throw new Error("Project permissions could not be loaded."); return response.json() as Promise<typeof permissions>; }).then(next => { if (alive) setPermissions(next); }).catch(issue => { if (alive) setError(issue instanceof Error ? issue.message : "Project access unavailable."); });
-    return () => { alive = false; };
+    let checking = false;
+    const denied = { canEdit: false, canExport: false, canManageMembers: false, canEnhance: false };
+    setPermissions(denied);
+    async function refreshPermissions() {
+      if (checking || document.visibilityState === "hidden") return;
+      checking = true;
+      try {
+        const response = await fetch(`/api/projects/${project.id}/permissions`, { cache: "no-store", signal: AbortSignal.timeout(5000) });
+        if (!response.ok) throw new Error("Current project access could not be verified.");
+        const next = await response.json() as typeof permissions;
+        if (alive) setPermissions(next);
+      } catch (issue) {
+        if (alive) { setPermissions(denied); setError(issue instanceof Error ? issue.message : "Project access unavailable."); }
+      } finally { checking = false; }
+    }
+    void refreshPermissions();
+    const timer = window.setInterval(() => void refreshPermissions(), 5000);
+    const refresh = () => { void refreshPermissions(); };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { alive = false; window.clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
   }, [session, project.id]);
   useEffect(() => {
     if (!isCreating) return;
@@ -1296,7 +1314,7 @@ export function App() {
     else setVisualSceneId(scene.id);
   }, [editorIsInline, scene?.id, project.storyboard.revision, permissions.canEdit, busy, hasOpenForm, error]);
   const activeVisualScene = visualSceneId ? scenes.find(item => item.id === visualSceneId) : undefined;
-  const visualEditor = activeVisualScene ? <SceneVisualEditor key={`${project.id}:${activeVisualScene.id}`} initialPanel={sceneEditorPanel} embedded={editorIsInline} project={project} scene={activeVisualScene} templates={templates} onClose={() => setVisualSceneId(null)} onNavigationState={sceneNavigation.register} onNavigate={sceneNavigation.request} onLearnerPreview={() => sceneNavigation.request(() => setShowPreview(true))} onScenePreview={() => sceneNavigation.request(() => { setPreviewSceneId(scene?.id); setShowPreview(true); })} onActivity={kind => sceneNavigation.request(() => { if (scene) {setActivityKind(kind);setVisualSceneId(null);setStudioInteractionSceneId(scene.id);} })} onQuestion={type => sceneNavigation.request(() => {setQuestionType(type as AssessmentType);setShowAssessmentEditor(true);})} onHTML5={() => sceneNavigation.request(() => setShowHTML5(true))} onSave={saveVisualScene} onExtract={extractVisualScene} onApplyTemplate={previewSceneTemplate} onGenerate={generateSceneContentDraft} onProjectUpdated={applyProject} canGenerate={permissions.canEnhance} /> : null;
+  const visualEditor = activeVisualScene ? <SceneVisualEditor key={`${project.id}:${activeVisualScene.id}`} initialPanel={sceneEditorPanel} embedded={editorIsInline} project={project} scene={activeVisualScene} templates={templates} onClose={() => setVisualSceneId(null)} onNavigationState={sceneNavigation.register} onNavigate={sceneNavigation.request} onLearnerPreview={() => sceneNavigation.request(() => setShowPreview(true))} onScenePreview={() => sceneNavigation.request(() => { setPreviewSceneId(scene?.id); setShowPreview(true); })} onActivity={kind => sceneNavigation.request(() => { if (scene) {setActivityKind(kind);setVisualSceneId(null);setStudioInteractionSceneId(scene.id);} })} onQuestion={type => sceneNavigation.request(() => {setQuestionType(type as AssessmentType);setShowAssessmentEditor(true);})} onHTML5={() => sceneNavigation.request(() => setShowHTML5(true))} onSave={saveVisualScene} onExtract={extractVisualScene} onApplyTemplate={previewSceneTemplate} onGenerate={generateSceneContentDraft} onProjectUpdated={applyProject} canGenerate={permissions.canEnhance} canEdit={permissions.canEdit} /> : null;
 
   function openCourseReviewObject(objectType: "course" | "scene" | "objective" | "assessment" | "asset", objectId: string) {
     setShowPythiaCourseReview(false);
