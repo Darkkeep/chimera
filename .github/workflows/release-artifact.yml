@@ -37,6 +37,33 @@ jobs:
           STUDIO_ENABLED: ${{ github.event_name == 'pull_request' && 'true' || inputs.studio_enabled }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: bash scripts/build-release.sh "$SOURCE_SHA" "$STUDIO_ENABLED"
+      - name: Verify SHA manifest, Studio default, and archive integrity
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          STUDIO_ENABLED: ${{ github.event_name == 'pull_request' && 'true' || inputs.studio_enabled }}
+        run: |
+          python - <<'PY'
+          import io, json, os, subprocess, tarfile
+          from pathlib import Path
+
+          sha, studio = os.environ["SOURCE_SHA"], os.environ["STUDIO_ENABLED"] == "true"
+          directory = Path("release-artifacts") / f"chimera-{sha}-studio-{str(studio).lower()}"
+          archive = directory / f"chimera-{sha}-studio-{str(studio).lower()}.tar.gz"
+          subprocess.run(["sha256sum", "--check", "SHA256SUMS"], cwd=directory, check=True)
+          with tarfile.open(archive, "r:gz") as tar:
+              def read_json(name):
+                  stream = tar.extractfile(name)
+                  if stream is None:
+                      raise ValueError(f"Missing artifact member: {name}")
+                  return json.load(stream)
+              manifest = read_json("release-manifest.json")
+              identity = read_json("frontend/dist/release-version.json")
+          for document in (manifest, identity):
+              assert document["sourceSha"] == sha, "Artifact SHA mismatch"
+              assert document["studioEnabled"] == studio, "Studio enabled mismatch"
+              assert document["studioDefault"] == studio, "Studio default mismatch"
+          print("Artifact checksum, exact SHA and Studio startup mode verified")
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: chimera-${{ github.event.pull_request.head.sha || github.sha }}-studio-${{ github.event_name == 'pull_request' && 'true' || inputs.studio_enabled }}
