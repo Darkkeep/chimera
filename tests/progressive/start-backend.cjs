@@ -10,7 +10,7 @@ const env = {...process.env};
 // Tests cannot inherit provider settings or hosted access from the parent shell.
 for (const name of Object.keys(env)) if (/^(CHIMERA_|PYTHIA_|OPENAI_|ANTHROPIC_)/.test(name)) delete env[name];
 Object.assign(env, {CHIMERA_WORKSPACE: workspace, CHIMERA_PROGRESSIVE_DEMO: 'true'});
-return spawn(python, ['-m', 'uvicorn', 'app.main:app', '--app-dir', 'backend', '--host', '127.0.0.1', '--port', '8031'], {stdio: 'inherit', env, windowsHide:true});
+return spawn(python, ['-m', 'uvicorn', 'app.main:app', '--app-dir', 'backend', '--host', '127.0.0.1', '--port', process.env.PROGRESSIVE_API_PORT || '8031'], {stdio: 'inherit', env, windowsHide:true});
 }
 exports.startBackend = startBackend;
 if (require.main === module) {

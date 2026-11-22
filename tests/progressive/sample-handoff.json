@@ -1,0 +1,49 @@
+{
+  "format": "pythia-chimera-production-handoff",
+  "version": "1.0",
+  "handoff_id": "lorem-owner-demo-v1",
+  "review_state": "pending",
+  "validation_state": "passed",
+  "provenance": {
+    "producer": "pythia",
+    "project_id": "sample-project",
+    "artifact_id": "sample-artifact",
+    "sources": [{"id": "sample-text", "title": "Lorem Ipsum sample only; no instructional evidence", "locator": "Bundled sample-handoff.json"}]
+  },
+  "storyboard": {
+    "id": "sample-storyboard",
+    "title": "Owner demonstration — placeholder content",
+    "objectives": [],
+    "media": [],
+    "scenes": [
+      {
+        "id": "sample-introduction",
+        "kind": "content",
+        "title": "Sample only — Lorem Ipsum introduction",
+        "screen_text": [
+          "LOREM IPSUM — PLACEHOLDER TEXT, NOT INSTRUCTIONAL CONTENT",
+          "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus posuere velit aliquet.",
+          "Vestibulum id ligula porta felis euismod semper. Maecenas faucibus mollis interdum. Review this complete proposal, then accept and edit it in Studio."
+        ],
+        "narration": {"script": "Sample narration only. Lorem ipsum dolor sit amet, consectetur adipiscing elit."},
+        "action_description": "Sample production direction: arrange the title and body as editable text elements.",
+        "production_notes": "Manually authored contract-shaped demonstration fixture; no model call or claim of real Pythia authorship.",
+        "objective_ids": [], "media_ids": [], "source_ids": ["sample-text"], "interactions": [], "assessment": null
+      },
+      {
+        "id": "sample-reflection",
+        "kind": "content",
+        "title": "Sample only — continue composing",
+        "screen_text": [
+          "SAMPLE SECOND SCENE — AUTHOR REVIEW REQUIRED",
+          "Donec ullamcorper nulla non metus auctor fringilla. Aenean lacinia bibendum nulla sed consectetur. Curabitur blandit tempus porttitor.",
+          "Cras mattis consectetur purus sit amet fermentum. Nulla vitae elit libero, a pharetra augue. Accept scenes one at a time; your first edit remains yours."
+        ],
+        "narration": {"script": "Placeholder narration for the second sample scene."},
+        "action_description": "Sample production direction: preview the editable title and multiple body paragraphs.",
+        "production_notes": "No citations, media, or live generation are claimed by this sample.",
+        "objective_ids": [], "media_ids": [], "source_ids": ["sample-text"], "interactions": [], "assessment": null
+      }
+    ]
+  }
+}
