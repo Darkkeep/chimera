@@ -158,3 +158,42 @@ test('proposal controls remain accessible across narrow and wide Studio layouts'
     if(width===320 || width===1440)await panel.screenshot({path:info.outputPath(`proposal-${width}.png`)});
   }
 });
+
+
+test('Pythia-format fixture arrives through the existing Studio pipeline without interrupting edits', async ({page}) => {
+  const providerPosts=[];
+  page.on('request', request => {
+    if (request.method()==='POST' && /\/pythia|\/content-drafts?|\/enhancement-jobs|\/conversation/.test(request.url())) providerPosts.push(request.url());
+  });
+  const panel=await studio(page);
+  await panel.getByRole('button',{name:'Try Pythia-format fixture'}).click();
+  const first=panel.getByRole('article',{name:'Draft proposal: Inspect before use'});
+  await expect(first).toBeVisible();
+  await expect(first.getByText(/Pythia-format test result \(no live model or citations\)/)).toBeVisible();
+  await expect(first.getByText(/Design rationale:/)).toBeVisible();
+  await expect(panel.getByText('1 of 2 complete drafts available · Generation continues')).toBeVisible();
+  await first.getByRole('button',{name:'Accept and edit'}).click();
+  const editor=page.locator('.studio-inline-editor');
+  await expect(editor).toHaveAttribute('data-scene-id',/progressive-.*-scene-1/);
+  const editorNode=await editor.elementHandle();
+  await editor.locator('.visual-editable').first().dblclick();
+  const textbox=editor.getByRole('textbox',{name:'Edit canvas text'});
+  await textbox.fill('Author revised this Pythia-format fixture.');
+  await textbox.press('Tab');
+  await editor.getByRole('button',{name:'Save scene',exact:true}).click();
+  await expect(editor).toHaveAttribute('data-dirty','false');
+  await editor.locator('.visual-editable').first().dblclick();
+  await textbox.fill('New unsaved author thought.');
+  await expect(textbox).toBeFocused();
+  const second=panel.getByRole('article',{name:'Draft proposal: Respond to a defect'});
+  await expect(second).toBeVisible({timeout:40000});
+  await expect(second.getByText(/Pythia-format test result/)).toBeVisible();
+  expect(await editorNode.evaluate(node=>node.isConnected && node===document.querySelector('.studio-inline-editor'))).toBe(true);
+  await expect(textbox).toBeFocused();
+  await expect(textbox).toHaveValue('New unsaved author thought.');
+  const projectId=await page.evaluate(()=>localStorage.getItem('chimera.activeProjectId'));
+  const saved=await (await page.request.get(`/api/projects/${projectId}`)).json();
+  expect(saved.storyboard.scenes.some(scene=>scene.title==='Inspect before use' &&
+    scene.visualLayout?.elements.some(element=>element.text==='Author revised this Pythia-format fixture.'))).toBe(true);
+  expect(providerPosts).toEqual([]);
+});
