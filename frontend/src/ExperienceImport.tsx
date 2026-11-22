@@ -34,8 +34,9 @@ export function ExperienceImport({onClose, onCreate}: {onClose: () => void; onCr
     {busy && <p role="status">{preview ? "Creating your experience…" : "Reading your file…"}</p>}
     {error && <p role="alert">{error}</p>}
     {preview && <section aria-label="Import preview">
+      <p>Selected file: <strong>{file?.name}</strong></p>
       <h3>{preview.kind === "pythia" ? "Pythia production handoff" : preview.kind === "pptx" ? "PowerPoint presentation" : "Chimera storyboard backup"}</h3>
-      <p>{preview.scenes.length} scenes {preview.kind === "pythia" ? "available for review. No scenes are accepted automatically." : "available for a new project."}</p>
+      <p>{preview.scenes.length} {preview.scenes.length === 1 ? "scene" : "scenes"} {preview.kind === "pythia" ? "available for review. No scenes are accepted automatically." : "available for a new project."}</p>
       <ul>{preview.diagnostics.map((message, index) => <li key={index}>{message}</li>)}</ul>
       <details open><summary>Preview scenes</summary><ol>{preview.scenes.map((scene, index) => <li key={index}><strong>{scene.title}</strong>{scene.extractedText && <p style={{whiteSpace:"pre-wrap", overflowWrap:"anywhere"}}>{Array.isArray(scene.extractedText) ? scene.extractedText.join("\n") : scene.extractedText}</p>}</li>)}</ol></details>
       <label>Experience name<input aria-label="Experience name" value={title} onChange={event => setTitle(event.target.value)} disabled={busy} /></label>
