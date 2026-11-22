@@ -1,5 +1,7 @@
 # Chimera
 
+> Hosted release history: Chimera2 replaced 1.2.0 in the [November 22 production cutover](docs/chimera2-production-release-2026-11-22.md). This candidate retains that release and the later access/navigation fixes. Production identity must be checked independently of the branch name.
+
 Development candidate: **Chimera 2.0.0-beta.1** | [MIT license](LICENSE) | [Beta release notes](docs/release-2.0.0-beta.1.md) | [Product charter](CHIMERA_CHARTER.md).
 
 For local Beta development, use `C:\inetpub\Chimera2\Chimera2.code-workspace`
