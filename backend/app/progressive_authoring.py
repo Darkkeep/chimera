@@ -46,9 +46,10 @@ class DraftScene(SceneCreate):
 
 class Provenance(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    producer: Literal["deterministic-fixture-v1"] = "deterministic-fixture-v1"
+    producer: Literal["deterministic-fixture-v1", "pythia-authoring-fixture-v1"] = "deterministic-fixture-v1"
     sourceIds: list[str] = Field(default_factory=list, max_length=0)
     locators: list[str] = Field(default_factory=lambda: ["synthetic:inspection-basics"])
+    rationale: str = Field(default="", max_length=2000)
 
 
 class ComponentEvent(BaseModel):
@@ -119,14 +120,15 @@ def _write(job):
     pending.replace(path)
 
 
-def _event(job, event_type, status, component_id=None, payload=None, order=None):
+def _event(job, event_type, status, component_id=None, payload=None, order=None, provenance=None):
     sequence = len(job["events"]) + 1
     if sequence > MAX_EVENTS:
         raise ValueError("Event retention limit reached")
     event = ComponentEvent(jobId=job["jobId"], projectId=job["projectId"],
         sourceRevision=job["sourceRevision"], projectRevision=job["projectRevision"],
         eventId=f'{job["jobId"]}:{sequence}', sequence=sequence, type=event_type,
-        status=status, componentId=component_id, payload=payload, orderHint=order)
+        status=status, componentId=component_id, payload=payload, orderHint=order,
+        provenance=provenance or Provenance())
     job["events"].append(event.model_dump())
 
 
@@ -183,7 +185,7 @@ def submit(project_id, revision, actor_id):
         return job
 
 
-def emit_scene(project_id, job_id, actor_id, component_id, payload, order, authorize):
+def emit_scene(project_id, job_id, actor_id, component_id, payload, order, authorize, provenance=None):
     with storage.storyboard_transaction():
         authorize()
         job = _read(project_id, job_id, actor_id)
@@ -193,7 +195,8 @@ def emit_scene(project_id, job_id, actor_id, component_id, payload, order, autho
         # revision. Conflicts are checked when the author accepts, not by failing
         # otherwise valid background generation.
         # An event retry is idempotent; a different payload cannot revise a reviewed draft.
-        digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+        provenance = Provenance.model_validate(provenance) if provenance is not None else Provenance()
+        digest = hashlib.sha256(json.dumps({"payload": payload, "provenance": provenance.model_dump()}, sort_keys=True).encode()).hexdigest()
         previous = job["components"].get(component_id)
         if previous:
             if previous["digest"] != digest:
@@ -203,11 +206,11 @@ def emit_scene(project_id, job_id, actor_id, component_id, payload, order, autho
             scene = DraftScene.model_validate(payload)
         except ValidationError:
             job["components"][component_id] = {"status": "failed", "digest": digest, "orderHint": order}
-            _event(job, "component.failed", "failed", component_id, order=order)
+            _event(job, "component.failed", "failed", component_id, order=order, provenance=provenance)
         else:
             job["components"][component_id] = {"status": "proposed", "payload": scene.model_dump(),
                                                "digest": digest, "orderHint": order}
-            _event(job, "component.ready", "proposed", component_id, scene, order)
+            _event(job, "component.ready", "proposed", component_id, scene, order, provenance=provenance)
         _write(job)
         return True
 
@@ -275,17 +278,29 @@ def decide(project_id, job_id, component_id, actor_id, decision, revision):
         return project
 
 
-def start(project_id, job_id, actor_id, authorize, wait=None):
+def start(project_id, job_id, actor_id, authorize, wait=None, producer="deterministic-fixture-v1"):
     # A complete fixture scene is produced first; there is no completed batch to split.
     # The interruptible pause makes the early-result state inspectable in Studio.
+    if producer not in {"deterministic-fixture-v1", "pythia-authoring-fixture-v1"}:
+        raise ValueError("Unsupported local progressive fixture")
+
     def run():
         try:
-            for index, (title, text) in enumerate([
-                ("Inspect before use", "Check the equipment for visible damage before use."),
-                ("Respond to a defect", "Stop and report damaged equipment before continuing."),
-            ]):
+            if producer == "pythia-authoring-fixture-v1":
+                from .progressive_pythia_adapter import PYTHIA_AUTHORING_FIXTURE, adapt_scene
+                scene_inputs = [adapt_scene(PYTHIA_AUTHORING_FIXTURE, index)
+                                for index in range(len(PYTHIA_AUTHORING_FIXTURE["scenes"]))]
+            else:
+                scene_inputs = [
+                    ({"title": title, "extractedText": [text]}, None)
+                    for title, text in [
+                        ("Inspect before use", "Check the equipment for visible damage before use."),
+                        ("Respond to a defect", "Stop and report damaged equipment before continuing."),
+                    ]
+                ]
+            for index, (payload, provenance) in enumerate(scene_inputs):
                 if not emit_scene(project_id, job_id, actor_id, f"scene-{index + 1}",
-                                  {"title": title, "extractedText": [text]}, index, authorize):
+                                  payload, index, authorize, provenance=provenance):
                     return
                 if index == 0:
                     if wait:
