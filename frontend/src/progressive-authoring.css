@@ -3,6 +3,9 @@
 .progressive-heading h3{margin:0;font-size:1rem}
 .progressive-heading span,.progressive-authoring p{font-size:.875rem;line-height:1.5}
 .progressive-actions{display:flex;flex-wrap:wrap;gap:.5rem}
+.progressive-actions label{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;font-size:.875rem;max-width:100%}
+.progressive-actions input{max-width:100%;min-width:0}
+.progressive-authoring details,.progressive-authoring p{overflow-wrap:anywhere}
 .progressive-process{display:flex;align-items:center;gap:.5rem;min-height:2.5rem}
 .progressive-process p{margin:.5rem 0;overflow-wrap:anywhere}
 .progressive-actions button{padding:.5rem .75rem;border:1px solid var(--line);border-radius:.5rem;background:var(--theme-raised);color:var(--ink)}

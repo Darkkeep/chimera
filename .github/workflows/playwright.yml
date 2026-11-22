@@ -3,7 +3,7 @@ on:
   push:
     branches: [ main, master ]
   pull_request:
-    branches: [ main, master, feature/chimera-2-golden-path-qualification, fix/issue-46-access-refresh ]
+    branches: [ main, master, feature/chimera-2-golden-path-qualification, fix/issue-46-access-refresh, feature/chimera2-progressive-authoring ]
 concurrency:
   group: chimera-checks-${{ github.ref }}
   cancel-in-progress: true

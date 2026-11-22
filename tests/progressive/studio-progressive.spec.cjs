@@ -15,6 +15,61 @@ async function studio(page) {
   await expect(panel).toBeVisible();
   return panel;
 }
+
+test('saved portable Pythia handoff imports offline, reports gaps and preserves an unsaved editor draft', async ({page}, info) => {
+  const panel = await studio(page);
+  const providerPosts = [];
+  page.on('request', request => {
+    if (request.method() === 'POST' && /\/pythia|\/content-drafts?|\/enhancement-jobs|\/conversation/.test(request.url())) providerPosts.push(request.url());
+  });
+  await panel.getByLabel('Import saved Pythia artifact', {exact:true}).setInputFiles('backend/tests/fixtures/production-handoff-v1.json');
+  await expect(panel.getByText('Saved artifact import complete. Review your proposals.', {exact:true})).toBeVisible();
+  await expect(panel.getByText('Artifact import report · 1 of 2 scenes proposed')).toBeVisible();
+  await expect(panel.getByText(/alarm-check: question scene withheld/)).toBeVisible();
+  await expect(panel.getByText(/media references \(no assets fetched\)/)).toBeVisible();
+  const first = panel.getByRole('article', {name:'Draft proposal: Leave by a marked exit'});
+  await expect(first.locator('.scene-player-surface')).toBeVisible();
+  await expect(first.getByText(/Source IDs: site-guide/)).toBeVisible();
+  const projectId = await page.evaluate(() => localStorage.getItem('chimera.activeProjectId'));
+  const before = await (await page.request.get(`/api/projects/${projectId}`)).json();
+  expect(before.storyboard.scenes).toHaveLength(1);
+  await first.getByRole('button', {name:'Accept and edit',exact:true}).click();
+  const editor = page.locator('.studio-inline-editor');
+  await expect(editor).toHaveAttribute('data-scene-id', /progressive-.*-alarm-response/);
+  await editor.locator('.visual-editable').first().dblclick();
+  const text = editor.getByRole('textbox', {name:'Edit canvas text'});
+  await text.fill('Owner edit from a portable artifact.');
+  await text.press('Tab');
+  await editor.getByRole('button', {name:'Save scene',exact:true}).click();
+  await expect(editor).toHaveAttribute('data-dirty','false');
+  await editor.locator('.visual-editable').first().dblclick();
+  await text.fill('Preserve this unsaved artifact draft.');
+  const editorNode = await editor.elementHandle();
+  const saved = await (await page.request.get(`/api/projects/${projectId}`)).json();
+  await panel.getByLabel('Import saved Pythia artifact', {exact:true}).setInputFiles('backend/tests/fixtures/production-handoff-v1.json');
+  await expect(panel.getByRole('article')).toHaveCount(1);
+  await expect(editor).toHaveAttribute('data-dirty','true');
+  expect(await editorNode.evaluate(node => node.isConnected)).toBe(true);
+  await expect(editor.locator('.visual-editable').first()).toContainText('Preserve this unsaved artifact draft.');
+  const after = await (await page.request.get(`/api/projects/${projectId}`)).json();
+  expect(after.storyboard).toEqual(saved.storyboard);
+  expect(providerPosts).toEqual([]);
+  await panel.screenshot({path:info.outputPath('saved-artifact-review.png')});
+});
+
+test('clearly labeled Lorem Ipsum artifact previews two complete proposals without claiming generation', async ({page}, info) => {
+  const panel = await studio(page);
+  await panel.getByLabel('Import saved Pythia artifact', {exact:true}).setInputFiles('tests/progressive/sample-handoff.json');
+  await expect(panel.getByText('Artifact import report · 2 of 2 scenes proposed')).toBeVisible();
+  await expect(panel.getByRole('article')).toHaveCount(2);
+  await expect(panel.locator('.progressive-process svg')).toHaveCount(0);
+  await expect(panel.getByText('Saved artifact import complete. Review your proposals.', {exact:true})).toBeVisible();
+  await expect(panel.getByRole('article').first().locator('.scene-player-surface')).toContainText('LOREM IPSUM');
+  await panel.screenshot({path:info.outputPath('lorem-artifact-proposals.png')});
+  await page.setViewportSize({width:320,height:900});
+  await expect(panel.getByLabel('Import saved Pythia artifact', {exact:true})).toBeVisible();
+  expect(await panel.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+});
 test('accept, edit and save the first scene while the second arrives without interrupting the editor', async ({page}, info) => {
   const providerPosts = [];
   page.on('request', request => {

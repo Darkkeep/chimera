@@ -46,10 +46,15 @@ class DraftScene(SceneCreate):
 
 class Provenance(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    producer: Literal["deterministic-fixture-v1", "pythia-authoring-fixture-v1"] = "deterministic-fixture-v1"
-    sourceIds: list[str] = Field(default_factory=list, max_length=0)
+    producer: Literal["deterministic-fixture-v1", "pythia-authoring-fixture-v1", "pythia-production-handoff-v1"] = "deterministic-fixture-v1"
+    sourceIds: list[str] = Field(default_factory=list, max_length=20)
     locators: list[str] = Field(default_factory=lambda: ["synthetic:inspection-basics"])
     rationale: str = Field(default="", max_length=2000)
+    handoffId: str | None = None
+    artifactId: str | None = None
+    sourceProjectId: str | None = None
+    sourceSceneId: str | None = None
+    artifactSha256: str | None = None
 
 
 class ComponentEvent(BaseModel):
@@ -124,6 +129,8 @@ def _event(job, event_type, status, component_id=None, payload=None, order=None,
     sequence = len(job["events"]) + 1
     if sequence > MAX_EVENTS:
         raise ValueError("Event retention limit reached")
+    if provenance is None:
+        provenance = job["components"].get(component_id, {}).get("provenance") or job.get("provenance")
     event = ComponentEvent(jobId=job["jobId"], projectId=job["projectId"],
         sourceRevision=job["sourceRevision"], projectRevision=job["projectRevision"],
         eventId=f'{job["jobId"]}:{sequence}', sequence=sequence, type=event_type,
@@ -212,7 +219,8 @@ def emit_scene(project_id, job_id, actor_id, component_id, payload, order, autho
             _event(job, "component.failed", "failed", component_id, order=order, provenance=provenance)
         else:
             job["components"][component_id] = {"status": "proposed", "payload": scene.model_dump(),
-                                               "digest": digest, "orderHint": order}
+                                               "digest": digest, "orderHint": order,
+                                               "provenance": provenance.model_dump()}
             _event(job, "component.ready", "proposed", component_id, scene, order, provenance=provenance)
         _write(job)
         return True
@@ -238,6 +246,7 @@ def page(project_id, job_id, actor_id, cursor=0):
                 "sourceRevision": job["sourceRevision"], "projectRevision": job["projectRevision"],
                 "status": job["status"], "cursor": len(job["events"]),
                 "events": job["events"][cursor:], "pollAfterMs": 500,
+                "importReport": job.get("importReport"),
                 "requiresReview": not _source_matches(job, storage.read_project(project_id))}
 
 

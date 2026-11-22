@@ -83,6 +83,7 @@ PUBLIC_API_PATHS = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/
 
 ROUTE_ACTIONS = {
     "start_progressive_demo": "enhancement.job.create",
+    "import_progressive_handoff": "enhancement.job.create",
     "read_progressive_events": "enhancement.job.create",
     "cancel_progressive_demo": "enhancement.job.manage",
     "decide_progressive_component": "scene.manage",
@@ -3073,6 +3074,27 @@ def start_progressive_demo(project_id: str, if_match: Annotated[str | None, Head
             lambda: _require_action(get_authorization_policy(), actor, "enhancement.job.create", project_id), producer=producer)
         return progressive.page(project_id, job["jobId"], actor.actorId)
     return _progressive_call(begin)
+
+
+@app.post("/api/projects/{project_id}/progressive-jobs/import", status_code=201)
+async def import_progressive_handoff(project_id: str, request: Request,
+                                     if_match: Annotated[str | None, Header()] = None):
+    progressive.require_demo()
+    revision = _expected_revision(if_match)
+    if revision is None:
+        raise HTTPException(428, "An If-Match storyboard revision is required")
+    raw = bytearray()
+    async for chunk in request.stream():
+        if len(raw) + len(chunk) > MAX_HANDOFF_BYTES:
+            raise HTTPException(413, "Pythia handoff JSON must be 1 MB or smaller")
+        raw.extend(chunk)
+    from .progressive_handoff import ingest
+    actor = get_actor_context()
+    try:
+        return await run_in_threadpool(lambda: _progressive_call(
+            lambda: ingest(project_id, raw, revision, actor.actorId)))
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
 
 
 @app.get("/api/projects/{project_id}/progressive-jobs/{job_id}/events")

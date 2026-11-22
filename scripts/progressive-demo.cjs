@@ -20,7 +20,8 @@ watch(spawn(process.execPath, ['frontend/node_modules/vite/bin/vite.js', '--conf
   cwd:root, stdio:'inherit', windowsHide:true,
   env:{...process.env, VITE_CHIMERA_STUDIO_ENABLED:'true', VITE_CHIMERA_PROGRESSIVE_DEMO_ENABLED:'true'},
 }));
-console.log('Synthetic progressive demo: http://127.0.0.1:5191');
+console.log(`Local progressive review demo: http://127.0.0.1:${process.env.PROGRESSIVE_UI_PORT || 5191}`);
+console.log('Milestone 3: Import saved Pythia artifact, then choose tests/progressive/sample-handoff.json.');
 console.log('Create a synthetic course, enter Studio, then Start progressive demo.');
 console.log('Accept and edit scene 1, save an improvement, and keep editing as scene 2 arrives (~20 seconds).');
 console.log('Fresh isolated workspace; provider configuration is stripped. Ctrl+C stops the demo.');
