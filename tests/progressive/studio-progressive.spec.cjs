@@ -175,13 +175,14 @@ test('Pythia-format fixture arrives through the existing Studio pipeline without
   await first.getByRole('button',{name:'Accept and edit'}).click();
   const editor=page.locator('.studio-inline-editor');
   await expect(editor).toHaveAttribute('data-scene-id',/progressive-.*-scene-1/);
-  const editorNode=await editor.elementHandle();
   await editor.locator('.visual-editable').first().dblclick();
   const textbox=editor.getByRole('textbox',{name:'Edit canvas text'});
   await textbox.fill('Author revised this Pythia-format fixture.');
   await textbox.press('Tab');
   await editor.getByRole('button',{name:'Save scene',exact:true}).click();
   await expect(editor).toHaveAttribute('data-dirty','false');
+  // Saving may refresh editor state. Only the second proposal's arrival must preserve identity.
+  const editorNode=await editor.elementHandle();
   await editor.locator('.visual-editable').first().dblclick();
   await textbox.fill('New unsaved author thought.');
   await expect(textbox).toBeFocused();
