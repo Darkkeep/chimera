@@ -43,6 +43,10 @@ class ProgressiveHandoffTests(unittest.TestCase):
                                       "accept", before.storyboard.revision)
         self.assertEqual(len(accepted.storyboard.scenes), 2)
         self.assertTrue(accepted.storyboard.scenes[-1].visualLayout.elements)
+        reviewed = progressive.page(self.project.id, page["jobId"], self.actor)
+        self.assertEqual(reviewed["events"][-1]["provenance"], provenance)
+        self.assertTrue(all(event["provenance"]["producer"] == handoff.PRODUCER
+                            for event in reviewed["events"]))
         self.assertEqual(self.ingest()["jobId"], page["jobId"])
         changed = self.document()
         changed["storyboard"]["title"] = "Different artifact"

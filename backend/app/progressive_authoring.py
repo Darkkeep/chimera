@@ -129,6 +129,8 @@ def _event(job, event_type, status, component_id=None, payload=None, order=None,
     sequence = len(job["events"]) + 1
     if sequence > MAX_EVENTS:
         raise ValueError("Event retention limit reached")
+    if provenance is None:
+        provenance = job["components"].get(component_id, {}).get("provenance") or job.get("provenance")
     event = ComponentEvent(jobId=job["jobId"], projectId=job["projectId"],
         sourceRevision=job["sourceRevision"], projectRevision=job["projectRevision"],
         eventId=f'{job["jobId"]}:{sequence}', sequence=sequence, type=event_type,
@@ -217,7 +219,8 @@ def emit_scene(project_id, job_id, actor_id, component_id, payload, order, autho
             _event(job, "component.failed", "failed", component_id, order=order, provenance=provenance)
         else:
             job["components"][component_id] = {"status": "proposed", "payload": scene.model_dump(),
-                                               "digest": digest, "orderHint": order}
+                                               "digest": digest, "orderHint": order,
+                                               "provenance": provenance.model_dump()}
             _event(job, "component.ready", "proposed", component_id, scene, order, provenance=provenance)
         _write(job)
         return True

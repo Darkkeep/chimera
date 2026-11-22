@@ -65,6 +65,10 @@ def ingest(project_id, raw, revision, actor_id):
         job = progressive.submit(project_id, revision, actor_id)
         job["sourceArtifact"] = document
         job["importReport"] = report
+        job["provenance"] = drafts[0][3].model_copy(update={
+            "sourceSceneId": None, "sourceIds": [], "locators": [],
+        }).model_dump()
+        job["events"][0]["provenance"] = job["provenance"]
         progressive._write(job)
         for scene_id, payload, order, provenance in drafts:
             progressive.emit_scene(project_id, job["jobId"], actor_id, scene_id, payload, order,
