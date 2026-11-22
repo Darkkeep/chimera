@@ -1,5 +1,25 @@
 import type { Scene } from "./App";
 
+// Presentation-only seam: future optional insights can reference operationKey.
+// Labels describe validated events, never inferred model work or elapsed time.
+export function progressiveProcess(events: ComponentEvent[], status: string): { operationKey: string; label: string } {
+  const terminal: Record<string, string> = {
+    completed: "Scene preparation complete. Review your proposals.",
+    cancelled: "Preparation stopped. Your saved work is unchanged.",
+    failed: "Couldn't complete preparation. Your saved work is unchanged.",
+  };
+  const last = events.at(-1);
+  if (terminal[status] && !(status === "completed" && ["component.accepted", "component.rejected"].includes(last?.type || ""))) return { operationKey: `job.${status}`, label: terminal[status] };
+  const labels: Record<string, string> = {
+    "job.started": "Preparing demonstration scenes…",
+    "component.ready": "Scene ready to review. Demonstration continues…",
+    "component.accepted": "Scene added.",
+    "component.rejected": "Scene proposal rejected. Your saved work is unchanged.",
+    "component.failed": "A scene couldn't be prepared. Other proposals remain available.",
+  };
+  return { operationKey: last?.type || "idle", label: labels[last?.type || ""] || "Ready when you are." };
+}
+
 export type DraftPayload = { title: string; extractedText: string[]; sceneType: "content"; layoutMode: "native"; narration: string; notes: string; actionDescription: string; required: boolean; audioRequired: boolean };
 export type ComponentEvent = {
   schemaVersion: 1; eventId: string; jobId: string; projectId: string; sourceRevision: number;

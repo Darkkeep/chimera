@@ -25,6 +25,8 @@ test('accept, edit and save the first scene while the second arrives without int
   const first = panel.getByRole('article', {name:'Draft proposal: Inspect before use'});
   await expect(first.locator('.scene-player-surface')).toBeVisible();
   await expect(panel.getByText('1 of 2 complete drafts available · Generation continues')).toBeVisible();
+  await expect(panel.locator('.progressive-process [role=status]')).toHaveText('Scene ready to review. Demonstration continues…');
+  await panel.screenshot({path:info.outputPath('process-blurb-while-editable.png')});
   await first.getByRole('button', {name:'Accept and edit', exact:true}).click();
   const editor = page.locator('.studio-inline-editor');
   await expect(editor).toHaveAttribute('data-scene-id', /progressive-.*-scene-1/);
@@ -49,6 +51,8 @@ test('accept, edit and save the first scene while the second arrives without int
   const second = panel.getByRole('article', {name:'Draft proposal: Respond to a defect'});
   await expect(second).toBeVisible({timeout:40000});
   await expect(panel.getByText('Generation: completed')).toBeVisible();
+  await expect(panel.locator('.progressive-process [role=status]')).toHaveText('Scene preparation complete. Review your proposals.');
+  await expect(panel.locator('.progressive-process svg')).toHaveCount(0);
   expect(await editorNode.evaluate(node => node.isConnected && node === document.querySelector('.studio-inline-editor'))).toBe(true);
   expect(await textNode.evaluate(node => node.isConnected && node === document.activeElement)).toBe(true);
   await expect(editor).toHaveAttribute('data-scene-id', acceptedId);
@@ -108,6 +112,8 @@ test('cancel keeps proposals noncanonical and survives browser reconnect', async
   await expect(panel.getByRole('article')).toHaveCount(1);
   await panel.getByRole('button',{name:'Cancel generation'}).click();
   await expect(panel.getByText('Generation: cancelled')).toBeVisible();
+  await expect(panel.locator('.progressive-process [role=status]')).toHaveText('Preparation stopped. Your saved work is unchanged.');
+  await expect(panel.locator('.progressive-process svg')).toHaveCount(0);
   await panel.getByRole('button',{name:'Reconnect proposals'}).click();
   await expect(panel.getByRole('article')).toHaveCount(1);
   await expect(panel.getByRole('button',{name:'Accept scene',exact:true})).toBeDisabled();
@@ -197,4 +203,66 @@ test('Pythia-format fixture arrives through the existing Studio pipeline without
   expect(saved.storyboard.scenes.some(scene=>scene.title==='Inspect before use' &&
     scene.visualLayout?.elements.some(element=>element.text==='Author revised this Pythia-format fixture.'))).toBe(true);
   expect(providerPosts).toEqual([]);
+});
+
+test('process status preserves proposals through interruption and explicit reconnect', async ({page}, info) => {
+  const panel=await studio(page);
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await panel.getByRole('button',{name:'Start progressive demo'}).click();
+  await expect(panel.getByRole('article')).toHaveCount(1);
+  const proposal=await panel.getByRole('article').elementHandle();
+  const status=panel.locator('.progressive-process [role=status]');
+  await expect(status).toHaveText('Scene ready to review. Demonstration continues…');
+  expect(await panel.locator('.enhancement-working-spinner').evaluate(node=>getComputedStyle(node).animationName)).toBe('none');
+  await page.route('**/progressive-jobs/*/events?*',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({detail:'Temporary test interruption'})}));
+  await expect(status).toHaveText('Connection interrupted. Reconnect proposals to resume; your work is preserved.');
+  await expect(panel.getByRole('alert')).toContainText('Temporary test interruption');
+  await expect(panel.locator('.progressive-process svg')).toHaveCount(0);
+  await panel.screenshot({path:info.outputPath('process-connection-interrupted.png')});
+  await page.unroute('**/progressive-jobs/*/events?*');
+  await panel.getByRole('button',{name:'Reconnect proposals'}).click();
+  await expect(status).toHaveText('Scene ready to review. Demonstration continues…');
+  expect(await proposal.evaluate(node=>node.isConnected)).toBe(true);
+  // Repeated empty polling pages must not rewrite the live announcement.
+  await status.evaluate(node=>{window.blurbChanges=0;new MutationObserver(()=>window.blurbChanges++).observe(node,{childList:true,characterData:true,subtree:true});});
+  await page.waitForTimeout(1200);
+  expect(await page.evaluate(()=>window.blurbChanges)).toBe(0);
+  await panel.getByRole('button',{name:'Cancel generation'}).click();
+});
+
+test('failed preparation stops its indicator and leaves proposals and diagnostics available', async ({page}, info) => {
+  const panel=await studio(page);
+  await panel.getByRole('button',{name:'Start progressive demo'}).click();
+  await expect(panel.getByRole('article')).toHaveCount(1);
+  await page.route('**/progressive-jobs/*/events?*',async route=>{
+    const response=await route.fetch(); const body=await response.json();
+    body.status='failed';
+    await route.fulfill({response,json:body});
+  });
+  const status=panel.locator('.progressive-process [role=status]');
+  await expect(status).toHaveText("Couldn't complete preparation. Your saved work is unchanged.");
+  await expect(panel.locator('.progressive-process svg')).toHaveCount(0);
+  await expect(panel.getByRole('article')).toHaveCount(1);
+  await expect(panel.getByRole('button',{name:'Reconnect proposals'})).toBeEnabled();
+  await panel.screenshot({path:info.outputPath('process-preparation-failed.png')});
+});
+
+test('request and acceptance blurbs follow actual in-flight operations', async ({page}) => {
+  const panel=await studio(page);
+  const status=panel.locator('.progressive-process [role=status]');
+  let releaseStart;
+  const startGate=new Promise(resolve=>{releaseStart=resolve;});
+  await page.route('**/progressive-jobs?producer=*',async route=>{await startGate;await route.continue();});
+  await panel.getByRole('button',{name:'Start progressive demo'}).click();
+  await expect(status).toHaveText('Requesting demonstration scenes…');
+  releaseStart();
+  await expect(panel.getByRole('article')).toHaveCount(1);
+  let releaseAccept;
+  const acceptGate=new Promise(resolve=>{releaseAccept=resolve;});
+  await page.route('**/components/*/decision',async route=>{await acceptGate;await route.continue();});
+  await panel.getByRole('button',{name:'Accept scene',exact:true}).click();
+  await expect(status).toHaveText('Adding the scene to your course…');
+  releaseAccept();
+  await expect(status).toHaveText('Scene added.');
+  await panel.getByRole('button',{name:'Cancel generation'}).click();
 });
