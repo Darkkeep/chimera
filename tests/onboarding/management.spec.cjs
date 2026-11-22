@@ -142,16 +142,18 @@ test('opens the remembered project and another project in authoring', async ({ p
   await expect(page.getByRole('heading', { name: 'Alpha course', exact: true })).toBeVisible();
 });
 
-test('waits for startup restoration before opening another project', async ({ page }) => {
+test('opens another project without waiting for restoration, and ignores the stale restore', async ({ page }) => {
   let release;
   const restoreGate = new Promise(resolve => { release = resolve; });
   await mockWorkspace(page, { restoreGate });
   await page.goto('/');
   const projectButton = page.getByRole('button', { name: 'Edit Beta course', exact: true });
   await expect(projectButton).toBeVisible();
-  await expect(projectButton).toBeDisabled();
-  release();
+  await expect(projectButton).toBeEnabled();
   await projectButton.click();
+  await expect(page.getByRole('heading', { name: 'Beta course', exact: true })).toBeVisible();
+  const restored = page.waitForResponse(r => new URL(r.url()).pathname === '/api/projects/alpha');
+  release(); await restored;
   await expect(page.getByRole('heading', { name: 'Beta course', exact: true })).toBeVisible();
 });
 

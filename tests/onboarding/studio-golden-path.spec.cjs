@@ -92,7 +92,7 @@ test('three-scene no-AI course: author, preview and export both SCORM profiles',
   await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
   await page.goto('/');
   await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
-  await page.getByRole('button', { name: 'Studio 2.0 preview' }).click();
+  await page.getByRole('button', { name: 'Chimera2 Studio', exact: true }).click();
   const studio = page.getByRole('region', { name: 'Chimera 2.0 Authoring Studio' });
   await expect(studio.getByRole('navigation', { name: 'Studio scenes' }).locator('.studio-scene')).toHaveCount(3);
 

@@ -353,27 +353,37 @@ class HostedAuthorizationPolicy:
         self.installation = installation
 
     def allows(self, context: ActorContext, action: str, project_id: str | None = None) -> bool:
+        return self.allows_many(context, [action], project_id)[action]
+
+    def allows_many(self, context: ActorContext, actions: list[str], project_id: str | None = None) -> dict[str, bool]:
+        """One current authority decision for capabilities in a single response.
+
+        No decision survives this call. Subsequent reads, writes, exports and jobs
+        still consult the authority independently.
+        """
         from .identity import RoleBasedAuthorizationPolicy
-        if context.deploymentMode != "team" or context.installationId != public_origin():
-            return False
         from . import central_access
-        decision = None
-        if self.installation.identityProvider == "darkrogue":
-            decision = central_access.account_access(self.directory, context.actorId, project_id)
-            if not central_access.permits_action(decision["capabilities"], action):
-                return False
+        if context.deploymentMode != "team" or context.installationId != public_origin():
+            return dict.fromkeys(actions, False)
+        decision = central_access.account_access(self.directory, context.actorId, project_id) if self.installation.identityProvider == "darkrogue" else None
         global_roles = self.directory.roles_for(context.actorId)
-        if not global_roles:
-            return False
-        if action in {"workspace.view", "identity.self", "review.invitation"}:
-            return True
         roles = self.directory.roles_for(context.actorId, project_id)
         if project_id and decision and decision.get("scopeManaged"):
             roles = set(central_access.roles_for_capabilities(decision["capabilities"]))
-        if project_id and not self.installation.adminCanViewProjectContent and action not in {"project.membership.manage"}:
-            roles.discard("administrator")
-        required = {"author", "instructional-designer", "administrator"} if action in {"project.export", "review.share"} else RoleBasedAuthorizationPolicy.actionRoles.get(action, {"administrator"})
-        return bool(roles & required)
+        results = {}
+        for action in actions:
+            selected = set(roles)
+            if not global_roles or decision is not None and not central_access.permits_action(decision["capabilities"], action):
+                results[action] = False
+                continue
+            if action in {"workspace.view", "identity.self", "review.invitation"}:
+                results[action] = True
+                continue
+            if project_id and not self.installation.adminCanViewProjectContent and action != "project.membership.manage":
+                selected.discard("administrator")
+            required = {"author", "instructional-designer", "administrator"} if action in {"project.export", "review.share"} else RoleBasedAuthorizationPolicy.actionRoles.get(action, {"administrator"})
+            results[action] = bool(selected & required)
+        return results
 
 
 class PasswordIdentityProvider:

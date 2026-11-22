@@ -343,7 +343,7 @@ async def _require_request_access(
     project_id = request.path_params.get("project_id")
     if action == "admin.audit.view":
         project_id = request.query_params.get("project_id")
-    _require_action(policy, context, action, project_id)
+    await run_in_threadpool(_require_action, policy, context, action, project_id)
     with action_context(context):
         yield
         if request.method != "GET" or action == "project.export":
@@ -397,6 +397,22 @@ async def private_response_headers(request: Request, call_next):
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@app.middleware("http")
+async def access_timing_headers(request: Request, call_next):
+    from .central_access import AUTHORITY_TIMINGS
+    from time import perf_counter
+    started = perf_counter()
+    calls = []
+    token = AUTHORITY_TIMINGS.set(calls)
+    try:
+        response = await call_next(request)
+        if request.url.path.startswith("/api/"):
+            response.headers["Server-Timing"] = f'chimera;dur={(perf_counter()-started)*1000:.1f}, authority;dur={sum(calls):.1f};desc="{len(calls)} checks"'
+        return response
+    finally:
+        AUTHORITY_TIMINGS.reset(token)
 
 
 app.add_middleware(
@@ -687,9 +703,11 @@ def delete_project_member(project_id: str, user_id: str) -> dict[str, bool]:
 def get_project_permissions(project_id: str) -> dict[str, bool]:
     policy = get_authorization_policy()
     actor = get_actor_context()
-    return {name: policy.allows(actor, action, project_id) for name, action in {
+    actions = {
         "canEdit": "scene.manage", "canExport": "project.export", "canManageMembers": "project.membership.manage",
-        "canShare": "review.share", "canEnhance": "enhancement.job.create", "canApprove": "enhancement.proposal.decide"}.items()}
+        "canShare": "review.share", "canEnhance": "enhancement.job.create", "canApprove": "enhancement.proposal.decide"}
+    decisions = policy.allows_many(actor, list(actions.values()), project_id) if isinstance(policy, HostedAuthorizationPolicy) else {action: policy.allows(actor, action, project_id) for action in actions.values()}
+    return {name: decisions[action] for name, action in actions.items()}
 
 
 @app.post("/api/projects/{project_id}/review-links", status_code=201)
@@ -733,8 +751,13 @@ def access_review(request: Request, token: Annotated[str, Header(alias="X-Review
 @app.get("/api/management/project-health")
 def get_project_health() -> list[dict[str, object]]:
     health: list[dict[str, object]] = []
+    policy = get_authorization_policy()
+    actor = get_actor_context()
+    global_permissions = None
     for summary in list_projects():
-        if not get_authorization_policy().allows(get_actor_context(), "project.metadata.view", summary.id):
+        actions = ["project.metadata.view", "scene.manage", "project.settings.update", "project.membership.manage"]
+        decisions = policy.allows_many(actor, actions, summary.id) if isinstance(policy, HostedAuthorizationPolicy) else {action: policy.allows(actor, action, summary.id) for action in actions}
+        if not decisions["project.metadata.view"]:
             continue
         project = read_project(summary.id)
         authoring = validate_project(project, target="authoring")
@@ -745,6 +768,9 @@ def get_project_health() -> list[dict[str, object]]:
         blocker_counts: dict[str, int] = {}
         for issue in blockers:
             blocker_counts[issue.code] = blocker_counts.get(issue.code, 0) + 1
+        if global_permissions is None:
+            global_actions = ["project.create", "project.membership.manage"]
+            global_permissions = policy.allows_many(actor, global_actions) if isinstance(policy, HostedAuthorizationPolicy) else {action: policy.allows(actor, action) for action in global_actions}
         health.append({
             "projectId": summary.id,
             "title": summary.title,
@@ -758,15 +784,15 @@ def get_project_health() -> list[dict[str, object]]:
             "productionPassed": production.passed,
             "blockerCounts": blocker_counts,
             "blockers": [issue.model_dump() for issue in blockers],
-            "canEdit": get_authorization_policy().allows(get_actor_context(), "scene.manage", summary.id),
-            "canSetStage": get_authorization_policy().allows(get_actor_context(), "project.settings.update", summary.id),
-            "canTrash": project.ownerId == get_actor_context().actorId or get_authorization_policy().allows(get_actor_context(), "project.membership.manage", summary.id) or get_authorization_policy().allows(get_actor_context(), "project.membership.manage"),
+            "canEdit": decisions["scene.manage"],
+            "canSetStage": decisions["project.settings.update"],
+            "canTrash": project.ownerId == get_actor_context().actorId or decisions["project.membership.manage"] or global_permissions["project.membership.manage"],
             "updatedAt": summary.updatedAt,
             "parentProjectId": summary.parentProjectId,
             "siblingOrder": summary.siblingOrder,
             "metadataRevision": summary.metadataRevision,
-            "canManageRelationship": get_authorization_policy().allows(get_actor_context(), "project.settings.update", summary.id),
-            "canCreateSubproject": summary.parentProjectId is None and get_authorization_policy().allows(get_actor_context(), "project.create") and get_authorization_policy().allows(get_actor_context(), "project.settings.update", summary.id),
+            "canManageRelationship": decisions["project.settings.update"],
+            "canCreateSubproject": summary.parentProjectId is None and global_permissions["project.create"] and decisions["project.settings.update"],
         })
     return health
 
