@@ -14,7 +14,7 @@ type Health = RelationshipProject & { revision: number; sceneCount: number; pend
 type TrashedProject = { id: string; title: string; sceneCount: number; updatedAt: string; trashedAt: string; expiresAt: string; parentProjectId?: string | null };
 type Context = { actor: { actorId: string; actorDisplayName: string; installationId: string; deploymentMode: string }; memberships: { role: string }[]; policy: { deploymentMode: string; trackingMode: string; auditRetentionDays: number; allowGuestReviewers: boolean } };
 type AuditEvent = { eventId: string; eventName: string; eventClass: string; occurredAt: string; projectId: string | null; actorId: string | null };
-type ManagementViewProps = { openError?: string; onClose: () => void; onOpenProject: (projectId: string) => Promise<boolean>; onCreateProject: (parent?: { id: string; title: string }) => void; onProjectTrashed: (projectId: string) => Promise<void>; onProjectsRestored: (projectId: string) => Promise<void>; onRelationshipUpdated: (project: Project) => Promise<void>; canCreateProject: boolean; canResume: boolean; busy: boolean };
+type ManagementViewProps = { onStartImport: () => void; openError?: string; onClose: () => void; onOpenProject: (projectId: string) => Promise<boolean>; onCreateProject: (parent?: { id: string; title: string }) => void; onProjectTrashed: (projectId: string) => Promise<void>; onProjectsRestored: (projectId: string) => Promise<void>; onRelationshipUpdated: (project: Project) => Promise<void>; canCreateProject: boolean; canResume: boolean; busy: boolean };
 
 const stages: Record<ProductionStage, string> = { "not-set": "Not set", draft: "Draft", "in-production": "In production", "in-review": "In review", approved: "Approved", published: "Published" };
 const blockerLabels: Record<string, string> = {
@@ -28,7 +28,7 @@ const blockerLabels: Record<string, string> = {
   "missing-media-attribution": "Missing media attribution",
 };
 
-export function ManagementView({ onClose, onOpenProject, onCreateProject, onProjectTrashed, onProjectsRestored, onRelationshipUpdated, canCreateProject, canResume, busy, openError }: ManagementViewProps) {
+export function ManagementView({ onStartImport, onClose, onOpenProject, onCreateProject, onProjectTrashed, onProjectsRestored, onRelationshipUpdated, canCreateProject, canResume, busy, openError }: ManagementViewProps) {
   const [health, setHealth] = useState<Health[]>([]);
   const [context, setContext] = useState<Context | null>(null);
   const [events, setEvents] = useState<AuditEvent[]>([]);
@@ -174,7 +174,7 @@ export function ManagementView({ onClose, onOpenProject, onCreateProject, onProj
   return <section data-onboarding="workspace.management" className="management-view" aria-labelledby="management-title">
     <header className="management-header">
       <div><p className="eyebrow">WORKSPACE</p><h1 ref={titleRef} tabIndex={-1} id="management-title">My Work</h1></div>
-      <div className="management-actions"><button type="button" className="button button-outline" disabled={disabled} aria-pressed={showTrash} onClick={() => { const next = !showTrash; setShowTrash(next); if (next) void loadTrash(); }}> {showTrash ? "My Work" : "Trash"}</button><button type="button" className="button button-accent" disabled={!canCreateProject || disabled} onClick={() => onCreateProject()}><Plus size={15} />New Project</button><button type="button" className="button button-outline" disabled={!canResume || disabled} onClick={onClose}>Resume authoring<ArrowRight size={15} /></button></div>
+      <div className="management-actions"><button type="button" className="button button-accent" disabled={!canCreateProject || disabled} onClick={event => {event.currentTarget.focus(); onStartImport();}}>Start Experience from Import</button><button type="button" className="button button-outline" disabled={disabled} aria-pressed={showTrash} onClick={() => { const next = !showTrash; setShowTrash(next); if (next) void loadTrash(); }}> {showTrash ? "My Work" : "Trash"}</button><button type="button" className="button button-accent" disabled={!canCreateProject || disabled} onClick={() => onCreateProject()}><Plus size={15} />New Project</button><button type="button" className="button button-outline" disabled={!canResume || disabled} onClick={onClose}>Resume authoring<ArrowRight size={15} /></button></div>
     </header>
     <div className="management-body">
       {openError && <div className="notice" role="alert">{openError}</div>}

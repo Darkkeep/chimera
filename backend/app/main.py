@@ -130,6 +130,7 @@ ROUTE_ACTIONS = {
     "access_review": "review.invitation", "get_project_health": "project.list", "get_my_work": "project.list",
     "get_audit_events": "admin.audit.view", "get_projects": "project.list", "get_templates": "template.view",
     "post_template": "template.manage", "patch_template": "template.manage", "put_template_source": "template.manage",
+    "preview_experience_import": "project.create",
     "post_project": "project.create", "get_project": "project.view", "get_project_validation": "project.view",
     "patch_project_production_stage": "project.settings.update", "get_project_readiness": "project.metadata.view",
     "patch_project_asset_attribution": "media.manage", "patch_project_completion_settings": "project.settings.update",
@@ -284,7 +285,7 @@ def _hosted_request_action(request: Request) -> str:
     if request.method == "GET":
         return "project.view"
     path = request.url.path
-    if path == "/api/projects":
+    if path in {"/api/projects", "/api/experience-import/preview"}:
         return "project.create"
     if path.endswith("/identity/policy"):
         return "admin.policy.manage"
@@ -2932,6 +2933,51 @@ class StoryboardRestore(Storyboard):
         if isinstance(data, dict) and data.get("format") == production_handoff.FORMAT:
             raise ValueError("Pythia handoffs must be imported for review")
         return data
+
+
+@app.post("/api/experience-import/preview")
+async def preview_experience_import(file: UploadFile = File(...), progressive_mode: bool = Form(False)):
+    """Read-only recognition using the same contracts as project import."""
+    raw = await file.read(25 * 1024 * 1024 + 1)
+    if len(raw) > 25 * 1024 * 1024:
+        raise HTTPException(413, "Choose a file of 25 MB or smaller")
+    name = file.filename or ""
+    try:
+        if name.lower().endswith(".pptx"):
+            deck = Presentation(io.BytesIO(raw))
+            return {"kind": "pptx", "title": Path(name).stem,
+                    "scenes": [{"title": slide.shapes.title.text if slide.shapes.title else f"Slide {i + 1}"}
+                               for i, slide in enumerate(deck.slides)],
+                    "diagnostics": ["PowerPoint slides become editable scenes after you create the project. Check rendering and media afterward."]}
+        if not name.lower().endswith(".json"):
+            raise ValueError("Choose a PowerPoint (.pptx) or supported JSON (.json) file")
+        import json
+        data = json.loads(raw)
+        if isinstance(data, dict) and data.get("format") == production_handoff.FORMAT:
+            if progressive_mode:
+                progressive.require_demo()
+                from .progressive_handoff import prepare
+                document, drafts, report = prepare(raw)
+                scenes = [payload for _, payload, _, _ in drafts]
+                diagnostics = [report["notice"], *report["unsupported"]]
+            else:
+                document = production_handoff.decode(raw)
+                scenes = [production_handoff._draft(scene, document["handoff_id"]) for scene in document["storyboard"]["scenes"]]
+                diagnostics = ["Saved Pythia handoff. Review and accept the scene proposal before it changes your storyboard. Source records are retained; media files are not downloaded and objective/interaction mappings are not applied."]
+            return {"kind": "pythia", "title": document["storyboard"]["title"],
+                    "scenes": scenes, "diagnostics": diagnostics}
+        if not isinstance(data, dict) or "format" in data or data.get("schemaVersion") != "1.0" or not all(key in data for key in ("projectId", "title", "scenes")):
+            raise ValueError("Unknown JSON format. Choose a Pythia production handoff v1.0 or Chimera storyboard JSON v1.0.")
+        storyboard = StoryboardRestore.model_validate(data)
+        if storyboard.assets or storyboard.backgroundAsset or storyboard.courseMedia or any(scene.templateId or scene.imageAssets or scene.audioAssets or scene.videoAssets for scene in storyboard.scenes):
+            raise ValueError("This backup references media or templates. Restore its Chimera storyboard archive in a project so those files are available.")
+        return {"kind": "storyboard", "title": storyboard.title,
+                "scenes": [{"title": scene.title, "extractedText": scene.extractedText} for scene in storyboard.scenes],
+                "diagnostics": ["Chimera storyboard backup: restore scenes into a new project only after confirmation. JSON contains no media files."]}
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(422, f"This file could not be imported: {error}") from error
 
 
 @app.put("/api/projects/{project_id}/storyboard/import", response_model=ProjectDetail)

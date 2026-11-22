@@ -1,4 +1,5 @@
 import { accessRequest } from "./access-request";
+import { ExperienceImport, progressiveImport, type ImportPreview } from "./ExperienceImport";
 import { useProjectAccess } from "./use-project-access";
 import { createPortal } from "react-dom";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
@@ -145,6 +146,41 @@ export function App() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [activeView, setActiveView] = useState<"storyboard" | "media" | "templates">("storyboard");
   const [studioPreview, setStudioPreview] = useState(studioDefault);
+  const [showExperienceImport, setShowExperienceImport] = useState(false);
+  const importTarget = useRef<Project | null>(null);
+
+  function beginExperienceImport() {
+    importTarget.current = null;
+    setShowExperienceImport(true);
+  }
+
+  async function createExperienceFromImport(file: File, preview: ImportPreview, title: string) {
+    // Retain the target on failure: retry must never create duplicate projects.
+    let target = importTarget.current;
+    if (!target) {
+      const response = await fetch("/api/projects", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({title})});
+      const data = await response.json();
+      if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Project could not be created.");
+      target = data as Project;
+      importTarget.current = target;
+    }
+    const isProgressive = preview.kind === "pythia" && progressiveImport;
+    const body = preview.kind === "pptx" ? new FormData() : file;
+    if (body instanceof FormData) body.append("file", file);
+    const path = preview.kind === "pptx" ? "source" : isProgressive ? "progressive-jobs/import" : "storyboard/import";
+    const response = await fetch(`/api/projects/${target.id}/${path}`, {
+      method:preview.kind === "storyboard" ? "PUT" : "POST",
+      headers:storyboardWriteHeaders(target.storyboard.revision, preview.kind !== "pptx"), body,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(`${typeof data.detail === "string" ? data.detail : "Import could not be completed."} Your new project is saved; retry uses the same project.`);
+    if (isProgressive) localStorage.setItem(`chimera.progressive.job.${target.id}`, data.jobId);
+    applyProject(preview.kind === "pythia" ? target : data as Project);
+    setShowManagement(false); setIsCreating(false); setActiveView("storyboard"); setSelectedScene(0);
+    if (isProgressive) setStudioPreview(true);
+    else if (preview.kind === "pythia") {setImportedHandoffId(data.id); setShowEnhancementReview(true);}
+    setShowExperienceImport(false);
+  }
   const [showValidation, setShowValidation] = useState(false);
   const [showAccessibility, setShowAccessibility] = useState(false);
   const [showGoldenPath, setShowGoldenPath] = useState(false);
@@ -227,7 +263,7 @@ export function App() {
     showProjectBackground ? "storyboard.background" :
     showAccessibility ? "review.accessibility" : showValidation ? "review.validation" :
     showGoldenPath ? "catalog" : showManagement ? "workspace.management" : activeView;
-  const hasOpenForm = Boolean(showHTML5 || showSceneExperience || studioInteractionSceneId || showPythiaTalk || showSources || visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showProjectBackground || showAccessibility || showValidation);
+  const hasOpenForm = Boolean(showExperienceImport || showHTML5 || showSceneExperience || studioInteractionSceneId || showPythiaTalk || showSources || visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showProjectBackground || showAccessibility || showValidation);
   const preparationAttempt = useRef("");
   useEffect(() => {
     if (accessStatus !== "verified" || !project.id || !permissions.canEdit || busy || hasOpenForm || !project.storyboard.scenes.some(item => !item.visualLayout)) return;
@@ -1347,6 +1383,7 @@ export function App() {
   if (reviewToken && session) return <ReviewLinkView token={reviewToken} onClose={() => { history.replaceState(null, "", location.pathname+location.search); setReviewToken(""); }} />;
 
   return <ProjectPalette projectId={project.id} value={project}>
+{showExperienceImport && <ExperienceImport onClose={() => setShowExperienceImport(false)} onCreate={createExperienceFromImport} />}
     {/* Keep draft state mounted while its authorized Studio host comes and goes. */}
     <div style={{ display: showManagement || openingProject ? "none" : "contents" }} inert={accessStatus !== "verified"}>{visualEditor}</div>
     {retainWorkspace && accessStatus === "unavailable" && !showManagement && <div className="access-refresh-status" role="status">Connection interrupted. Your workspace and draft are preserved. Actions will resume when access is verified. <button type="button" onClick={access.retry}>Retry project access</button></div>}
@@ -1356,7 +1393,7 @@ export function App() {
       <div className="brand"><BrandMark /><div className="brand-wordmark"><span>CHIMERA</span></div></div>
       <div className="sidebar-project">
         <label data-onboarding="workspace.project" className="project-switcher"><span>PROJECT</span><select value={project.id} onChange={(event) => { const id = event.target.value; sceneNavigation.request(() => void switchProject(id)); }} disabled={busy || (hasOpenForm && !visualSceneId && !studioInteractionSceneId) || projects.length === 0} aria-label="Switch project"><option value="" disabled>Select a project</option><ProjectOptions projects={projects} sceneCounts recentFirst /></select></label>
-        <button className="new-project-button" onClick={() => sceneNavigation.request(() => beginProjectCreate())} disabled={busy || (hasOpenForm && !visualSceneId && !studioInteractionSceneId) || !canCreateProject}><Plus size={15} /> Create project</button>
+        <button className="button button-accent" onClick={event => { event.currentTarget.focus(); sceneNavigation.request(beginExperienceImport); }} disabled={busy || !canCreateProject}>Start Experience from Import</button><button className="new-project-button" onClick={() => sceneNavigation.request(() => beginProjectCreate())} disabled={busy || (hasOpenForm && !visualSceneId && !studioInteractionSceneId) || !canCreateProject}><Plus size={15} /> Create project</button>
         <button className="new-project-button" onClick={() => startOnboarding()} disabled={busy}><Route size={15} /> Start / resume walkthrough</button>
       </div>
       <div className="workspace-label">WORKSPACE</div>
@@ -1405,7 +1442,7 @@ export function App() {
     </div>}
     <main className="main-content" id="workspace-content" tabIndex={-1}>
       {deepLinkError && <div className="notice" role="alert"><span>{deepLinkError}</span><button className="icon-button" onClick={() => setDeepLinkError("")} aria-label="Dismiss deep link error"><X size={16} /></button></div>}
-      {showManagement && <ManagementView openError={projectOpenError} busy={busy || (hasOpenForm && !visualSceneId && !studioInteractionSceneId)} canCreateProject={canCreateProject} onCreateProject={beginProjectCreate} canResume={Boolean(project.id)} onOpenProject={async (id) => { if (id === project.id) return switchProject(id, true); let opening: Promise<boolean> | undefined; sceneNavigation.request(() => { opening = switchProject(id, true); }); return opening ? await opening : true; }} onProjectTrashed={handleProjectTrashed} onProjectsRestored={handleProjectsRestored} onRelationshipUpdated={handleRelationshipUpdated} onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} />}
+      {showManagement && <ManagementView onStartImport={beginExperienceImport} openError={projectOpenError} busy={busy || (hasOpenForm && !visualSceneId && !studioInteractionSceneId)} canCreateProject={canCreateProject} onCreateProject={beginProjectCreate} canResume={Boolean(project.id)} onOpenProject={async (id) => { if (id === project.id) return switchProject(id, true); let opening: Promise<boolean> | undefined; sceneNavigation.request(() => { opening = switchProject(id, true); }); return opening ? await opening : true; }} onProjectTrashed={handleProjectTrashed} onProjectsRestored={handleProjectsRestored} onRelationshipUpdated={handleRelationshipUpdated} onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} />}
       <div hidden={showManagement}>
       {openingProject || !retainWorkspace ? <section className="project-access-panel" aria-label="Project access" aria-busy={openingProject || accessStatus === "checking"}>
         <h1>{accessStatus === "denied" ? "Project access unavailable" : "Opening project"}</h1>
@@ -1530,6 +1567,7 @@ export function App() {
       const index = (updatedProject ?? project).storyboard.scenes.findIndex(candidate => candidate.id === sceneId);
       if (index >= 0) { setSelectedScene(index); setShowAssessments(false); setShowAssessmentEditor(true); }
     }} />}
+
     {showEnhancementReview && <EnhancementReviewView project={project} firstProposalId={importedHandoffId} onClose={() => { setImportedHandoffId(undefined); setShowEnhancementReview(false); }} onProjectUpdated={applyProject} />}
     {showValidation && <ValidationView projectId={project.id} onClose={() => setShowValidation(false)} onOpenScene={(sceneId, issueCode) => { const index = scenes.findIndex((item) => item.id === sceneId); setShowValidation(false); if (index >= 0) setSelectedScene(index); if (issueCode === "missing-image-alt-text") setShowAccessibility(true); else if (issueCode === "missing-assessment-item") setShowAssessmentEditor(true); else setActiveView("storyboard"); }} />}
     {showAccessibility && <AccessibilityView projectId={project.id} revision={project.storyboard.revision} scenes={scenes} assets={project.storyboard.assets} onClose={() => setShowAccessibility(false)} onProjectUpdated={applyProject} />}
