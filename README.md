@@ -12,10 +12,12 @@ and the [candidate review packet](docs/beta-1-review-packet.md).
 This candidate is not a production release. The charter is independently versioned
 2.0.0. Dated evidence and independently versioned assets/contracts retain their scope.
 
-Chimera **1.2.0** is the separately documented hosted DARKROGUE SSO release.
-The [hosted site](https://chimera.darkrogue.io/) is separate from this local Beta;
-its live deployment was not changed or verified by Beta preparation.
-See the [1.2.0 release notes](docs/release-1.2.0.md) for that release's scope.
+Chimera **1.2.0** was the prior hosted DARKROGUE SSO release. The current
+[hosted Chimera2](https://chimera.darkrogue.io/) uses DARKROGUE sign-in. See the
+[historical 1.2.0 notes](docs/release-1.2.0.md), the
+[Chimera2 cutover record](docs/chimera2-production-release-2026-11-22.md), and the
+[combined Milestone 3 candidate](docs/chimera2-milestone3-release-candidate.md).
+This candidate has not been merged or deployed.
 
 **Imported HTML5 activities** can now sit alongside native scene experiences.
 Import an offline HTML file or single-entry ZIP, review its isolated preview and
