@@ -66,8 +66,8 @@ test('accept, edit and save the first scene while the second arrives without int
   await panel.getByRole('button', {name:'Reconnect proposals'}).click();
   await expect(panel.getByRole('article')).toHaveCount(2);
   expect(await editorNode.evaluate(node => node.isConnected)).toBe(true);
-  await expect(text).toHaveValue('Still composing; keep my cursor here.');
-  await text.press('Tab');
+  await expect(editor.locator('.visual-editable').first()).toContainText('Still composing; keep my cursor here.');
+  await expect(editor).toHaveAttribute('data-dirty', 'true');
   await second.getByRole('button', {name:'Accept scene',exact:true}).click();
   const guard = page.getByRole('dialog', {name:'Unsaved scene changes',exact:true});
   await expect(guard).toBeVisible();
