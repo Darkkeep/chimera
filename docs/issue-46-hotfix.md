@@ -2,8 +2,9 @@
 
 Scope: retain an authorized Studio workspace and unsaved draft through transient
 permission-check failures; pause actions until verification recovers. Initial
-verification and confirmed denial still conceal private content. No backend,
-schema, backup-permission, provider or DNS changes. This preserves the charter's
+verification and confirmed denial still conceal private content. Backend changes
+are limited to current-response capability batching, non-blocking authorization
+I/O and aggregate diagnostics. No schema, backup-permission, provider or DNS changes. This preserves the charter's
 familiar authoring flow and existing access/revision safeguards.
 
 ## Navigation correction and delay investigation
