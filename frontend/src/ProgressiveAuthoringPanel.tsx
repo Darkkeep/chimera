@@ -58,10 +58,10 @@ export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated,
     void poll();
     return () => { disposed = true; controller.abort(); clearTimeout(timer); };
   }, [jobId, reconnect, base]);
-  async function begin() {
+  async function begin(producer: "deterministic-fixture-v1" | "pythia-authoring-fixture-v1" = "deterministic-fixture-v1") {
     setBusy(true); setError("");
     try {
-      const page = await json(await fetch(base, { method: "POST", headers: storyboardWriteHeaders(project.storyboard.revision) })) as EventPage;
+      const page = await json(await fetch(`${base}?producer=${producer}`, { method: "POST", headers: storyboardWriteHeaders(project.storyboard.revision) })) as EventPage;
       activeJob.current = page.jobId; log.current = []; absorb(page); localStorage.setItem(storageKey, page.jobId); setJobId(page.jobId);
     } catch (issue) { setError(issue instanceof Error ? issue.message : "Could not start"); }
     finally { setBusy(false); }
@@ -92,6 +92,7 @@ export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated,
     <p>Review a complete draft while the next scene is still being prepared. Nothing enters your course until you choose Accept scene.</p>
     <div className="progressive-actions">
       <button type="button" disabled={disabled || busy || status === "running"} onClick={() => void begin()}>Start progressive demo</button>
+      <button type="button" disabled={disabled || busy || status === "running"} onClick={() => void begin("pythia-authoring-fixture-v1")}>Try Pythia-format fixture</button>
       {jobId && <button type="button" disabled={busy} onClick={() => { log.current = []; setEvents([]); setReconnect(value => value + 1); }}>Reconnect proposals</button>}
       {status === "running" && <button type="button" disabled={disabled || busy} onClick={() => void cancel()}>Cancel generation</button>}
     </div>
@@ -101,7 +102,8 @@ export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated,
     {ready.map(event => {
       const decision = events.find(item => item.componentId === event.componentId && ["component.accepted", "component.rejected"].includes(item.type));
       return <article key={event.componentId} aria-label={`Draft proposal: ${event.payload?.title}`}>
-        <h4>{event.payload?.title}</h4><p>Proposal only · Synthetic source: inspection basics · {decision?.status || "Awaiting your review"}</p>
+        <h4>{event.payload?.title}</h4><p>Proposal only · {event.provenance.producer === "pythia-authoring-fixture-v1" ? "Pythia-format test result (no live model or citations)" : "Synthetic source: inspection basics"} · {decision?.status || "Awaiting your review"}</p>
+        {event.provenance.producer === "pythia-authoring-fixture-v1" && event.provenance.rationale && <p>Design rationale: {event.provenance.rationale}</p>}
         <SceneSurface project={project} scene={proposalScene(event)} />
         <div className="progressive-actions">
           <button type="button" disabled={disabled || busy || requiresReview || Boolean(decision) || ["cancelled", "failed"].includes(status)} onClick={() => onReviewAction(() => void decide(event.componentId!, "accept"))}>Accept scene</button>
