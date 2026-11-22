@@ -51,6 +51,12 @@ class OwnerSuiteTests(unittest.TestCase):
         self.actor, self.target = str(uuid4()), str(uuid4())
         self.store.sso_login({"sub": self.actor, "email": "owner@example.test", "name": "Owner", "jti": uuid4().hex, "exp": time.time() + 60}, ["administrator"])
         self.store.sso_login({"sub": self.target, "email": "learner@example.test", "name": "Learner", "jti": uuid4().hex, "exp": time.time() + 60}, ["reviewer"])
+        def authority(subject, *_args, **_kwargs):
+            caps = ["app.use", "review"]
+            if subject == self.actor:
+                caps.append("administration")
+            return {"allowed": True, "revision": 3, "scopeManaged": False, "capabilities": caps}
+        self.enterContext(patch("backend.app.central_access.fetch_access", side_effect=authority))
         self.project = storage.create_project(ProjectCreate(title="Disposable owner access project"))
         self.client = TestClient(main.app, base_url=ORIGIN)
         self.addCleanup(self.client.close)
@@ -69,6 +75,14 @@ class OwnerSuiteTests(unittest.TestCase):
             self.assertEqual(self.post(value).status_code, 401)
         with patch.dict("os.environ", {"CHIMERA_OWNER_SUITE_SECRET": ""}):
             self.assertEqual(self.post(claims(self.actor)).status_code, 404)
+
+    def test_signed_owner_request_loses_management_after_demotion(self):
+        self.assertEqual(self.post(claims(self.actor)).status_code, 200)
+        reviewer = {"allowed": True, "revision": 4, "scopeManaged": False,
+                    "capabilities": ["app.use", "review"]}
+        with patch("backend.app.central_access.fetch_access", return_value=reviewer):
+            self.assertEqual(self.post(self.grant()).status_code, 403)
+        self.assertFalse(self.store._read().get("ownerSuiteGrants"))
 
     def test_grant_retry_conflict_and_missing_link_are_durable(self):
         grant = self.grant()

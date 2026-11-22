@@ -1605,6 +1605,7 @@ def create_media_generation_job(project_id: str, data: MediaGenerationJobCreate)
                 raise ValueError("Google Cloud narration is limited to 5,000 UTF-8 bytes per request.")
         timestamp = now_iso()
         job = MediaGenerationJob(
+            actorId=get_actor_context().actorId,
             id=f"media-generation-{uuid.uuid4().hex[:12]}",
             projectId=project_id,
             sourceRevision=project.storyboard.revision,

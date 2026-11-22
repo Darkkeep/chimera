@@ -1,6 +1,7 @@
 import { assetLabel } from "./asset-display";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Rnd } from "react-rnd";
 import { AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignHorizontalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, AlignVerticalJustifyStart, ArrowDown, ArrowUp, Check, ChevronRight, Copy, ImagePlus, Lock, Play, Plus, Redo2, Sparkles, Square, Trash2, Undo2, Unlock, X } from "lucide-react";
 import type { Project, Scene } from "./App";
@@ -84,7 +85,7 @@ function syncSceneText(layout: SceneLayout, scene: Scene, title: string, screenT
   return next;
 }
 
-export function SceneVisualEditor({ project, scene, templates, onClose, onSave, onExtract, onApplyTemplate, onGenerate, onProjectUpdated, canGenerate, initialPanel = "canvas", embedded = false, onNavigationState, onNavigate, onLearnerPreview, onScenePreview, onActivity, onQuestion, onHTML5 }: { project: Project; scene: Scene; templates: { id: string; title: string }[]; onClose: () => void; onSave: (layout: SceneLayout, settings: SceneEditSettings) => Promise<void>; onExtract: () => Promise<SceneLayout>; onApplyTemplate: (templateId: string, title: string, extractedText: string[]) => Promise<SceneLayout>; onGenerate: (prompt: string, currentScene: Partial<Scene>, connectionId?: string) => Promise<GeneratedSceneDraft>; onProjectUpdated: (project: Project) => void; canGenerate: boolean; initialPanel?: "canvas" | "details"; embedded?: boolean; onNavigationState?: (state: SceneNavigationState | null) => void; onNavigate?: (action: () => void) => void; onLearnerPreview?: () => void; onScenePreview?: () => void; onActivity?: (kind: string) => void; onQuestion?: (type: string) => void; onHTML5?: () => void }) {
+export function SceneVisualEditor({ project, scene, templates, onClose, onSave, onExtract, onApplyTemplate, onGenerate, onProjectUpdated, canGenerate, canEdit, initialPanel = "canvas", embedded = false, portalTarget, onNavigationState, onNavigate, onLearnerPreview, onScenePreview, onActivity, onQuestion, onHTML5 }: { project: Project; scene: Scene; templates: { id: string; title: string }[]; onClose: () => void; onSave: (layout: SceneLayout, settings: SceneEditSettings, revision: number) => Promise<void>; onExtract: () => Promise<SceneLayout>; onApplyTemplate: (templateId: string, title: string, extractedText: string[]) => Promise<SceneLayout>; onGenerate: (prompt: string, currentScene: Partial<Scene>, connectionId?: string) => Promise<GeneratedSceneDraft>; onProjectUpdated: (project: Project) => void; canGenerate: boolean; canEdit: boolean; initialPanel?: "canvas" | "details"; embedded?: boolean; portalTarget?: HTMLElement | null; onNavigationState?: (state: SceneNavigationState | null) => void; onNavigate?: (action: () => void) => void; onLearnerPreview?: () => void; onScenePreview?: () => void; onActivity?: (kind: string) => void; onQuestion?: (type: string) => void; onHTML5?: () => void }) {
   const { catalog: mediaCatalog, error: connectionError } = useMediaConnections();
   const [connectionId, setConnectionId] = useState("");
   const sceneConnections = mediaCatalog?.connections.filter(item => item.readyFor.includes("scene")) ?? [];
@@ -276,6 +277,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
     finally { setBusy(false); }
   }
   async function save(closeAfterSave = true) {
+    if (!canEdit) return false;
     if (!durationValid) { setError("Enter a valid scene duration before saving."); return false; }
     setBusy(true); setError("");
     try {
@@ -294,7 +296,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
         assessmentSettings: sceneType === "question" ? assessmentSettings : null,
         canvasEdited: canvasEdited || JSON.stringify(layout) !== JSON.stringify(initialLayout(scene)),
         imageAltText,
-      });
+      }, draftRevision.current);
       setSavedMediaContext(mediaContextSignature);
       baseline.current = draftSignature;
       if (closeAfterSave) onClose();
@@ -350,7 +352,15 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
   const draftSignature = JSON.stringify({ title, sceneType, layoutMode, templateId, screenText, imageAltText, actionDescription, narration, notes, required, audioRequired, assessmentItem, assessmentSettings, layout });
   const baseline = useRef(draftSignature);
   const dirty = draftSignature !== baseline.current;
-  const saveDisabled = busy || !title.trim() || !durationValid || Boolean((scene.sourceSlide || scene.previewImage) && !scene.visualLayout && !canvasEdited) || layoutMode === "template" && !templateId;
+  // A recovered draft must still compare against the revision its edits were based on.
+  const draftRevision = useRef(project.storyboard.revision);
+  if (!dirty) draftRevision.current = project.storyboard.revision;
+  const [wasPaused, setWasPaused] = useState(false);
+  useEffect(() => {
+    if (!dirty) setWasPaused(false);
+    else if (!canEdit) setWasPaused(true);
+  }, [dirty, canEdit]);
+  const saveDisabled = !canEdit || busy || !title.trim() || !durationValid || Boolean((scene.sourceSlide || scene.previewImage) && !scene.visualLayout && !canvasEdited) || layoutMode === "template" && !templateId;
   const navigationState = useRef<SceneNavigationState>({ dirty, busy, save: () => save(), discard: onClose });
   navigationState.current = { dirty, busy, save: () => save(), discard: onClose };
   useEffect(() => {
@@ -471,7 +481,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
   const mediaContent = <div className="scene-editor-media" hidden={!embedded && panel !== "media"}>
       <h3>Media for {scene.title}</h3>
       <p className="field-hint">Create image, narration, or video requests for this scene using the same workflow as Media Library. Requests may incur provider charges. Review candidates before approving; approval does not attach media.</p>
-      {mediaContextDirty && <div role="status"><p>Save your scene edits before requesting media so Pythia and the selected provider use the current scene context.</p><button type="button" className="button button-accent" disabled={busy || !title.trim() || !durationValid || Boolean((scene.sourceSlide || scene.previewImage) && !scene.visualLayout && !canvasEdited)} onClick={() => void save(false)}>Save scene for media</button></div>}
+      {mediaContextDirty && <div role="status"><p>Save your scene edits before requesting media so Pythia and the selected provider use the current scene context.</p><button type="button" className="button button-accent" disabled={!canEdit || busy || !title.trim() || !durationValid || Boolean((scene.sourceSlide || scene.previewImage) && !scene.visualLayout && !canvasEdited)} onClick={() => void save(false)}>Save scene for media</button></div>}
       <div hidden={mediaContextDirty}>
         <GeneratedMediaPanel project={project} scene={scene} busy={busy || mediaContextDirty} onProjectUpdated={onProjectUpdated} onEditScene={() => setPanel("canvas")} onBusyChange={setMediaWorking} />
         <fieldset className="scene-editor-placement" disabled={saving || mediaWorking || mediaContextDirty}>
@@ -514,6 +524,7 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
   const imageContent = <section className="visual-attached-images" aria-label="Stage image content"><h3>Content</h3><div>{images.filter(asset => scene.imageAssets.includes(asset.id)).map(asset => <button type="button" key={asset.id} title={assetLabel(asset)} aria-label={`Add ${assetLabel(asset)}`} draggable={!busy} disabled={busy || sourceVisible} onDragStart={event => event.dataTransfer.setData("application/x-chimera-image", asset.id)} onClick={() => addImage(asset.id)}><img src={`/api/projects/${project.id}/assets/${asset.id}`} alt={assetLabel(asset)} /></button>)}</div><div className="visual-library-picker"><select aria-label="Image from media library" value={imageId} onChange={event => setImageId(event.target.value)}><option value="">Media library</option>{images.map(asset => <option key={asset.id} value={asset.id}>{assetLabel(asset)}</option>)}</select><button type="button" className="icon-button" title="Add selected image" aria-label="Add selected image" disabled={!imageId || busy || sourceVisible} onClick={() => addImage(imageId)}><ImagePlus size={18} /></button></div></section>;
   const content = <>
     {scene.experience && <p role="status">This scene delivers a native experience instead of the underlying canvas. To edit its diagram, reveals and activities, close this editor and select Design experience. Canvas edits here are retained but are not the learner-facing stage.</p>}
+    {dirty && wasPaused && <p role="status">Editing is available again. Review your preserved draft before saving.</p>}
     <header className="visual-editor-header"><div><p className="eyebrow">SCENE EDITOR</p><h2 id="visual-editor-title">{title || scene.title}</h2></div>{embedded ? dirty && <button type="button" className="button button-accent scene-save-button" disabled={saveDisabled} onClick={() => void save()}><Check size={14}/>{saving ? "Saving…" : "Save scene"}</button> : <button type="button" className="icon-button" aria-label="Close scene editor" disabled={busy} onClick={cancelEditing}><X size={18} /></button>}</header>
     {embedded && <div className="scene-menu-bar" data-scene-menubar role="toolbar" aria-label="Scene menus" onKeyDown={event => {
       if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
@@ -625,7 +636,9 @@ export function SceneVisualEditor({ project, scene, templates, onClose, onSave, 
         {name==="Scene properties"?detailsContent:name==="Insert image"?imageContent:name==="Scene media"?mediaContent:name==="Shapes"?<div className="effect-gallery" role="group" aria-label="Shapes">{(["rectangle","rounded-rectangle","ellipse","line","arrow","triangle","diamond"] as const).map(shape=><button type="button" key={shape} disabled={busy||sourceVisible} onClick={()=>insertShape(shape)}>{shape.replaceAll("-"," ")}</button>)}</div>:name==="Learner activities"?<><p>Practice with feedback. Scored questions use the separate question editor.</p><div className="activity-gallery">{[["flow","Concept flow"],["reveals","Click-reveal"],["branching","Branching decisions"],["hotspots","Hotspots"],["sequencing","Sequencing"],["guided-practice","Guided practice"],["software-walkthrough","Software walkthrough"],["before-after","Before/after comparison"],["external-link","External launch link"],["learner-conversation","Scripted conversation"]].map(([kind,label])=><button type="button" key={kind} disabled={!onActivity || Boolean(scene.assessmentItem||scene.html5Activity||scene.visualLayout?.timeline)} onClick={()=>onActivity?.(kind)}>{label}<small>Open the learner activity editor</small></button>)}</div>{Boolean(scene.assessmentItem||scene.html5Activity||scene.visualLayout?.timeline)&&<p role="status">This scene has a timeline, assessment or HTML5 activity. Use a separate scene for learner activities.</p>}</>:name==="Scored questions"?<div className="activity-gallery">{[["single-choice","Single choice"],["multiple-response","Multiple response"],["true-false","True / false"],["ordering","Ordering"],["matching","Matching"],["drag-drop","Drag and drop"],["short-answer","Short answer"]].map(([type,label])=><button type="button" key={type} disabled={Boolean(scene.experience||scene.html5Activity)} onClick={()=>onQuestion?.(type)}>{label}</button>)}{Boolean(scene.experience||scene.html5Activity)&&<p role="status">Use a separate scene for a scored question. Existing activities are preserved.</p>}</div>:name==="Properties"?<>{renderInspector("Properties")}<button type="button" onClick={()=>openInspector("Layout")}>Text and geometry…</button></>:renderInspector(name)}
       </FloatingInspector>)}
     </div> : null}
-    {!embedded && <footer className="modal-actions"><button type="button" className="button button-outline" disabled={busy} onClick={cancelEditing}>Cancel</button><button type="button" className="button button-accent" disabled={busy || !title.trim() || Boolean((scene.sourceSlide || scene.previewImage) && !scene.visualLayout && !canvasEdited) || layoutMode === "template" && !templateId} onClick={() => void save()}><Check size={16} />{busy ? "Saving" : "Save scene"}</button></footer>}
+    {!embedded && <footer className="modal-actions"><button type="button" className="button button-outline" disabled={busy} onClick={cancelEditing}>Cancel</button><button type="button" className="button button-accent" disabled={!canEdit || busy || !title.trim() || Boolean((scene.sourceSlide || scene.previewImage) && !scene.visualLayout && !canvasEdited) || layoutMode === "template" && !templateId} onClick={() => void save()}><Check size={16} />{busy ? "Saving" : "Save scene"}</button></footer>}
   </>;
-  return <ProjectPalette key={project.id} projectId={project.id} value={{project,layout}}>{embedded ? <section ref={editorRoot} data-scene-menu={menu || ""} data-has-selection={Boolean(selected)} data-dirty={dirty} data-scene-id={scene.id} className="visual-editor studio-inline-editor scene-compact" aria-labelledby="visual-editor-title" data-onboarding="scene.edit">{content}</section> : <EditorDialog className="visual-editor" labelledBy="visual-editor-title" busy={busy} onClose={cancelEditing} onboardingTarget="scene.edit" onboardingJourney={panel === "canvas" ? "canvas" : "edit-scene"}>{content}</EditorDialog>}</ProjectPalette>;
+  if (!canEdit) return dirty ? <p role="status" className="project-access-panel">Your unsaved scene changes are preserved in this tab. Editing is temporarily unavailable.</p> : null;
+  const editor = <ProjectPalette key={project.id} projectId={project.id} value={{project,layout}}>{embedded ? <section ref={editorRoot} data-scene-menu={menu || ""} data-has-selection={Boolean(selected)} data-dirty={dirty} data-scene-id={scene.id} className="visual-editor studio-inline-editor scene-compact" aria-labelledby="visual-editor-title" data-onboarding="scene.edit">{content}</section> : <EditorDialog className="visual-editor" labelledBy="visual-editor-title" busy={busy} onClose={cancelEditing} onboardingTarget="scene.edit" onboardingJourney={panel === "canvas" ? "canvas" : "edit-scene"}>{content}</EditorDialog>}</ProjectPalette>;
+  return embedded ? (portalTarget ? createPortal(editor, portalTarget) : null) : editor;
 }

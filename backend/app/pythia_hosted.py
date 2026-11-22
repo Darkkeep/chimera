@@ -149,6 +149,10 @@ def account_roles(actor_id):
     """Current hosted account roles; None when the actor has no enabled account."""
     from .password_auth import AccountStore
     from .storage import ROOT
+    from . import central_access
+    if central_access.enabled():
+        decision = central_access.account_access(AccountStore(ROOT), actor_id)
+        return set(central_access.roles_for_capabilities(decision["capabilities"]))
     for account in AccountStore(ROOT).accounts():
         if account["id"] == actor_id:
             return None if account["disabled"] else set(account["roles"])
