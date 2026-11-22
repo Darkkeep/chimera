@@ -7,9 +7,10 @@ import "./progressive-authoring.css";
 
 type EventPage = { jobId: string; projectId: string; status: string; cursor: number; projectRevision: number; requiresReview: boolean; events: ComponentEvent[] };
 
-export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated, onReviewAction, onAcceptAndEdit }: {
+export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated, onReviewAction, onAcceptAndEdit, getCurrentRevision }: {
   project: Project; disabled: boolean; onProjectUpdated: (project: Project) => void; onReviewAction: (action: () => void) => void;
   onAcceptAndEdit: (project: Project, sceneId: string) => void;
+  getCurrentRevision: () => number;
 }) {
   const storageKey = `chimera.progressive.job.${project.id}`;
   const [jobId, setJobId] = useState(() => localStorage.getItem(storageKey) || "");
@@ -18,10 +19,6 @@ export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated,
   const log = useRef<ComponentEvent[]>([]);
   const [status, setStatus] = useState("idle");
   const [requiresReview, setRequiresReview] = useState(false);
-  // The unsaved-edit guard can save before invoking a deferred acceptance.
-  // Read the latest project rather than the revision captured by that click.
-  const latestProject = useRef(project);
-  latestProject.current = project;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [reconnect, setReconnect] = useState(0);
@@ -79,7 +76,7 @@ export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated,
     setBusy(true); setError("");
     try {
       const updated = await json(await fetch(`${base}/${jobId}/components/${componentId}/decision`, {
-        method: "POST", headers: storyboardWriteHeaders(latestProject.current.storyboard.revision), body: JSON.stringify({ decision }),
+        method: "POST", headers: storyboardWriteHeaders(getCurrentRevision()), body: JSON.stringify({ decision }),
       })) as Project;
       if (decision === "accept") {
         if (edit) onAcceptAndEdit(updated, `progressive-${jobId}-${componentId}`);

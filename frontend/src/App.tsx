@@ -107,6 +107,8 @@ export function App() {
   const [showProjectAccess, setShowProjectAccess] = useState(false);
   const [linkedAccessProject, setLinkedAccessProject] = useState<Pick<Project, "id" | "title"> | null>(null);
   const [project, setProject] = useState<Project>(emptyProject);
+  const progressiveProject = useRef(project);
+  progressiveProject.current = project;
   const access = useProjectAccess(project.id, session?.actor.actorId || "");
   const permissions = access.permissions;
   const accessStatus = access.status;
@@ -346,6 +348,8 @@ export function App() {
   }
 
   function applyProject(updatedProject: Project) {
+    // A guarded Save changes can immediately continue into proposal acceptance.
+    progressiveProject.current = updatedProject;
     setProject({ ...updatedProject, storyboard: { ...updatedProject.storyboard, scenes: updatedProject.storyboard.scenes.map(scene => String(scene.sceneType) === "assessment" ? { ...scene, sceneType: "question" } : scene) } });
     if (!updatedProject.id) return;
     window.localStorage.setItem("chimera.activeProjectId", updatedProject.id);
@@ -1428,6 +1432,10 @@ export function App() {
       {activeView === "media" && <GeneratedMediaPanel onEditScene={beginSceneEdit} key={project.id} project={project} scene={mediaScene} busy={busy} onProjectUpdated={applyProject} />}
       {activeView === "storyboard" ? studioAvailable && studioPreview ? <StudioShell
         key={project.id} project={project} selectedScene={selectedScene} onReviewAction={sceneNavigation.request}
+        getCurrentRevision={() => {
+          if (progressiveProject.current.id !== project.id) throw new Error("The open project changed. Review this proposal again.");
+          return progressiveProject.current.storyboard.revision;
+        }}
         onAcceptAndEdit={(updatedProject, sceneId) => {
           applyProject(updatedProject);
           setSelectedScene(updatedProject.storyboard.scenes.findIndex(item => item.id === sceneId));
