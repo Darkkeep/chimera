@@ -17,7 +17,7 @@ async function setup(page, request) {
   }
   await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
   await page.goto('/'); await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
-  await page.getByRole('button', { name: 'Studio 2.0 preview', exact: true }).click();
+  await page.getByRole('button', { name: 'Chimera2 Studio', exact: true }).click();
   return project;
 }
 
@@ -60,7 +60,7 @@ test('media opens course-wide and scene filtering uses the matching attachment t
   }
   expect(response.ok()).toBeTruthy(); project = await response.json();
   await page.reload(); await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
-  await page.getByRole('button', { name: 'Studio 2.0 preview', exact: true }).click();
+  await page.getByRole('button', { name: 'Chimera2 Studio', exact: true }).click();
   await page.getByRole('group', { name: 'Course tools' }).getByRole('button', { name: 'Media library', exact: true }).click();
   await expect(page.getByLabel('Filter media by scene', { exact: true })).toHaveValue('');
   await expect(page.locator('.other-project-media')).toHaveAttribute('open', '');

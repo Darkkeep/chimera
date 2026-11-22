@@ -10,7 +10,7 @@ async function setup(page, request) {
   await page.goto('/'); await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
   const menu = page.getByRole('button', { name: 'Show workspace menu', exact: true });
   if (await menu.isVisible()) await menu.click();
-  await page.getByRole('button', { name: 'Studio 2.0 preview', exact: true }).click();
+  await page.getByRole('button', { name: 'Chimera2 Studio', exact: true }).click();
   return project;
 }
 for (const width of [1440, 1100, 390]) test(`scene selection opens the actual stage directly at ${width}`, async ({ page, request }, info) => {

@@ -10,7 +10,7 @@ async function studio(page) {
   await guide(page).getByRole('button', {name:'Next',exact:true}).click();
   await guide(page).getByRole('button', {name:'Close guide'}).click();
   await openWorkspaceMenu(page);
-  await page.getByRole('button',{name:'Studio 2.0 preview',exact:true}).click();
+  await page.getByRole('button',{name:'Chimera2 Studio',exact:true}).click();
   const panel=page.getByRole('region',{name:'Progressive scene proposals'});
   await expect(panel).toBeVisible();
   return panel;
@@ -116,7 +116,7 @@ test('cancel keeps proposals noncanonical and survives browser reconnect', async
   await page.reload();
   await page.getByRole('button',{name:'Resume authoring',exact:true}).click();
   await openWorkspaceMenu(page);
-  await page.getByRole('button',{name:'Studio 2.0 preview',exact:true}).click();
+  await page.getByRole('button',{name:'Chimera2 Studio',exact:true}).click();
   await expect(panel.getByText('Generation: cancelled')).toBeVisible();
   await expect(panel.getByRole('article')).toHaveCount(1);
 });

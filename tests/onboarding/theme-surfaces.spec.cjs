@@ -8,7 +8,7 @@ for(const width of [1440,1100,390]) test(`populated screens, nested inspector an
  await page.addInitScript(id=>localStorage.setItem('chimera.activeProjectId',id),project.id);
  await page.goto('/');await page.getByRole('button',{name:'Resume authoring',exact:true}).click();
  const show=page.getByRole('button',{name:'Show workspace menu',exact:true});if(await show.isVisible())await show.click();
- await page.getByRole('button',{name:'Studio 2.0 preview',exact:true}).click();
+ await page.getByRole('button',{name:'Chimera2 Studio',exact:true}).click();
  const editor=page.locator('.studio-inline-editor');await expect(editor).toBeVisible();
  const authored=await editor.locator('.visual-editable').evaluateAll(nodes=>nodes.map(n=>({style:n.getAttribute('style'),text:n.textContent})));
  for(const [label,key] of themes){

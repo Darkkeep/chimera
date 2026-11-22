@@ -5,7 +5,7 @@ test('classic editor retains its tabs and shares dirty close/save protection',as
   project=await (await request.post(`/api/projects/${project.id}/scenes`,{headers:{'If-Match':`"${project.storyboard.revision}"`},data:{title:'Classic source',extractedText:['Short original text']}})).json();
   await page.addInitScript(id=>localStorage.setItem('chimera.activeProjectId',id),project.id);await page.goto('/');
   await page.getByRole('button',{name:'Resume authoring',exact:true}).click();
-  await expect(page.getByRole('button',{name:'Studio 2.0 preview'})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Chimera2 Studio'})).toHaveCount(0);
   await page.getByRole('button',{name:'Edit scene',exact:true}).click();
   const editor=page.locator('.modal.visual-editor');await editor.getByRole('tab',{name:'Details',exact:true}).click();
   await editor.getByRole('textbox',{name:'Scene title',exact:true}).fill('Classic saved with guard');

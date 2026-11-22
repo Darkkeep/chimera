@@ -4,7 +4,7 @@ async function setup(page,request) {
   let project=await (await request.post('/api/projects',{data:{title:'Conditional save synthetic'}})).json();
   project=await (await request.post(`/api/projects/${project.id}/scenes`,{headers:{'If-Match':`"${project.storyboard.revision}"`},data:{title:'Save only changes',extractedText:['Keep the stage clear.']}})).json();
   await page.addInitScript(id=>localStorage.setItem('chimera.activeProjectId',id),project.id);await page.goto('/');
-  await page.getByRole('button',{name:'Resume authoring',exact:true}).click();await page.getByRole('button',{name:'Studio 2.0 preview',exact:true}).click();
+  await page.getByRole('button',{name:'Resume authoring',exact:true}).click();await page.getByRole('button',{name:'Chimera2 Studio',exact:true}).click();
   const editor=page.locator('.studio-inline-editor');await expect(editor).toBeVisible();return {project,editor};
 }
 async function insertText(editor) {
