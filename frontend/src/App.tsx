@@ -106,10 +106,11 @@ export function App() {
   const [linkedAccessProject, setLinkedAccessProject] = useState<Pick<Project, "id" | "title"> | null>(null);
   const [permissions, setPermissions] = useState({ canEdit: !session, canExport: !session, canManageMembers: false, canEnhance: !session });
   const [project, setProject] = useState<Project>(emptyProject);
-  const [accessCheck, setAccessCheck] = useState<{ projectId: string; status: "verified" | "unavailable" | "denied" } | null>(null);
+  const [accessCheck, setAccessCheck] = useState<{ projectId: string; status: "verified" | "unavailable" | "denied"; hasGrant?: boolean } | null>(null);
   const accessStatus = session && project.id
     ? accessCheck?.projectId === project.id ? accessCheck.status : "checking"
     : "verified";
+  const retainWorkspace = accessStatus === "verified" || (accessStatus === "unavailable" && accessCheck?.projectId === project.id && accessCheck.hasGrant === true);
   const [studioHost, setStudioHost] = useState<HTMLDivElement | null>(null);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [restoringProject, setRestoringProject] = useState(true);
@@ -180,16 +181,21 @@ export function App() {
     if (!session || !project.id) return;
     let alive = true;
     let checking = false;
+    let hasGrant = false;
     const denied = { canEdit: false, canExport: false, canManageMembers: false, canEnhance: false };
     setPermissions(denied);
     setAccessCheck(null);
     async function refreshPermissions() {
       if (checking || document.visibilityState === "hidden") return;
       checking = true;
+      const started = performance.now();
+      let status: number | undefined;
       try {
         const response = await fetch(`/api/projects/${project.id}/permissions`, { cache: "no-store", signal: AbortSignal.timeout(5000) });
         if (!alive) return;
-        if (response.status === 403 || response.status === 404) {
+        status = response.status;
+        if (response.status === 401 || response.status === 403 || response.status === 404) {
+          hasGrant = false;
           setPermissions(denied);
           setAccessCheck({ projectId: project.id, status: "denied" });
           setVisualSceneId(null);
@@ -200,13 +206,15 @@ export function App() {
         const next = await response.json() as typeof permissions;
         if (Object.keys(denied).some(key => typeof next[key as keyof typeof denied] !== "boolean")) throw new Error();
         if (alive) {
+          hasGrant = true;
           setPermissions(next);
           setAccessCheck({ projectId: project.id, status: "verified" });
         }
-      } catch {
+      } catch (issue) {
         if (alive) {
-          setPermissions(denied);
-          setAccessCheck({ projectId: project.id, status: "unavailable" });
+          // No identifiers, response bodies, credentials or draft content in diagnostics.
+          console.warn("Project access refresh failed", { status: status ?? "network", elapsedMs: Math.round(performance.now() - started), timeout: issue instanceof DOMException && issue.name === "TimeoutError" });
+          setAccessCheck({ projectId: project.id, status: "unavailable", hasGrant });
         }
       } finally { checking = false; }
     }
@@ -1182,6 +1190,7 @@ export function App() {
   }
 
   async function saveVisualScene(layout: SceneLayout, settings: SceneEditSettings, revision: number) {
+    if (accessStatus !== "verified" || !permissions.canEdit) throw new Error("Verify project access before saving. Your draft is preserved.");
     const sourceScene = scenes.find(item => item.id === visualSceneId);
     const { canvasEdited, ...sceneSettings } = settings;
     const refreshSourceLayout = !canvasEdited && !sourceScene?.visualLayout && Boolean(sourceScene?.sourceSlide);
@@ -1335,7 +1344,7 @@ export function App() {
     else setVisualSceneId(scene.id);
   }, [editorIsInline, scene?.id, project.storyboard.revision, permissions.canEdit, busy, hasOpenForm, error]);
   const activeVisualScene = visualSceneId ? scenes.find(item => item.id === visualSceneId) : undefined;
-  const visualEditor = activeVisualScene ? <SceneVisualEditor key={`${project.id}:${activeVisualScene.id}`} initialPanel={sceneEditorPanel} embedded={editorIsInline} portalTarget={studioHost} project={project} scene={activeVisualScene} templates={templates} onClose={() => setVisualSceneId(null)} onNavigationState={sceneNavigation.register} onNavigate={sceneNavigation.request} onLearnerPreview={() => sceneNavigation.request(() => setShowPreview(true))} onScenePreview={() => sceneNavigation.request(() => { setPreviewSceneId(scene?.id); setShowPreview(true); })} onActivity={kind => sceneNavigation.request(() => { if (scene) {setActivityKind(kind);setVisualSceneId(null);setStudioInteractionSceneId(scene.id);} })} onQuestion={type => sceneNavigation.request(() => {setQuestionType(type as AssessmentType);setShowAssessmentEditor(true);})} onHTML5={() => sceneNavigation.request(() => setShowHTML5(true))} onSave={saveVisualScene} onExtract={extractVisualScene} onApplyTemplate={previewSceneTemplate} onGenerate={generateSceneContentDraft} onProjectUpdated={applyProject} canGenerate={permissions.canEnhance} canEdit={permissions.canEdit && accessStatus === "verified"} /> : null;
+  const visualEditor = activeVisualScene ? <SceneVisualEditor key={`${project.id}:${activeVisualScene.id}`} initialPanel={sceneEditorPanel} embedded={editorIsInline} portalTarget={studioHost} project={project} scene={activeVisualScene} templates={templates} onClose={() => setVisualSceneId(null)} onNavigationState={sceneNavigation.register} onNavigate={sceneNavigation.request} onLearnerPreview={() => sceneNavigation.request(() => setShowPreview(true))} onScenePreview={() => sceneNavigation.request(() => { setPreviewSceneId(scene?.id); setShowPreview(true); })} onActivity={kind => sceneNavigation.request(() => { if (scene) {setActivityKind(kind);setVisualSceneId(null);setStudioInteractionSceneId(scene.id);} })} onQuestion={type => sceneNavigation.request(() => {setQuestionType(type as AssessmentType);setShowAssessmentEditor(true);})} onHTML5={() => sceneNavigation.request(() => setShowHTML5(true))} onSave={saveVisualScene} onExtract={extractVisualScene} onApplyTemplate={previewSceneTemplate} onGenerate={generateSceneContentDraft} onProjectUpdated={applyProject} canGenerate={permissions.canEnhance} canEdit={permissions.canEdit && retainWorkspace} /> : null;
 
   function openCourseReviewObject(objectType: "course" | "scene" | "objective" | "assessment" | "asset", objectId: string) {
     setShowPythiaCourseReview(false);
@@ -1366,12 +1375,13 @@ export function App() {
 
   return <ProjectPalette projectId={project.id} value={project}>
     {/* Keep draft state mounted while its authorized Studio host comes and goes. */}
-    {visualEditor}
-    {accessStatus !== "verified" ? <main className="project-access-panel">
+    <div style={{ display: "contents" }} inert={accessStatus !== "verified"}>{visualEditor}</div>
+    {retainWorkspace && accessStatus === "unavailable" && <p className="access-refresh-status" role="status">Connection interrupted. Your workspace and draft are preserved. Actions will resume when access is verified; retrying automatically.</p>}
+    {!retainWorkspace ? <main className="project-access-panel">
       <h1>{accessStatus === "denied" ? "Project access unavailable" : "Checking project access"}</h1>
       <p role="status">{accessStatus === "denied" ? "Your account cannot open this project." : "Editing is temporarily unavailable while Chimera verifies your access."}</p>
       {accessStatus === "denied" && <button onClick={() => location.reload()}>Return to workspace</button>}
-    </main> : <div className="app-shell">
+    </main> : <div className="app-shell" inert={accessStatus !== "verified"}>
     <a className="skip-link" href="#workspace-content">Skip to workspace</a>
     <WorkspaceNavigation>
       <div className="brand"><BrandMark /><div className="brand-wordmark"><span>CHIMERA</span></div></div>
