@@ -1427,7 +1427,14 @@ export function App() {
       {readiness && <div className="readiness-strip" aria-label="Project readiness"><span className={readiness.publicationBlockers ? "blocked" : "clear"}>{readiness.publicationBlockers ? `${readiness.publicationBlockers} publication blocker${readiness.publicationBlockers === 1 ? "" : "s"}` : "Ready for publication checks"}</span><span>{readiness.pendingProposals} pending suggestion{readiness.pendingProposals === 1 ? "" : "s"}</span><span>{readiness.unresolvedComments} unresolved comment{readiness.unresolvedComments === 1 ? "" : "s"}</span>{readiness.outdatedComments > 0 && <span>{readiness.outdatedComments} outdated thread{readiness.outdatedComments === 1 ? "" : "s"}</span>}{readiness.missingMedia > 0 && <span>{readiness.missingMedia} missing media reference{readiness.missingMedia === 1 ? "" : "s"}</span>}</div>}
       {activeView === "media" && <GeneratedMediaPanel onEditScene={beginSceneEdit} key={project.id} project={project} scene={mediaScene} busy={busy} onProjectUpdated={applyProject} />}
       {activeView === "storyboard" ? studioAvailable && studioPreview ? <StudioShell
-        key={project.id} project={project} selectedScene={selectedScene} courseCommands={[
+        key={project.id} project={project} selectedScene={selectedScene} onReviewAction={sceneNavigation.request}
+        onAcceptAndEdit={(updatedProject, sceneId) => {
+          applyProject(updatedProject);
+          setSelectedScene(updatedProject.storyboard.scenes.findIndex(item => item.id === sceneId));
+          setSceneEditorPanel("canvas");
+          setStudioInteractionSceneId(null);
+          setVisualSceneId(sceneId);
+        }} courseCommands={[
           {label:"Templates…",action:()=>sceneNavigation.request(()=>setActiveView("templates"))},
           {label:"Question bank and assessments…",disabled:!permissions.canEdit,action:()=>sceneNavigation.request(()=>setShowAssessments(true))},
           {label:"Completion settings…",disabled:!permissions.canEdit,action:()=>sceneNavigation.request(()=>setShowCompletionSettings(true))},
