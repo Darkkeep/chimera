@@ -3061,7 +3061,8 @@ def _progressive_call(operation):
 
 
 @app.post("/api/projects/{project_id}/progressive-jobs", status_code=202)
-def start_progressive_demo(project_id: str, if_match: Annotated[str | None, Header()] = None):
+def start_progressive_demo(project_id: str, if_match: Annotated[str | None, Header()] = None,
+                           producer: Literal["deterministic-fixture-v1", "pythia-authoring-fixture-v1"] = Query("deterministic-fixture-v1")):
     revision = _expected_revision(if_match)
     if revision is None:
         raise HTTPException(428, "An If-Match storyboard revision is required")
@@ -3069,7 +3070,7 @@ def start_progressive_demo(project_id: str, if_match: Annotated[str | None, Head
     def begin():
         job = progressive.submit(project_id, revision, actor.actorId)
         progressive.start(project_id, job["jobId"], actor.actorId,
-            lambda: _require_action(get_authorization_policy(), actor, "enhancement.job.create", project_id))
+            lambda: _require_action(get_authorization_policy(), actor, "enhancement.job.create", project_id), producer=producer)
         return progressive.page(project_id, job["jobId"], actor.actorId)
     return _progressive_call(begin)
 
