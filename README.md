@@ -1,5 +1,7 @@
 # Chimera
 
+> **Hosted release (2026-11-22):** [Chimera2 Studio](https://chimera.darkrogue.io/) is live on Hostinger at deployed commit [`7dae45d1`](https://github.com/Darkkeep/chimera/commit/7dae45d1e68cf83f5eaac1c9e875b4fbd7d2772e), with DARKROGUE SSO, saved Studio authoring and SCORM 1.2 export verified against production. **Repository `main` still documents and contains the 1.2.0 line**; the deployed Chimera2 source is tracked in [draft PR #44](https://github.com/Darkkeep/chimera/pull/44), stacked on [draft PR #40](https://github.com/Darkkeep/chimera/pull/40). See the [production release record](docs/chimera2-production-release-2026-11-22.md). Do not infer the deployed version from `main` until the branch stack is reconciled.
+
 Repository context: **Chimera 1.2.0** | [MIT license](LICENSE) | [Release notes](docs/release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
 
 Chimera **1.2.0** is the hosted DARKROGUE SSO release. Use [hosted Chimera](https://chimera.darkrogue.io/) with a DARKROGUE account, or run the local authoring installation below. See [release notes](docs/release-1.2.0.md) for verified scope and open checks.
