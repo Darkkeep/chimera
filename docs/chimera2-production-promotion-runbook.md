@@ -1,5 +1,7 @@
 # Chimera2 production promotion: execution runbook (draft v0.1)
 
+> **POST-CUTOVER UPDATE (2026-11-22): Chimera2 is live and verified at https://chimera.darkrogue.io/ on exact SHA `7dae45d1e68cf83f5eaac1c9e875b4fbd7d2772e`. The pre-cutover checks below are a historical draft, not the current status. See [the verified production release record](https://github.com/Darkkeep/chimera/blob/main/docs/chimera2-production-release-2026-11-22.md) and [Issue #42 cutover evidence](https://github.com/Darkkeep/chimera/issues/42#issuecomment-7074981807). The release PR is still draft and not merged; reconcile the PR stack deliberately.**
+
 Status: **PREPARATION ONLY**, not a deploy authorization. Work tracked in #41 and #42. Candidate base: `9c35f2b853cc42b7ab21c9ce11c70b171330558f`.
 
 ## Objective
