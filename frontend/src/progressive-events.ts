@@ -5,7 +5,7 @@ export type ComponentEvent = {
   schemaVersion: 1; eventId: string; jobId: string; projectId: string; sourceRevision: number;
   projectRevision: number; sequence: number; type: string; status: string;
   componentId: string | null; orderHint: number | null; payload: DraftPayload | null;
-  provenance: { producer: "deterministic-fixture-v1"; sourceIds: string[]; locators: string[] };
+  provenance: { producer: "deterministic-fixture-v1" | "pythia-authoring-fixture-v1"; sourceIds: string[]; locators: string[]; rationale?: string };
 };
 const kinds: Record<string, string> = { "job.started": "running", "component.ready": "proposed", "component.failed": "failed", "component.accepted": "accepted", "component.rejected": "rejected", "job.completed": "completed", "job.cancelled": "cancelled", "job.failed": "failed" };
 
@@ -17,7 +17,7 @@ export function mergeProgressiveEvents(previous: ComponentEvent[], incoming: Com
         !Number.isSafeInteger(event.sequence) || event.sequence < 1 || event.eventId !== `${jobId}:${event.sequence}` ||
         !Number.isSafeInteger(event.sourceRevision) || event.sourceRevision < 1 ||
         !Number.isSafeInteger(event.projectRevision) || event.projectRevision < event.sourceRevision ||
-        !Object.hasOwn(kinds, event.type) || kinds[event.type] !== event.status || event.provenance?.producer !== "deterministic-fixture-v1" ||
+        !Object.hasOwn(kinds, event.type) || kinds[event.type] !== event.status || !["deterministic-fixture-v1", "pythia-authoring-fixture-v1"].includes(event.provenance?.producer) ||
         !Array.isArray(event.provenance.sourceIds) || event.provenance.sourceIds.length !== 0 ||
         !Array.isArray(event.provenance.locators)) throw new Error("Invalid progressive scene event. Nothing was applied.");
     if (event.type === "component.ready") {
