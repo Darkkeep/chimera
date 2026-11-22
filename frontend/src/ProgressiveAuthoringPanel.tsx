@@ -110,7 +110,7 @@ export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated,
     : error ? "Couldn't complete this step. Review the details below." : operation || (importReport && status === "completed" && !["component.accepted", "component.rejected"].includes(events.at(-1)?.type || "") ? "Saved artifact import complete. Review your proposals." : process.label);
   return <section className="progressive-authoring" aria-label="Progressive scene proposals">
     <div className="progressive-heading"><h3>Progressive scene proposals</h3><span>Local review · no AI calls</span></div>
-    <p>Review a complete draft while the next scene is still being prepared. Nothing enters your course until you choose Accept scene.</p>
+    <p>{importReport ? "Review complete proposals from your saved artifact. Nothing enters your course until you choose Accept scene." : "Review a complete draft while the next scene is still being prepared. Nothing enters your course until you choose Accept scene."}</p>
     <div className="progressive-actions">
       <label>Import saved Pythia artifact <input type="file" accept=".json,application/json" aria-label="Import saved Pythia artifact" disabled={disabled || busy || status === "running"}
         onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) void importArtifact(file); }} /></label>
@@ -123,7 +123,7 @@ export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated,
       {!error && !interrupted && (busy || status === "running") && <LoaderCircle size={18} className="enhancement-working-spinner" aria-hidden="true" />}
       <p role="status" aria-live="polite" aria-atomic="true">{processLabel}</p>
     </div>
-    <p>{status === "running" ? `${ready.length} of 2 complete drafts available · Generation continues` : `Generation: ${status}`}</p>
+    <p>{importReport ? `Artifact import: ${status}` : status === "running" ? `${ready.length} of 2 complete drafts available · Generation continues` : `Generation: ${status}`}</p>
     {error && <p role="alert">{error}</p>}
     {importReport && <details open><summary>Artifact import report · {importReport.supportedScenes} of {importReport.totalScenes} scenes proposed</summary>
       <p>{importReport.notice}</p><p>Handoff: {importReport.handoffId} · SHA-256: {importReport.artifactSha256}</p>
