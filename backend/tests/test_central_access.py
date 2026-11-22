@@ -125,6 +125,21 @@ class CentralAccessTests(unittest.TestCase):
             with self.assertRaises(HTTPException):
                 self.policy.allows(self.actor, "scene.manage", "course-one")
 
+    def test_capability_batch_uses_one_online_decision_and_next_call_observes_revocation(self):
+        central_access.account_access(self.store, self.user["id"])
+        actions = ["scene.manage", "project.export", "project.membership.manage", "review.share", "enhancement.job.create", "enhancement.proposal.decide"]
+        original = central_access.fetch_access
+        with patch.object(central_access, "fetch_access", wraps=original) as lookup:
+            decisions = self.policy.allows_many(self.actor, actions, "course-one")
+            self.assertTrue(decisions["scene.manage"])
+            self.assertTrue(decisions["project.export"])
+            self.assertEqual(lookup.call_count, 1)
+        self.decision.update(revision=2, capabilities=["app.use", "review"])
+        denied = self.policy.allows_many(self.actor, actions, "course-one")
+        self.assertFalse(denied["scene.manage"])
+        self.assertFalse(denied["project.export"])
+        self.assertTrue(self.policy.allows(self.actor, "project.view", "course-one"))
+
     def test_local_disable_remains_a_deny_and_unknown_actions_never_gain_admin_fallback(self):
         data = self.store._read()
         data["accounts"]["pilot@example.test"]["disabled"] = True

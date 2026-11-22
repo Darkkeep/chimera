@@ -22,14 +22,14 @@ async function openDraft({ page, request }, initialAccess = "author") {
     ? { status: 401, json: {} }
     : { json: { actor: { actorId: 'test-author', actorDisplayName: 'Synthetic author' }, memberships: [{ role: 'author' }], policy: {} } }));
   await page.route('**' + base + '/permissions', async route => {
-    if (access === 'timeout') { await new Promise(resolve => setTimeout(resolve, 6500)); await route.fulfill({ status: 503, json: {} }).catch(() => {}); return; }
+    if (access === 'timeout') { await new Promise(resolve => setTimeout(resolve, 11500)); await route.fulfill({ status: 503, json: {} }).catch(() => {}); return; }
     const status = { unavailable: 503, suspended: 403, missing: 404, expired: 401 }[access] || 200;
     return route.fulfill({ status, json: { canEdit: access === 'author', canExport: access === 'author', canManageMembers: false, canEnhance: false } });
   });
   await page.goto('/?project_id=' + project.id);
   if (initialAccess !== 'author') {
-    await expect(page.getByRole('heading', { name: initialAccess === 'suspended' ? 'Project access unavailable' : 'Checking project access' })).toBeVisible();
-    await expect(page.locator('.app-shell')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: initialAccess === 'suspended' ? 'Project access unavailable' : 'Opening project' })).toBeVisible();
+    await expect(page.locator('.app-shell')).toBeVisible();
     await expect(page.getByText('Stored content', { exact: true })).toHaveCount(0);
     access = 'author';
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
@@ -124,11 +124,11 @@ for (const failure of ['unavailable', 'timeout']) {
   await expect(page.getByText('Connection interrupted.', { exact: false })).toBeVisible({ timeout: 12000 });
   await expect(draft.field).toBeVisible();
   await expect(draft.field).toHaveAttribute('data-mount-marker', 'original');
-  await expect(page.locator('.app-shell')).toHaveAttribute('inert', '');
+  await expect(page.locator('[data-project-surface]')).toHaveAttribute('inert', '');
   expect(await draft.editor.getByRole('button', { name: 'Save scene', exact: true }).first().evaluate(node => Boolean(node.closest('[inert]')))).toBe(true);
   expect(await draft.read()).toEqual(draft.original);
   await draft.change('author');
-  await expect(page.locator('.app-shell')).not.toHaveAttribute('inert', '');
+  await expect(page.locator('[data-project-surface]')).not.toHaveAttribute('inert', '');
   await expect(draft.field).toHaveValue(draft.marker);
   await expect(draft.field).toHaveAttribute('data-mount-marker', 'original');
  });

@@ -4,6 +4,10 @@ on:
     branches: [release/chimera2-production-promotion]
     paths:
       - 'frontend/src/**'
+      - 'backend/app/**'
+      - 'backend/tests/**'
+      - 'tests/onboarding/access-navigation.spec.cjs'
+      - 'tests/onboarding/management.spec.cjs'
       - 'tests/onboarding/studio-draft-access.spec.cjs'
       - 'tests/onboarding/studio-golden-path.spec.cjs'
       - '.github/workflows/issue-46-hotfix.yml'
@@ -35,7 +39,9 @@ jobs:
           CHIMERA_TEST_PYTHON: python
           CHIMERA_STUDIO_TEST: 'true'
           VITE_CHIMERA_STUDIO_ENABLED: 'true'
-        run: npx playwright test --config playwright.onboarding.config.cjs studio-draft-access.spec.cjs studio-golden-path.spec.cjs --project chromium --workers 1
+        run: npx playwright test --config playwright.onboarding.config.cjs access-navigation.spec.cjs studio-draft-access.spec.cjs studio-golden-path.spec.cjs management.spec.cjs --project chromium --workers 1
+      - name: Verify authorization and latency regressions
+        run: python -m unittest backend.tests.test_central_access backend.tests.test_access_latency backend.tests.test_darkrogue_auth backend.tests.test_owner_suite backend.tests.test_platform_access backend.tests.test_management
       - name: Build frontend
         run: npm run build --prefix frontend
       - uses: actions/upload-artifact@v4

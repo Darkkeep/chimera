@@ -9,6 +9,10 @@ import hmac
 import os
 import re
 import urllib.request
+from contextvars import ContextVar
+from time import perf_counter
+
+AUTHORITY_TIMINGS: ContextVar[list[float] | None] = ContextVar("chimera_authority_timings", default=None)
 
 from fastapi import HTTPException
 
@@ -51,6 +55,7 @@ def fetch_access(subject: str, project_id: str | None = None, *, acknowledge: in
         def redirect_request(self, *_args):
             return None
 
+    started = perf_counter()
     try:
         with urllib.request.build_opener(NoRedirect()).open(request, timeout=5) as response:
             raw = response.read(32769)
@@ -72,6 +77,10 @@ def fetch_access(subject: str, project_id: str | None = None, *, acknowledge: in
     except Exception as error:
         # Never echo tokens, remote response bodies, or credential-bearing request objects.
         raise HTTPException(503, "Current access could not be verified. Try again shortly.") from error
+    finally:
+        timings = AUTHORITY_TIMINGS.get()
+        if timings is not None:
+            timings.append((perf_counter() - started) * 1000)
 
 
 def acknowledge_revision(subject: str, revision: int) -> None:

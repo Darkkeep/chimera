@@ -1,3 +1,4 @@
+import { accessRequest } from "./access-request";
 import { createContext, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { BrandMark } from "./BrandMark";
@@ -16,16 +17,16 @@ async function responseError(response: Response) {
 
 async function darkrogueHandoff(sessionUrl: string, fetcher: typeof fetch): Promise<boolean> {
   try {
-    const session = await fetcher(sessionUrl, { credentials: "include" });
+    const session = await accessRequest(sessionUrl, "darkrogue-session", { credentials: "include" }, fetcher);
     if (!session.ok) return false;
     const body = await session.json().catch(() => null) as { token?: unknown } | null;
     if (typeof body?.token !== "string") return false;
-    const login = await fetcher("/api/auth/darkrogue", {
+    const login = await accessRequest("/api/auth/darkrogue", "darkrogue-login", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: body.token }),
-    });
+    }, fetcher);
     return login.ok;
-  } catch { return false; }
+  } catch { throw new Error("DARKROGUE sign-in could not finish. Please retry."); }
 }
 
 export function AuthGate({ children }: { children: ReactNode }) {
@@ -44,6 +45,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [message, setMessage] = useState("");
   const titleRef = useRef<HTMLHeadingElement>(null);
   const nativeFetch = useRef(window.fetch.bind(window));
+  const [connectionRetry, setConnectionRetry] = useState(0);
+  const [admissionUnavailable, setAdmissionUnavailable] = useState(false);
 
   useEffect(() => {
     const changed = () => {
@@ -58,20 +61,20 @@ export function AuthGate({ children }: { children: ReactNode }) {
     let alive = true;
     async function check() {
       try {
-        const response = await nativeFetch.current("/api/auth/config");
+        const response = await accessRequest("/api/auth/config", "auth-config", {}, nativeFetch.current);
         if (!response.ok) throw new Error(await responseError(response));
         const next = await response.json() as typeof config;
         if (!alive || !next) return;
         setConfig(next);
         if (next.passwordLoginAvailable || next.identityProvider === "darkrogue") {
-          const identity = await nativeFetch.current("/api/identity/context");
+          const identity = await accessRequest("/api/identity/context", "identity", {}, nativeFetch.current);
           if (identity.ok) { const actor = await identity.json() as Session; if (alive) setSession(actor); }
           else if (identity.status !== 401) throw new Error(await responseError(identity));
           else if (next.identityProvider === "darkrogue" && next.darkrogue) {
             // Silently adopt an existing DARKROGUE session before showing the sign-in screen.
             const adopted = await darkrogueHandoff(next.darkrogue.sessionUrl, nativeFetch.current);
             if (adopted && alive) {
-              const refreshed = await nativeFetch.current("/api/identity/context");
+              const refreshed = await accessRequest("/api/identity/context", "identity", {}, nativeFetch.current);
               if (refreshed.ok) { const actor = await refreshed.json() as Session; if (alive) setSession(actor); }
             }
           }
@@ -79,9 +82,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
       } catch (issue) { if (alive) setError(issue instanceof Error ? issue.message : "Sign-in configuration is unavailable."); }
       finally { if (alive) setChecking(false); }
     }
+    setChecking(true);
     void check();
     return () => { alive = false; };
-  }, []);
+  }, [connectionRetry]);
 
   useEffect(() => {
     if (!config?.passwordLoginAvailable && config?.identityProvider !== "darkrogue") return;
@@ -89,7 +93,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     let confirming: Promise<boolean> | null = null;
     // Only the identity endpoint can establish that a Chimera session has expired.
     // An upstream integration might return 401 despite a valid Chimera session.
-    const sessionRejected = () => confirming ??= original("/api/identity/context", { credentials: "same-origin" })
+    const sessionRejected = () => confirming ??= accessRequest("/api/identity/context", "identity", { credentials: "same-origin" }, original)
       .then(identity => identity.status === 401, () => false)
       .finally(() => { confirming = null; });
     window.fetch = async (input, init) => {
@@ -110,11 +114,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
     if (!session || config?.identityProvider !== "darkrogue") { setAdmitted(null); return; }
     let active = true;
     setAdmitted(null);
-    void nativeFetch.current("/api/admission/status").then(async response => {
+    setAdmissionUnavailable(false);
+    void accessRequest("/api/admission/status", "admission", {}, nativeFetch.current).then(async response => {
       if (!response.ok) throw new Error("Admission status unavailable");
       return response.json() as Promise<{ admitted: boolean }>;
     }).then(value => { if (active) setAdmitted(value.admitted === true); })
-      .catch(() => { if (active) setAdmitted(false); });
+      .catch(() => { if (active) { setAdmissionUnavailable(true); setAdmitted(false); } });
     return () => { active = false; };
   }, [session, config?.identityProvider]);
 
@@ -135,7 +140,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         resetToken.current = ""; history.replaceState(null, "", location.pathname+location.search);
         setSession(null); setMode("login"); setMessage("Password saved. Sign in with your new password.");
       } else {
-        const identity = await nativeFetch.current("/api/identity/context");
+        const identity = await accessRequest("/api/identity/context", "identity", {}, nativeFetch.current);
         if (!identity.ok) throw new Error(await responseError(identity));
         setSession(await identity.json() as Session);
       }
@@ -149,7 +154,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     try {
       const adopted = await darkrogueHandoff(config.darkrogue.sessionUrl, nativeFetch.current);
       if (adopted) {
-        const identity = await nativeFetch.current("/api/identity/context");
+        const identity = await accessRequest("/api/identity/context", "identity", {}, nativeFetch.current);
         if (!identity.ok) throw new Error(await responseError(identity));
         setSession(await identity.json() as Session);
       } else {
@@ -177,9 +182,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
       <section className="admission-card" aria-labelledby="admission-title">
         <div className="admission-eyebrow"><BrandMark className="admission-mark" /> CHIMERA <span>PRIVATE PREVIEW</span></div>
         <div className="admission-symbol" aria-hidden="true">✦</div>
-        <h1 id="admission-title">{admitted === null ? "Checking the gates…" : "The Chimera is still in its lair."}</h1>
+        <h1 id="admission-title">{admitted === null ? "Checking the gates…" : admissionUnavailable ? "Access verification unavailable" : "The Chimera is still in its lair."}</h1>
         <p>{admitted === null ? "Confirming your invitation." : "Something powerful is taking shape behind these doors."}</p>
-        {admitted === false && <>
+        {admissionUnavailable ? <><p role="status">Your invitation could not be verified. Please retry.</p><button type="button" onClick={() => { setSession(null); setConnectionRetry(value => value + 1); }}>Retry connection</button></> : admitted === false && <>
           <p className="admission-subtext">Chimera is currently open by personal invitation only. Your DARKROGUE account is ready; the beast just isn't receiving visitors yet.</p>
           <a className="admission-return" href={returnUrl}>← Return to DARKROGUE</a>
         </>}
@@ -195,7 +200,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     <section className={`auth-card ${mode === "recovery" ? "auth-recovery" : ""}`} aria-labelledby="auth-title">
       {mode === "recovery" && <div className="auth-recovery-icon"><Mail size={64} aria-hidden="true" /><ShieldCheck size={30} aria-hidden="true" /></div>}
       <h1 id="auth-title" ref={titleRef} tabIndex={-1}>{checking ? "Connecting to Chimera" : unavailable ? "Sign-in unavailable" : mode === "reset" ? "Reset your password" : mode === "recovery" ? "Request a password reset link" : "Sign in to Chimera"}</h1>
-      {error && <p className="auth-error" role="alert">{error}</p>}
+      {error && <><p className="auth-error" role="alert">{error}</p><button type="button" disabled={checking || busy} onClick={() => setConnectionRetry(value => value + 1)}>Retry connection</button></>}
       {message && <p className="auth-message" role="status">{message}</p>}
       {checking ? <p role="status">Checking your workspace…</p> : darkrogue ? <>
         <p>Chimera uses your DARKROGUE account. Continue with your existing session, or sign in at DARKROGUE and return here.</p>

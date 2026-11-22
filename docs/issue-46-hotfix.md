@@ -6,16 +6,63 @@ verification and confirmed denial still conceal private content. No backend,
 schema, backup-permission, provider or DNS changes. This preserves the charter's
 familiar authoring flow and existing access/revision safeguards.
 
+## Navigation correction and delay investigation
+
+The first patch is live at `9a151797ffffe4160759192986280234cac71f05`.
+This follow-up stays on the same branch and PR #47 and requires fresh Owner
+production authorization.
+
+The project check formerly reset permissions on project changes and gated the
+entire shell, including My Work. Opening the same project also fetched/applied
+it again and reset the editor. The corrected shell/navigation remain mounted;
+My Work is independent of the project check. Visiting My Work hides the current
+editor without unmounting it, and resuming that project does not reload it.
+Actual project switches retain the unsaved-change decision. New unverified
+project content is not mounted; its pane offers status, retry and My Work.
+A late project response cannot pull the author back out of My Work.
+
+Backend inspection established six sequential authority calls for the six
+permission flags, repeated checks per My Work row, and blocking authority I/O
+in the asynchronous request guard. Flags within one response now share one
+current authority decision; nothing is cached across calls, requests or jobs.
+The guard runs that I/O in the thread pool, leaving the event loop responsive.
+Existing local-role restrictions, live revocation and fail-closed writes remain.
+
+The exact historical sixty-second wait is unproven: the live Nginx configuration
+has no request/upstream timing fields. A read-only bounded journal sample at
+investigation time contained permissions responses 200 (903), 401 (1), 503 (3).
+Public health/config controls returned 200 in 244/146 ms respectively; those
+controls do not measure authenticated authority latency. The source defects
+are verified contributors, not proof of the Owner's exact request history.
+
+Requests for login, identity, admission, My Work, project loading and permissions
+are bounded to ten seconds per request and offer retry on failure. Browser
+performance measures record only operation category, code/timeout and duration.
+API Server-Timing reports aggregate application/authority durations and authority
+call counts. No subjects, project IDs, credentials, bodies or private documents
+enter these diagnostics. These measurements distinguish browser waiting,
+Chimera work and authority time after the correction is deployed.
+
 ## Qualification
 
-The focused Chromium suite and existing full authoring smoke passed locally
-(10 tests). The smoke's obsolete Studio button selector alone was corrected;
-all editing, persistence, assessment, preview, export and no-model-call
-assertions remain. The frontend production build and diff checks passed.
-The PR's exact-head hotfix workflow repeats these tests. The existing release
-workflow packages that exact head with Studio enabled/default, compares two
-independent builds, and installs/tests the archive offline. Verify both CI
-results and the downloaded artifact before any merge or production switch.
+Local correction validation passed: 38 Chromium tests (zero skips/failures),
+58 relevant backend tests, and the frontend production build. Measured fixture
+transitions were 80–306 ms; the identity timeout surfaced a retry at about ten
+seconds. These are controlled local timings, not hosted latency claims.
+
+The focused suite covers fresh DARKROGUE handoff and logout/login, slow initial
+project verification, My Work round trips, real project switches, retained
+unsaved drafts, explicit retry, request timeouts, actual denied decisions,
+demotion, session expiry, recovery and stale-write 412. Navigation timings are
+retained as JSON test attachments and must remain below 1500 ms in the controlled
+slow-response fixture. The broader editing/assessment/preview/both-SCORM smoke
+retains every assertion. Backend tests check one online lookup for a capability
+batch, fresh revocation on the next call, event-loop responsiveness under a slow
+authority, authorization parity and aggregate-only timing headers.
+
+Exact-head CI repeats the browser/backend checks and frontend build. The
+existing release pipeline compares two archive builds and installs/tests the
+exact payload offline. Verify the new head and artifact before final approval.
 Machine results do not constitute Owner usability acceptance.
 
 ## Production preparation and switch
@@ -23,11 +70,12 @@ Machine results do not constitute Owner usability acceptance.
 Proposal only; requires final Owner authorization. Read-only inspection on
 November 22 confirmed the current pointer, systemd drop-in and Nginx static
 root use `/srv/chimera-releases/current`. The current release is
-`7dae45d1e68cf83f5eaac1c9e875b4fbd7d2772e`.
+`9a151797ffffe4160759192986280234cac71f05`. The earlier guarded
+`7dae45d` release remains retained separately.
 
 1. Pin the PR head, successful test/package runs, downloaded archive digest and
    manifest/frontend identity. Use the actual uploaded archive; do not rebuild
-   on production. Confirm no backend source changes from the fallback.
+   on production. Review the bounded backend authorization/diagnostic correction as well as the frontend; no data schema changes are included.
 2. Recheck the current pointer and healthy fallback; retain its complete release
    and `production.conf`. Under the approved procedure, prepare the current
    application-consistent recovery checkpoint and drain writes for the switch.
@@ -47,7 +95,7 @@ root use `/srv/chimera-releases/current`. The current release is
 ```bash
 set -euo pipefail
 releases=/srv/chimera-releases
-fallback=7dae45d1e68cf83f5eaac1c9e875b4fbd7d2772e
+fallback=9a151797ffffe4160759192986280234cac71f05
 : "${candidate:?set the approved full hotfix SHA}"
 [[ $candidate =~ ^[0-9a-f]{40}$ && $candidate != "$fallback" ]]
 unit=chimera-networked.service
