@@ -196,7 +196,10 @@ def emit_scene(project_id, job_id, actor_id, component_id, payload, order, autho
         # otherwise valid background generation.
         # An event retry is idempotent; a different payload cannot revise a reviewed draft.
         provenance = Provenance.model_validate(provenance) if provenance is not None else Provenance()
-        digest = hashlib.sha256(json.dumps({"payload": payload, "provenance": provenance.model_dump()}, sort_keys=True).encode()).hexdigest()
+        # Preserve the original deterministic digest for retained Milestone 1 jobs.
+        # A Pythia-format fixture also binds its provenance to duplicate detection.
+        digest_input = payload if provenance.producer == "deterministic-fixture-v1" else {"payload": payload, "provenance": provenance.model_dump()}
+        digest = hashlib.sha256(json.dumps(digest_input, sort_keys=True).encode()).hexdigest()
         previous = job["components"].get(component_id)
         if previous:
             if previous["digest"] != digest:
