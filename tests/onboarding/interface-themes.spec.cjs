@@ -34,7 +34,7 @@ test('theme changes preserve active scene draft and authored stage colors', asyn
   await saveScene(page,'Theme isolation');
   await guide(page).getByRole('button',{name:'Next',exact:true}).click();
   await guide(page).getByRole('button',{name:'Close guide'}).click();
-  await page.getByRole('button',{name:'Studio 2.0 preview',exact:true}).click();
+  await page.getByRole('button',{name:'Chimera2 Studio',exact:true}).click();
   const editor=page.locator('.studio-inline-editor');
   await expect(editor).toBeVisible();
   await editor.getByRole('toolbar',{name:'Scene menus'}).getByRole('button',{name:'Insert',exact:true}).click();

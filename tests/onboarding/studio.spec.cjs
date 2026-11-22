@@ -12,7 +12,7 @@ test('Studio 2.0 reuses saved scenes, existing editor and reversible classic nav
   await guide(page).getByRole('button', { name: 'Next', exact: true }).click();
   await guide(page).getByRole('button', { name: 'Close guide' }).click();
 
-  await page.getByRole('button', { name: 'Studio 2.0 preview' }).click();
+  await page.getByRole('button', { name: 'Chimera2 Studio' }).click();
   const studio = page.getByRole('region', { name: 'Chimera 2.0 Authoring Studio' });
   await expect(studio).toBeVisible();
   await expect(studio.getByRole('navigation', { name: 'Studio scenes' })).toBeVisible();

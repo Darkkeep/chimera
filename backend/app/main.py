@@ -73,6 +73,7 @@ from .models import ReviewedVideoTreatment
 from . import pythia_actions
 from .signal import router as signal_router
 from .build_information import runtime_build_information
+from . import progressive_authoring as progressive
 
 
 HOSTED_ACCOUNT_PROVIDERS = {"builtin", "darkrogue"}
@@ -81,6 +82,10 @@ PUBLIC_API_PATHS = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/
 
 
 ROUTE_ACTIONS = {
+    "start_progressive_demo": "enhancement.job.create",
+    "read_progressive_events": "enhancement.job.create",
+    "cancel_progressive_demo": "enhancement.job.manage",
+    "decide_progressive_component": "scene.manage",
     # Public feedback intake bypasses actor auth; keep the route registered in the deny-by-default inventory.
     "submit_signal": "identity.self",
     "get_scene_experience": "project.view", "post_scene_experience": "enhancement.proposal.create",
@@ -196,6 +201,10 @@ def _hosted_request_action(request: Request) -> str:
     path = request.url.path
     if ROUTE_ACTIONS.get(getattr(request.scope.get("route"), "name", "")) == "project.export":
         return "project.export"
+    if "/progressive-jobs" in path:
+        if path.endswith("/decision"):
+            return "scene.manage"
+        return "enhancement.job.manage" if path.endswith("/cancel") else "enhancement.job.create"
     if "/question-import" in path:
         return "project.view" if request.method == "GET" else "project.import"
     if path.endswith(("/questions.csv", "/questions.xlsx")):
@@ -432,6 +441,7 @@ AUDIO_UPLOAD_EXTENSIONS = {".mp3", ".m4a", ".aac", ".wav", ".ogg"}
 
 @app.on_event("startup")
 def resume_enhancement_jobs() -> None:
+    progressive.recover()
     selected = installation_policy(LocalIdentityDirectory(ROOT))
     context = ActorContext(actorId="system-service", actorDisplayName="Chimera service", installationId=public_origin(), deploymentMode="team") if selected.deploymentMode == "team" else LOCAL_ACTOR
     token = REQUEST_ACTOR.set(context)
@@ -3038,6 +3048,55 @@ def post_scene(project_id: str, data: SceneCreate, if_match: Annotated[str | Non
         raise HTTPException(status_code=404, detail="Project not found") from error
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+def _progressive_call(operation):
+    progressive.require_demo()
+    try:
+        return operation()
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+
+
+@app.post("/api/projects/{project_id}/progressive-jobs", status_code=202)
+def start_progressive_demo(project_id: str, if_match: Annotated[str | None, Header()] = None,
+                           producer: Literal["deterministic-fixture-v1", "pythia-authoring-fixture-v1"] = Query("deterministic-fixture-v1")):
+    revision = _expected_revision(if_match)
+    if revision is None:
+        raise HTTPException(428, "An If-Match storyboard revision is required")
+    actor = get_actor_context()
+    def begin():
+        job = progressive.submit(project_id, revision, actor.actorId)
+        progressive.start(project_id, job["jobId"], actor.actorId,
+            lambda: _require_action(get_authorization_policy(), actor, "enhancement.job.create", project_id), producer=producer)
+        return progressive.page(project_id, job["jobId"], actor.actorId)
+    return _progressive_call(begin)
+
+
+@app.get("/api/projects/{project_id}/progressive-jobs/{job_id}/events")
+def read_progressive_events(project_id: str, job_id: str, response: Response, after: int = Query(0, ge=0)):
+    response.headers["Cache-Control"] = "no-store"
+    return _progressive_call(lambda: progressive.page(project_id, job_id, get_actor_context().actorId, after))
+
+
+@app.post("/api/projects/{project_id}/progressive-jobs/{job_id}/cancel")
+def cancel_progressive_demo(project_id: str, job_id: str):
+    def cancel():
+        progressive.finish(project_id, job_id, get_actor_context().actorId, "cancelled", lambda: None)
+        return progressive.page(project_id, job_id, get_actor_context().actorId)
+    return _progressive_call(cancel)
+
+
+@app.post("/api/projects/{project_id}/progressive-jobs/{job_id}/components/{component_id}/decision", response_model=ProjectDetail)
+def decide_progressive_component(project_id: str, job_id: str, component_id: str, data: progressive.Decision,
+                                 if_match: Annotated[str | None, Header()] = None):
+    revision = _expected_revision(if_match)
+    if revision is None:
+        raise HTTPException(428, "An If-Match storyboard revision is required")
+    return _progressive_call(lambda: progressive.decide(project_id, job_id, component_id,
+        get_actor_context().actorId, data.decision, revision))
 
 
 @app.post("/api/projects/{project_id}/content-drafts/course", response_model=CourseContentDraft)

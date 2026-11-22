@@ -9,7 +9,7 @@ async function setup(page, request) {
   await page.addInitScript(id=>localStorage.setItem('chimera.activeProjectId',id),project.id);
   await page.goto('/'); await page.getByRole('button',{name:'Resume authoring',exact:true}).click();
   const menu=page.getByRole('button',{name:'Show workspace menu',exact:true}); if(await menu.isVisible())await menu.click();
-  await page.getByRole('button',{name:'Studio 2.0 preview',exact:true}).click();
+  await page.getByRole('button',{name:'Chimera2 Studio',exact:true}).click();
   const editor=page.locator('.studio-inline-editor');await expect(editor).toBeVisible();
   return {project,editor};
 }

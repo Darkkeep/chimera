@@ -251,6 +251,9 @@ test('Pythia guides fit desktop and mobile, preserve drafts and do not submit on
   const state = await mockPythia(page, id);
   for (const [width, theme] of [[1440, 'Light Temple'], [390, 'Classic Dark']]) {
     await page.setViewportSize({ width, height: 1000 });
+    // Crossing the mobile breakpoint closes the drawer asynchronously. Wait for
+    // that existing responsive state before opening it; do not race its reset.
+    if (width <= 760) await expect(page.getByRole('button', { name: 'Show workspace menu', exact: true })).toBeVisible();
     await openWorkspaceMenu(page);
     const reviewTools = page.getByRole('button', { name: 'Review tools', exact: true });
     if (await reviewTools.getAttribute('aria-expanded') === 'true') await reviewTools.click();

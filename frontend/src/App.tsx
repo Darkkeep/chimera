@@ -107,6 +107,8 @@ export function App() {
   const [showProjectAccess, setShowProjectAccess] = useState(false);
   const [linkedAccessProject, setLinkedAccessProject] = useState<Pick<Project, "id" | "title"> | null>(null);
   const [project, setProject] = useState<Project>(emptyProject);
+  const progressiveProject = useRef(project);
+  progressiveProject.current = project;
   const access = useProjectAccess(project.id, session?.actor.actorId || "");
   const permissions = access.permissions;
   const accessStatus = access.status;
@@ -346,6 +348,8 @@ export function App() {
   }
 
   function applyProject(updatedProject: Project) {
+    // A guarded Save changes can immediately continue into proposal acceptance.
+    progressiveProject.current = updatedProject;
     setProject({ ...updatedProject, storyboard: { ...updatedProject.storyboard, scenes: updatedProject.storyboard.scenes.map(scene => String(scene.sceneType) === "assessment" ? { ...scene, sceneType: "question" } : scene) } });
     if (!updatedProject.id) return;
     window.localStorage.setItem("chimera.activeProjectId", updatedProject.id);
@@ -1427,7 +1431,18 @@ export function App() {
       {readiness && <div className="readiness-strip" aria-label="Project readiness"><span className={readiness.publicationBlockers ? "blocked" : "clear"}>{readiness.publicationBlockers ? `${readiness.publicationBlockers} publication blocker${readiness.publicationBlockers === 1 ? "" : "s"}` : "Ready for publication checks"}</span><span>{readiness.pendingProposals} pending suggestion{readiness.pendingProposals === 1 ? "" : "s"}</span><span>{readiness.unresolvedComments} unresolved comment{readiness.unresolvedComments === 1 ? "" : "s"}</span>{readiness.outdatedComments > 0 && <span>{readiness.outdatedComments} outdated thread{readiness.outdatedComments === 1 ? "" : "s"}</span>}{readiness.missingMedia > 0 && <span>{readiness.missingMedia} missing media reference{readiness.missingMedia === 1 ? "" : "s"}</span>}</div>}
       {activeView === "media" && <GeneratedMediaPanel onEditScene={beginSceneEdit} key={project.id} project={project} scene={mediaScene} busy={busy} onProjectUpdated={applyProject} />}
       {activeView === "storyboard" ? studioAvailable && studioPreview ? <StudioShell
-        key={project.id} project={project} selectedScene={selectedScene} courseCommands={[
+        key={project.id} project={project} selectedScene={selectedScene} onReviewAction={sceneNavigation.request}
+        getCurrentRevision={() => {
+          if (progressiveProject.current.id !== project.id) throw new Error("The open project changed. Review this proposal again.");
+          return progressiveProject.current.storyboard.revision;
+        }}
+        onAcceptAndEdit={(updatedProject, sceneId) => {
+          applyProject(updatedProject);
+          setSelectedScene(updatedProject.storyboard.scenes.findIndex(item => item.id === sceneId));
+          setSceneEditorPanel("canvas");
+          setStudioInteractionSceneId(null);
+          setVisualSceneId(sceneId);
+        }} courseCommands={[
           {label:"Templates…",action:()=>sceneNavigation.request(()=>setActiveView("templates"))},
           {label:"Question bank and assessments…",disabled:!permissions.canEdit,action:()=>sceneNavigation.request(()=>setShowAssessments(true))},
           {label:"Completion settings…",disabled:!permissions.canEdit,action:()=>sceneNavigation.request(()=>setShowCompletionSettings(true))},

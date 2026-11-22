@@ -7,6 +7,8 @@
     "doc": "docs"
   },
   "scripts": {
+    "demo:progressive": "node scripts/progressive-demo.cjs",
+    "test:progressive": "node --test tests/progressive/events.test.cjs && playwright test --config playwright.progressive.config.cjs",
     "test:visual": "node tests/visual/qualify.cjs",
     "test:golden-path": "python tests/golden_path/qualify.py",
     "test:onboarding": "playwright test --config playwright.onboarding.config.cjs",

@@ -8,7 +8,7 @@ async function setup(page,request){
  await page.addInitScript(id=>localStorage.setItem('chimera.activeProjectId',id),project.id);
  await page.goto('/');await page.getByRole('button',{name:'Resume authoring',exact:true}).click();
  const menu=page.getByRole('button',{name:'Show workspace menu',exact:true});if(await menu.isVisible())await menu.click();
- await page.getByRole('button',{name:'Studio 2.0 preview',exact:true}).click();
+ await page.getByRole('button',{name:'Chimera2 Studio',exact:true}).click();
  const editor=page.locator('.studio-inline-editor');await expect(editor).toBeVisible();
  const hide=page.getByRole('button',{name:'Hide workspace menu',exact:true});if(await hide.isVisible())await hide.click();
  if((page.viewportSize()?.width||1280)>760)await expect.poll(()=>page.locator('.workspace-navigation').evaluate(node=>Math.round(node.getBoundingClientRect().width))).toBe(52);
@@ -92,7 +92,7 @@ test('saved swatches survive reopening and invalid hex never changes the scene',
  const hex=picker.getByRole('textbox',{name:'Background color hex',exact:true});await hex.fill('#xyzxyz');await hex.press('Enter');await expect(picker.getByRole('alert')).toBeVisible();await expect(editor).toHaveAttribute('data-dirty','false');await hex.fill('#abc');await hex.press('Enter');await picker.getByRole('button',{name:'Save current color as swatch'}).click();
  await picker.getByRole('button',{name:'Standard colors #ffffff',exact:true}).click();await picker.getByRole('button',{name:'Close color picker'}).click();await panel.getByRole('button',{name:'Close scene controls'}).click();
  await expect(editor).toHaveAttribute('data-dirty','false');await page.reload();await page.getByRole('button',{name:'Resume authoring',exact:true}).click();
- const menu=page.getByRole('button',{name:'Show workspace menu',exact:true});if(await menu.isVisible())await menu.click();await page.getByRole('button',{name:'Studio 2.0 preview',exact:true}).click();
+ const menu=page.getByRole('button',{name:'Show workspace menu',exact:true});if(await menu.isVisible())await menu.click();await page.getByRole('button',{name:'Chimera2 Studio',exact:true}).click();
  await command(page.locator('.studio-inline-editor'),'Layers','Scene background…');panel=page.getByRole('dialog',{name:'Background',exact:true});await panel.getByRole('button',{name:/^Background color #/}).click();picker=page.getByRole('dialog',{name:'Background color picker',exact:true});await expect(picker.getByRole('button',{name:'Saved swatches #aabbcc',exact:true})).toBeVisible();
  expect(await page.evaluate(id=>JSON.parse(localStorage.getItem('chimera.swatches.'+id)),project.id)).toContain('#aabbcc');
 });
