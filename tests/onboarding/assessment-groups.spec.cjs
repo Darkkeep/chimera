@@ -61,6 +61,11 @@ for (const width of [1440, 390]) {
     await expect(dialog.getByRole('button', { name: 'Edit Edited check', exact: true })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('assessment-groups.png') });
     await dialog.getByRole('button', { name: 'Close assessments', exact: true }).click();
+    // Closing Assessments returns to authoring on the current baseline.
+    // Enter My Work explicitly before exercising the resume action.
+    await openWorkspaceMenu(page);
+    await page.getByRole('button', { name: 'My Work', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'My Work', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
     await page.getByRole('button', { name: 'Preview course', exact: true }).click();
     const preview = page.getByRole('dialog', { name: /course preview$/ });
