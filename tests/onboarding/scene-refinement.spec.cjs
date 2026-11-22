@@ -26,7 +26,16 @@ const paths={
   scene: async(page)=>page.getByRole('navigation',{name:'Studio scenes'}).getByRole('button',{name:/Second scene/}).click(),
   classic: async(page)=>page.getByRole('button',{name:'Classic storyboard',exact:true}).click(),
   workspace: async(page)=>page.getByRole('navigation',{name:'Workspace',exact:true}).getByRole('button',{name:'Media library',exact:true}).click(),
-  management: async(page)=>page.getByRole('button',{name:'My Work',exact:true}).click(),
+  // My Work is non-destructive in Issue #46. Check the retained draft through
+  // that round trip, then exercise the guard on an actual project departure.
+  management: async(page,other)=>{
+    await page.getByRole('button',{name:'My Work',exact:true}).click();
+    await expect(prompt(page)).toHaveCount(0);
+    await page.getByRole('button',{name:'Resume authoring',exact:true}).click();
+    await expect(page.locator('.studio-inline-editor')).toHaveAttribute('data-dirty','true');
+    await expect(page.getByRole('textbox',{name:'Studio selected text',exact:true})).toHaveValue('Draft must survive');
+    await page.getByLabel('Switch project',{exact:true}).selectOption(other.id);
+  },
   project: async(page,other)=>page.getByLabel('Switch project',{exact:true}).selectOption(other.id),
   preview: async(page)=>page.getByRole('button',{name:'Learner preview',exact:true}).click(),
 };
