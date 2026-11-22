@@ -4,7 +4,7 @@
 
 Repository context: **Chimera 1.2.0** | [MIT license](LICENSE) | [Release notes](docs/release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
 
-Chimera **1.2.0** is the hosted DARKROGUE SSO release. Use [hosted Chimera](https://chimera.darkrogue.io/) with a DARKROGUE account, or run the local authoring installation below. See [release notes](docs/release-1.2.0.md) for verified scope and open checks.
+Chimera **1.2.0** was the prior hosted DARKROGUE SSO release and remains the `main` branch's code baseline until the Chimera2 PR stack is reconciled. The current [hosted Chimera2](https://chimera.darkrogue.io/) uses DARKROGUE sign-in. For historical 1.2.0 scope see [release notes](docs/release-1.2.0.md); for the live release see [Chimera2 production record](docs/chimera2-production-release-2026-11-22.md). The local authoring instructions below reflect the code checked out from this branch.
 
 **Imported HTML5 activities** can now sit alongside native scene experiences.
 Import an offline HTML file or single-entry ZIP, review its isolated preview and
