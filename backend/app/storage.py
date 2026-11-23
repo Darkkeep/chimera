@@ -28,7 +28,7 @@ def project_trash_path() -> Path:
     return PROJECTS / ".trash"
 
 
-class ProjectIdentityMismatch(Exception):
+class ProjectIdentityMismatch(ValueError):
     """Stored project metadata and storyboard disagree. Preserve bytes for recovery."""
 
 
