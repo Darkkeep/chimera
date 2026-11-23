@@ -261,6 +261,20 @@ class ProgressiveAuthoringTests(unittest.TestCase):
         with action_context(LOCAL_ACTOR.model_copy(update={"deploymentMode": "team"})), self.assertRaises(HTTPException):
             progressive.require_demo()
 
+    def test_hosted_progressive_review_enabled_but_synthetic_demo_remains_blocked(self):
+        team = LOCAL_ACTOR.model_copy(update={"deploymentMode": "team"})
+        with action_context(team), patch.dict(os.environ, {"CHIMERA_PROGRESSIVE_DEMO": "false"}, clear=False):
+            progressive.require_available()
+            with self.assertRaises(HTTPException):
+                progressive.require_demo()
+            with patch.dict(os.environ, {"CHIMERA_PROGRESSIVE_HOSTED_ENABLED": "false"}):
+                with self.assertRaises(HTTPException) as denied:
+                    progressive.require_available()
+                self.assertEqual(denied.exception.status_code, 404)
+        with patch.dict(os.environ, {"CHIMERA_PROGRESSIVE_DEMO": "false"}):
+            with self.assertRaises(HTTPException):
+                progressive.require_available()
+
     def test_restart_retains_replay_and_marks_unfinished_job_failed_without_regeneration(self):
         self.emit()
         with patch.object(progressive, "RUN_ID", "restarted-process"):
