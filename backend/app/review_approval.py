@@ -27,7 +27,41 @@ def storyboard_digest(storyboard):
 
 
 def receipt_path(project_id: str) -> Path:
-    return storage.project_path(project_id) / "review" / "decisions.json"
+    # Trusted human decisions are server-side evidence, not portable course data.
+    # Project archives can be imported; they must not be able to forge approvals.
+    digest = hashlib.sha256(project_id.encode("utf-8")).hexdigest()
+    return storage.ROOT / "review-ledger" / (digest + ".json")
+
+
+def _append_receipt(project_id: str, entry: dict):
+    history = _load_receipts(project_id)
+    history.append(entry)
+    path = receipt_path(project_id)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    temporary = path.parent / ("." + uuid.uuid4().hex + ".tmp")
+    import os
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump(history, stream, indent=2)
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def invalidate_after_restore(project_id: str):
+    """Restoring course content never carries forward a previous human approval."""
+    with storage.storyboard_transaction():
+        project = storage.read_project(project_id)
+        _append_receipt(project_id, {
+            "id": "review-" + uuid.uuid4().hex[:16],
+            "projectId": project_id, "revision": project.storyboard.revision,
+            "storyboardSha256": storyboard_digest(project.storyboard),
+            "decision": "invalidated", "note": "Project content was restored from an archive. Re-review required.",
+            "actorId": "chimera-system", "actorDisplayName": "Chimera system",
+            "installationId": project.installationId, "createdAt": storage.now_iso(),
+        })
+
 
 
 def _load_receipts(project_id: str):
@@ -56,7 +90,8 @@ def review_status(project_id: str):
             "storyboardSha256": digest, "approved": valid,
             "state": "approved" if valid else
                      "changed-since-review" if latest and latest["decision"] == "approve" else
-                     "changes-requested" if latest and latest["decision"] == "request-changes" else "not-reviewed",
+                     "changes-requested" if latest and latest["decision"] == "request-changes" else
+                     "restored-needs-review" if latest and latest["decision"] == "invalidated" else "not-reviewed",
             "lastDecision": latest, "unresolvedComments": unresolved,
         }
 
@@ -82,13 +117,7 @@ def record_decision(project_id: str, actor: ActorContext, data: ReviewDecisionRe
         }
         if not entry["note"]:
             raise ValueError("An explanation is required for a review decision")
-        history = _load_receipts(project_id)
-        history.append(entry)
-        path = receipt_path(project_id)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.parent / ("." + uuid.uuid4().hex + ".tmp")
-        temporary.write_text(json.dumps(history, indent=2), encoding="utf-8")
-        temporary.replace(path)
+        _append_receipt(project_id, entry)
         storage.append_platform_event(project_id, "review.approved" if data.decision == "approve" else "review.changes_requested",
                                       {"reviewId": entry["id"], "revision": entry["revision"]}, actor)
         return review_status(project_id)
