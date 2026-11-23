@@ -85,7 +85,7 @@ PUBLIC_API_PATHS = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/
 
 ROUTE_ACTIONS = {
     "get_review_approval": "project.view",
-    "post_review_approval": "review.comment.create",
+    "post_review_approval": "review.approve",
     "start_progressive_demo": "enhancement.job.create",
     "import_progressive_handoff": "enhancement.job.create",
     "read_progressive_events": "enhancement.job.create",
@@ -1931,7 +1931,7 @@ def post_review_approval(
     policy: Annotated[AuthorizationPolicy | None, Depends(get_authorization_policy)] = None,
 ) -> dict:
     actor = context or LOCAL_ACTOR
-    _require_action(policy or get_authorization_policy(), actor, "review.comment.create", project_id)
+    _require_action(policy or get_authorization_policy(), actor, "review.approve", project_id)
     try:
         return review_approval.record_decision(project_id, actor, data)
     except StoryboardRevisionConflict as error:
