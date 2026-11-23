@@ -12,6 +12,7 @@ exports.startChimera = async page => {
     else await route.continue();
   });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await exports.openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Start / resume walkthrough', exact: true }).click();
   await exports.expectStep(page, 'Name your course');
 };
@@ -25,4 +26,19 @@ exports.saveScene = async (page, title) => {
   await page.getByRole('textbox', { name: 'On-screen text', exact: true }).fill('Persistent onboarding content');
   await page.getByRole('button', { name: 'Create scene', exact: true }).click();
   await exports.expectStep(page, 'Review your saved content');
+};
+
+exports.openWorkspaceMenu = async page => {
+  await page.locator('.workspace-menu-toggle').waitFor({ state: 'visible' });
+  const show = page.getByRole('button', { name: 'Show workspace menu', exact: true });
+  if (await show.isVisible()) {
+    await show.click();
+    await page.getByRole('button', { name: 'Hide workspace menu', exact: true }).waitFor({ state: 'visible' });
+  }
+};
+
+exports.closeMobileWorkspaceMenu = async page => {
+  if ((page.viewportSize()?.width || 1280) > 760) return;
+  const hide = page.getByRole('button', { name: 'Hide workspace menu', exact: true });
+  if (await hide.isVisible()) await hide.click();
 };

@@ -444,6 +444,8 @@ def _run_job(project_id: str, job_id: str) -> None:
             job = storage.update_enhancement_job(project_id, job_id, status="running", message="Preparing selected content", progress=5)
         if job.cancelRequested:
             return
+        from .central_access import require_job_access
+        require_job_access(job.actorId, project_id, "enhancement.job.create")
         provider = _provider() if _provider_factory is _provider else _provider_factory()
         payload, locator_text = _load_job_context(job)
         serialized_payload = json.dumps(payload, ensure_ascii=False)

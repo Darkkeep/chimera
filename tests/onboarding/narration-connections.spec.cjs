@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const {mockMediaConnections,mediaCapability} = require('./media-connection-fixtures.cjs');
 test.beforeEach(async ({page}) => mockMediaConnections(page));
@@ -31,6 +32,7 @@ async function openConnections(page, options = {}, provider = 'ElevenLabs') {
     return route.fulfill({ json: collection });
   });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'AI Connections', exact: true }).click();
   await page.getByRole('tab', { name: provider, exact: true }).click();
@@ -231,6 +233,7 @@ async function openCreator(page, request, capability, sceneText = {}) {
   });
   await page.goto('/');
   await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Media library', exact: true }).click();
   await expect(page.locator('.generation-creator summary')).toHaveAttribute('aria-disabled', 'false');
   await page.locator('.generation-creator summary').click();

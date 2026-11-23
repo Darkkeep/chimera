@@ -1387,6 +1387,7 @@ setTimeout(() => console.log(JSON.stringify(calls)), 0);'''
         with ZipFile(io.BytesIO(response.body)) as package:
             manifest = ET.fromstring(package.read("imsmanifest.xml"))
             namespace = "{http://www.imsproject.org/xsd/imscp_rootv1p1p2}"
+            self.assertEqual(manifest.findtext(f"{namespace}metadata/{namespace}schemaversion"), "1.2")
             resource = manifest.find(f".//{namespace}resource")
             self.assertIsNotNone(resource)
             assert resource is not None

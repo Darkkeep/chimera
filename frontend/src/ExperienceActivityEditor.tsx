@@ -1,3 +1,4 @@
+import { assetLabel } from "./asset-display";
 import type { Activity } from "./NativeExperience";
 
 type Kind = Activity["kind"];
@@ -37,7 +38,7 @@ export function newActivity(kind: Kind, screenshotAssetId = ""): Activity {
 }
 
 export function ExperienceActivityEditor({ activity, onChange, imageAssets = [] }: {
-  activity: Activity; onChange: (value: Activity) => void; imageAssets?: { id: string; filename: string }[];
+  activity: Activity; onChange: (value: Activity) => void; imageAssets?: { id: string; filename: string; displayName?: string }[];
 }) {
   function field(label: string, value: string, change: (value: string) => void, short = false) {
     return <label>{label}{short
@@ -88,7 +89,7 @@ export function ExperienceActivityEditor({ activity, onChange, imageAssets = [] 
           <option value="">Select a project image</option>
           {activity[side].imageAssetId && !imageAssets.some(asset => asset.id === activity[side].imageAssetId)
             && <option value={activity[side].imageAssetId}>Unavailable image ({activity[side].imageAssetId})</option>}
-          {imageAssets.map(asset => <option key={asset.id} value={asset.id}>{asset.filename}</option>)}
+          {imageAssets.map(asset => <option key={asset.id} value={asset.id}>{assetLabel(asset)}</option>)}
         </select></label>
         {field(`${side} label`, activity[side].label, label => onChange({ ...activity, [side]: { ...activity[side], label } }), true)}
         <label>{side} alternative text<textarea maxLength={500} value={activity[side].altText}
@@ -198,7 +199,7 @@ export function ExperienceActivityEditor({ activity, onChange, imageAssets = [] 
         <option value="">Use the labelled schematic</option>
         {activity.imageAssetId && !imageAssets.some(asset => asset.id === activity.imageAssetId)
           && <option value={activity.imageAssetId}>Unavailable image ({activity.imageAssetId})</option>}
-        {imageAssets.map(asset => <option key={asset.id} value={asset.id}>{asset.filename}</option>)}
+        {imageAssets.map(asset => <option key={asset.id} value={asset.id}>{assetLabel(asset)}</option>)}
       </select></label>
       <p>Position numbered points at percentages of the image canvas. The separate hotspot list stays in the order authored below and remains available to keyboard and screen-reader users.</p>
       {activity.hotspots.map((point, index) => {
@@ -263,7 +264,7 @@ export function ExperienceActivityEditor({ activity, onChange, imageAssets = [] 
             <option value="">Choose a project image</option>
             {item.screenshotAssetId && !imageAssets.some(asset => asset.id === item.screenshotAssetId)
               && <option value={item.screenshotAssetId}>Unavailable image ({item.screenshotAssetId})</option>}
-            {imageAssets.map(asset => <option key={asset.id} value={asset.id}>{asset.filename}</option>)}
+            {imageAssets.map(asset => <option key={asset.id} value={asset.id}>{assetLabel(asset)}</option>)}
           </select></label>
           {field("Screenshot alternative text", item.screenshotAltText, screenshotAltText => update({ ...item, screenshotAltText }))}
           {field("What the screenshot shows", item.description, description => update({ ...item, description }))}

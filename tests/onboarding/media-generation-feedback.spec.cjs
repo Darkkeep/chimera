@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const { mediaCapability } = require('./media-connection-fixtures.cjs');
 test('generation animation tracks queued, running, completed and failed jobs', async ({ page, request }) => {
@@ -14,6 +15,7 @@ test('generation animation tracks queued, running, completed and failed jobs', a
   await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
   await page.goto('/');
   await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Media library', exact: true }).click();
   await page.locator('.generation-creator summary').click();
   await page.getByRole('textbox', { name: 'Purpose', exact: true }).fill('Explain the topic');
@@ -28,6 +30,7 @@ test('generation animation tracks queued, running, completed and failed jobs', a
   expect(await processing.locator('.pythia-processing-orb').evaluate(node => getComputedStyle(node, '::before').animationName)).toBe('none');
   await page.reload();
   await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Media library', exact: true }).click();
   await expect(activeJob('Generating image')).toBeVisible();
   completed = true; jobs = [{ ...job, status: 'completed', message: 'Candidate ready' }];

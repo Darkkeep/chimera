@@ -214,3 +214,26 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Animation phases share their object's lane; overlapping phases retain separate hit targets. */
+.scene-timeline .timeline-tools{gap:6px;margin:6px 0}
+.scene-timeline .timeline-tools label{max-width:150px;font-size:11px}
+.scene-timeline .timeline-tools :is(input:not([type=checkbox]),select){min-height:26px;padding:3px 5px;font-size:11px}
+.scene-timeline .timeline-tools .button{min-height:28px;padding:4px 8px;font-size:11px}
+.scene-timeline .timeline-transport .timeline-icon{display:inline-grid;place-items:center;width:30px;height:28px;padding:0;font-size:14px}
+.scene-timeline .timeline-transport output{font-size:12px;margin:0 6px}
+.scene-timeline .timeline-rail{min-height:38px}
+.scene-timeline .timeline-ruler{height:38px}
+.scene-timeline .timeline-label{padding:5px 8px;font-size:11px}
+.scene-timeline .timeline-object-row .timeline-block:not(.timeline-phase){top:4px;height:30px;padding:1px 6px 11px;font-size:11px;background:color-mix(in srgb,var(--theme-selected) 65%,var(--theme-panel));border-color:var(--line)}
+.scene-timeline .timeline-object-row .timeline-phase{height:7px;min-width:7px;padding:0;font-size:0;z-index:1;border-radius:2px;background:var(--accent);top:12px}
+.scene-timeline .timeline-object-row .timeline-presentation{top:20px;background:#c5a45d}
+.scene-timeline .timeline-object-row .timeline-exit{top:28px;background:#bf7c82}
+.scene-timeline .timeline-phase:focus-visible{height:14px;z-index:4;font-size:9px;padding:0 3px;min-width:60px;color:var(--theme-panel)}
+.scene-timeline .timeline-properties{gap:6px;padding:6px 0;grid-template-columns:repeat(auto-fit,minmax(110px,1fr))}
+.scene-timeline .timeline-properties :is(input,select){min-height:26px;padding:3px 5px;font-size:11px}
+.scene-timeline .timeline-properties label,.scene-timeline .timeline-properties strong{font-size:11px}
+.timeline-reflections{border-top:1px solid var(--line);margin-top:6px;padding-top:6px;font-size:12px}
+.timeline-reflections>summary{cursor:pointer;font-weight:600}
+
+.timeline-layer-handle[draggable="true"]{cursor:grab}.timeline-layer-handle[draggable="true"]:active{cursor:grabbing}.timeline-object-row[data-drop-edge="before"]{box-shadow:inset 0 2px var(--accent)}.timeline-object-row[data-drop-edge="after"]{box-shadow:inset 0 -2px var(--accent)}

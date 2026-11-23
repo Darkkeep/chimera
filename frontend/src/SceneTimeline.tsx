@@ -1,3 +1,4 @@
+import { assetLabel } from "./asset-display";
 import { useState } from "react";
 import type { PointerEvent } from "react";
 import type { Project } from "./App";
@@ -100,6 +101,7 @@ export function SceneTimeline({
   audition,
   onAudition,
   onDurationValidityChange,
+  initiallyOpen = true,
 }: {
   layout: SceneLayout;
   project: Project;
@@ -116,6 +118,7 @@ export function SceneTimeline({
   audition: { muted: string[]; solo: string | null };
   onAudition: (a: { muted: string[]; solo: string | null }) => void;
   onDurationValidityChange: (valid: boolean) => void;
+  initiallyOpen?: boolean;
 }) {
   const [zoom, setZoom] = useState(1),
     [snap, setSnap] = useState(true),
@@ -124,6 +127,21 @@ export function SceneTimeline({
     [message, setMessage] = useState("");
   const [waveforms, setWaveforms] = useState<Record<string, Waveform>>({}),
     [decoding, setDecoding] = useState(false);
+  const [draggedLayer,setDraggedLayer] = useState<string | null>(null);
+  const [layerDrop,setLayerDrop] = useState<{id:string;edge:"before"|"after"} | null>(null);
+  function reorderLayer(id: string, targetId: string, edge: "before" | "after") {
+    const moving=layout.elements.find(element=>element.id===id);
+    if(disabled || !moving || moving.locked || id===targetId) return;
+    const frontToBack=[...layout.elements].reverse().filter(element=>element.id!==id);
+    const targetIndex=frontToBack.findIndex(element=>element.id===targetId);
+    if(targetIndex<0)return;
+    frontToBack.splice(targetIndex+(edge==="after"?1:0),0,moving);
+    const elements=frontToBack.reverse();
+    if(elements.every((element,index)=>element.id===layout.elements[index].id))return;
+    setPlaying(false);setPreview(false);select(id);setClipId(null);
+    commit({...layout,elements});
+    setMessage(`Moved ${moving.name || moving.kind} to layer ${elements.length-elements.findIndex(element=>element.id===id)} of ${elements.length}, front to back.`);
+  }
   const timeline = withSceneTimeline(layout).timeline;
   const media = project.storyboard.assets.filter(
     (a) => a.kind === "audio" || a.kind === "video",
@@ -295,7 +313,7 @@ export function SceneTimeline({
           {
             id,
             assetId: asset.id,
-            name: asset.filename,
+            name: assetLabel(asset),
             kind: asset.kind as "audio" | "video",
             startMs: time,
             sourceInMs: 0,
@@ -347,41 +365,49 @@ export function SceneTimeline({
     }
   }
   return (
-    <details className="scene-timeline" open>
+    <details className="scene-timeline" open={initiallyOpen}>
       <summary>Timeline and layers</summary>
       <fieldset disabled={disabled}>
-        <div className="timeline-tools">
+        <div className="timeline-tools timeline-transport" role="group" aria-label="Timeline playback">
           <button
             type="button"
-            className="button button-outline"
+            className="button button-outline timeline-icon"
+            aria-label={playing ? "Pause" : "Play"}
+            title={playing ? "Pause" : "Play"}
             onClick={() => {
               setPreview(true);
               setPlaying(!playing);
             }}
           >
-            {playing ? "Pause" : "Play"}
+            <span aria-hidden="true">{playing ? "Ⅱ" : "▶"}</span>
           </button>
           <button
             type="button"
-            className="button button-outline"
+            className="button button-outline timeline-icon"
+            aria-label="Restart" title="Stop and return to start"
             onClick={() => {
               setPreview(true);
               setTime(0);
               setPlaying(false);
             }}
           >
-            Restart
+            <span aria-hidden="true">■</span>
+          </button>
+          <button type="button" className="button button-outline timeline-icon" aria-label="Forward 5 seconds" title="Forward 5 seconds" onClick={() => { setPreview(true); setTime(Math.min(timeline.durationMs, time + 5000)); }}>
+            <span aria-hidden="true">▸▸</span>
           </button>
           <button
             type="button"
-            className="button button-outline"
-            aria-pressed={!preview}
+            className="button button-outline timeline-icon"
+            aria-label={preview ? "Return to editing" : "Preview at playhead"}
+            title={preview ? "Return to editing" : "Preview at playhead"}
+            aria-pressed={preview}
             onClick={() => {
               setPlaying(false);
               setPreview(!preview);
             }}
           >
-            {preview ? "Return to editing" : "Preview at playhead"}
+            <span aria-hidden="true">{preview ? "✎" : "◉"}</span>
           </button>
           <output>{(time / 1000).toFixed(2)} s</output>
           <label className="timeline-checkbox">
@@ -440,7 +466,7 @@ export function SceneTimeline({
               <option value="">Choose audio or video</option>
               {media.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.filename}
+                  {assetLabel(a)}
                 </option>
               ))}
             </select>
@@ -483,11 +509,41 @@ export function SceneTimeline({
                 end = element.timing?.endMs || timeline.durationMs;
               const a = element.animations;
               return (
-                <div className="timeline-row" key={element.id}>
+                <div className="timeline-row timeline-object-row" key={element.id} data-layer-id={element.id} data-drop-edge={layerDrop?.id===element.id?layerDrop.edge:undefined}
+                  onDragOver={event=>{
+                    // WebKit can strip custom drag MIME types across native
+                    // events. Trust only a drag begun by this mounted editor.
+                    if(disabled || !draggedLayer || !layout.elements.some(item=>item.id===draggedLayer&&!item.locked))return;
+                    const id=draggedLayer;
+                    if(id===element.id)return;
+                    event.preventDefault();event.dataTransfer.dropEffect="move";
+                    const bounds=event.currentTarget.getBoundingClientRect();setLayerDrop({id:element.id,edge:event.clientY<bounds.top+bounds.height/2?"before":"after"});
+                  }}
+                  onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setLayerDrop(null);}}
+                  onDrop={event=>{
+                    event.preventDefault();
+                    const bounds=event.currentTarget.getBoundingClientRect();
+                    if(draggedLayer)reorderLayer(draggedLayer,element.id,event.clientY<bounds.top+bounds.height/2?"before":"after");
+                    setDraggedLayer(null);setLayerDrop(null);
+                  }}>
+
                   <button
                     type="button"
-                    className="timeline-label"
+                    className="timeline-label timeline-layer-handle"
+                    draggable={!disabled && !element.locked}
+                    title="Drag to change layer order. Alt+Up brings forward; Alt+Down sends backward."
+                    aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+                    onDragStart={event=>{if(disabled||element.locked){event.preventDefault();return;}event.dataTransfer.setData("application/x-chimera-layer",element.id);event.dataTransfer.effectAllowed="move";setDraggedLayer(element.id);}}
+                    onDragEnd={()=>{setDraggedLayer(null);setLayerDrop(null);}}
+                    onKeyDown={event=>{
+                      if(!event.altKey || !["ArrowUp","ArrowDown"].includes(event.key))return;
+                      event.preventDefault();event.stopPropagation();
+                      const layers=[...layout.elements].reverse(),index=layers.findIndex(item=>item.id===element.id);
+                      const target=layers[index+(event.key==="ArrowUp"?-1:1)];
+                      if(target)reorderLayer(element.id,target.id,event.key==="ArrowUp"?"before":"after");
+                    }}
                     aria-pressed={selection === element.id}
+                    onFocus={() => select(element.id)}
                     onClick={() => {
                       select(element.id);
                       setClipId(null);
@@ -577,6 +633,15 @@ export function SceneTimeline({
                               type="button"
                               className={`timeline-block timeline-phase timeline-${phase}`}
                               aria-label={`Move ${phase} animation`}
+                              title={`${phase}: ${a[phase].effect} · ${(start / 1000).toFixed(2)}–${((start + duration) / 1000).toFixed(2)} s`}
+                              disabled={element.locked}
+                              onClick={() => { select(element.id); setClipId(null); }}
+                              onKeyDown={event => {
+                                if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                                event.preventDefault();
+                                const next = Math.max(phase === "presentation" ? entranceEnd : 0, Math.min(timeline.durationMs - duration, start + (event.key === "ArrowLeft" ? -100 : 100)));
+                                changeElement(element, { animations: alignExitTiming({ ...a, [phase]: { ...a[phase], delayMs: phase === "presentation" ? next - entranceEnd : next } }) });
+                              }}
                               style={{
                                 left: `${(start / timeline.durationMs) * 100}%`,
                                 width: `${(duration / timeline.durationMs) * 100}%`,
@@ -1054,8 +1119,9 @@ export function SceneTimeline({
             </span>
           ))}
         </div>
-        <section aria-label="Interactive video authoring">
-          <h3>Video reflections</h3>
+        <details className="timeline-reflections" open={initiallyOpen}>
+          <summary>Video reflections</summary>
+          <section aria-label="Interactive video authoring">
           <p>Optional, formative pauses (up to 8). Seeking past a pause skips it; replay allows unlimited retries. No grades or completion gates. Responses are not saved.</p>
           <button type="button" className="button button-outline"
             disabled={(timeline.pauses || []).length >= 8}
@@ -1101,7 +1167,8 @@ export function SceneTimeline({
               <button type="button" onClick={() => save({ ...timeline, pauses: (timeline.pauses || []).filter(p => p.id !== point.id) })}>Remove video pause {index + 1}</button>
             </fieldset>
           ))}
-        </section>
+          </section>
+        </details>
         <p className="field-hint">
           Drag blocks to move them; use the time fields to resize precisely.
           Source media is preserved. Required clips earn credit only from

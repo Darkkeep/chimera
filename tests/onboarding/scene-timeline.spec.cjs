@@ -357,8 +357,8 @@ test("native shapes, alpha, effects, timeline seconds and layer edits survive sa
     await page.setViewportSize({width,height:900});
     await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
-  await page.evaluate(()=>{document.documentElement.dataset.theme='light';document.documentElement.style.colorScheme='light';});
-  await expect(reopened.getByRole("button", { name: "Play", exact: true })).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await page.evaluate(()=>{document.documentElement.dataset.appearance='light';document.documentElement.dataset.theme='light';document.documentElement.style.colorScheme='light';});
+  await expect(reopened.getByRole("button", { name: "Play", exact: true })).toHaveCSS("background-color", "rgb(237, 233, 225)");
   expect((await new AxeBuilder({page}).include('.visual-editor').analyze()).violations).toEqual([]);
   await reopened.screenshot({path:testInfo.outputPath('timeline-editor-light.png')});
   expect(errors).toEqual([]);

@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const { guide, expectStep, startChimera, createProject, saveScene } = require('./helpers.cjs');
 
@@ -16,7 +17,9 @@ test('dismiss leaves the current draft open and next help follows the new workfl
   await expect(guide(page)).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Scene title', exact: true })).toHaveValue('Draft survives dismissal');
   await page.getByRole('button', { name: 'Close scene editor', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Media library', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Start / resume walkthrough', exact: true }).click();
   await expectStep(page, 'Upload images or audio');
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -41,6 +44,7 @@ test('dismissed canvas guide picks up Details rather than resuming the old task 
 
 test('a stale first-scene review does not resume inside media settings', async ({ page }) => {
   await pauseFirstScene(page);
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'AI Connections', exact: true }).click();
   const dialog = page.getByRole('dialog');
@@ -68,7 +72,9 @@ test('editing a scene starts its workflow without returning to first-scene revie
 
 test('sidebar follows the current media workflow rather than stale first-scene progress', async ({ page }) => {
   await pauseFirstScene(page);
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Media library', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Start / resume walkthrough', exact: true }).click();
   await expectStep(page, 'Upload images or audio');
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -80,6 +86,7 @@ test('completed first-scene practice does not restart scene creation from Storyb
   await saveScene(page, 'Continue authoring this scene');
   await guide(page).getByRole('button', { name: 'Next', exact: true }).click();
   await guide(page).getByRole('button', { name: 'Close guide', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Start / resume walkthrough', exact: true }).click();
   await expectStep(page, 'Edit scene content and settings');
   await expect(page.getByRole('textbox', { name: 'Scene title', exact: true })).toHaveValue('Continue authoring this scene');
@@ -88,6 +95,7 @@ test('completed first-scene practice does not restart scene creation from Storyb
 
 test('a targetless result review pauses when leaving its workflow', async ({ page }) => {
   await pauseFirstScene(page);
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'AI Connections', exact: true }).click();
   await page.getByRole('button', { name: 'Start walkthrough', exact: true }).click();
@@ -118,7 +126,9 @@ test('stage walkthrough stays attached when switching editor tabs', async ({ pag
 
 test('new project walkthrough starts at naming instead of skipping to the previous project', async ({ page }) => {
   await pauseFirstScene(page);
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Create project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   await page.getByRole('textbox', { name: 'Course name', exact: true }).fill('Preserved new course draft');
   await page.getByRole('button', { name: 'Start walkthrough', exact: true }).click();
   await expectStep(page, 'Name your course');
@@ -186,6 +196,7 @@ for (const [type, title] of [['matching', 'Matching question'], ['short-answer',
 
 test('unsupported forms do not offer a misleading resume for an unrelated paused guide', async ({ page }) => {
   await pauseFirstScene(page);
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Assessments', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Resume walkthrough', exact: true })).toHaveCount(0);
@@ -212,7 +223,8 @@ for (const [provider, kind] of [['Cartesia', 'narration'], ['Shotstack', 'video'
       return route.fulfill({ json: collection });
     });
     async function chooseTask(title) {
-      await page.getByRole('button', { name: 'Review tools', exact: true }).click();
+      await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'Review tools', exact: true }).click();
       await page.getByRole('button', { name: 'Guided review', exact: true }).click();
       await page.getByText(/^All functionality walkthroughs/).click();
       await page.getByRole('button', { name: `Start ${title}`, exact: true }).click();

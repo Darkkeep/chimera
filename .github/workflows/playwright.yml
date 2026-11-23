@@ -3,7 +3,7 @@ on:
   push:
     branches: [ main, master ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, feature/chimera-2-golden-path-qualification, fix/issue-46-access-refresh, feature/chimera2-progressive-authoring, feature/chimera2-m3-artifact-import ]
 concurrency:
   group: chimera-checks-${{ github.ref }}
   cancel-in-progress: true
@@ -41,7 +41,14 @@ jobs:
       run: pip install -r backend/requirements-dev.txt
     - name: Verify retained qualification evidence
       run: python docs/qualification/support/verify.py
+    - name: Configure bounded Ubuntu package downloads
+      run: |
+        printf '%s\n' 'Acquire::Retries "2";' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/80-chimera-ci >/dev/null
+        if [ -f /etc/apt/apt-mirrors.txt ]; then
+          printf '%s\n' 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+        fi
     - name: Install Playwright Browsers
+      timeout-minutes: 8
       run: npx playwright install --with-deps chromium
     - name: Run backend checks
       run: python -m unittest discover -s backend/tests
@@ -49,16 +56,55 @@ jobs:
       run: npm run verify:onboarding:artifact
     - name: Build frontend
       run: npm run build --prefix frontend
+    - name: Qualify deterministic progressive scenes without providers
+      run: |
+        node --test tests/progressive/events.test.cjs
+        npx playwright test --config playwright.progressive.config.cjs --project chromium
+      env:
+        CHIMERA_TEST_PYTHON: python
+    - name: Qualify file-start review with progressive release gates off
+      run: npx playwright test --config playwright.release-candidate.config.cjs --project chromium
+      env:
+        CHIMERA_TEST_PYTHON: python
+    - uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: release-candidate-defaults-${{ github.event.pull_request.head.sha }}
+        path: |
+          workspace/release-candidate-results/
+          workspace/release-candidate-report/
+        retention-days: 14
     - name: Qualify visual editing and exported rendering
       if: ${{ success() || failure() }}
       run: npm run test:visual
       env:
         CHIMERA_TEST_PYTHON: python
+    - uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: progressive-authoring-${{ github.event.pull_request.head.sha }}
+        path: |
+          workspace/progressive-results/
+          workspace/progressive-report/
+        retention-days: 14
     - name: Qualify hosted authentication over HTTPS
       if: ${{ success() || failure() }}
       run: npm run test:auth
       env:
         CHIMERA_TEST_PYTHON: python
+    - name: Qualify opt-in Studio 2.0 smoke on Chromium
+      if: ${{ success() }}
+      run: npm run test:onboarding -- studio authoring-menus compact-timeline course-libraries dialog-selection direct-stage header-save interface-themes keyboard-delete media-alias preview-discussion-layout preview-player-controls scene-refinement.spec theme-surfaces timeline-layer-order windows-menu workspace-navigation access-navigation.spec studio-draft-access.spec --project=chromium --workers=1
+      env:
+        CHIMERA_TEST_PYTHON: python
+        VITE_CHIMERA_STUDIO_ENABLED: "true"
+        CHIMERA_STUDIO_TEST: "true"
+    - name: Qualify classic editor with Studio disabled
+      if: ${{ success() }}
+      run: npm run test:onboarding -- scene-refinement-classic --project=chromium --workers=1
+      env:
+        CHIMERA_TEST_PYTHON: python
+        VITE_CHIMERA_STUDIO_ENABLED: "false"
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:
@@ -83,6 +129,8 @@ jobs:
         shard: [1, 2, 3]
     env:
       CHIMERA_TEST_PYTHON: python
+      CHIMERA_STUDIO_TEST: "true"
+      VITE_CHIMERA_STUDIO_ENABLED: "true"
     steps:
     - uses: actions/checkout@v4
       with:
@@ -109,7 +157,14 @@ jobs:
         npm ci
         npm ci --prefix frontend
         pip install -r backend/requirements-dev.txt
+    - name: Configure bounded Ubuntu package downloads
+      run: |
+        printf '%s\n' 'Acquire::Retries "2";' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/80-chimera-ci >/dev/null
+        if [ -f /etc/apt/apt-mirrors.txt ]; then
+          printf '%s\n' 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+        fi
     - name: Install selected browser and document renderer
+      timeout-minutes: 8
       # Word export always uses Chromium, including Firefox/WebKit test shards.
       run: npx playwright install --with-deps chromium ${{ matrix.browser }}
     - name: Provide audio output for Firefox playback

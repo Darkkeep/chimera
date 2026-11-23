@@ -21,6 +21,19 @@ ADVICE = {"kind": "answer", "content": "Investigate the queue before choosing tr
 
 
 class SavedConnectionBridgeTests(unittest.TestCase):
+    def test_safe_failure_category_survives_bridge_and_unknown_details_are_redacted(self):
+        from backend.app.pythia_failures import FAILURE_MESSAGES
+        process = Mock(returncode=1)
+        with patch.object(talk.subprocess, 'Popen', return_value=process):
+            for message in FAILURE_MESSAGES.values():
+                process.communicate.return_value = (json.dumps({'ok': False, 'errorCode': 'operation_failed', 'error': message}).encode(), b'')
+                with self.assertRaisesRegex(talk.TalkError, message.replace('.', r'\.')):
+                    talk._run_local_mcp(self.root, {'action': 'consult'})
+            process.communicate.return_value = (json.dumps({'ok': False, 'errorCode': 'operation_failed', 'error': 'SECRET provider body'}).encode(), b'')
+            with self.assertRaises(talk.TalkError) as caught:
+                talk._run_local_mcp(self.root, {'action': 'consult'})
+            self.assertNotIn('SECRET', str(caught.exception))
+
     def setUp(self):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.enterContext(patch.object(storage, "ROOT", self.root))
@@ -167,6 +180,17 @@ class PythiaTalkTests(unittest.TestCase):
                 return data
             time.sleep(.01)
         self.fail("Pythia worker did not settle")
+
+    def test_consultation_starts_from_existing_work_and_checks_alignment(self):
+        request = talk.TalkRequest(message="Expand the supplied presentation without repeating our completed analysis.",
+                                   sessionId="existing-work", requestId="existing-work-request")
+        question, binding = talk.compose(self.project.id, request)
+        self.assertIn("do not impose a fixed ADDIE entry stage or repeat completed analysis", question)
+        self.assertIn("Check alignment", question)
+        self.assertIn("when missing information or a contradiction would materially change the enhancement", question)
+        self.assertIn("Never claim to have researched, used a tool, accessed another workspace", question)
+        self.assertTrue(question.endswith(request.message))
+        self.assertEqual(binding, {"sceneRevision": None, "sources": {}})
 
     def test_direct_consultation_followup_reload_and_actor_isolation(self):
         before = storage.read_project(self.project.id).storyboard.model_dump()

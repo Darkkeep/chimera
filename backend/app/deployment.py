@@ -40,6 +40,9 @@ def public_origin() -> str:
 def cors_origins() -> list[str]:
     if deployment_profile() in {"networked", "darkrogue"}:
         return [public_origin()]
+    if deployment_profile() == "local":
+        return ["http://localhost:5173", "http://127.0.0.1:5173",
+                "http://localhost:5175", "http://127.0.0.1:5175"]
     return ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 
