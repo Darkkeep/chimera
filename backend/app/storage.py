@@ -28,6 +28,10 @@ def project_trash_path() -> Path:
     return PROJECTS / ".trash"
 
 
+class ProjectIdentityMismatch(Exception):
+    """Stored project metadata and storyboard disagree. Preserve bytes for recovery."""
+
+
 class StoryboardRevisionConflict(Exception):
     def __init__(self, expected_revision: int, actual_revision: int):
         super().__init__(f"Storyboard changed since revision {expected_revision}; current revision is {actual_revision}.")
@@ -235,6 +239,8 @@ def read_project(project_id: str) -> ProjectDetail:
         if metadata.get("trashedAt"):
             raise FileNotFoundError(project_id)
         storyboard = Storyboard.model_validate(json.loads(storyboard_file.read_text(encoding="utf-8")))
+        if metadata.get("id") != project_id or storyboard.projectId != project_id:
+            raise ProjectIdentityMismatch("This project's stored identity does not match its storyboard. No changes were made. Contact the project owner for recovery.")
         names = generated_media_names(project_id, storyboard)
         for asset in storyboard.assets:
             if asset.id in names:
@@ -284,10 +290,14 @@ def write_project_metadata(path: Path, metadata: dict[str, str | int | None]) ->
 def write_storyboard(path: Path, storyboard: Storyboard, expected_revision: int | None = None) -> None:
     with storyboard_transaction():
         storyboard = Storyboard.model_validate(storyboard.model_dump())
+        if storyboard.projectId != path.name:
+            raise ProjectIdentityMismatch("Cannot write a storyboard to a different project. No changes were made.")
         storyboard_file = path / "storyboard.json"
         revision = 1
         if storyboard_file.exists():
             previous = Storyboard.model_validate(json.loads(storyboard_file.read_text(encoding="utf-8")))
+            if previous.projectId != path.name:
+                raise ProjectIdentityMismatch("The saved storyboard belongs to a different project. No changes were made.")
             expected = storyboard.revision if expected_revision is None else expected_revision
             if expected != previous.revision:
                 raise StoryboardRevisionConflict(expected, previous.revision)
