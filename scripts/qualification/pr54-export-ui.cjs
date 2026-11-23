@@ -1,0 +1,9 @@
+const {chromium,expect}=require('@playwright/test'),fs=require('fs'),path=require('path');
+const out=process.env.CHIMERA_QUALIFICATION_OUTPUT||path.resolve('workspace/pr54-qualification'),origin='https://localhost:18002';
+(async()=>{const b=await chromium.launch();try{
+const c=await b.newContext({ignoreHTTPSErrors:true,baseURL:origin,extraHTTPHeaders:{Origin:origin}});c.setDefaultTimeout(15000);
+const account=JSON.parse(fs.readFileSync(path.join(out,'test-accounts.private.json'))).author,id=JSON.parse(fs.readFileSync(path.join(out,'project.json'))).id;
+expect((await c.request.post('/api/auth/login',{data:account})).status()).toBe(200);
+const p=await c.newPage();await p.addInitScript(id=>localStorage.setItem('chimera.activeProjectId',id),id);await p.goto('/');await p.getByRole('button',{name:'Resume authoring',exact:true}).click();await p.getByRole('button',{name:'Publish / export',exact:true}).click();const dialog=p.getByRole('dialog',{name:'Export course'});const gate=dialog.getByRole('checkbox',{name:'Require current human approval for SCORM and standalone exports'});await expect(gate).toBeEnabled();await gate.check();
+const response=p.waitForResponse(r=>r.url().includes('/scorm-12.zip?approved=true'));const download=p.waitForEvent('download');await dialog.getByRole('button',{name:'Build SCORM 1.2',exact:true}).click();const r=await response;expect(r.status()).toBe(200);await(await download).saveAs(path.join(out,'ui-approved-scorm12.zip'));await p.screenshot({path:path.join(out,'approved-export-ui.png')});fs.writeFileSync(path.join(out,'export-ui-results.json'),JSON.stringify({approvedCheckbox:'PASS',serverApprovedQuery:'PASS',responseCode:r.status(),download:'PASS'},null,2));console.log('PASS UI approval-required export and real download');
+}finally{await b.close();}})().catch(e=>{console.error(e.stack);process.exitCode=1});

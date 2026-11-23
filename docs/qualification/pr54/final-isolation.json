@@ -1,0 +1,46 @@
+{
+  "candidate": "4a38e4952de20def973b5dcd91cda3f4dfe5b1cf",
+  "units": {
+    "chimera-networked.service": {
+      "ActiveState": "active",
+      "MainPID": "146118",
+      "WorkingDirectory": "/srv/chimera-releases/8dab8474f5c1911081578240bf845762b9d9b973/backend",
+      "User": "chimera"
+    },
+    "pythia-engine.service": {
+      "ActiveState": "active",
+      "MainPID": "146063",
+      "WorkingDirectory": "/opt/pythia",
+      "User": "pythia"
+    },
+    "chimera2-pr54-4a38e49-staging.service": {
+      "ActiveState": "active",
+      "MainPID": "149762",
+      "WorkingDirectory": "/srv/chimera2-staging/ops/pr54-4a38e49",
+      "User": "chimera2-stage"
+    }
+  },
+  "frontend": {
+    "sourceSha": "4a38e4952de20def973b5dcd91cda3f4dfe5b1cf",
+    "version": "2.0.0-beta.1",
+    "studioEnabled": true,
+    "studioDefault": true
+  },
+  "stageHealth": {
+    "status": "ok"
+  },
+  "productionHealth": {
+    "status": "ok"
+  },
+  "pythiaHealth": 200,
+  "priorReleasesPreserved": true,
+  "stageSecurity": [
+    "IPAddressAllow=127.0.0.0/8 ::1/128",
+    "IPAddressDeny=::/0 0.0.0.0/0",
+    "UMask=0077",
+    "User=chimera2-stage",
+    "ReadWritePaths=/srv/chimera2-staging/state/qualification-pr54-4a38e49"
+  ],
+  "savedStudioText": "PASS",
+  "backupTimer": "active"
+}

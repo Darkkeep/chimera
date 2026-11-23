@@ -1,0 +1,29 @@
+[
+  {
+    "profile": "1.2",
+    "launch": "PASS",
+    "branching": "PASS",
+    "assessment": "PASS",
+    "tracking": "PASS",
+    "freshLaunchResume": "PASS",
+    "scope": "Standalone test player; not LMS certification"
+  },
+  {
+    "profile": "2004",
+    "launch": "PASS",
+    "branching": "PASS",
+    "assessment": "PASS",
+    "tracking": "PASS",
+    "freshLaunchResume": "PASS",
+    "scope": "Standalone test player; not LMS certification"
+  },
+  {
+    "profile": "standalone",
+    "launch": "PASS",
+    "branching": "PASS",
+    "assessment": "PASS",
+    "tracking": "not applicable",
+    "freshLaunchResume": "not tested",
+    "scope": "Standalone test player; not LMS certification"
+  }
+]

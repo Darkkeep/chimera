@@ -1,0 +1,33 @@
+{
+  "ledgerChecks": [
+    {
+      "check": "/review-approval",
+      "status": 500,
+      "result": "FAIL_CLOSED"
+    },
+    {
+      "check": "/scorm-12.zip?approved=true",
+      "status": 409,
+      "result": "FAIL_CLOSED"
+    },
+    {
+      "check": "/scorm-2004.zip?approved=true",
+      "status": 409,
+      "result": "FAIL_CLOSED"
+    },
+    {
+      "check": "/standalone.zip?approved=true",
+      "status": 409,
+      "result": "FAIL_CLOSED"
+    },
+    {
+      "check": "malformed ledger",
+      "status": 409,
+      "result": "FAIL_CLOSED"
+    }
+  ],
+  "auditAttribution": "PASS",
+  "stagingRestartPersistence": "PASS",
+  "matchedWorkspaceFiles": 66,
+  "syntheticLedgerRestored": true
+}
