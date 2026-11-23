@@ -94,6 +94,21 @@ def require_demo():
         raise HTTPException(404, "Local progressive demonstration is disabled")
 
 
+def require_available():
+    """Allow verified hosted authors to use progressive review, not synthetic demo jobs.
+
+    Hosted requests are still subject to the route's existing project action policy;
+    actor-scoped events, If-Match, and immutable source bindings remain mandatory.
+    The explicit opt-out remains available to release operators.
+    """
+    actor = get_actor_context()
+    if actor.deploymentMode == "team":
+        if os.environ.get("CHIMERA_PROGRESSIVE_HOSTED_ENABLED", "true").lower() == "true":
+            return
+        raise HTTPException(404, "Progressive authoring is disabled for this installation")
+    require_demo()
+
+
 def _directory(project_id):
     if not re.fullmatch(r"[a-zA-Z0-9_-]{1,120}", project_id):
         raise HTTPException(404, "Project not found")
