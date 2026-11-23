@@ -205,6 +205,8 @@ def get_authorization_policy() -> AuthorizationPolicy:
 
 def _hosted_request_action(request: Request) -> str:
     path = request.url.path
+    if path.endswith("/review-approval") and request.method == "POST":
+        return "review.approve"
     if ROUTE_ACTIONS.get(getattr(request.scope.get("route"), "name", "")) == "project.export":
         return "project.export"
     if "/progressive-jobs" in path:
