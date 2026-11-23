@@ -531,7 +531,7 @@ export function CoursePreview({ project, onClose, canEnhance = true, sceneId }: 
           <p aria-live="polite">{humanApproval ? humanApproval.approved
             ? "Approved for this exact storyboard revision."
             : humanApproval.state === "changed-since-review"
-              ? "Previously approved, but the storyboard has changed. Request a new approval."
+              ? "Previously approved, but the storyboard or review discussion has changed. Request a new approval."
               : humanApproval.state === "changes-requested" ? "Changes requested." : "Awaiting human approval."
             : "Checking human approval status…"}</p>
           {humanApproval?.lastDecision && <p>Last decision: {humanApproval.lastDecision.decision} by {humanApproval.lastDecision.actorDisplayName} on revision {humanApproval.lastDecision.revision}. {humanApproval.lastDecision.note}</p>}
