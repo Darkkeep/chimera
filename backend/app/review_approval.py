@@ -39,8 +39,16 @@ def receipt_path(project_id: str) -> Path:
     return storage.ROOT / "review-ledger" / (digest + ".json")
 
 
+def _receipt_digest(entry: dict) -> str:
+    payload = {key: value for key, value in entry.items() if key != "receiptSha256"}
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
 def _append_receipt(project_id: str, entry: dict):
     history = _load_receipts(project_id)
+    entry = dict(entry)
+    entry["previousReceiptSha256"] = (history[-1].get("receiptSha256") or _receipt_digest(history[-1])) if history else None
+    entry["receiptSha256"] = _receipt_digest(entry)
     history.append(entry)
     path = receipt_path(project_id)
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -77,6 +85,21 @@ def _load_receipts(project_id: str):
     receipts = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(receipts, list):
         raise ValueError("Invalid review decision history")
+    previous = None
+    sealed = False
+    for receipt in receipts:
+        if not isinstance(receipt, dict):
+            raise ValueError("Invalid review decision history entry")
+        if "receiptSha256" not in receipt:
+            # Read historic pre-chain receipts, but never trust them as current approvals.
+            if sealed:
+                raise ValueError("Unsealed entry in review decision history")
+            previous = _receipt_digest(receipt)
+            continue
+        sealed = True
+        if receipt.get("previousReceiptSha256") != previous or receipt["receiptSha256"] != _receipt_digest(receipt):
+            raise ValueError("Review decision history integrity check failed")
+        previous = receipt["receiptSha256"]
     return receipts
 
 
@@ -92,6 +115,7 @@ def review_status(project_id: str):
         valid = bool(latest and latest["decision"] == "approve"
                      and latest["revision"] == project.storyboard.revision
                      and latest["storyboardSha256"] == digest
+                     and bool(latest.get("receiptSha256"))
                      and latest.get("reviewCommentsSha256") == comment_digest
                      and not unresolved)
         return {
