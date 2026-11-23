@@ -75,6 +75,7 @@ from . import pythia_actions
 from .signal import router as signal_router
 from .build_information import runtime_build_information
 from . import progressive_authoring as progressive
+from . import review_approval
 
 
 HOSTED_ACCOUNT_PROVIDERS = {"builtin", "darkrogue"}
@@ -83,6 +84,8 @@ PUBLIC_API_PATHS = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/
 
 
 ROUTE_ACTIONS = {
+    "get_review_approval": "project.view",
+    "post_review_approval": "review.comment.create",
     "start_progressive_demo": "enhancement.job.create",
     "import_progressive_handoff": "enhancement.job.create",
     "read_progressive_events": "enhancement.job.create",
@@ -1912,6 +1915,33 @@ def get_enhancement_proposals(project_id: str) -> list[EnhancementProposal]:
         raise HTTPException(status_code=404, detail="Project not found") from error
 
 
+@app.get("/api/projects/{project_id}/review-approval", name="get_review_approval")
+def get_review_approval(project_id: str) -> dict:
+    try:
+        return review_approval.review_status(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+
+
+@app.post("/api/projects/{project_id}/review-approval", name="post_review_approval")
+def post_review_approval(
+    project_id: str,
+    data: review_approval.ReviewDecisionRequest,
+    context: Annotated[ActorContext | None, Depends(resolve_actor_context)] = None,
+    policy: Annotated[AuthorizationPolicy | None, Depends(get_authorization_policy)] = None,
+) -> dict:
+    actor = context or LOCAL_ACTOR
+    _require_action(policy or get_authorization_policy(), actor, "review.comment.create", project_id)
+    try:
+        return review_approval.record_decision(project_id, actor, data)
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+
+
 @app.get("/api/projects/{project_id}/review-comments", response_model=list[ReviewComment])
 def get_review_comments(project_id: str) -> list[ReviewComment]:
     try:
@@ -2765,9 +2795,14 @@ def export_qti_assessment_test(project_id: str) -> Response:
 
 
 @app.get("/api/projects/{project_id}/standalone.zip")
-def export_standalone(project_id: str) -> Response:
+def export_standalone(project_id: str, approved: bool = False) -> Response:
     try:
         project = read_project(project_id)
+        if approved:
+            try:
+                review_approval.require_approved(project_id, project)
+            except ValueError as error:
+                raise HTTPException(409, str(error)) from error
         content, filename = build_standalone_course(project)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
@@ -2777,9 +2812,14 @@ def export_standalone(project_id: str) -> Response:
 
 
 @app.get("/api/projects/{project_id}/scorm-2004.zip")
-def export_scorm_2004(project_id: str) -> Response:
+def export_scorm_2004(project_id: str, approved: bool = False) -> Response:
     try:
         project = read_project(project_id)
+        if approved:
+            try:
+                review_approval.require_approved(project_id, project)
+            except ValueError as error:
+                raise HTTPException(409, str(error)) from error
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
     try:
@@ -2795,9 +2835,14 @@ def export_scorm_2004(project_id: str) -> Response:
 
 
 @app.get("/api/projects/{project_id}/scorm-12.zip")
-def export_scorm_12(project_id: str) -> Response:
+def export_scorm_12(project_id: str, approved: bool = False) -> Response:
     try:
         project = read_project(project_id)
+        if approved:
+            try:
+                review_approval.require_approved(project_id, project)
+            except ValueError as error:
+                raise HTTPException(409, str(error)) from error
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
     try:
