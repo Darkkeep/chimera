@@ -578,7 +578,7 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated, firs
   return <div className="assessment-editor-backdrop" onMouseDown={(event) => event.target === event.currentTarget && !busyProposalId && onClose()}>
     <section data-onboarding="review.enhancement" className="enhancement-review-dialog" role="dialog" aria-modal="true" aria-labelledby="enhancement-review-title">
       <header className="assessment-editor-header">
-        <div><p className="eyebrow">AUTHOR APPROVAL · {pendingCount} PENDING</p><h2 id="enhancement-review-title">Storyboard suggestions</h2></div>
+        <div><p className="eyebrow">AUTHOR APPROVAL · {pendingCount} PENDING</p><h2 id="enhancement-review-title">Storyboard suggestions</h2><p className="field-hint">Editing course: <strong>{project.title}</strong>. Accepted suggestions change only this course. To build a different course, create and open that project first.</p></div>
         <button className="icon-button" onClick={onClose} disabled={Boolean(busyProposalId)} aria-label="Close suggestion review"><X size={18} /></button>
       </header>
       {hasActiveJobs && <ActiveEnhancementStatus jobs={jobs} />}
