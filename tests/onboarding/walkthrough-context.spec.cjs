@@ -128,6 +128,7 @@ test('new project walkthrough starts at naming instead of skipping to the previo
   await pauseFirstScene(page);
   await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Create project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   await page.getByRole('textbox', { name: 'Course name', exact: true }).fill('Preserved new course draft');
   await page.getByRole('button', { name: 'Start walkthrough', exact: true }).click();
   await expectStep(page, 'Name your course');

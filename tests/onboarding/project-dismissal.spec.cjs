@@ -5,6 +5,7 @@ test('project planning resists accidental dismissal and isolates new project con
   await page.route('**/pythia-conversation', route => route.fulfill({ json: { sessionId: 'dismissal-test', turns: [], actions: [], configured: true } }));
   await page.goto('/');
   await page.getByRole('button', { name: 'New Project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   let dialog = page.getByRole('dialog');
   await dialog.getByLabel('Course name', { exact: true }).fill(`Dismissal regression ${Date.now()}`);
   await dialog.getByLabel('Course prompt', { exact: true }).fill('An outline that must survive a backdrop click');
@@ -25,6 +26,7 @@ test('project planning resists accidental dismissal and isolates new project con
   await page.keyboard.press('Escape');
   await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Create project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   dialog = page.getByRole('dialog');
   await expect(dialog.getByLabel('Course name', { exact: true })).toHaveValue('');
   await expect(dialog.getByLabel('Course prompt', { exact: true })).toHaveValue('');

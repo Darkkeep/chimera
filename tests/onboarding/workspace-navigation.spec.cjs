@@ -38,6 +38,7 @@ test('mobile drawer contains keyboard focus, closes and opens authoring actions'
   await expect(show).toBeVisible();
   await show.click();
   await page.getByRole('button', { name: 'Create project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Course name', exact: true })).toBeFocused();
   await expect(page.locator('#workspace-content')).toHaveJSProperty('inert', false);
 });

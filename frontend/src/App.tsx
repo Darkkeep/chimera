@@ -1,4 +1,5 @@
 import { accessRequest } from "./access-request";
+import { ExperienceImport, progressiveImport, type ImportPreview } from "./ExperienceImport";
 import { useProjectAccess } from "./use-project-access";
 import { createPortal } from "react-dom";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
@@ -145,6 +146,54 @@ export function App() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [activeView, setActiveView] = useState<"storyboard" | "media" | "templates">("storyboard");
   const [studioPreview, setStudioPreview] = useState(studioDefault);
+  const [showNewProjectChoice, setShowNewProjectChoice] = useState(false);
+  const newProjectTrigger = useRef<HTMLElement | null>(null);
+  function beginNewProject() {
+    newProjectTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setShowNewProjectChoice(true);
+  }
+  const [showExperienceImport, setShowExperienceImport] = useState(false);
+  useEffect(() => {
+    if (showNewProjectChoice || showExperienceImport || isCreating || !newProjectTrigger.current) return;
+    const trigger = newProjectTrigger.current;
+    newProjectTrigger.current = null;
+    const frame = requestAnimationFrame(() => { if (trigger.isConnected && trigger.getClientRects().length && !trigger.closest('[inert], [aria-hidden="true"]')) trigger.focus(); else document.querySelector<HTMLElement>(".workspace-menu-toggle")?.focus(); });
+    return () => cancelAnimationFrame(frame);
+  }, [showNewProjectChoice, showExperienceImport, isCreating]);
+  const importTarget = useRef<Project | null>(null);
+
+  function beginExperienceImport() {
+    importTarget.current = null;
+    setShowExperienceImport(true);
+  }
+
+  async function createExperienceFromImport(file: File, preview: ImportPreview, title: string) {
+    // Retain the target on failure: retry must never create duplicate projects.
+    let target = importTarget.current;
+    if (!target) {
+      const response = await fetch("/api/projects", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({title})});
+      const data = await response.json();
+      if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Project could not be created.");
+      target = data as Project;
+      importTarget.current = target;
+    }
+    const isProgressive = preview.kind === "pythia" && progressiveImport;
+    const body = preview.kind === "pptx" ? new FormData() : file;
+    if (body instanceof FormData) body.append("file", file);
+    const path = preview.kind === "pptx" ? "source" : isProgressive ? "progressive-jobs/import" : "storyboard/import";
+    const response = await fetch(`/api/projects/${target.id}/${path}`, {
+      method:preview.kind === "storyboard" ? "PUT" : "POST",
+      headers:storyboardWriteHeaders(target.storyboard.revision, preview.kind !== "pptx"), body,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(`${typeof data.detail === "string" ? data.detail : "Import could not be completed."} Your new project is saved; retry uses the same project.`);
+    if (isProgressive) localStorage.setItem(`chimera.progressive.job.${target.id}`, data.jobId);
+    applyProject(preview.kind === "pythia" ? target : data as Project);
+    setShowManagement(false); setIsCreating(false); setActiveView("storyboard"); setSelectedScene(0);
+    if (isProgressive) setStudioPreview(true);
+    else if (preview.kind === "pythia") {setImportedHandoffId(data.id); setShowEnhancementReview(true);}
+    setShowExperienceImport(false);
+  }
   const [showValidation, setShowValidation] = useState(false);
   const [showAccessibility, setShowAccessibility] = useState(false);
   const [showGoldenPath, setShowGoldenPath] = useState(false);
@@ -227,7 +276,7 @@ export function App() {
     showProjectBackground ? "storyboard.background" :
     showAccessibility ? "review.accessibility" : showValidation ? "review.validation" :
     showGoldenPath ? "catalog" : showManagement ? "workspace.management" : activeView;
-  const hasOpenForm = Boolean(showHTML5 || showSceneExperience || studioInteractionSceneId || showPythiaTalk || showSources || visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showProjectBackground || showAccessibility || showValidation);
+  const hasOpenForm = Boolean(showNewProjectChoice || showExperienceImport || showHTML5 || showSceneExperience || studioInteractionSceneId || showPythiaTalk || showSources || visualSceneId || sceneDraft || isCreating || templateDraft || showExport || showPreview || showAssessmentEditor || showAssessments || showCompletionSettings || showEnhancementReview || showPythiaAnalysis || showPythiaTransform || showPythiaAssessmentDesign || showPythiaCourseReview || showIntelligenceEngine || showAIConnection || showProjectBackground || showAccessibility || showValidation);
   const preparationAttempt = useRef("");
   useEffect(() => {
     if (accessStatus !== "verified" || !project.id || !permissions.canEdit || busy || hasOpenForm || !project.storyboard.scenes.some(item => !item.visualLayout)) return;
@@ -1347,6 +1396,18 @@ export function App() {
   if (reviewToken && session) return <ReviewLinkView token={reviewToken} onClose={() => { history.replaceState(null, "", location.pathname+location.search); setReviewToken(""); }} />;
 
   return <ProjectPalette projectId={project.id} value={project}>
+{showNewProjectChoice && <EditorDialog labelledBy="new-project-choice-title" onClose={() => setShowNewProjectChoice(false)}>
+      <h2 id="new-project-choice-title">New Project</h2>
+      <p>How would you like to start?</p>
+      <div className="new-project-choices">
+        <button type="button" className="button button-accent" onClick={() => { setShowNewProjectChoice(false); beginExperienceImport(); }}>Start from a file</button>
+        <p>Import a supported Pythia handoff JSON, Chimera storyboard JSON, or PowerPoint (.pptx). Preview before creating.</p>
+        <button type="button" className="button button-outline" onClick={() => { setShowNewProjectChoice(false); beginProjectCreate(); }}>Start with an idea</button>
+        <p>Name your course, optionally attach source documents, and plan with Pythia.</p>
+      </div>
+      <button type="button" className="button button-outline" onClick={() => setShowNewProjectChoice(false)}>Cancel</button>
+    </EditorDialog>}
+{showExperienceImport && <ExperienceImport onClose={() => setShowExperienceImport(false)} onCreate={createExperienceFromImport} />}
     {/* Keep draft state mounted while its authorized Studio host comes and goes. */}
     <div style={{ display: showManagement || openingProject ? "none" : "contents" }} inert={accessStatus !== "verified"}>{visualEditor}</div>
     {retainWorkspace && accessStatus === "unavailable" && !showManagement && <div className="access-refresh-status" role="status">Connection interrupted. Your workspace and draft are preserved. Actions will resume when access is verified. <button type="button" onClick={access.retry}>Retry project access</button></div>}
@@ -1356,7 +1417,7 @@ export function App() {
       <div className="brand"><BrandMark /><div className="brand-wordmark"><span>CHIMERA</span></div></div>
       <div className="sidebar-project">
         <label data-onboarding="workspace.project" className="project-switcher"><span>PROJECT</span><select value={project.id} onChange={(event) => { const id = event.target.value; sceneNavigation.request(() => void switchProject(id)); }} disabled={busy || (hasOpenForm && !visualSceneId && !studioInteractionSceneId) || projects.length === 0} aria-label="Switch project"><option value="" disabled>Select a project</option><ProjectOptions projects={projects} sceneCounts recentFirst /></select></label>
-        <button className="new-project-button" onClick={() => sceneNavigation.request(() => beginProjectCreate())} disabled={busy || (hasOpenForm && !visualSceneId && !studioInteractionSceneId) || !canCreateProject}><Plus size={15} /> Create project</button>
+        <button className="button button-accent" onClick={event => { event.currentTarget.focus(); sceneNavigation.request(beginExperienceImport); }} disabled={busy || !canCreateProject}>Start Experience from Import</button><button className="new-project-button" onClick={event => { event.currentTarget.focus(); sceneNavigation.request(beginNewProject); }} disabled={busy || (hasOpenForm && !visualSceneId && !studioInteractionSceneId) || !canCreateProject}><Plus size={15} /> Create project</button>
         <button className="new-project-button" onClick={() => startOnboarding()} disabled={busy}><Route size={15} /> Start / resume walkthrough</button>
       </div>
       <div className="workspace-label">WORKSPACE</div>
@@ -1405,7 +1466,7 @@ export function App() {
     </div>}
     <main className="main-content" id="workspace-content" tabIndex={-1}>
       {deepLinkError && <div className="notice" role="alert"><span>{deepLinkError}</span><button className="icon-button" onClick={() => setDeepLinkError("")} aria-label="Dismiss deep link error"><X size={16} /></button></div>}
-      {showManagement && <ManagementView openError={projectOpenError} busy={busy || (hasOpenForm && !visualSceneId && !studioInteractionSceneId)} canCreateProject={canCreateProject} onCreateProject={beginProjectCreate} canResume={Boolean(project.id)} onOpenProject={async (id) => { if (id === project.id) return switchProject(id, true); let opening: Promise<boolean> | undefined; sceneNavigation.request(() => { opening = switchProject(id, true); }); return opening ? await opening : true; }} onProjectTrashed={handleProjectTrashed} onProjectsRestored={handleProjectsRestored} onRelationshipUpdated={handleRelationshipUpdated} onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} />}
+      {showManagement && <ManagementView onStartImport={beginExperienceImport} openError={projectOpenError} busy={busy || (hasOpenForm && !visualSceneId && !studioInteractionSceneId)} canCreateProject={canCreateProject} onCreateProject={parent => parent ? beginProjectCreate(parent) : beginNewProject()} canResume={Boolean(project.id)} onOpenProject={async (id) => { if (id === project.id) return switchProject(id, true); let opening: Promise<boolean> | undefined; sceneNavigation.request(() => { opening = switchProject(id, true); }); return opening ? await opening : true; }} onProjectTrashed={handleProjectTrashed} onProjectsRestored={handleProjectsRestored} onRelationshipUpdated={handleRelationshipUpdated} onClose={() => { setShowManagement(false); managementButtonRef.current?.focus(); }} />}
       <div hidden={showManagement}>
       {openingProject || !retainWorkspace ? <section className="project-access-panel" aria-label="Project access" aria-busy={openingProject || accessStatus === "checking"}>
         <h1>{accessStatus === "denied" ? "Project access unavailable" : "Opening project"}</h1>
@@ -1490,7 +1551,7 @@ export function App() {
           <div className="canvas-body"><div className="canvas-meta"><span>SCENE {String(selectedScene + 1).padStart(2, "0")} · {scene.sceneType.toUpperCase()}</span><span>{scene.templateId ? templates.find((template) => template.id === scene.templateId)?.title || "TEMPLATE" : "AUTHORED SCENE"}{scene.sourceSlide ? ` · SOURCE SLIDE ${scene.sourceSlide}` : " · NEW SCENE"}</span></div><div className="slide-canvas">{scene.previewImage ? <img className="slide-preview" src={`/api/projects/${project.id}/${scene.previewImage}`} alt={scene.sourceSlide ? `Rendered source slide ${scene.sourceSlide}` : scene.title} /> : <><div className="canvas-grid" /><div className="slide-label">{scene.title}</div><div className="slide-subtitle">{scene.extractedText.join(" · ") || "No additional slide text extracted"}</div></>}<div className="canvas-chip">{scene.previewImage ? "SOURCE SLIDE PREVIEW" : "AUTHORED SCENE"}</div></div><div className="canvas-footer"><div><strong>{scene.title}</strong><span>Speaker notes: {scene.notes || "None extracted"}</span><span>{scene.imageAssets.length} images / {scene.audioAssets.length} audio files{scene.sourceAnimationXml ? " / Native animation captured" : ""}{scene.sourceTransitionXml ? " / Transition captured" : ""}</span>{scene.renderWarning && <span className="render-warning">{scene.renderWarning}</span>}</div></div>{(scene.imageAssets.length > 0 || scene.audioAssets.length > 0) && <div className="scene-media-strip">{scene.imageAssets.map((assetId) => { const asset = project.storyboard.assets.find((item) => item.id === assetId); return asset ? <img key={assetId} src={`/api/projects/${project.id}/assets/${assetId}`} alt={asset.filename} title={asset.filename} /> : null; })}{scene.audioAssets.map((assetId) => { const asset = project.storyboard.assets.find((item) => item.id === assetId); return asset ? <div className="scene-audio" key={assetId}><span>{asset.filename}</span><audio controls preload="metadata" src={`/api/projects/${project.id}/assets/${assetId}`} /></div> : null; })}</div>}
           {scene.audioAssets.length > 0 && <section data-onboarding="scene.audio" className="audio-requirement-setting"><label><input type="checkbox" checked={scene.audioRequired} onChange={(event) => void setSceneAudioRequired(event.target.checked)} disabled={busy} /><span><strong>Require attached audio to finish</strong><small>Learners must play every attached track to the end.</small></span></label></section>}
           </div></> : <div className="canvas-empty"><div className="brand-emblem"><BrandMark /></div><span className="brand-signature">Distinct parts. Deliberate design. Powerful learning.</span><strong>{project.id ? "Your storyboard starts here" : "Build your next learning experience"}</strong><span>{project.id ? "Bring in a PowerPoint or start with a blank scene." : "Create a project to organize scenes, media, and assessments."}</span>
-          <div className="empty-start-actions">{project.id ? <><label className={`button button-accent upload-control ${busy ? "disabled" : ""}`}><FileUp size={16} /> Import PowerPoint<input type="file" aria-label="Import PowerPoint" accept=".pptx" onChange={uploadDeck} disabled={busy} /></label><button className="button button-outline" onClick={beginSceneCreate} disabled={busy}><Plus size={16} /> Add scene</button></> : <button className="button button-accent" onClick={() => beginProjectCreate()}><Plus size={16} /> Create project</button>}</div></div>}</section>
+          <div className="empty-start-actions">{project.id ? <><label className={`button button-accent upload-control ${busy ? "disabled" : ""}`}><FileUp size={16} /> Import PowerPoint<input type="file" aria-label="Import PowerPoint" accept=".pptx" onChange={uploadDeck} disabled={busy} /></label><button className="button button-outline" onClick={beginSceneCreate} disabled={busy}><Plus size={16} /> Add scene</button></> : <button className="button button-accent" onClick={event => { event.currentTarget.focus(); beginNewProject(); }}><Plus size={16} /> Create project</button>}</div></div>}</section>
       </div></> : activeView === "media" ? <section data-onboarding="media.library" className="template-library media-library">
         <div className="template-toolbar">
           <div><p className="eyebrow">PROJECT ASSETS</p><h2>Media library</h2><span className="field-hint">{mediaScene ? `Selected scene: ${mediaScene.title}` : "Whole course · filter by scene to attach media"}</span></div>
@@ -1530,10 +1591,11 @@ export function App() {
       const index = (updatedProject ?? project).storyboard.scenes.findIndex(candidate => candidate.id === sceneId);
       if (index >= 0) { setSelectedScene(index); setShowAssessments(false); setShowAssessmentEditor(true); }
     }} />}
+
     {showEnhancementReview && <EnhancementReviewView project={project} firstProposalId={importedHandoffId} onClose={() => { setImportedHandoffId(undefined); setShowEnhancementReview(false); }} onProjectUpdated={applyProject} />}
     {showValidation && <ValidationView projectId={project.id} onClose={() => setShowValidation(false)} onOpenScene={(sceneId, issueCode) => { const index = scenes.findIndex((item) => item.id === sceneId); setShowValidation(false); if (index >= 0) setSelectedScene(index); if (issueCode === "missing-image-alt-text") setShowAccessibility(true); else if (issueCode === "missing-assessment-item") setShowAssessmentEditor(true); else setActiveView("storyboard"); }} />}
     {showAccessibility && <AccessibilityView projectId={project.id} revision={project.storyboard.revision} scenes={scenes} assets={project.storyboard.assets} onClose={() => setShowAccessibility(false)} onProjectUpdated={applyProject} />}
-    {showGoldenPath && <GoldenPathView walkthroughStatuses={Object.fromEntries(Object.entries(guides).map(([id, guide]) => [id, guide.controller.snapshot().status]))} onStartWalkthrough={() => startOnboarding()} onSelectWalkthrough={id => startOnboarding(id)} project={project} onClose={() => setShowGoldenPath(false)} onCreateProject={() => { setShowGoldenPath(false); beginProjectCreate(); }} onOpenStoryboard={() => { setShowGoldenPath(false); setActiveView("storyboard"); }} onOpenMedia={() => { setShowGoldenPath(false); setActiveView("media"); }} onOpenAccessibility={() => { setShowGoldenPath(false); setShowAccessibility(true); }} onOpenPreview={() => { setShowGoldenPath(false); if (project.id) setShowPreview(true); }} onRunValidation={() => { setShowGoldenPath(false); setShowValidation(true); }} onOpenPythiaAnalysis={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaAnalysis(true); }} onOpenPythiaTransform={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaTransform(true); }} onOpenPythiaAssessment={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaAssessmentDesign(true); }} onOpenSuggestions={() => { setShowGoldenPath(false); setShowManagement(false); setShowEnhancementReview(true); }} onOpenCourseReview={() => { setShowGoldenPath(false); setShowManagement(false); setShowPythiaCourseReview(true); }} onOpenManagement={() => { setShowGoldenPath(false); setShowManagement(true); }} onOpenExport={() => { setShowGoldenPath(false); setShowManagement(false); setShowExport(true); }} />}
+    {showGoldenPath && <GoldenPathView walkthroughStatuses={Object.fromEntries(Object.entries(guides).map(([id, guide]) => [id, guide.controller.snapshot().status]))} onStartWalkthrough={() => startOnboarding()} onSelectWalkthrough={id => startOnboarding(id)} project={project} onClose={() => setShowGoldenPath(false)} onCreateProject={() => { setShowGoldenPath(false); beginNewProject(); }} onOpenStoryboard={() => { setShowGoldenPath(false); setActiveView("storyboard"); }} onOpenMedia={() => { setShowGoldenPath(false); setActiveView("media"); }} onOpenAccessibility={() => { setShowGoldenPath(false); setShowAccessibility(true); }} onOpenPreview={() => { setShowGoldenPath(false); if (project.id) setShowPreview(true); }} onRunValidation={() => { setShowGoldenPath(false); setShowValidation(true); }} onOpenPythiaAnalysis={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaAnalysis(true); }} onOpenPythiaTransform={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaTransform(true); }} onOpenPythiaAssessment={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaAssessmentDesign(true); }} onOpenSuggestions={() => { setShowGoldenPath(false); setShowManagement(false); setShowEnhancementReview(true); }} onOpenCourseReview={() => { setShowGoldenPath(false); setShowManagement(false); setShowPythiaCourseReview(true); }} onOpenManagement={() => { setShowGoldenPath(false); setShowManagement(true); }} onOpenExport={() => { setShowGoldenPath(false); setShowManagement(false); setShowExport(true); }} />}
     {showPreview && project.id && <CoursePreview key={previewSceneId || "experience"} project={project} sceneId={previewSceneId} onClose={() => { setShowPreview(false); setPreviewSceneId(undefined); }} canEnhance={permissions.canEnhance} />}
     {showAssessmentEditor && project.id && scene && permissions.canEdit && <AssessmentEditor initialType={questionType} projectId={project.id} projectTitle={project.title} revision={project.storyboard.revision} scene={scene} scenes={scenes}
       onClose={() => setShowAssessmentEditor(false)}

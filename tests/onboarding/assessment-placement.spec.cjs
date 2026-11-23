@@ -14,6 +14,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     await page.goto('/');
     await openWorkspaceMenu(page);
     await page.getByRole('button', { name: 'Create project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
     const projectDialog = page.getByRole('dialog', { name: 'Name your course' });
     await projectDialog.getByRole('textbox', { name: 'Course name' }).fill(`Assessment placement ${viewport.width}`);
     await projectDialog.getByRole('button', { name: 'Create project', exact: true }).click();

@@ -87,6 +87,7 @@ test('manually created projects do not inherit completed walkthroughs', async ({
   await expectStep(page, 'Walkthrough complete'); await guide(page).getByRole('button', { name: 'Close guide' }).click();
   await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Create project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   await page.getByRole('textbox', { name: 'Course name' }).fill(unique('Separate project'));
   await page.getByRole('dialog').getByRole('button', { name: 'Create project', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0); await expect(guide(page)).toHaveCount(0);
