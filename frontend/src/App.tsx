@@ -85,7 +85,7 @@ export type CourseCompletionSettings = { passingScore: number; includeOptionalAs
 export type ExportSettings = { packageWarningThresholdMB: number };
 export type Scene = { html5Activity?: HTML5Activity | null; experience?: Experience | null; videoAssets?: string[]; mediaPlacements?: MediaPlacement[]; excludedCourseMedia?: string[]; visualLayout?: SceneLayout | null; backgroundAsset?: string | null; id: string; sourceSlide: number | null; title: string; sceneType: SceneType; layoutMode: LayoutMode; templateId: string | null; required: boolean; audioRequired: boolean; assessmentItem: AssessmentItem | null; assessmentSettings: AssessmentSettings | null; extractedText: string[]; actionDescription: string; narration: string; imageAssets: string[]; imageAltText: Record<string, string>; decorativeImages: string[]; audioAssets: string[]; previewImage: string | null; renderWarning: string | null; sourceAnimationXml: string | null; sourceTransitionXml: string | null; notes: string };
 export type Asset = { displayName?: string; id: string; kind: "image" | "audio" | "video" | "html5"; transcript?: string; captionsVtt?: string; language?: string; sharedSourceId?: string | null; role?: "content" | "background"; filename: string; contentType: string; sizeBytes: number; sha256: string; path: string; attributionText: string; attributionStatus: "draft" | "complete" };
-export type ProjectSummary = { id: string; title: string; sceneCount: number; updatedAt: string; hasSourceDeck: boolean; parentProjectId?: string | null; siblingOrder?: number; metadataRevision?: number };
+export type ProjectSummary = { id: string; title: string; sceneCount: number; updatedAt: string; hasSourceDeck: boolean; ownerId?: string; parentProjectId?: string | null; siblingOrder?: number; metadataRevision?: number };
 export type Assessment = { id: string; title: string; questionSceneIds: string[] };
 export type Project = ProjectSummary & { storyboard: { backgroundAsset?: string | null; courseMedia?: MediaPlacement[]; revision: number; scenes: Scene[]; assets: Asset[]; assessments?: Assessment[]; completionSettings: CourseCompletionSettings; exportSettings: ExportSettings } };
 type SceneDraft = { id: string | null; title: string; screenText: string; actionDescription: string; notes: string; required: boolean; audioRequired: boolean; sceneType: SceneType; layoutMode: LayoutMode; templateId: string };
@@ -227,6 +227,7 @@ export function App() {
     if (!showExport || !project.id) return;
     const controller = new AbortController();
     setExportApproval(null);
+    setApprovedExport(false);
     fetch(`/api/projects/${project.id}/review-approval`, { signal: controller.signal })
       .then(async response => response.ok ? response.json() : Promise.reject(new Error("Review status unavailable")))
       .then(setExportApproval).catch(() => { if (!controller.signal.aborted) setExportApproval(null); });
