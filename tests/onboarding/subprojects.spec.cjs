@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 
@@ -63,7 +64,7 @@ for (const [theme, width] of [['light', 1440], ['dark', 390]]) {
     await row(parent).getByRole('button', { name: 'Create subproject', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toContainText(`Creating a subproject of ${parent.title}`);
-    await expect(page.getByRole('combobox', { name: 'Switch project', exact: true })).toBeDisabled();
+    await expect(page.getByRole('combobox', { name: 'Switch project', exact: true, includeHidden: true })).toBeDisabled();
     const childTitle = `${prefix} Created child`;
     await dialog.getByRole('textbox', { name: 'Course name', exact: true }).fill(childTitle);
     await dialog.getByRole('button', { name: 'Create project', exact: true }).click();
@@ -71,14 +72,15 @@ for (const [theme, width] of [['light', 1440], ['dark', 390]]) {
     const breadcrumb = page.getByRole('navigation', { name: 'Project hierarchy', exact: true });
     await expect(breadcrumb).toContainText(parent.title);
     await expect(breadcrumb).toContainText(childTitle);
-    const activeId = await page.getByRole('combobox', { name: 'Switch project', exact: true }).inputValue();
+    const activeId = await page.getByRole('combobox', { name: 'Switch project', exact: true, includeHidden: true }).inputValue();
     const child = await (await request.get(`/api/projects/${activeId}`)).json();
     expect(child.parentProjectId).toBe(parent.id);
     expect(child.sceneCount).toBe(0);
     expect(child.storyboard.assets).toEqual([]);
     expect(child.storyboard.backgroundAsset).toBeNull();
-    await expect(page.getByRole('combobox', { name: 'Switch project' }).locator('optgroup').filter({ has: page.locator(`option[value="${activeId}"]`) })).toHaveAttribute('label', parent.title);
-    await page.getByRole('button', { name: 'My Work', exact: true }).click();
+    await expect(page.getByRole('combobox', { name: 'Switch project', includeHidden: true }).locator('optgroup').filter({ has: page.locator(`option[value="${activeId}"]`) })).toHaveAttribute('label', parent.title);
+    await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'My Work', exact: true }).click();
     await expect(row(parent)).toBeVisible();
     const parentExpand = page.getByRole('button', { name: `Subprojects of ${parent.title}`, exact: true });
     await parentExpand.click();
@@ -181,6 +183,6 @@ test('restricted hierarchy listings do not expose hidden titles or relationship 
   await expect(page.locator('.management-view')).not.toContainText(second.title);
   await expect(page.locator('.project-hierarchy-actions')).toHaveCount(0);
   await expect(page.locator('.project-expand')).toHaveCount(0);
-  await expect(page.getByRole('combobox', { name: 'Switch project', exact: true }).locator(`option[value="${parent.id}"]`)).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: 'Switch project', exact: true, includeHidden: true }).locator(`option[value="${parent.id}"]`)).toHaveCount(0);
   await expect(page.locator('.management-view')).toContainText('Parent project unavailable');
 });

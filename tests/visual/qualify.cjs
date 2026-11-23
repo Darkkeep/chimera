@@ -183,7 +183,10 @@ async function freePort() {
   const expectedTextWidth = Number(await text.locator('xpath=..').evaluate(element => element.style.width.replace('px', '')));
   await page.getByLabel('Stage width', { exact: true }).fill('1400');
   await page.getByLabel('Stage height', { exact: true }).fill('800');
-  await page.getByLabel('Background color', { exact: true }).fill('#ddeeff');
+  await page.getByRole('button', { name: /^Background color #/ }).click();
+  await page.getByRole('textbox', { name: 'Background color hex', exact: true }).fill('#ddeeff');
+  await page.getByRole('textbox', { name: 'Background color hex', exact: true }).press('Enter');
+  await page.getByRole('button', { name: 'Close color picker', exact: true }).click();
   await page.getByRole('button', { name: 'Center horizontally', exact: true }).click();
   assert.equal(Number(await page.getByLabel('Element x', { exact: true }).inputValue()), 500);
   await page.getByRole('button', { name: 'Align bottom', exact: true }).click();

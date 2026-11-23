@@ -875,6 +875,7 @@ def _manifest_12(project: ProjectDetail) -> bytes:
     })
     metadata = ET.SubElement(root, f"{{{SCORM_12_NAMESPACE}}}metadata")
     ET.SubElement(metadata, f"{{{SCORM_12_NAMESPACE}}}schema").text = "ADL SCORM"
+    ET.SubElement(metadata, f"{{{SCORM_12_NAMESPACE}}}schemaversion").text = "1.2"
     organizations = ET.SubElement(root, f"{{{SCORM_12_NAMESPACE}}}organizations", {"default": "ORG-1"})
     organization = ET.SubElement(organizations, f"{{{SCORM_12_NAMESPACE}}}organization", {"identifier": "ORG-1"})
     ET.SubElement(organization, f"{{{SCORM_12_NAMESPACE}}}title").text = project.title

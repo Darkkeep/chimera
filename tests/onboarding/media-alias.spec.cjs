@@ -1,0 +1,24 @@
+
+const{test,expect}=require('@playwright/test');
+async function setup(page,request){
+ let project=await(await request.post('/api/projects',{data:{title:'Media alias synthetic'}})).json();
+ project=await(await request.post(`/api/projects/${project.id}/scenes`,{headers:{'If-Match':`"${project.storyboard.revision}"`},data:{title:'Media references',visualLayout:{enabled:true,elements:[]}}})).json();
+ const buffer=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAE0lEQVR4nGP8//8/AwMDEwMYAAAkBgMBXaJOiAAAAABJRU5ErkJggg==','base64');
+ const response=await request.post(`/api/projects/${project.id}/assets`,{headers:{'If-Match':`"${project.storyboard.revision}"`},multipart:{file:{name:'original-image.png',mimeType:'image/png',buffer}}});expect(response.ok()).toBeTruthy();project=await response.json();
+ await page.addInitScript(id=>localStorage.setItem('chimera.activeProjectId',id),project.id);await page.goto('/');await page.getByRole('button',{name:'Resume authoring',exact:true}).click();const show=page.getByRole('button',{name:'Show workspace menu',exact:true});if(await show.isVisible())await show.click();await page.getByRole('navigation',{name:'Workspace',exact:true}).getByRole('button',{name:'Media library',exact:true}).click();await page.getByLabel('Filter media by scene',{exact:true}).selectOption('');
+ const card=page.locator('.media-item').first();await expect(card).toBeVisible();return{project,card};
+}
+test('media library aliases save, reopen, clear and appear in authoring pickers',async({page,request},info)=>{
+ const{project,card}=await setup(page,request);const original=project.storyboard.assets[0];await card.getByRole('button',{name:'Rename original-image.png'}).click();const input=card.getByRole('textbox',{name:'Media display name'});await input.fill('Safety reference diagram');await input.press('Enter');await expect(card.locator('.media-item-info>strong')).toHaveText('Safety reference diagram');await expect(card).toContainText('Original file: original-image.png');
+ const saved=await(await request.get(`/api/projects/${project.id}`)).json();expect(saved.storyboard.assets[0]).toEqual({...original,displayName:'Safety reference diagram'});
+ await page.screenshot({path:info.outputPath('media-alias.png'),fullPage:true});
+ await page.reload();await page.getByRole('button',{name:'Resume authoring',exact:true}).click();await page.getByRole('button',{name:'Edit scene',exact:true}).click();const editor=page.locator('.modal.visual-editor');await expect(editor.getByRole('combobox',{name:'Image from media library',exact:true}).getByRole('option',{name:'Safety reference diagram',exact:true})).toHaveCount(1);await editor.getByRole('button',{name:'Close scene editor'}).click();
+ const show=page.getByRole('button',{name:'Show workspace menu',exact:true});if(await show.isVisible())await show.click();await page.getByRole('navigation',{name:'Workspace',exact:true}).getByRole('button',{name:'Media library',exact:true}).click();await page.getByLabel('Filter media by scene',{exact:true}).selectOption('');await card.getByRole('button',{name:'Rename Safety reference diagram'}).click();await card.getByRole('textbox',{name:'Media display name'}).fill('');await card.getByRole('button',{name:'Save name'}).click();await expect(card.locator('.media-item-info>strong')).toHaveText('original-image.png');
+});
+for(const status of [403,412])test(`rejected alias save ${status} retains the name draft`,async({page,request})=>{
+ const{card}=await setup(page,request);await card.getByRole('button',{name:'Rename original-image.png'}).click();await card.getByRole('textbox',{name:'Media display name'}).fill('Keep this draft');await page.route('**/assets/*/metadata',route=>route.fulfill({status,json:{detail:'Rejected alias'}}));await card.getByRole('button',{name:'Save name'}).click();await expect(card.getByRole('alert')).toBeVisible();await expect(card.getByRole('textbox',{name:'Media display name'})).toHaveValue('Keep this draft');await expect(card.locator('.media-item-info>strong')).toHaveText('original-image.png');
+ await card.getByRole('button',{name:'Cancel',exact:true}).click();await expect(card.getByRole('button',{name:'Rename original-image.png'})).toBeFocused();
+});
+test('rename cancel is keyboard accessible and does not change the asset',async({page,request})=>{
+ await page.setViewportSize({width:390,height:1000});const{project,card}=await setup(page,request);await card.getByRole('button',{name:'Rename original-image.png'}).click();const input=card.getByRole('textbox',{name:'Media display name'});await expect(input).toBeFocused();await input.fill('Unsaved name');await input.press('Escape');await expect(card.getByRole('button',{name:'Rename original-image.png'})).toBeFocused();const current=await(await request.get(`/api/projects/${project.id}`)).json();expect(current.storyboard.assets[0].displayName).toBe('');
+});

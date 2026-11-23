@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 from uuid import uuid4
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from backend.app import darkrogue_auth, main, storage
@@ -80,12 +81,18 @@ class DarkrogueSignInTests(unittest.TestCase):
         self.enterContext(patch.dict("os.environ", {
             "CHIMERA_DEPLOYMENT_PROFILE": "darkrogue", "CHIMERA_PUBLIC_ORIGIN": CHIMERA_ORIGIN,
             "CHIMERA_DARKROGUE_SSO_SECRET": SECRET}))
+        self.decision = {"revision": 1, "allowed": True, "scopeManaged": False,
+                         "capabilities": ["app.use", "author", "review", "export", "administration"]}
+        self.authority = self.enterContext(patch("backend.app.central_access.fetch_access",
+                                                 return_value=self.decision))
         self.store = AccountStore(self.root)
         self.client = TestClient(main.app, base_url=CHIMERA_ORIGIN)
         self.addCleanup(self.client.close)
         self.origin = {"Origin": CHIMERA_ORIGIN}
 
     def sign_in(self, token=None, **kwargs):
+        if kwargs.get("role") == "LEARNER":
+            self.decision.update(revision=2, capabilities=["app.use", "review"])
         return self.client.post("/api/auth/darkrogue", json={"token": token or mint(**kwargs)}, headers=self.origin)
 
     def test_config_reports_darkrogue_sign_in_urls_without_password_login(self):
@@ -104,7 +111,7 @@ class DarkrogueSignInTests(unittest.TestCase):
         self.assertEqual(identity["actor"]["actorDisplayName"], "Dark Keep")
         self.assertEqual(identity["policy"]["identityProvider"], "darkrogue")
         self.assertEqual({item["role"] for item in identity["memberships"]},
-                         {"administrator", "author", "instructional-designer"})
+                         {"administrator", "author", "instructional-designer", "reviewer"})
         # A DARKROGUE administrator is authenticated, but not automatically admitted.
         self.assertEqual(self.client.get("/api/admission/status").json(), {"admitted": False})
         self.assertEqual(self.client.post("/api/projects", json={"title": "Denied"}, headers=self.origin).status_code, 403)
@@ -156,6 +163,36 @@ class DarkrogueSignInTests(unittest.TestCase):
         denied = self.sign_in(sub="supabase-user-2", email="learner@example.com", name="Learner", role="LEARNER")
         self.assertEqual(denied.status_code, 403)
         self.assertEqual(self.client.get("/api/projects").status_code, 401)
+
+    def test_existing_cookie_obeys_current_authority_for_edits_export_and_suspension(self):
+        from backend.app.admission import AdmissionStore
+
+        email = "pilot@example.test"
+        AdmissionStore(self.root).set_approved(email, True)
+        self.assertEqual(self.sign_in(sub=str(uuid4()), email=email, name="Pilot").status_code, 200)
+        created = self.client.post("/api/projects", json={"title": "Fixture"}, headers=self.origin)
+        self.assertEqual(created.status_code, 201)
+        project = "/api/projects/" + created.json()["id"]
+        self.assertEqual(self.client.get(project + "/storyboard/export").status_code, 200)
+        self.decision.update(revision=2, capabilities=["app.use", "review"])
+        self.assertEqual(self.client.get(project).status_code, 200)
+        self.assertEqual(self.client.post(project + "/scenes", json={}, headers=self.origin).status_code, 403)
+        self.assertEqual(self.client.get(project + "/storyboard/export").status_code, 403)
+        self.decision.update(revision=3, capabilities=["app.use", "author", "export"])
+        self.assertTrue(self.client.get(project + "/permissions").json()["canEdit"])
+        self.decision.update(revision=4, allowed=False)
+        self.assertEqual(self.client.get(project).status_code, 403)
+        self.decision.update(revision=5, allowed=True)
+        self.assertEqual(self.client.get(project).status_code, 401)
+
+    def test_authority_outage_denies_existing_session_and_new_sign_in(self):
+        self.assertEqual(self.sign_in(sub=str(uuid4()), email="pilot@example.test").status_code, 200)
+        self.authority.side_effect = HTTPException(503, "Authority unavailable")
+        self.assertEqual(self.client.get("/api/identity/context").status_code, 503)
+        denied = self.sign_in(sub=str(uuid4()), email="new@example.test")
+        self.assertEqual(denied.status_code, 503)
+        self.assertNotIn("set-cookie", denied.headers)
+        self.assertNotIn("new@example.test", self.store._read()["accounts"])
 
     def test_password_login_and_reset_are_disabled_under_darkrogue(self):
         login = self.client.post("/api/auth/login", json={"email": "darkkeep@gmail.com", "password": "irrelevant-passphrase"}, headers=self.origin)

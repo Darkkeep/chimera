@@ -3,7 +3,7 @@ const AxeBuilder = require('@axe-core/playwright').default;
 const { execFileSync } = require('node:child_process');
 const { existsSync } = require('node:fs');
 const path = require('node:path');
-const { guide, expectStep, startChimera, createProject, saveScene, reloadAuthoring } = require('./helpers.cjs');
+const { openWorkspaceMenu, guide, expectStep, startChimera, createProject, saveScene, reloadAuthoring } = require('./helpers.cjs');
 const unique = name => `${name} ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`;
 const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAE0lEQVR4nGP8//8/AwMDEwMYAAAkBgMBXaJOiAAAAABJRU5ErkJggg==', 'base64');
 function pptx() {
@@ -18,6 +18,7 @@ async function seed(page) {
   return page.evaluate(() => localStorage.getItem('chimera.activeProjectId'));
 }
 async function choose(page, name) {
+  await openWorkspaceMenu(page);
   const review = page.getByRole('button', { name: 'Guided review', exact: true });
   if (!await review.isVisible()) await page.getByRole('button', { name: 'Review tools', exact: true }).click();
   await review.click();
@@ -248,8 +249,12 @@ test('media provider walkthroughs require successful explicit actions and retain
 test('Pythia guides fit desktop and mobile, preserve drafts and do not submit on navigation', async ({ page }) => {
   const id = await seed(page);
   const state = await mockPythia(page, id);
-  for (const [width, theme] of [[1440, 'Light'], [390, 'Dark']]) {
+  for (const [width, theme] of [[1440, 'Light Temple'], [390, 'Classic Dark']]) {
     await page.setViewportSize({ width, height: 1000 });
+    // Crossing the mobile breakpoint closes the drawer asynchronously. Wait for
+    // that existing responsive state before opening it; do not race its reset.
+    if (width <= 760) await expect(page.getByRole('button', { name: 'Show workspace menu', exact: true })).toBeVisible();
+    await openWorkspaceMenu(page);
     const reviewTools = page.getByRole('button', { name: 'Review tools', exact: true });
     if (await reviewTools.getAttribute('aria-expanded') === 'true') await reviewTools.click();
     const settings = page.getByRole('button', { name: 'Settings', exact: true });
@@ -494,7 +499,8 @@ test('reordering, audio requirements, export threshold and deletion persist only
 
 test('catalog search is usable in a narrow dark window', async ({ page }) => {
   await seed(page); await page.setViewportSize({ width: 600, height: 900 }); await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.getByRole('button', { name: 'Settings', exact: true }).click(); await page.getByRole('radio', { name: 'Dark', exact: true }).check();
+  await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click(); await page.getByRole('radio', { name: 'Classic Dark', exact: true }).check();
   await page.getByRole('button', { name: 'Review tools', exact: true }).click(); await page.getByRole('button', { name: 'Guided review' }).click(); await page.getByText(/^All functionality walkthroughs/).click();
   await page.getByRole('searchbox', { name: 'Find a walkthrough' }).fill('storyboard');
   await expect(page.getByRole('button', { name: 'Start Download Chimera storyboard' })).toBeVisible();

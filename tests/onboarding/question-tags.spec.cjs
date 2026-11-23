@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 
@@ -24,7 +25,8 @@ for (const theme of ['light', 'dark']) {
       await page.goto('/');
       const bank = page.getByRole('dialog', { name: 'Assessments', exact: true });
       async function openEditor() {
-        await page.getByRole('button', { name: 'Assessments', exact: true }).click();
+        await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'Assessments', exact: true }).click();
         await bank.getByRole('button', { name: 'Edit question and metadata', exact: true }).nth(1).click();
         const editor = page.getByRole('dialog', { name: 'Question 2', exact: true });
         await expect(editor.locator('.question-references')).not.toHaveAttribute('open', '');

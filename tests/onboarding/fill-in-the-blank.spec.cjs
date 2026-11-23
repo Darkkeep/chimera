@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 
 for (const width of [1440, 390]) {
@@ -17,7 +18,8 @@ for (const width of [1440, 390]) {
     await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
     await page.route('**/api/projects', route => route.fulfill({ json: [project] }));
     await page.goto('/');
-    await page.getByRole('button', { name: 'Assessments', exact: true }).click();
+    await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'Assessments', exact: true }).click();
     const bank = page.getByRole('dialog', { name: 'Assessments', exact: true });
     await expect(bank).toContainText('LEGACY_BLANK · Fill-in-the-blank');
     await bank.getByRole('button', { name: 'Edit question and metadata', exact: true }).click();

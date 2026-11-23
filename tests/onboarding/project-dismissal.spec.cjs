@@ -1,9 +1,11 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 test('project planning resists accidental dismissal and isolates new project content', async ({ page }) => {
   await page.route('**/api/ai-connection', route => route.fulfill({ json: { configured: false, canManage: false } }));
   await page.route('**/pythia-conversation', route => route.fulfill({ json: { sessionId: 'dismissal-test', turns: [], actions: [], configured: true } }));
   await page.goto('/');
   await page.getByRole('button', { name: 'New Project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   let dialog = page.getByRole('dialog');
   await dialog.getByLabel('Course name', { exact: true }).fill(`Dismissal regression ${Date.now()}`);
   await dialog.getByLabel('Course prompt', { exact: true }).fill('An outline that must survive a backdrop click');
@@ -12,16 +14,19 @@ test('project planning resists accidental dismissal and isolates new project con
   await expect(dialog).toBeVisible();
   await expect(dialog.getByLabel('Course prompt', { exact: true })).toHaveValue('An outline that must survive a backdrop click');
   await dialog.getByRole('button', { name: 'Create & plan with Pythia', exact: true }).click();
-  await expect(dialog.getByLabel('Your message', { exact: true })).toBeEnabled();
-  await dialog.getByLabel('Your message', { exact: true }).fill('Unsent expanded outline');
+  await expect(dialog.getByLabel('What would you like to do?', { exact: true })).toBeEnabled();
+  await dialog.getByLabel('What would you like to do?', { exact: true }).fill('Unsent expanded outline');
   await page.locator('.modal-backdrop').click({ position: { x: 2, y: 2 } });
   await page.keyboard.press('Escape');
-  await expect(dialog.getByLabel('Your message', { exact: true })).toHaveValue('Unsent expanded outline');
+  await expect(dialog.getByLabel('What would you like to do?', { exact: true })).toHaveValue('Unsent expanded outline');
   await dialog.getByRole('button', { name: 'Open storyboard', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
-  await expect(page.getByLabel('Your message', { exact: true })).toHaveValue('Unsent expanded outline');
+  await expect(page.getByLabel('What would you like to do?', { exact: true })).toHaveValue('Unsent expanded outline');
   await page.keyboard.press('Escape');
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Create project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   dialog = page.getByRole('dialog');
   await expect(dialog.getByLabel('Course name', { exact: true })).toHaveValue('');
   await expect(dialog.getByLabel('Course prompt', { exact: true })).toHaveValue('');

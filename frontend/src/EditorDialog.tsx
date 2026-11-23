@@ -14,6 +14,7 @@ export function EditorDialog({ children, labelledBy, onClose, busy = false, dism
   onboardingJourney?: string;
 }) {
   const dialog = useRef<HTMLElement>(null);
+  const backdropPress = useRef(false);
   const latest = useRef({ onClose, busy, dismissible });
   latest.current = { onClose, busy, dismissible };
 
@@ -24,7 +25,7 @@ export function EditorDialog({ children, labelledBy, onClose, busy = false, dism
     const focusable = () => Array.from(dialog.current?.querySelectorAll<HTMLElement>(
       'button:not(:disabled), input:not(:disabled):not([type="hidden"]), select:not(:disabled), textarea:not(:disabled), summary, a[href], [tabindex="0"]',
     ) ?? []).filter((element) => element.getClientRects().length > 0);
-    const initial = dialog.current?.querySelector<HTMLElement>("input:not(:disabled), textarea:not(:disabled)");
+    const initial = focusable().find(element => element.matches("input, textarea"));
     (initial ?? focusable()[0] ?? dialog.current)?.focus();
 
     function onKeyDown(event: KeyboardEvent) {
@@ -51,12 +52,20 @@ export function EditorDialog({ children, labelledBy, onClose, busy = false, dism
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
-      if (previousFocus?.isConnected) previousFocus.focus();
+      if (previousFocus?.isConnected && previousFocus.getClientRects().length > 0 && !previousFocus.closest('[inert], [aria-hidden="true"]')) previousFocus.focus();
+      else document.querySelector<HTMLElement>(".workspace-menu-toggle, #workspace-content")?.focus();
     };
   }, []);
 
-  return <div className="modal-backdrop" onClick={(event) => {
-    if (event.target === event.currentTarget && !busy && dismissible) onClose();
+  return <div className="modal-backdrop" onPointerDown={(event) => {
+    // A text-selection drag can synthesize a backdrop click even when it began inside.
+    backdropPress.current = event.target === event.currentTarget;
+  }} onPointerUp={(event) => {
+    backdropPress.current = backdropPress.current && event.target === event.currentTarget;
+  }} onPointerCancel={() => { backdropPress.current = false; }} onClick={(event) => {
+    const dismiss = backdropPress.current && event.target === event.currentTarget;
+    backdropPress.current = false;
+    if (dismiss && !busy && dismissible) onClose();
   }}>
     <section ref={dialog} data-onboarding={onboardingTarget} data-onboarding-journey={onboardingJourney} className={`modal ${className}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy} tabIndex={-1}>
       {children}

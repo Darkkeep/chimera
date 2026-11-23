@@ -126,6 +126,8 @@ def _run_job(project_id: str, job_id: str) -> None:
         if job.cancelRequested:
             storage.update_media_generation_job(project_id, job_id, status="cancelled", progress=100, message="Cancelled before processing")
             return
+        from .central_access import require_job_access
+        require_job_access(job.actorId, project_id, "media.job.create")
         if _provider_factory is not _provider:
             provider = _provider_factory()
         elif job.kind == "video" and job.connectionId not in {None, "pythia", "legacy-openai"}:

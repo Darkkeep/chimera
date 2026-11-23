@@ -83,6 +83,7 @@ test('AI draft text is fitted before review and unresolved edits cannot be saved
   await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
   const editor = page.getByRole('dialog').last();
   await editor.getByRole('tab', { name: 'Details', exact: true }).click();
+  await editor.locator('.scene-ai-options > summary').click();
   await editor.getByLabel('Scene prompt', { exact: true }).fill('Draft a supply checklist.');
   await editor.getByRole('button', { name: 'Generate scene + layout draft' }).click();
   await expect(editor.getByRole('tab', { name: 'Stage', exact: true })).toHaveAttribute('aria-selected', 'true');

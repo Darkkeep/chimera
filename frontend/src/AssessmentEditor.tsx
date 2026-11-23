@@ -9,6 +9,7 @@ import "./assessment-settings.css";
 import "./assessment-types.css";
 
 type AssessmentEditorProps = {
+  initialType?: AssessmentType;
   projectId: string;
   projectTitle: string;
   revision: number;
@@ -92,8 +93,8 @@ function questionTypeName(type: AssessmentType): string {
   })[type];
 }
 
-export function AssessmentEditor({ projectId, projectTitle, revision, scene, scenes, onClose, onProjectUpdated }: AssessmentEditorProps) {
-  const [item, setItem] = useState<AssessmentItem>(() => scene.assessmentItem ?? createDefaultItem("single-choice", scene));
+export function AssessmentEditor({ projectId, projectTitle, revision, scene, scenes, onClose, onProjectUpdated, initialType = "single-choice" }: AssessmentEditorProps) {
+  const [item, setItem] = useState<AssessmentItem>(() => scene.assessmentItem ?? createDefaultItem(initialType, scene));
   const [settings, setSettings] = useState<AssessmentSettings>(() => scene.assessmentSettings ?? { maxAttempts: 2, passingScore: 100, scoreWeight: 1, remediationSceneId: null });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -187,6 +188,7 @@ export function AssessmentEditor({ projectId, projectTitle, revision, scene, sce
         method: "PATCH",
         headers: storyboardWriteHeaders(revision),
         body: JSON.stringify({
+          sceneType: "question",
           assessmentSettings: settings,
           assessmentItem: {
             ...item,

@@ -1,0 +1,18 @@
+.app-shell > .workspace-navigation{position:relative;flex:0 0 232px;width:232px;transition:width .2s ease,flex-basis .2s ease}
+.app-shell > .workspace-navigation.menu-closed{flex-basis:52px;width:52px}
+.workspace-navigation > .sidebar{position:sticky;top:0;width:232px;height:100dvh;overflow-y:auto;padding-top:64px;transition:transform .2s ease,visibility .2s}
+.workspace-navigation.menu-closed > .sidebar{transform:translateX(-100%);visibility:hidden;pointer-events:none}
+.workspace-menu-toggle{position:fixed;top:12px;left:12px;z-index:40;display:grid;place-items:center;width:40px;height:40px;border:1px solid #52606d;border-radius:8px;background:var(--chimera-carbon,#171d24);color:var(--chimera-white-hot,#fff);cursor:pointer}
+.workspace-menu-toggle:focus-visible{outline:2px solid var(--chimera-ignition,#ff6a21);outline-offset:3px}
+.workspace-menu-backdrop{position:fixed;inset:0;z-index:41;border:0;background:#0008}
+@media(max-width:760px){
+  .app-shell > .workspace-navigation,.app-shell > .workspace-navigation.menu-closed{flex:0 0 0;width:0}
+  .app-shell:has(> .workspace-navigation) > .main-content{padding-top:60px}
+  .workspace-navigation > .sidebar{position:fixed;inset:0 auto 0 0;z-index:42;width:min(300px,calc(100vw - 48px));height:100dvh;display:flex;flex-direction:column;padding:64px 16px 20px}
+  .workspace-navigation .workspace-menu-toggle{z-index:43}
+  .workspace-navigation .sidebar .brand{padding-bottom:24px}
+  .workspace-navigation .sidebar .sidebar-project{display:flex;flex-direction:column;align-items:stretch}
+  .workspace-navigation .sidebar nav{display:flex;flex-direction:column}
+  .workspace-navigation .sidebar .sidebar-review{position:static}
+}
+@media(prefers-reduced-motion:reduce){.app-shell > .workspace-navigation,.workspace-navigation > .sidebar{transition:none}}
