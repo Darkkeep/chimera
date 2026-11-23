@@ -520,7 +520,7 @@ export function CoursePreview({ project, onClose, canEnhance = true, sceneId }: 
       </article>
       </div>
       <aside className="course-preview-discussion" aria-label="Scene discussion panel">
-        {!sceneId && <section className="course-preview-review" aria-label="Human review decision">
+        {!sceneId && <section className="course-preview-approval" aria-label="Human review decision">
           <h2>Human review · Revision {project.storyboard.revision}</h2>
           <p role="status">{humanApproval ? humanApproval.approved
             ? "Approved for this exact storyboard revision."
