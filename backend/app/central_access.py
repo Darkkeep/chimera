@@ -136,7 +136,7 @@ def roles_for_capabilities(capabilities: list[str]) -> list[str]:
 def permits_action(capabilities: list[str], action: str) -> bool:
     if action in {"workspace.view", "identity.self", "identity.view", "review.invitation", "project.view", "project.metadata.view", "project.list"}:
         return "app.use" in capabilities
-    if action in {"review.comment.create", "review.reply.create", "review.comment.resolve"}:
+    if action in {"review.comment.create", "review.reply.create", "review.comment.resolve", "review.approve"}:
         return "review" in capabilities
     if action in {"project.export", "review.share"}:
         return "export" in capabilities
