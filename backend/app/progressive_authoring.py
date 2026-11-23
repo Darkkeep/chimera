@@ -46,7 +46,7 @@ class DraftScene(SceneCreate):
 
 class Provenance(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    producer: Literal["deterministic-fixture-v1", "pythia-authoring-fixture-v1", "pythia-production-handoff-v1"] = "deterministic-fixture-v1"
+    producer: Literal["deterministic-fixture-v1", "pythia-authoring-fixture-v1", "pythia-production-handoff-v1", "pythia-authored-draft-v1"] = "deterministic-fixture-v1"
     sourceIds: list[str] = Field(default_factory=list, max_length=20)
     locators: list[str] = Field(default_factory=lambda: ["synthetic:inspection-basics"])
     rationale: str = Field(default="", max_length=2000)
