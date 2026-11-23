@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { EditorDialog } from "./EditorDialog";
 
 export type ImportPreview = { kind: "pythia" | "storyboard" | "pptx"; title: string; scenes: {title: string; extractedText?: string | string[]}[]; diagnostics: string[] };
-export const progressiveImport = import.meta.env.VITE_CHIMERA_STUDIO_ENABLED === "true" && import.meta.env.VITE_CHIMERA_PROGRESSIVE_DEMO_ENABLED === "true";
+export const progressiveImport = import.meta.env.VITE_CHIMERA_STUDIO_ENABLED === "true" && (import.meta.env.PROD || import.meta.env.VITE_CHIMERA_PROGRESSIVE_DEMO_ENABLED === "true");
 
 export function ExperienceImport({onClose, onCreate}: {onClose: () => void; onCreate: (file: File, preview: ImportPreview, title: string) => Promise<void>}) {
   const [file, setFile] = useState<File | null>(null);
