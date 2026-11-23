@@ -31,6 +31,9 @@ def ingest_latest(project_id, actor, revision):
         indexes = [i for i, scene in enumerate(result.scenes) if scene.sceneType == "content"]
         if not indexes:
             raise HTTPException(422, "The completed Pythia draft contains no supported content scenes.")
+        source_ids = list(action.get("binding", {}).get("sources", {}))
+        if len(source_ids) > 20:
+            raise HTTPException(422, "This draft references more than 20 sources; review a smaller draft without discarding source identity.")
         fingerprint = hashlib.sha256(json.dumps(action["result"], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
         for path in progressive._directory(project_id).glob("*.json"):
             prior = json.loads(path.read_text(encoding="utf-8"))
@@ -53,7 +56,7 @@ def ingest_latest(project_id, actor, revision):
             provenance = base.model_copy(update={
                 "producer": "pythia-authored-draft-v1", "artifactId": action["id"],
                 "sourceProjectId": project_id, "sourceSceneId": f"draft-scene-{index + 1}",
-                "sourceIds": list(action.get("binding", {}).get("sources", {}))[:20],
+                "sourceIds": source_ids,
                 "locators": [], "artifactSha256": fingerprint,
             })
             progressive.emit_scene(project_id, job["jobId"], actor.actorId, f"scene-{index + 1}",
