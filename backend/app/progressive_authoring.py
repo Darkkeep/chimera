@@ -134,9 +134,13 @@ def _read(project_id, job_id, actor_id):
 
 def _write(job):
     path = _path(job["projectId"], job["jobId"])
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     pending = path.with_suffix(".tmp")
-    pending.write_text(json.dumps(job, ensure_ascii=False), encoding="utf-8")
+    # Hosted proposal journals can retain private Pythia source content. Never
+    # create new journal files with world-readable default permissions.
+    fd = os.open(pending, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        json.dump(job, stream, ensure_ascii=False)
     pending.replace(path)
 
 
