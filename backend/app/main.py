@@ -84,6 +84,7 @@ PUBLIC_API_PATHS = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/
 ROUTE_ACTIONS = {
     "start_progressive_demo": "enhancement.job.create",
     "import_progressive_handoff": "enhancement.job.create",
+    "import_completed_pythia_draft": "enhancement.job.create",
     "read_progressive_events": "enhancement.job.create",
     "cancel_progressive_demo": "enhancement.job.manage",
     "decide_progressive_component": "scene.manage",
