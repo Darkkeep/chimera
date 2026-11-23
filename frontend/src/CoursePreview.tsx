@@ -34,6 +34,7 @@ type RemediationRoute = { assessmentSceneId: string; remediationSceneId: string 
 type ResumeState = { sceneIndex: number; visitedSceneIds: string[]; completedAudioKeys: string[]; videoProgress: Record<string, VideoProgress>; assessmentResults: Record<string, AssessmentResult>; remediationRoute: RemediationRoute | null; experienceProgress?: Record<string, Record<string, unknown>>; html5Progress?: Record<string, HTML5Progress> };
 type ReviewReply = { id: string; authorLabel: string; body: string; createdAt: string };
 type ReviewComment = { id: string; sceneId: string; sceneTitle: string; revision: number; authorLabel: string; body: string; replies: ReviewReply[]; resolved: boolean; outdated: boolean; sceneDeleted: boolean };
+type HumanApproval = { projectId: string; revision: number; storyboardSha256: string; approved: boolean; state: string; unresolvedComments: number; lastDecision: { actorDisplayName: string; note: string; revision: number; decision: string } | null };
 
 function audioCompletionKey(sceneId: string, audioId: string): string {
   return `${sceneId}:${audioId}`;
@@ -199,6 +200,10 @@ export function CoursePreview({ project, onClose, canEnhance = true, sceneId }: 
   const [commentFilter, setCommentFilter] = useState<"all" | "unresolved" | "outdated">("all");
   const [commentBusy, setCommentBusy] = useState(false);
   const [commentError, setCommentError] = useState("");
+  const [humanApproval, setHumanApproval] = useState<HumanApproval | null>(null);
+  const [approvalNote, setApprovalNote] = useState("");
+  const [approvalBusy, setApprovalBusy] = useState(false);
+  const [approvalError, setApprovalError] = useState("");
   const dotsContainerRef = useRef<HTMLDivElement | null>(null);
   const activeDotRef = useRef<HTMLButtonElement | null>(null);
   const previewRef = useRef<HTMLElement>(null);
@@ -328,6 +333,40 @@ export function CoursePreview({ project, onClose, canEnhance = true, sceneId }: 
       .catch((error: unknown) => { if (error instanceof DOMException && error.name === "AbortError") return; setCommentError(error instanceof Error ? error.message : "Review comments could not be loaded."); });
     return () => controller.abort();
   }, [project.id]);
+
+  async function decideHumanReview(decision: "approve" | "request-changes") {
+    if (approvalBusy || !approvalNote.trim()) return;
+    setApprovalBusy(true);
+    setApprovalError("");
+    try {
+      const response = await fetch(`/api/projects/${project.id}/review-approval`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision, expectedRevision: project.storyboard.revision, note: approvalNote.trim() }),
+      });
+      const result = await response.json() as HumanApproval & { detail?: string };
+      if (!response.ok) throw new Error(result.detail || "Review decision could not be saved.");
+      setHumanApproval(result);
+      setApprovalNote("");
+    } catch (error) {
+      setApprovalError(error instanceof Error ? error.message : "Review decision could not be saved.");
+    } finally {
+      setApprovalBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setHumanApproval(null);
+    fetch(`/api/projects/${project.id}/review-approval`, { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error("Approval status unavailable");
+        return response.json() as Promise<HumanApproval>;
+      })
+      .then(setHumanApproval)
+      .catch(error => { if (error.name !== "AbortError") setApprovalError("Human approval status could not be loaded."); });
+    return () => controller.abort();
+  }, [project.id, project.storyboard.revision]);
 
   function submitAssessment(item: AssessmentItem) {
     if (!scene) return;
@@ -481,6 +520,25 @@ export function CoursePreview({ project, onClose, canEnhance = true, sceneId }: 
       </article>
       </div>
       <aside className="course-preview-discussion" aria-label="Scene discussion panel">
+        {!sceneId && <section className="course-preview-review" aria-label="Human review decision">
+          <h2>Human review · Revision {project.storyboard.revision}</h2>
+          <p role="status">{humanApproval ? humanApproval.approved
+            ? "Approved for this exact storyboard revision."
+            : humanApproval.state === "changed-since-review"
+              ? "Previously approved, but the storyboard has changed. Request a new approval."
+              : humanApproval.state === "changes-requested" ? "Changes requested." : "Awaiting human approval."
+            : "Checking human approval status…"}</p>
+          {humanApproval?.lastDecision && <p>Last decision: {humanApproval.lastDecision.decision} by {humanApproval.lastDecision.actorDisplayName} on revision {humanApproval.lastDecision.revision}. {humanApproval.lastDecision.note}</p>}
+          {humanApproval?.unresolvedComments ? <p>{humanApproval.unresolvedComments} unresolved review comment(s). Address them before approval.</p> : null}
+          {(session ? session.actor.actorId !== project.ownerId : true) && <div className="course-preview-comment-form">
+            <label>Review decision explanation<textarea aria-label="Review decision explanation" rows={2} maxLength={2000} value={approvalNote} onChange={event => setApprovalNote(event.target.value)} placeholder="Record your review rationale for this revision" /></label>
+            <div className="course-preview-comment-actions">
+              <button type="button" onClick={() => void decideHumanReview("request-changes")} disabled={approvalBusy || !approvalNote.trim()}>Request changes</button>
+              <button type="button" onClick={() => void decideHumanReview("approve")} disabled={approvalBusy || !approvalNote.trim() || Boolean(humanApproval?.unresolvedComments)}>Approve this revision</button>
+            </div>
+          </div>}
+          {approvalError && <p className="course-preview-comment-error" role="alert">{approvalError}</p>}
+        </section>}
         <section data-onboarding="preview.comments" className="course-preview-review" aria-labelledby="course-preview-review-title">
           <div className="course-preview-review-heading"><div><span className="course-preview-assessment-kicker">IN-APP REVIEW · REVISION {project.storyboard.revision}</span><h2 id="course-preview-review-title"><MessageCircle size={17} /> Scene discussion</h2></div><label className="course-preview-comment-filter">Show<select value={commentFilter} onChange={(event) => setCommentFilter(event.target.value as "all" | "unresolved" | "outdated")}><option value="all">All threads</option><option value="unresolved">Unresolved</option><option value="outdated">Outdated</option></select></label></div>
           <div className="course-preview-comment-form"><label>Reviewer<input value={commentAuthor} readOnly={Boolean(session)} onChange={(event) => setCommentAuthor(event.target.value)} /></label><label>Comment<textarea rows={2} value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Leave feedback on this scene" /></label><button type="button" className="course-preview-nav-button next" onClick={() => void postComment()} disabled={commentBusy || !commentBody.trim()}><Send size={14} /> Add comment</button></div>
