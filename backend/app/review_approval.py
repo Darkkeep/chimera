@@ -26,6 +26,12 @@ def storyboard_digest(storyboard):
     ).hexdigest()
 
 
+def review_comments_digest(comments):
+    """Bind approval to the exact discussion state as well as the storyboard."""
+    payload = [comment.model_dump(mode="json") for comment in comments]
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
 def receipt_path(project_id: str) -> Path:
     # Trusted human decisions are server-side evidence, not portable course data.
     # Project archives can be imported; they must not be able to forge approvals.
@@ -80,11 +86,14 @@ def review_status(project_id: str):
         digest = storyboard_digest(project.storyboard)
         receipts = _load_receipts(project_id)
         latest = receipts[-1] if receipts else None
-        valid = bool(latest and latest["decision"] == "approve"
-                     and latest["revision"] == project.storyboard.revision
-                     and latest["storyboardSha256"] == digest)
         comments = storage.list_review_comments(project_id)
         unresolved = sum(not c.resolved and not c.sceneDeleted for c in comments)
+        comment_digest = review_comments_digest(comments)
+        valid = bool(latest and latest["decision"] == "approve"
+                     and latest["revision"] == project.storyboard.revision
+                     and latest["storyboardSha256"] == digest
+                     and latest.get("reviewCommentsSha256") == comment_digest
+                     and not unresolved)
         return {
             "projectId": project_id, "revision": project.storyboard.revision,
             "storyboardSha256": digest, "approved": valid,
@@ -111,6 +120,7 @@ def record_decision(project_id: str, actor: ActorContext, data: ReviewDecisionRe
             "id": "review-" + uuid.uuid4().hex[:16],
             "projectId": project_id, "revision": project.storyboard.revision,
             "storyboardSha256": storyboard_digest(project.storyboard),
+            "reviewCommentsSha256": review_comments_digest(storage.list_review_comments(project_id)),
             "decision": data.decision, "note": data.note.strip(),
             "actorId": actor.actorId, "actorDisplayName": actor.actorDisplayName,
             "installationId": actor.installationId, "createdAt": storage.now_iso(),
