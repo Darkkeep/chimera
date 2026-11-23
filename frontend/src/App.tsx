@@ -221,6 +221,17 @@ export function App() {
   const [showPythiaTalk, setShowPythiaTalk] = useState(false);
   const [showProjectBackground, setShowProjectBackground] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [approvedExport, setApprovedExport] = useState(false);
+  const [exportApproval, setExportApproval] = useState<{ approved: boolean; state: string; revision: number } | null>(null);
+  useEffect(() => {
+    if (!showExport || !project.id) return;
+    const controller = new AbortController();
+    setExportApproval(null);
+    fetch(`/api/projects/${project.id}/review-approval`, { signal: controller.signal })
+      .then(async response => response.ok ? response.json() : Promise.reject(new Error("Review status unavailable")))
+      .then(setExportApproval).catch(() => { if (!controller.signal.aborted) setExportApproval(null); });
+    return () => controller.abort();
+  }, [showExport, project.id, project.storyboard.revision]);
   const [showManagement, setShowManagement] = useState(true);
   const managementButtonRef = useRef<HTMLButtonElement>(null);
   const [includeWordAnswerKey, setIncludeWordAnswerKey] = useState(false);
@@ -909,7 +920,7 @@ export function App() {
     setError("");
     setFeedback("");
     try {
-      const response = await fetch(`/api/projects/${project.id}/standalone.zip`);
+      const response = await fetch(`/api/projects/${project.id}/standalone.zip${approvedExport ? "?approved=true" : ""}`);
       if (!response.ok) {
         const detail = await response.json().catch(() => null) as { detail?: string } | null;
         throw new Error(detail?.detail || "Standalone course could not be built.");
@@ -936,7 +947,7 @@ export function App() {
     setError("");
     setFeedback("");
     try {
-      const response = await fetch(`/api/projects/${project.id}/scorm-2004.zip`);
+      const response = await fetch(`/api/projects/${project.id}/scorm-2004.zip${approvedExport ? "?approved=true" : ""}`);
       if (!response.ok) {
         const detail = await response.json().catch(() => null) as { detail?: string } | null;
         throw new Error(detail?.detail || "SCORM 2004 package could not be built.");
@@ -964,7 +975,7 @@ export function App() {
     setError("");
     setFeedback("");
     try {
-      const response = await fetch(`/api/projects/${project.id}/scorm-12.zip`);
+      const response = await fetch(`/api/projects/${project.id}/scorm-12.zip${approvedExport ? "?approved=true" : ""}`);
       if (!response.ok) {
         const detail = await response.json().catch(() => null) as { detail?: string } | null;
         throw new Error(detail?.detail || "SCORM 1.2 package could not be built.");
@@ -1584,6 +1595,16 @@ export function App() {
     {showExport && permissions.canExport && <EditorDialog labelledBy="export-title" className="export-dialog" onClose={() => setShowExport(false)} busy={busy}>
       <div data-onboarding="export.panel" className="modal-head"><div><p className="eyebrow">DELIVER & EXPORT</p><h2 id="export-title">Export course</h2></div><button className="icon-button" onClick={() => setShowExport(false)} disabled={busy} aria-label="Close export"><X size={19} /></button></div>
       <p className="export-project-name">{project.title}</p>
+      <section className="export-section" aria-label="Human approval for release">
+        <h3>Review and release status</h3>
+        <p role="status">{exportApproval
+          ? exportApproval.approved ? `Approved revision ${exportApproval.revision}. Ready for approved export.`
+            : `Revision ${exportApproval.revision} is not approved for release (${exportApproval.state}).`
+          : "Human review status unavailable. Approved export cannot be selected."}</p>
+        <label><input type="checkbox" checked={approvedExport} disabled={busy || !exportApproval?.approved} onChange={event => setApprovedExport(event.target.checked)} />
+          Require current human approval for SCORM and standalone exports</label>
+        <p className="field-hint">Without this option, exports are working drafts, not approved releases. Changing the storyboard invalidates its approval automatically.</p>
+      </section>
       <p className="field-hint">Exports and archives include only this project's content, not its parent or subprojects. Archive restore preserves the current project attachment.</p>
       <section className="export-section"><h3>Learning management system</h3><p>Build a portable course package for your LMS.</p><div className="export-actions"><button className="button button-accent" onClick={() => void exportScorm2004()} disabled={busy}><Download size={16} /> Build SCORM 2004</button><button className="button button-outline" onClick={() => void exportScorm12()} disabled={busy}>Build SCORM 1.2</button></div>
         <label className="package-threshold"><span>Warn when a package exceeds</span><input aria-label="Package warning threshold in MB" type="number" min="1" max="4096" key={`${project.id}-${project.storyboard.exportSettings.packageWarningThresholdMB}`} defaultValue={project.storyboard.exportSettings.packageWarningThresholdMB} onBlur={(event) => { if (event.currentTarget.validity.valid && event.currentTarget.value !== "") void updatePackageWarningThreshold(Number(event.currentTarget.value)); else event.currentTarget.value = String(project.storyboard.exportSettings.packageWarningThresholdMB); }} disabled={busy} /><span>MB</span></label>
