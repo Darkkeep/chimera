@@ -174,6 +174,20 @@ class ReviewApprovalTests(unittest.TestCase):
             review_approval.require_approved(self.project.id)
         self.assertTrue(self.decide()["approved"])
 
+    def test_review_ledger_detects_modified_receipts(self):
+        import json
+        self.decide()
+        self.decide("request-changes", "Needs a stronger interaction")
+        path = review_approval.receipt_path(self.project.id)
+        entries = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(entries[1]["previousReceiptSha256"], entries[0]["receiptSha256"])
+        entries[0]["note"] = "Tampered prior approval"
+        path.write_text(json.dumps(entries), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "integrity check failed"):
+            review_approval.review_status(self.project.id)
+        with self.assertRaisesRegex(ValueError, "integrity check failed"):
+            review_approval.require_approved(self.project.id)
+
     def test_stale_decision_is_rejected(self):
         data = review_approval.ReviewDecisionRequest(decision="approve",
             expectedRevision=self.project.storyboard.revision - 1, note="Late approval")
