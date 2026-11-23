@@ -67,6 +67,58 @@ class ReviewApprovalTests(unittest.TestCase):
             ReviewCommentDecision(resolved=True), self.owner)
         self.assertTrue(self.decide()["approved"])
 
+    def test_post_approval_comment_invalidates_release_until_new_decision(self):
+        from backend.app.models import ReviewCommentDecision
+        self.assertTrue(self.decide()["approved"])
+        scene = self.project.storyboard.scenes[0]
+        comment = storage.create_review_comment(self.project.id,
+            ReviewCommentCreate(sceneId=scene.id, body="New issue after sign-off",
+                                authorLabel="Reviewer"), self.reviewer)
+        status = review_approval.review_status(self.project.id)
+        self.assertFalse(status["approved"])
+        self.assertEqual(status["unresolvedComments"], 1)
+        with self.assertRaisesRegex(ValueError, "no current human approval"):
+            review_approval.require_approved(self.project.id)
+        storage.decide_review_comment(self.project.id, comment.id,
+            ReviewCommentDecision(resolved=True), self.owner)
+        self.assertFalse(review_approval.review_status(self.project.id)["approved"])
+        self.assertTrue(self.decide()["approved"])
+
+    def test_reopening_review_comment_revokes_approval(self):
+        from backend.app.models import ReviewCommentDecision
+        scene = self.project.storyboard.scenes[0]
+        comment = storage.create_review_comment(self.project.id,
+            ReviewCommentCreate(sceneId=scene.id, body="Needs clarification",
+                                authorLabel="Reviewer"), self.reviewer)
+        storage.decide_review_comment(self.project.id, comment.id,
+            ReviewCommentDecision(resolved=True), self.owner)
+        self.assertTrue(self.decide()["approved"])
+        storage.decide_review_comment(self.project.id, comment.id,
+            ReviewCommentDecision(resolved=False), self.reviewer)
+        self.assertFalse(review_approval.review_status(self.project.id)["approved"])
+
+    def test_review_approval_requires_distinct_permission(self):
+        from backend.app import main, central_access
+        from backend.app.identity import RoleBasedAuthorizationPolicy
+        from fastapi import HTTPException
+        self.assertIn("review.approve", RoleBasedAuthorizationPolicy.actionRoles)
+        self.assertNotIn("author", RoleBasedAuthorizationPolicy.actionRoles["review.approve"])
+        self.assertIn("reviewer", RoleBasedAuthorizationPolicy.actionRoles["review.approve"])
+        self.assertTrue(central_access.permits_action(["app.use", "review"], "review.approve"))
+        self.assertFalse(central_access.permits_action(["app.use", "author"], "review.approve"))
+        self.assertEqual(main.ROUTE_ACTIONS["post_review_approval"], "review.approve")
+
+        class CommentOnlyPolicy:
+            def allows(self, actor, action, project_id=None):
+                return action == "review.comment.create"
+        with self.assertRaises(HTTPException) as blocked:
+            main.post_review_approval(self.project.id,
+                review_approval.ReviewDecisionRequest(
+                    decision="approve", expectedRevision=self.project.storyboard.revision,
+                    note="Should be denied"), context=self.reviewer, policy=CommentOnlyPolicy())
+        self.assertEqual(blocked.exception.status_code, 403)
+        self.assertFalse(review_approval.review_status(self.project.id)["approved"])
+
     def test_change_request_preserves_history_and_never_approves(self):
         request = self.decide("request-changes", "Need more clarity")
         self.assertFalse(request["approved"])
