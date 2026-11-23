@@ -109,13 +109,13 @@ export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated,
   const processLabel = interrupted ? "Connection interrupted. Reconnect proposals to resume; your work is preserved."
     : error ? "Couldn't complete this step. Review the details below." : operation || (importReport && status === "completed" && !["component.accepted", "component.rejected"].includes(events.at(-1)?.type || "") ? "Saved artifact import complete. Review your proposals." : process.label);
   return <section className="progressive-authoring" aria-label="Progressive scene proposals">
-    <div className="progressive-heading"><h3>Progressive scene proposals</h3><span>Local review · no AI calls</span></div>
+    <div className="progressive-heading"><h3>Progressive scene proposals</h3><span>{import.meta.env.PROD ? "Saved Pythia artifacts · author-reviewed" : "Local review · no AI calls"}</span></div>
     <p>{importReport ? "Review complete proposals from your saved artifact. Nothing enters your course until you choose Accept scene." : "Review a complete draft while the next scene is still being prepared. Nothing enters your course until you choose Accept scene."}</p>
     <div className="progressive-actions">
       <label>Import saved Pythia artifact <input type="file" accept=".json,application/json" aria-label="Import saved Pythia artifact" disabled={disabled || busy || status === "running"}
         onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) void importArtifact(file); }} /></label>
-      <button type="button" disabled={disabled || busy || status === "running"} onClick={() => void begin()}>Start progressive demo</button>
-      <button type="button" disabled={disabled || busy || status === "running"} onClick={() => void begin("pythia-authoring-fixture-v1")}>Try Pythia-format fixture</button>
+      {!import.meta.env.PROD && <><button type="button" disabled={disabled || busy || status === "running"} onClick={() => void begin()}>Start progressive demo</button>
+      <button type="button" disabled={disabled || busy || status === "running"} onClick={() => void begin("pythia-authoring-fixture-v1")}>Try Pythia-format fixture</button></>}
       {jobId && <button type="button" disabled={busy} onClick={() => { log.current = []; setInterrupted(false); setError(""); setOperation("Reconnecting to saved proposals…"); setReconnect(value => value + 1); }}>Reconnect proposals</button>}
       {status === "running" && <button type="button" disabled={disabled || busy} onClick={() => void cancel()}>Cancel generation</button>}
     </div>
