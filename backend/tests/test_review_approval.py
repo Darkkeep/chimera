@@ -75,6 +75,35 @@ class ReviewApprovalTests(unittest.TestCase):
         self.assertTrue(approved["approved"])
         self.assertEqual(len(review_approval._load_receipts(self.project.id)), 2)
 
+    def test_release_exports_refuse_unapproved_revision(self):
+        from backend.app import main
+        from fastapi import HTTPException
+        with patch.object(main, "persist_scorm_12_build",
+                          return_value=(b"test-scorm-package", {}, "test.zip")) as builder:
+            with self.assertRaises(HTTPException) as rejected:
+                main.export_scorm_12(self.project.id, approved=True)
+            self.assertEqual(rejected.exception.status_code, 409)
+            builder.assert_not_called()
+            self.decide()
+            published = main.export_scorm_12(self.project.id, approved=True)
+            self.assertEqual(published.body, b"test-scorm-package")
+            builder.assert_called_once()
+            current = storage.read_project(self.project.id)
+            storage.create_scene(self.project.id, SceneCreate(title="An unreviewed change"),
+                                 current.storyboard.revision)
+            with self.assertRaises(HTTPException) as stale:
+                main.export_scorm_12(self.project.id, approved=True)
+            self.assertEqual(stale.exception.status_code, 409)
+            builder.assert_called_once()
+
+    def test_draft_export_remains_available_during_migration(self):
+        from backend.app import main
+        with patch.object(main, "persist_scorm_12_build",
+                          return_value=(b"draft-package", {}, "draft.zip")) as builder:
+            exported = main.export_scorm_12(self.project.id, approved=False)
+            self.assertEqual(exported.body, b"draft-package")
+            builder.assert_called_once()
+
     def test_stale_decision_is_rejected(self):
         data = review_approval.ReviewDecisionRequest(decision="approve",
             expectedRevision=self.project.storyboard.revision - 1, note="Late approval")
