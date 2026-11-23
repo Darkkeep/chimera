@@ -171,6 +171,7 @@ export function App() {
     // Retain the target on failure: retry must never create duplicate projects.
     let target = importTarget.current;
     if (!target) {
+      ++projectRequest.current; // Creation from import also changes authoring context.
       const response = await fetch("/api/projects", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({title})});
       const data = await response.json();
       if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Project could not be created.");
@@ -394,6 +395,18 @@ export function App() {
       id === "first-scene" && !guideMatchesSurface && hasOpenForm;
     if (id !== guideId) { onboarding.controller.pause(); pendingGuideStart.current = { restart }; setGuideId(id); }
     else requested.controller.start({ restart });
+  }
+
+  function applyScopedProject(expectedProjectId: string, requestVersion: number, updatedProject: Project) {
+    // Delayed consultation/review responses must not reopen or overwrite a
+    // different project after navigation or a fresh course creation.
+    if (updatedProject.id !== expectedProjectId ||
+        progressiveProject.current.id !== expectedProjectId ||
+        projectRequest.current !== requestVersion) {
+      setFeedback("A response arrived for a different project. Your current course was not changed. Open the original project to review that result.");
+      return;
+    }
+    applyProject(updatedProject);
   }
 
   function applyProject(updatedProject: Project) {
@@ -629,6 +642,7 @@ export function App() {
     const oversized = items.find(item => item.file.size > 100 * 1024 * 1024);
     if (oversized) { setError(`${oversized.file.name} is larger than the 100 MB reference limit.`); return; }
     setBusy(true); setError("");
+    ++projectRequest.current; // Retire callbacks bound to the previous course.
     try {
       const response = await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, parentProjectId: creatingParent?.id ?? null }) });
       if (!response.ok) {
@@ -1395,6 +1409,7 @@ export function App() {
 
   if (reviewToken && session) return <ReviewLinkView token={reviewToken} onClose={() => { history.replaceState(null, "", location.pathname+location.search); setReviewToken(""); }} />;
 
+  const renderedProjectRequest = projectRequest.current;
   return <ProjectPalette projectId={project.id} value={project}>
 {showNewProjectChoice && <EditorDialog labelledBy="new-project-choice-title" onClose={() => setShowNewProjectChoice(false)}>
       <h2 id="new-project-choice-title">New Project</h2>
@@ -1461,7 +1476,7 @@ export function App() {
     {showIntelligenceEngine && <IntelligenceEnginePanel onClose={() => { setShowIntelligenceEngine(false); window.dispatchEvent(new Event("chimera:ai-connection-updated")); }} />}
     {retainWorkspace && <div hidden={showManagement || openingProject} inert={accessStatus !== "verified"}>
     {showSources && <SourcesPanel key={project.id} projectId={project.id} projectTitle={project.title} scenes={scenes} canAdd={permissions.canEdit} onClose={() => setShowSources(false)} />}
-    {showPythiaTalk && <PythiaTalkPanel key={project.id} project={project} scene={scene ?? undefined} onClose={() => setShowPythiaTalk(false)} onProjectUpdated={applyProject} />}
+    {showPythiaTalk && <PythiaTalkPanel key={project.id} project={project} scene={scene ?? undefined} onClose={() => setShowPythiaTalk(false)} onProjectUpdated={updated => applyScopedProject(project.id, renderedProjectRequest, updated)} />}
     {showProjectBackground && <ProjectBackgroundPanel key={project.id} project={project} onClose={() => setShowProjectBackground(false)} onProjectUpdated={applyProject} />}
     </div>}
     <main className="main-content" id="workspace-content" tabIndex={-1}>
@@ -1592,7 +1607,7 @@ export function App() {
       if (index >= 0) { setSelectedScene(index); setShowAssessments(false); setShowAssessmentEditor(true); }
     }} />}
 
-    {showEnhancementReview && <EnhancementReviewView project={project} firstProposalId={importedHandoffId} onClose={() => { setImportedHandoffId(undefined); setShowEnhancementReview(false); }} onProjectUpdated={applyProject} />}
+    {showEnhancementReview && <EnhancementReviewView key={project.id} project={project} firstProposalId={importedHandoffId} onClose={() => { setImportedHandoffId(undefined); setShowEnhancementReview(false); }} onProjectUpdated={updated => applyScopedProject(project.id, renderedProjectRequest, updated)} />}
     {showValidation && <ValidationView projectId={project.id} onClose={() => setShowValidation(false)} onOpenScene={(sceneId, issueCode) => { const index = scenes.findIndex((item) => item.id === sceneId); setShowValidation(false); if (index >= 0) setSelectedScene(index); if (issueCode === "missing-image-alt-text") setShowAccessibility(true); else if (issueCode === "missing-assessment-item") setShowAssessmentEditor(true); else setActiveView("storyboard"); }} />}
     {showAccessibility && <AccessibilityView projectId={project.id} revision={project.storyboard.revision} scenes={scenes} assets={project.storyboard.assets} onClose={() => setShowAccessibility(false)} onProjectUpdated={applyProject} />}
     {showGoldenPath && <GoldenPathView walkthroughStatuses={Object.fromEntries(Object.entries(guides).map(([id, guide]) => [id, guide.controller.snapshot().status]))} onStartWalkthrough={() => startOnboarding()} onSelectWalkthrough={id => startOnboarding(id)} project={project} onClose={() => setShowGoldenPath(false)} onCreateProject={() => { setShowGoldenPath(false); beginNewProject(); }} onOpenStoryboard={() => { setShowGoldenPath(false); setActiveView("storyboard"); }} onOpenMedia={() => { setShowGoldenPath(false); setActiveView("media"); }} onOpenAccessibility={() => { setShowGoldenPath(false); setShowAccessibility(true); }} onOpenPreview={() => { setShowGoldenPath(false); if (project.id) setShowPreview(true); }} onRunValidation={() => { setShowGoldenPath(false); setShowValidation(true); }} onOpenPythiaAnalysis={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaAnalysis(true); }} onOpenPythiaTransform={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaTransform(true); }} onOpenPythiaAssessment={() => { setShowGoldenPath(false); setShowManagement(false); setActiveView("storyboard"); setShowPythiaAssessmentDesign(true); }} onOpenSuggestions={() => { setShowGoldenPath(false); setShowManagement(false); setShowEnhancementReview(true); }} onOpenCourseReview={() => { setShowGoldenPath(false); setShowManagement(false); setShowPythiaCourseReview(true); }} onOpenManagement={() => { setShowGoldenPath(false); setShowManagement(true); }} onOpenExport={() => { setShowGoldenPath(false); setShowManagement(false); setShowExport(true); }} />}
