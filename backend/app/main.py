@@ -2955,7 +2955,7 @@ async def preview_experience_import(file: UploadFile = File(...), progressive_mo
         data = json.loads(raw)
         if isinstance(data, dict) and data.get("format") == production_handoff.FORMAT:
             if progressive_mode:
-                progressive.require_demo()
+                progressive.require_available()
                 from .progressive_handoff import prepare
                 document, drafts, report = prepare(raw)
                 scenes = [payload for _, payload, _, _ in drafts]
@@ -3098,7 +3098,7 @@ def post_scene(project_id: str, data: SceneCreate, if_match: Annotated[str | Non
 
 
 def _progressive_call(operation):
-    progressive.require_demo()
+    progressive.require_available()
     try:
         return operation()
     except StoryboardRevisionConflict as error:
@@ -3110,6 +3110,7 @@ def _progressive_call(operation):
 @app.post("/api/projects/{project_id}/progressive-jobs", status_code=202)
 def start_progressive_demo(project_id: str, if_match: Annotated[str | None, Header()] = None,
                            producer: Literal["deterministic-fixture-v1", "pythia-authoring-fixture-v1"] = Query("deterministic-fixture-v1")):
+    progressive.require_demo()  # Synthetic jobs are never exposed on hosted installations.
     revision = _expected_revision(if_match)
     if revision is None:
         raise HTTPException(428, "An If-Match storyboard revision is required")
@@ -3125,7 +3126,7 @@ def start_progressive_demo(project_id: str, if_match: Annotated[str | None, Head
 @app.post("/api/projects/{project_id}/progressive-jobs/import", status_code=201)
 async def import_progressive_handoff(project_id: str, request: Request,
                                      if_match: Annotated[str | None, Header()] = None):
-    progressive.require_demo()
+    progressive.require_available()
     revision = _expected_revision(if_match)
     if revision is None:
         raise HTTPException(428, "An If-Match storyboard revision is required")
