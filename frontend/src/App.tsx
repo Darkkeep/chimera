@@ -929,7 +929,7 @@ export function App() {
       const downloadUrl = window.URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = `${project.id}-standalone.zip`;
+      link.download = `${project.id}${approvedExport ? `-approved-r${exportApproval?.revision ?? project.storyboard.revision}` : '-draft'}-standalone.zip`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -956,7 +956,7 @@ export function App() {
       const downloadUrl = window.URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = `${project.id}-scorm2004.zip`;
+      link.download = `${project.id}${approvedExport ? `-approved-r${exportApproval?.revision ?? project.storyboard.revision}` : '-draft'}-scorm2004.zip`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -984,7 +984,7 @@ export function App() {
       const downloadUrl = window.URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = `${project.id}-scorm12.zip`;
+      link.download = `${project.id}${approvedExport ? `-approved-r${exportApproval?.revision ?? project.storyboard.revision}` : '-draft'}-scorm12.zip`;
       document.body.appendChild(link);
       link.click();
       link.remove();
