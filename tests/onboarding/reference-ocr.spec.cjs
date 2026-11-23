@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 
 test('OCR output requires passage inspection and explicit acceptance before reference selection', async ({ page, request }) => {
@@ -13,7 +14,9 @@ test('OCR output requires passage inspection and explicit acceptance before refe
   await page.route(`**/reference-resources/${resource.id}/ocr/accept`, route => { acceptances++; return route.fulfill({ json: { ...recognized, versions: recognized.versions.map(v => v.version === '2' ? { ...v, extractionStatus: 'complete', extractionMessage: 'OCR inspected by author.' } : v) } }); });
   await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
   await page.goto('/');
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Review tools', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Review suggestions', exact: true }).click();
   const dialog = page.getByRole('dialog');
   const reference = dialog.locator('.enhancement-resource-choice').filter({ hasText: 'Scanned guide' }).getByRole('checkbox');

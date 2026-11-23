@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "purpose": "Combined release candidate inputs; no merge or deployment",
+  "publicFrontendBaseline": "4968cab485e79ba921927f1b36cac20077fd4eb5",
+  "historicalCutover": "7dae45d1e68cf83f5eaac1c9e875b4fbd7d2772e",
+  "pr45": "cc881b94b2da7c91e02b34b0c91b1ac6e8b86754",
+  "pr49": "6b553c5a8147a1e9403c71d7b81fc3b13415def8",
+  "pr50": "775cd7f169a70d37077b3c743c5bb967e66c9f2f",
+  "mainline": "b8aeab52a271ae4347f246c064ee5af4c9780ab3",
+  "ownerLocalMilestone3Accepted": true,
+  "mergeAuthorized": false,
+  "deploymentAuthorized": false,
+  "releaseStudioEnabled": true,
+  "releaseStudioDefault": true,
+  "progressiveActivationAuthorized": false
+}

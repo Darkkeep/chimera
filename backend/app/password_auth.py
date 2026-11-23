@@ -144,7 +144,7 @@ class AccountStore:
             self.audit("auth.signed_in", account["id"])
             return token
 
-    def sso_login(self, claims: dict, roles: list[str], previous_token: str | None = None) -> str:
+    def sso_login(self, claims: dict, roles: list[str], previous_token: str | None = None, *, access_revision: int | None = None) -> str:
         """Create or refresh the DARKROGUE-backed account and issue a session.
 
         The handoff token ID is one-time: replays inside the token lifetime are
@@ -178,6 +178,10 @@ class AccountStore:
                 account = {"id": "user-" + secrets.token_hex(16), "displayName": claims["name"], "roles": roles, "disabled": False}
                 data["accounts"][email] = account
                 self.audit("account.provisioned", account["id"])
+            if access_revision is not None:
+                if access_revision < account.get("centralAccessRevision", -1):
+                    raise HTTPException(403, "Access changed during sign-in; retry")
+                account["centralAccessRevision"] = access_revision
             account.update(displayName=claims["name"], roles=roles, externalId=claims["sub"], identityProvider="darkrogue")
             if previous_token:
                 data["sessions"].pop(token_digest(previous_token), None)
@@ -349,19 +353,37 @@ class HostedAuthorizationPolicy:
         self.installation = installation
 
     def allows(self, context: ActorContext, action: str, project_id: str | None = None) -> bool:
+        return self.allows_many(context, [action], project_id)[action]
+
+    def allows_many(self, context: ActorContext, actions: list[str], project_id: str | None = None) -> dict[str, bool]:
+        """One current authority decision for capabilities in a single response.
+
+        No decision survives this call. Subsequent reads, writes, exports and jobs
+        still consult the authority independently.
+        """
         from .identity import RoleBasedAuthorizationPolicy
+        from . import central_access
         if context.deploymentMode != "team" or context.installationId != public_origin():
-            return False
+            return dict.fromkeys(actions, False)
+        decision = central_access.account_access(self.directory, context.actorId, project_id) if self.installation.identityProvider == "darkrogue" else None
         global_roles = self.directory.roles_for(context.actorId)
-        if not global_roles:
-            return False
-        if action in {"workspace.view", "identity.self", "review.invitation"}:
-            return True
         roles = self.directory.roles_for(context.actorId, project_id)
-        if project_id and not self.installation.adminCanViewProjectContent and action not in {"project.membership.manage"}:
-            roles.discard("administrator")
-        required = {"author", "instructional-designer", "administrator"} if action in {"project.export", "review.share"} else RoleBasedAuthorizationPolicy.actionRoles.get(action, {"administrator"})
-        return bool(roles & required)
+        if project_id and decision and decision.get("scopeManaged"):
+            roles = set(central_access.roles_for_capabilities(decision["capabilities"]))
+        results = {}
+        for action in actions:
+            selected = set(roles)
+            if not global_roles or decision is not None and not central_access.permits_action(decision["capabilities"], action):
+                results[action] = False
+                continue
+            if action in {"workspace.view", "identity.self", "review.invitation"}:
+                results[action] = True
+                continue
+            if project_id and not self.installation.adminCanViewProjectContent and action != "project.membership.manage":
+                selected.discard("administrator")
+            required = {"author", "instructional-designer", "administrator"} if action in {"project.export", "review.share"} else RoleBasedAuthorizationPolicy.actionRoles.get(action, {"administrator"})
+            results[action] = bool(selected & required)
+        return results
 
 
 class PasswordIdentityProvider:
@@ -372,4 +394,7 @@ class PasswordIdentityProvider:
         if request.method not in ("GET", "HEAD", "OPTIONS"):
             require_origin(request)
         account = self.store.account_for_token(request.cookies.get(COOKIE))
+        from . import central_access
+        if central_access.enabled():
+            central_access.account_access(self.store, account["id"])
         return ActorContext(actorId=account["id"], actorDisplayName=account["displayName"], installationId=public_origin(), deploymentMode="team")

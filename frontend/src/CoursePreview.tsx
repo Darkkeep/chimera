@@ -26,6 +26,7 @@ type CoursePreviewProps = {
   project: Project;
   onClose: () => void;
   canEnhance?: boolean;
+  sceneId?: string;
 };
 
 type AssessmentResult = AssessmentOutcome & { response: string[]; matches: Record<string, string>; textResponse: string; assessmentSignature: string };
@@ -174,10 +175,10 @@ function createEmptyAssessmentResult(item: AssessmentItem, settings: AssessmentS
   return { response: [], matches: {}, textResponse: "", attempts: 0, isCorrect: null, assessmentSignature: assessmentSignature(item, settings) };
 }
 
-export function CoursePreview({ project, onClose, canEnhance = true }: CoursePreviewProps) {
+export function CoursePreview({ project, onClose, canEnhance = true, sceneId }: CoursePreviewProps) {
   const { session } = useSession();
-  const resumeProjectId = session ? `${session.actor.actorId}.${project.id}` : project.id;
-  const scenes = useMemo(() => resolvedProject(project).storyboard.scenes, [project]);
+  const resumeProjectId = (session ? `${session.actor.actorId}.${project.id}` : project.id) + (sceneId ? `.scene.${sceneId}` : "");
+  const scenes = useMemo(() => resolvedProject(project).storyboard.scenes.filter(scene => !sceneId || scene.id === sceneId), [project, sceneId]);
   const [resumeState] = useState(() => readResumeState(resumeProjectId, scenes));
   const [sceneIndex, setSceneIndex] = useState(resumeState.sceneIndex);
   const [contentsOpen, setContentsOpen] = useState(false);
@@ -200,6 +201,36 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
   const [commentError, setCommentError] = useState("");
   const dotsContainerRef = useRef<HTMLDivElement | null>(null);
   const activeDotRef = useRef<HTMLButtonElement | null>(null);
+  const previewRef = useRef<HTMLElement>(null);
+  const previewOpener = useRef(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  useEffect(() => {
+    const opener = previewOpener.current;
+    const root = previewRef.current;
+    const focusable = () => Array.from(root?.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], summary, [tabindex="0"]',
+    ) ?? []).filter(element => element.getClientRects().length > 0);
+    (focusable()[0] ?? root)?.focus();
+    function containFocus(event: KeyboardEvent) {
+      // Nested assessment feedback owns its own keyboard handling.
+      if (event.key !== "Tab" || document.querySelector('dialog[open]')) return;
+      const elements = focusable();
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      if (!first) { event.preventDefault(); root?.focus(); }
+      else if (event.shiftKey && (document.activeElement === first || !root?.contains(document.activeElement))) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !root?.contains(document.activeElement))) {
+        event.preventDefault(); first.focus();
+      }
+    }
+    document.addEventListener("keydown", containFocus);
+    return () => {
+      document.removeEventListener("keydown", containFocus);
+      // The authoring trigger is disabled while a preview is open. Restore
+      // after React has removed the preview and enabled that trigger again.
+      requestAnimationFrame(() => { if (opener?.isConnected) opener.focus(); });
+    };
+  }, []);
   const scene = scenes[sceneIndex];
   const evaluation = evaluateCourseCompletion(
     scenes,
@@ -370,17 +401,18 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
     finally { setCommentBusy(false); }
   }
 
-  return <section data-onboarding="preview.content" className="course-preview-shell" role="dialog" aria-modal="true" aria-label={`${project.title} course preview`}>
+  return <section ref={previewRef} tabIndex={-1} data-onboarding="preview.content" className="course-preview-shell" role="dialog" aria-modal="true" aria-label={`${project.title} ${sceneId ? "scene" : "course"} preview`}>
     <header className="course-preview-header">
-      <div className="preview-brand-lockup"><BrandMark /><div className="course-preview-brand"><span>CHIMERA PREVIEW</span><strong>{project.title}</strong></div></div>
-      <div className={`course-preview-progress ${coursePassed ? "course-complete" : ""}`}><span>{courseComplete ? coursePassed ? `Course passed · Score ${weightedScore ?? 100}%` : `Course complete · Score ${weightedScore ?? 0}% · Pass ${project.storyboard.completionSettings.passingScore}%` : requiredAudioSetupMissingCount ? `${requiredAudioSetupMissingCount} required-audio ${requiredAudioSetupMissingCount === 1 ? "scene has" : "scenes have"} no audio attached` : `${completedRequiredSceneCount} of ${requiredSceneCount} required scenes · ${completedRequiredAudioCount} of ${requiredAudioTrackCount} required audio tracks${requiredVideoCount ? ` · ${completedRequiredVideoCount} of ${requiredVideoCount} required media clips` : ""}`}</span><div className="course-preview-progress-track" role="progressbar" aria-label="Required scenes completed" aria-valuemin={0} aria-valuemax={Math.max(requiredSceneCount, 1)} aria-valuenow={completedRequiredSceneCount}><span style={{ width: `${requiredSceneCount ? Math.round(completedRequiredSceneCount / requiredSceneCount * 100) : 0}%` }} /></div></div>
+      <div className="preview-brand-lockup"><BrandMark /><div className="course-preview-brand"><span>{sceneId ? "CHIMERA SCENE PREVIEW" : "CHIMERA PREVIEW"}</span><strong>{project.title}</strong></div></div>
+      <div className={`course-preview-progress ${coursePassed ? "course-complete" : ""}`}><span>{sceneId ? "Previewing this scene" : courseComplete ? coursePassed ? `Course passed · Score ${weightedScore ?? 100}%` : `Course complete · Score ${weightedScore ?? 0}% · Pass ${project.storyboard.completionSettings.passingScore}%` : requiredAudioSetupMissingCount ? `${requiredAudioSetupMissingCount} required-audio ${requiredAudioSetupMissingCount === 1 ? "scene has" : "scenes have"} no audio attached` : `${completedRequiredSceneCount} of ${requiredSceneCount} required scenes · ${completedRequiredAudioCount} of ${requiredAudioTrackCount} required audio tracks${requiredVideoCount ? ` · ${completedRequiredVideoCount} of ${requiredVideoCount} required media clips` : ""}`}</span><div className="course-preview-progress-track" role="progressbar" aria-label="Required scenes completed" aria-valuemin={0} aria-valuemax={Math.max(requiredSceneCount, 1)} aria-valuenow={completedRequiredSceneCount}><span style={{ width: `${requiredSceneCount ? Math.round(completedRequiredSceneCount / requiredSceneCount * 100) : 0}%` }} /></div></div>
       <button type="button" className="course-preview-close" onClick={onClose} aria-label="Close course preview"><X size={18} /><span>Exit preview</span></button>
     </header>
     <button type="button" className="course-preview-contents-toggle course-preview-nav-button" aria-expanded={contentsOpen} aria-controls="preview-contents" onClick={() => setContentsOpen(!contentsOpen)}><List size={17} /> Contents</button>
     {contentsOpen && <nav id="preview-contents" className="course-preview-contents" aria-label="Table of contents"><div className="course-preview-contents-heading"><strong>Contents</strong><button type="button" className="icon-button" aria-label="Close contents" onClick={() => setContentsOpen(false)}><X size={18} /></button></div>{scenes.map((item, index) => <button type="button" key={item.id} aria-current={index === sceneIndex ? "step" : undefined} onClick={() => { setSceneIndex(index); setRemediationRoute(null); setContentsOpen(false); }}><span>{index + 1}</span><span>{item.title || "Untitled scene"}</span>{visitedSceneIds.includes(item.id) && <Check size={14} aria-label="Visited" />}</button>)}</nav>}
     {scene ? <main className="course-preview-main">
+      <div className="course-preview-player-column">
       <div className="course-preview-scene-meta"><span>SCENE {String(sceneIndex + 1).padStart(2, "0")} / {String(scenes.length).padStart(2, "0")}</span><span>{scene.sceneType}</span></div>
-      {!scene.html5Activity && !scene.experience && scene.visualLayout?.elements.some(element => element.animations && Object.values(element.animations).some(phase => phase.effect !== "none")) && <div className="course-preview-motion-controls"><button type="button" className="course-preview-nav-button" aria-label={motionEnabled ? "Stop motion" : "Play motion"} onClick={() => setMotionEnabled(!motionEnabled)}>{motionEnabled ? <Square size={16} /> : <Play size={16} />}{motionEnabled ? "Stop motion" : "Play motion"}</button><button type="button" className="course-preview-nav-button" aria-label="Replay motion" onClick={() => { setMotionEnabled(true); setMotionReplay(current => current + 1); }}><RotateCcw size={16} />Replay motion</button></div>}
+      {!scene.html5Activity && !scene.experience && !scene.visualLayout?.timeline && scene.visualLayout?.elements.some(element => element.animations && Object.values(element.animations).some(phase => phase.effect !== "none")) && <div className="course-preview-motion-controls"><button type="button" className="course-preview-nav-button" aria-label={motionEnabled ? "Stop motion" : "Play motion"} onClick={() => setMotionEnabled(!motionEnabled)}>{motionEnabled ? <Square size={16} /> : <Play size={16} />}{motionEnabled ? "Stop motion" : "Play motion"}</button><button type="button" className="course-preview-nav-button" aria-label="Replay motion" onClick={() => { setMotionEnabled(true); setMotionReplay(current => current + 1); }}><RotateCcw size={16} />Replay motion</button></div>}
       <article className="course-preview-content" aria-labelledby="course-preview-scene-title">
         {remediationRoute?.remediationSceneId === scene.id && <button type="button" className="course-preview-nav-button previous" onClick={returnToAssessment}><ArrowLeft size={16} /><span>Return to question</span></button>}
         <h1 id="course-preview-scene-title" className={scene.assessmentItem || scene.visualLayout?.enabled && scene.visualLayout.elements.some(element => element.kind === "text" && element.text.trim() === scene.title.trim()) ? "course-preview-title-on-stage" : undefined}>{scene.title || "Untitled scene"}</h1>
@@ -390,9 +422,9 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
           : scene.experience ? <NativeExperience experience={scene.experience}
           imageAssets={experienceImagesForProject(project.id, project.storyboard.assets)}
           progress={experienceProgress[scene.id]} onProgress={value => setExperienceProgress(current => ({ ...current, [scene.id]: value }))} />
-          : scene.visualLayout?.enabled ? <SceneSurface key={motionReplay} project={project} scene={scene} animate={motionEnabled} progress={videoProgress} onProgress={updateVideoProgress} /> : scene.previewImage ? <div className="course-preview-slide"><img src={`/api/projects/${project.id}/${scene.previewImage}`} alt={`Slide ${scene.sourceSlide ?? sceneIndex + 1}: ${scene.title}`} /></div> : scene.extractedText.length > 0 ? <div className="course-preview-text">{scene.extractedText.map((text, index) => <p key={`${index}-${text}`}>{text}</p>)}</div> : <p className="course-preview-empty">This scene has no learner-facing content yet.</p>)}
+          : scene.visualLayout?.enabled ? <SceneSurface key={motionReplay} project={project} scene={scene} animate={motionEnabled && !scene.visualLayout?.timeline} progress={videoProgress} onProgress={updateVideoProgress} /> : scene.previewImage ? <div className="course-preview-slide"><img src={`/api/projects/${project.id}/${scene.previewImage}`} alt={`Slide ${scene.sourceSlide ?? sceneIndex + 1}: ${scene.title}`} /></div> : scene.extractedText.length > 0 ? <div className="course-preview-text">{scene.extractedText.map((text, index) => <p key={`${index}-${text}`}>{text}</p>)}</div> : <p className="course-preview-empty">This scene has no learner-facing content yet.</p>)}
 
-        {scene.assessmentItem && <SceneSurface key={motionReplay} project={project} scene={scene} animate={motionEnabled} progress={videoProgress} onProgress={updateVideoProgress} assessment={(() => {
+        {scene.assessmentItem && <SceneSurface key={motionReplay} project={project} scene={scene} animate={motionEnabled && !scene.visualLayout?.timeline} progress={videoProgress} onProgress={updateVideoProgress} assessment={(() => {
           const item = scene.assessmentItem;
           const settings = assessmentSettings(scene);
           const result = assessmentResults[scene.id] ?? createEmptyAssessmentResult(item, settings);
@@ -439,19 +471,23 @@ export function CoursePreview({ project, onClose, canEnhance = true }: CoursePre
           </section>;
         })()} />}
         <PublishedMedia position="after" project={project} scene={scene} completedAudioKeys={completedAudioKeys} onAudioEnded={key => setCompletedAudioKeys(current => current.includes(key) ? current : [...current, key])} videoProgress={videoProgress} onVideoProgress={updateVideoProgress} />
-        <footer className="course-preview-navigation"><button type="button" className="course-preview-nav-button previous" onClick={() => setSceneIndex((current) => Math.max(0, current - 1))} disabled={sceneIndex === 0}><ArrowLeft size={17} /><span>Previous</span></button><div className="course-preview-dots" ref={dotsContainerRef} role="group" aria-label="Scene navigation">{scenes.map((item, index) => <button type="button" key={item.id} ref={index === sceneIndex ? activeDotRef : null} className={`${index === sceneIndex ? "active" : ""} ${visitedSceneIds.includes(item.id) ? "visited" : ""}`} aria-label={`Go to scene ${index + 1}: ${item.title}`} aria-current={index === sceneIndex ? "step" : undefined} onClick={() => setSceneIndex(index)} />)}</div><button type="button" className="course-preview-nav-button next" onClick={() => setSceneIndex((current) => Math.min(scenes.length - 1, current + 1))} disabled={sceneIndex === scenes.length - 1}><span>{sceneIndex === scenes.length - 1 ? "End" : "Next"}</span>{sceneIndex === scenes.length - 1 ? <Check size={17} /> : <ArrowRight size={17} />}</button></footer>
+        {!sceneId && scenes.length>1 && <footer className="course-preview-navigation"><button type="button" className="course-preview-nav-button previous" aria-label="Previous" title="Previous scene" onClick={() => setSceneIndex((current) => Math.max(0, current - 1))} disabled={sceneIndex === 0}><ArrowLeft size={17} /></button><div className="course-preview-dots" ref={dotsContainerRef} role="group" aria-label="Scene navigation">{scenes.map((item, index) => <button type="button" key={item.id} ref={index === sceneIndex ? activeDotRef : null} className={`${index === sceneIndex ? "active" : ""} ${visitedSceneIds.includes(item.id) ? "visited" : ""}`} aria-label={`Go to scene ${index + 1}: ${item.title}`} aria-current={index === sceneIndex ? "step" : undefined} onClick={() => setSceneIndex(index)} />)}</div><button type="button" className="course-preview-nav-button next" aria-label={sceneIndex===scenes.length-1?"End":"Next"} title={sceneIndex===scenes.length-1?"Last scene":"Next scene"} onClick={() => setSceneIndex((current) => Math.min(scenes.length - 1, current + 1))} disabled={sceneIndex === scenes.length - 1}>{sceneIndex === scenes.length - 1 ? <Check size={17} /> : <ArrowRight size={17} />}</button></footer>}
         {(scene.visualLayout || scene.previewImage) && scene.extractedText.length > 0 && <details className="course-preview-transcript"><summary>Read slide text</summary><div>{scene.extractedText.map((text, index) => <p key={`${index}-${text}`}>{text}</p>)}</div></details>}
         {assessmentSummaries.length > 0 && <section className="course-preview-assessments" aria-labelledby="course-preview-assessments-title">
           <h2 id="course-preview-assessments-title">Assessments</h2>
           <ul>{assessmentSummaries.map(group => <li key={group.id}><strong>{group.title}</strong><span>{group.answeredCount}/{group.total} answered{group.score !== null ? ` · Score ${group.score}%` : ""}</span></li>)}</ul>
         </section>}
+
+      </article>
+      </div>
+      <aside className="course-preview-discussion" aria-label="Scene discussion panel">
         <section data-onboarding="preview.comments" className="course-preview-review" aria-labelledby="course-preview-review-title">
           <div className="course-preview-review-heading"><div><span className="course-preview-assessment-kicker">IN-APP REVIEW · REVISION {project.storyboard.revision}</span><h2 id="course-preview-review-title"><MessageCircle size={17} /> Scene discussion</h2></div><label className="course-preview-comment-filter">Show<select value={commentFilter} onChange={(event) => setCommentFilter(event.target.value as "all" | "unresolved" | "outdated")}><option value="all">All threads</option><option value="unresolved">Unresolved</option><option value="outdated">Outdated</option></select></label></div>
           <div className="course-preview-comment-form"><label>Reviewer<input value={commentAuthor} readOnly={Boolean(session)} onChange={(event) => setCommentAuthor(event.target.value)} /></label><label>Comment<textarea rows={2} value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Leave feedback on this scene" /></label><button type="button" className="course-preview-nav-button next" onClick={() => void postComment()} disabled={commentBusy || !commentBody.trim()}><Send size={14} /> Add comment</button></div>
           {commentError && <p className="course-preview-comment-error" role="alert">{commentError}</p>}
           <div className="course-preview-comment-list">{comments.filter((comment) => comment.sceneId === scene.id && (commentFilter === "all" || (commentFilter === "unresolved" && !comment.resolved) || (commentFilter === "outdated" && comment.outdated))).map((comment) => <article className={`course-preview-comment ${comment.resolved ? "resolved" : ""}`} key={comment.id}><div className="course-preview-comment-meta"><strong>{comment.authorLabel}</strong><span>{comment.outdated ? "Outdated context" : comment.resolved ? "Resolved" : `Revision ${comment.revision}`}</span></div><p>{comment.body}</p>{comment.replies.map((reply) => <div className="course-preview-reply" key={reply.id}><strong>{reply.authorLabel}</strong><span>{reply.body}</span></div>)}<div className="course-preview-comment-actions">{!comment.resolved && <button type="button" onClick={() => void updateComment(comment.id, "decision", { resolved: true })}>Resolve</button>}{comment.resolved && <button type="button" onClick={() => void updateComment(comment.id, "decision", { resolved: false })}>Reopen</button>}{canEnhance && <button type="button" onClick={() => void enhanceComment(comment)} disabled={commentBusy}>Enhance</button>}<input aria-label={`Reply to ${comment.authorLabel}`} value={replyDrafts[comment.id] ?? ""} onChange={(event) => setReplyDrafts((current) => ({ ...current, [comment.id]: event.target.value }))} placeholder="Reply" /><button type="button" onClick={() => void updateComment(comment.id, "replies", { authorLabel: commentAuthor, body: replyDrafts[comment.id] ?? "" })} disabled={commentBusy || !(replyDrafts[comment.id] ?? "").trim()}>Reply</button></div></article>)}</div>
         </section>
-      </article>
+      </aside>
     </main> : <main className="course-preview-no-scenes"><h1>This course has no scenes yet.</h1><p>Add or import scenes in the storyboard to preview the learner experience.</p><button type="button" className="course-preview-nav-button" onClick={onClose}>Return to authoring</button></main>}
     {feedbackSceneId && (() => {
       const feedbackScene = scenes.find(item => item.id === feedbackSceneId);

@@ -233,8 +233,10 @@ export function createSceneTransport({
             ? "hidden"
             : "";
     }
-    for (const animation of animations)
-      animation.currentTime = reduced?.matches ? null : time;
+    for (const animation of animations) {
+      if (reduced?.matches) animation.cancel();
+      else { animation.pause(); animation.currentTime = time; }
+    }
     for (const entry of media) {
       const { clip, node } = entry;
       const duration = clip.sourceOutMs - clip.sourceInMs;

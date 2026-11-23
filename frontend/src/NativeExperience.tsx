@@ -40,7 +40,7 @@ export type Experience = {
   background: string; foreground: string; accent: string; accentText: string; diagramAccent: string;
 };
 
-export type ExperienceImageAsset = { id: string; kind: string; filename: string; attributionText?: string };
+export type ExperienceImageAsset = { id: string; kind: string; filename: string; displayName?: string; attributionText?: string };
 export type ExperienceImage = { src: string; filename: string; attributionText: string };
 
 export function experienceImagesForProject(projectId: string, assets: readonly ExperienceImageAsset[]) {

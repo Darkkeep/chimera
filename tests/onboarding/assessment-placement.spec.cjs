@@ -1,13 +1,20 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   test(`assessment question controls precede the scene preview at ${viewport.width}px`, async ({ page }, testInfo) => {
+    // This covers course creation, repeated saves/reopen, geometry, screenshots
+    // and scored learner feedback. WebKit needs a full-journey budget; retain
+    // the normal per-assertion timeout so missing controls still fail promptly.
+    test.setTimeout(60000);
     await page.setViewportSize(viewport);
     await page.route('**/api/projects', route => route.request().method() === 'GET'
       ? route.fulfill({ json: [] }) : route.continue());
     await page.route('**/api/ai-connection', route => route.fulfill({ json: { configured: false } }));
     await page.goto('/');
+    await openWorkspaceMenu(page);
     await page.getByRole('button', { name: 'Create project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
     const projectDialog = page.getByRole('dialog', { name: 'Name your course' });
     await projectDialog.getByRole('textbox', { name: 'Course name' }).fill(`Assessment placement ${viewport.width}`);
     await projectDialog.getByRole('button', { name: 'Create project', exact: true }).click();

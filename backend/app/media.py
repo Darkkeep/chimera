@@ -180,7 +180,12 @@ def update_metadata(project_id: str, asset_id: str, data: AssetMetadataUpdate, r
             raise FileNotFoundError("Media not found")
         if asset.kind in {"image", "html5"} and (data.transcript or data.captionsVtt):
             raise ValueError("Transcripts and captions belong to audio or video")
-        assets = [a.model_copy(update=data.model_dump()) if a.id == asset_id else a for a in project.storyboard.assets]
+        # Alias-only edits must not clear transcripts, captions or language.
+        # Existing metadata requests keep their established replacement behavior.
+        changes = {} if data.model_fields_set == {"displayName"} else data.model_dump(exclude={"displayName"})
+        if "displayName" in data.model_fields_set:
+            changes["displayName"] = data.displayName.strip()
+        assets = [a.model_copy(update=changes) if a.id == asset_id else a for a in project.storyboard.assets]
         storage.write_storyboard(storage.project_path(project_id), project.storyboard.model_copy(update={"assets": assets}), revision)
         return storage.read_project(project_id)
 

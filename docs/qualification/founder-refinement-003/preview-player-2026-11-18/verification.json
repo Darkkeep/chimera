@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-18",
+  "focusedDistinctChecksPassed": 30,
+  "widths": [
+    1440,
+    1100,
+    390
+  ],
+  "build": "PASS",
+  "whitespace": "PASS",
+  "newPlayerAccessibility": "PASS",
+  "requiredMediaPolicy": "unchanged; seek credit regression passed",
+  "deployment": false
+}

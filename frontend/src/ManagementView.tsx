@@ -1,3 +1,4 @@
+import { accessRequest } from "./access-request";
 import { useEffect, useRef, useState } from "react";
 import { Activity, ArrowRight, ChevronRight, LoaderCircle, Plus, RotateCcw, ShieldCheck, Trash2, Users } from "lucide-react";
 import { EditorDialog } from "./EditorDialog";
@@ -13,7 +14,7 @@ type Health = RelationshipProject & { revision: number; sceneCount: number; pend
 type TrashedProject = { id: string; title: string; sceneCount: number; updatedAt: string; trashedAt: string; expiresAt: string; parentProjectId?: string | null };
 type Context = { actor: { actorId: string; actorDisplayName: string; installationId: string; deploymentMode: string }; memberships: { role: string }[]; policy: { deploymentMode: string; trackingMode: string; auditRetentionDays: number; allowGuestReviewers: boolean } };
 type AuditEvent = { eventId: string; eventName: string; eventClass: string; occurredAt: string; projectId: string | null; actorId: string | null };
-type ManagementViewProps = { onClose: () => void; onOpenProject: (projectId: string) => Promise<boolean>; onCreateProject: (parent?: { id: string; title: string }) => void; onProjectTrashed: (projectId: string) => Promise<void>; onProjectsRestored: (projectId: string) => Promise<void>; onRelationshipUpdated: (project: Project) => Promise<void>; canCreateProject: boolean; canResume: boolean; busy: boolean };
+type ManagementViewProps = { onStartImport: () => void; openError?: string; onClose: () => void; onOpenProject: (projectId: string) => Promise<boolean>; onCreateProject: (parent?: { id: string; title: string }) => void; onProjectTrashed: (projectId: string) => Promise<void>; onProjectsRestored: (projectId: string) => Promise<void>; onRelationshipUpdated: (project: Project) => Promise<void>; canCreateProject: boolean; canResume: boolean; busy: boolean };
 
 const stages: Record<ProductionStage, string> = { "not-set": "Not set", draft: "Draft", "in-production": "In production", "in-review": "In review", approved: "Approved", published: "Published" };
 const blockerLabels: Record<string, string> = {
@@ -27,7 +28,7 @@ const blockerLabels: Record<string, string> = {
   "missing-media-attribution": "Missing media attribution",
 };
 
-export function ManagementView({ onClose, onOpenProject, onCreateProject, onProjectTrashed, onProjectsRestored, onRelationshipUpdated, canCreateProject, canResume, busy }: ManagementViewProps) {
+export function ManagementView({ onStartImport, onClose, onOpenProject, onCreateProject, onProjectTrashed, onProjectsRestored, onRelationshipUpdated, canCreateProject, canResume, busy, openError }: ManagementViewProps) {
   const [health, setHealth] = useState<Health[]>([]);
   const [context, setContext] = useState<Context | null>(null);
   const [events, setEvents] = useState<AuditEvent[]>([]);
@@ -55,9 +56,9 @@ export function ManagementView({ onClose, onOpenProject, onCreateProject, onProj
     setLoading(true);
     setError("");
     Promise.all([
-      fetch("/api/management/project-health").then((response) => response.ok ? response.json() as Promise<Health[]> : Promise.reject(new Error("Project health unavailable."))),
-      fetch("/api/identity/context").then((response) => response.ok ? response.json() as Promise<Context> : Promise.reject(new Error("Identity context unavailable."))),
-      fetch("/api/management/audit?limit=12").then((response) => response.status === 403 ? { events: [] } : response.ok ? response.json() as Promise<{ events: AuditEvent[] }> : Promise.reject(new Error("Audit activity unavailable."))),
+      accessRequest("/api/management/project-health", "workspace").then((response) => response.ok ? response.json() as Promise<Health[]> : Promise.reject(new Error("Project health unavailable."))),
+      accessRequest("/api/identity/context", "workspace").then((response) => response.ok ? response.json() as Promise<Context> : Promise.reject(new Error("Identity context unavailable."))),
+      accessRequest("/api/management/audit?limit=12", "workspace").then((response) => response.status === 403 ? { events: [] } : response.ok ? response.json() as Promise<{ events: AuditEvent[] }> : Promise.reject(new Error("Audit activity unavailable."))),
     ]).then(([nextHealth, nextContext, nextEvents]) => {
       if (!alive) return;
       setHealth(nextHealth);
@@ -173,9 +174,10 @@ export function ManagementView({ onClose, onOpenProject, onCreateProject, onProj
   return <section data-onboarding="workspace.management" className="management-view" aria-labelledby="management-title">
     <header className="management-header">
       <div><p className="eyebrow">WORKSPACE</p><h1 ref={titleRef} tabIndex={-1} id="management-title">My Work</h1></div>
-      <div className="management-actions"><button type="button" className="button button-outline" disabled={disabled} aria-pressed={showTrash} onClick={() => { const next = !showTrash; setShowTrash(next); if (next) void loadTrash(); }}> {showTrash ? "My Work" : "Trash"}</button><button type="button" className="button button-accent" disabled={!canCreateProject || disabled} onClick={() => onCreateProject()}><Plus size={15} />New Project</button><button type="button" className="button button-outline" disabled={!canResume || disabled} onClick={onClose}>Resume authoring<ArrowRight size={15} /></button></div>
+      <div className="management-actions"><button type="button" className="button button-accent" disabled={!canCreateProject || disabled} onClick={event => {event.currentTarget.focus(); onStartImport();}}>Start Experience from Import</button><button type="button" className="button button-outline" disabled={disabled} aria-pressed={showTrash} onClick={() => { const next = !showTrash; setShowTrash(next); if (next) void loadTrash(); }}> {showTrash ? "My Work" : "Trash"}</button><button type="button" className="button button-accent" disabled={!canCreateProject || disabled} onClick={event => { event.currentTarget.focus(); onCreateProject(); }}><Plus size={15} />New Project</button><button type="button" className="button button-outline" disabled={!canResume || disabled} onClick={onClose}>Resume authoring<ArrowRight size={15} /></button></div>
     </header>
     <div className="management-body">
+      {openError && <div className="notice" role="alert">{openError}</div>}
       {error && !trashTarget && <div className="notice" role="alert"><span>{error}</span><button type="button" className="button button-outline" disabled={disabled || loading} onClick={() => setRetry((current) => current + 1)}>Retry</button></div>}
       <p className="management-status" role="status">{loading ? "Loading workspace..." : opening ? "Opening project..." : savingStage ? "Saving production stage..." : status}</p>
       <div className="management-summary" aria-label="Work summary" aria-busy={loading}>

@@ -20,6 +20,7 @@ async function setup(page, options = {}) {
     return route.fulfill({ json: status });
   });
   await mockMediaConnections(page);
+  await page.route('**/api/projects', route => route.request().method() === 'GET' ? route.fulfill({ json: [] }) : route.continue());
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'AI Connections', exact: true }).click();
@@ -90,6 +91,7 @@ for (const theme of ['light', 'dark']) {
     }
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog', { name: 'AI Connections' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'AI Connections', exact: true })).toBeFocused();
+    // At phone width the Settings trigger is inside the closed workspace drawer.
+    await expect(page.getByRole('button', { name: 'Show workspace menu', exact: true })).toBeFocused();
   });
 }

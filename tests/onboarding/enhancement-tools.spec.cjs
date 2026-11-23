@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 
 async function openToolReview(page, request, ready = true, initialStatus = 'failed') {
@@ -45,7 +46,9 @@ async function openToolReview(page, request, ready = true, initialStatus = 'fail
   });
   await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
   await page.goto('/');
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Review tools', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Review suggestions', exact: true }).click();
   return { project, dialog: page.getByRole('dialog'), submissions, previews,
     setJobStatus: status => { jobs = jobs.map(job => ({ ...job, status })); },
@@ -86,8 +89,10 @@ for (const width of [1280, 390]) {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect(banner.locator('svg')).toHaveCSS('animation-name', 'none');
     await page.reload();
-    await page.getByRole('button', { name: 'Review tools', exact: true }).click();
-    await page.getByRole('button', { name: 'Review suggestions', exact: true }).click();
+    await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'Review tools', exact: true }).click();
+    await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'Review suggestions', exact: true }).click();
     await expect(banner.getByRole('status')).toHaveText('Enhancement in progress');
     setJobStatus('failed');
     await expect(banner).toHaveCount(0);
@@ -126,8 +131,10 @@ for (const width of [1280, 390]) {
     expect(persisted.storyboard).toEqual(project.storyboard);
     const loaded = page.waitForResponse(response => response.url().endsWith(`/api/projects/${project.id}`) && response.request().method() === 'GET');
     await page.reload(); await loaded;
-    await page.getByRole('button', { name: 'Review tools', exact: true }).click();
-    await page.getByRole('button', { name: 'Review suggestions', exact: true }).click();
+    await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'Review tools', exact: true }).click();
+    await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'Review suggestions', exact: true }).click();
     await page.getByText('Tool execution · 2 completed', { exact: true }).click();
     await expect(page.getByRole('link', { name: 'Public fair-play reference', exact: true })).toBeVisible();
     expect(submissions).toHaveLength(1);

@@ -1,10 +1,23 @@
 # Chimera
 
-> **Hosted release (2026-11-22):** [Chimera2 Studio](https://chimera.darkrogue.io/) is live on Hostinger at deployed commit [`7dae45d1`](https://github.com/Darkkeep/chimera/commit/7dae45d1e68cf83f5eaac1c9e875b4fbd7d2772e), with DARKROGUE SSO, saved Studio authoring and SCORM 1.2 export verified against production. **Repository `main` still documents and contains the 1.2.0 line**; the deployed Chimera2 source is tracked in [draft PR #44](https://github.com/Darkkeep/chimera/pull/44), stacked on [draft PR #40](https://github.com/Darkkeep/chimera/pull/40). See the [production release record](docs/chimera2-production-release-2026-11-22.md). Do not infer the deployed version from `main` until the branch stack is reconciled.
+> Hosted release history: Chimera2 replaced 1.2.0 in the [November 22 production cutover](docs/chimera2-production-release-2026-11-22.md). This candidate retains that release and the later access/navigation fixes. Production identity must be checked independently of the branch name.
 
-Repository context: **Chimera 1.2.0** | [MIT license](LICENSE) | [Release notes](docs/release-1.2.0.md). Dated evidence and independently versioned assets/contracts retain their original scope.
+Development candidate: **Chimera 2.0.0-beta.1** | [MIT license](LICENSE) | [Beta release notes](docs/release-2.0.0-beta.1.md) | [Product charter](CHIMERA_CHARTER.md).
 
-Chimera **1.2.0** was the prior hosted DARKROGUE SSO release and remains the `main` branch's code baseline until the Chimera2 PR stack is reconciled. The current [hosted Chimera2](https://chimera.darkrogue.io/) uses DARKROGUE sign-in. For historical 1.2.0 scope see [release notes](docs/release-1.2.0.md); for the live release see [Chimera2 production record](docs/chimera2-production-release-2026-11-22.md). The local authoring instructions below reflect the code checked out from this branch.
+For local Beta development, use `C:\inetpub\Chimera2\Chimera2.code-workspace`
+and its **Chimera Backend** / **Chimera Frontend** tasks. Open
+`http://127.0.0.1:5175` and enable **Studio 2.0 preview**. The backend uses port
+8002 and the existing local workspace. See [local setup](docs/local-workspace-relocation.md)
+and the [candidate review packet](docs/beta-1-review-packet.md).
+This candidate is not a production release. The charter is independently versioned
+2.0.0. Dated evidence and independently versioned assets/contracts retain their scope.
+
+Chimera **1.2.0** was the prior hosted DARKROGUE SSO release. The current
+[hosted Chimera2](https://chimera.darkrogue.io/) uses DARKROGUE sign-in. See the
+[historical 1.2.0 notes](docs/release-1.2.0.md), the
+[Chimera2 cutover record](docs/chimera2-production-release-2026-11-22.md), and the
+[combined Milestone 3 candidate](docs/chimera2-milestone3-release-candidate.md).
+This candidate has not been merged or deployed.
 
 **Imported HTML5 activities** can now sit alongside native scene experiences.
 Import an offline HTML file or single-entry ZIP, review its isolated preview and

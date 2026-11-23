@@ -11,6 +11,7 @@ import "./brand.css";
 import "./production-kit/tokens.css";
 import "./production-kit/components.css";
 import "./production-brand.css";
+import "./interface-themes.css";
 import { initializeAppearance } from "./AppearanceSelector";
 import { AuthGate } from "./AuthGate";
 

@@ -93,6 +93,32 @@ No live-provider creative-quality qualification is implied by automated tests.
 
 ## Use
 
+Local Beta entry update (November 19, 2026): **Conversation** opens with an
+optional file drop/browse area and **What would you like to do?**. Choose
+**Start with Pythia** for the first message, then **Send to Pythia** for follow-ups.
+Attached documents are saved as project sources and their readable text is selected
+for that request. An unreadable attachment blocks submission until resolved or removed;
+a failed send retains the prompt and selected sources without uploading them again.
+Pending browser file selections must be attached again after closing/reloading.
+
+**Sources and instructions** contains existing-source selection, scene context and
+author direction. **Connection and conversation details** contains connection checks,
+capacity information and reset. **Design brief** holds the existing author-reviewed
+brief and drafting agreement; **Files** holds consultation artifacts and media controls.
+The numbered workflow below describes those existing capabilities; open the corresponding
+secondary view or details control first. This entry update does not connect conversation
+to specialist orchestration or public web research; see the
+[work-first delivery plan](pythia-work-first-delivery-plan.md).
+
+When a saved content draft is ready, **Review my draft** above the conversation opens
+its proposed slides and focuses the review. **Use this draft as my slides** adds the
+reviewed draft through the existing revision-controlled apply operation. For a scene
+update the button reads **Use these changes**. The acceptance control is at the start
+of the review; a stale draft explains why it cannot be used. After successful acceptance,
+**Open my slides** returns from the standalone consultation to the authoring workspace.
+The embedded new-project planner retains its existing **Open storyboard** navigation.
+These actions make no model calls and do not render media or publish.
+
 1. **Check connection** initializes the local tool server and checks its
    advertised capabilities, without submitting a model consultation.
 2. Enter a question and choose **Send to Pythia**. Follow up with a correction
@@ -127,7 +153,7 @@ No live-provider creative-quality qualification is implied by automated tests.
    before/after values or new scenes, rationale, target, and source revision.
    The agreed brief is sent with the draft and retained on its private record.
    The backend also enforces this author-controlled transition.
-9. **Apply changes** commits the reviewed content through Chimera's normal
+9. **Use this draft as my slides** (or **Use these changes** for a scene update) commits the reviewed content through Chimera's normal
    scene authoring and revision history. **Discard draft** preserves the current
    storyboard. A newer storyboard revision requires a fresh draft.
 10. **New conversation** asks before clearing this account's saved conversation

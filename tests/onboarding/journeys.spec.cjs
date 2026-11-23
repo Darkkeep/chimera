@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 const { guide, expectStep, startChimera, createProject, saveScene, reloadAuthoring } = require('./helpers.cjs');
@@ -68,8 +69,9 @@ test('guide controls participate in modal keyboard navigation and pass scoped ax
   await page.screenshot({ path: test.info().outputPath('chimera-guide.png') });
   await guide(page).getByRole('button', { name: 'Pause guide' }).click();
   await page.getByRole('button', { name: 'Close scene editor' }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('radio', { name: 'Dark', exact: true }).check();
+  await page.getByRole('radio', { name: 'Classic Dark', exact: true }).check();
   await page.getByRole('button', { name: 'Start / resume walkthrough' }).click();
   await expectStep(page, 'Create a scene');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
@@ -83,7 +85,9 @@ test('manually created projects do not inherit completed walkthroughs', async ({
   await startChimera(page); await createProject(page, unique('Completed project'));
   await saveScene(page, 'Practice scene'); await guide(page).getByRole('button', { name: 'Next', exact: true }).click();
   await expectStep(page, 'Walkthrough complete'); await guide(page).getByRole('button', { name: 'Close guide' }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Create project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   await page.getByRole('textbox', { name: 'Course name' }).fill(unique('Separate project'));
   await page.getByRole('dialog').getByRole('button', { name: 'Create project', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0); await expect(guide(page)).toHaveCount(0);

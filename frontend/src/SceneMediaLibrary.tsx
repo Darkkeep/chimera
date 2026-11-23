@@ -16,7 +16,7 @@ export function SceneMediaLibrary({ project, scene, renderAsset, onEditScene, bu
     }).then(setOrigins).catch(issue => { if (issue.name !== "AbortError") setError(issue.message); });
     return () => controller.abort();
   }, [project.id, project.storyboard.revision]);
-  const attached = new Set(scene ? effectivePlacements(project, scene).map(item => item.assetId) : []);
+  const attached = new Set(scene ? [...effectivePlacements(project, scene).map(item => item.assetId), ...(scene.visualLayout?.elements.map(item => item.assetId).filter(Boolean) ?? []), ...(scene.visualLayout?.timeline?.clips.map(item => item.assetId) ?? []), scene.visualLayout?.backgroundAsset, scene.backgroundAsset] : []);
   const intended = new Set(origins.filter(item => item.status === "approved" && item.sceneId === scene?.id).map(item => item.approvedAssetId));
   const current = project.storyboard.assets.filter(asset => asset.kind !== "html5" && (attached.has(asset.id) || intended.has(asset.id)));
   const other = project.storyboard.assets.filter(asset => asset.kind !== "html5" && !current.includes(asset));
@@ -29,6 +29,6 @@ export function SceneMediaLibrary({ project, scene, renderAsset, onEditScene, bu
   return <>
     {error && <p role="alert">{error}</p>}
     {scene ? <section aria-label="Selected scene media"><div className="template-toolbar"><h3>Media for {scene.title}</h3><button type="button" className="button button-outline" disabled={busy} onClick={() => onEditScene(scene)}>Edit scene</button></div><p className="field-hint">Attached media and approved assets requested for this scene.</p>{current.length ? <div className="media-grid">{current.map(card)}</div> : <p>No attached or approved media for this scene.</p>}</section> : null}
-    {other.length > 0 && <details key={scene?.id || "project"} className="other-project-media"><summary>{scene ? "Other project media" : "Project media"} ? {other.length}</summary><p>These assets are available in the project. They are not attached to the selected scene.</p><div className="media-grid">{other.map(card)}</div></details>}
+    {other.length > 0 && <details key={scene?.id || "project"} className="other-project-media" open={!scene}><summary>{scene ? "Other course media" : "Course media"} ? {other.length}</summary><p>These assets are available in the project. They are not attached to the selected scene.</p><div className="media-grid">{other.map(card)}</div></details>}
   </>;
 }
