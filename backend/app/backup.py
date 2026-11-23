@@ -147,6 +147,10 @@ def restore_project_archive(project_id: str, content: bytes) -> object:
                     destination = templates_path() / source.relative_to(extracted / "templates")
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(source, destination)
+                # Trusted approval evidence is never imported from a course archive.
+                # Even restoring matching content requires a new human decision.
+                from . import review_approval
+                review_approval.invalidate_after_restore(project_id)
             except Exception:
                 shutil.rmtree(root, ignore_errors=True)
                 shutil.copytree(backup_root, root)
