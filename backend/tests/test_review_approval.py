@@ -148,6 +148,44 @@ class ReviewApprovalTests(unittest.TestCase):
             self.assertEqual(stale.exception.status_code, 409)
             builder.assert_called_once()
 
+    def test_all_approved_export_formats_fail_closed_on_review_changes(self):
+        from backend.app import main
+        from fastapi import HTTPException
+        cases = (
+            (main.export_standalone, "build_standalone_course",
+             (b"standalone-pkg", "standalone.zip")),
+            (main.export_scorm_2004, "persist_scorm_build",
+             (b"scorm2004-pkg", {}, "scorm2004.zip")),
+        )
+        for exporter, builder_name, package in cases:
+            with self.subTest(export=builder_name):
+                with patch.object(main, builder_name, return_value=package) as builder:
+                    with self.assertRaises(HTTPException) as rejected:
+                        exporter(self.project.id, approved=True)
+                    self.assertEqual(rejected.exception.status_code, 409)
+                    builder.assert_not_called()
+        self.decide()
+        with patch.object(main, "build_standalone_course",
+                          return_value=(b"standalone-pkg", "standalone.zip")) as builder:
+            self.assertEqual(main.export_standalone(self.project.id, approved=True).body,
+                             b"standalone-pkg")
+            builder.assert_called_once()
+        with patch.object(main, "persist_scorm_build",
+                          return_value=(b"scorm2004-pkg", {}, "scorm2004.zip")) as builder:
+            self.assertEqual(main.export_scorm_2004(self.project.id, approved=True).body,
+                             b"scorm2004-pkg")
+            builder.assert_called_once()
+        scene = self.project.storyboard.scenes[0]
+        storage.create_review_comment(self.project.id, ReviewCommentCreate(
+            sceneId=scene.id, body="Hold publication", authorLabel="Reviewer"), self.reviewer)
+        for exporter, builder_name, package in cases:
+            with self.subTest(revoked=builder_name):
+                with patch.object(main, builder_name, return_value=package) as builder:
+                    with self.assertRaises(HTTPException) as rejected:
+                        exporter(self.project.id, approved=True)
+                    self.assertEqual(rejected.exception.status_code, 409)
+                    builder.assert_not_called()
+
     def test_draft_export_remains_available_during_migration(self):
         from backend.app import main
         with patch.object(main, "persist_scorm_12_build",
