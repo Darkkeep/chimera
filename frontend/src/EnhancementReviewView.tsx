@@ -282,6 +282,11 @@ export function EnhancementReviewView({ project, onClose, onProjectUpdated, firs
 
   useEffect(() => {
     const controller = new AbortController();
+    // Project switching must never retain another course's reference selection.
+    setResources([]);
+    setSelectedResourceIds([]);
+    setSelectedSceneIds([]);
+    setPreview(null);
     setJobs([]);
     setStatusError("");
     Promise.all([
