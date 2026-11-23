@@ -1,15 +1,21 @@
 const {test, expect} = require('@playwright/test');
 const {execFileSync} = require('node:child_process');
+const {openWorkspaceMenu} = require('../onboarding/helpers.cjs');
 const AxeBuilder = require('@axe-core/playwright').default;
 test.setTimeout(90000);
-async function open(page) {
+async function open(page, surface = 'My Work') {
   await page.route('**/api/projects', async route => route.request().method() === 'GET' ? route.fulfill({json:[]}) : route.continue());
   await page.goto('/');
-  await page.getByRole('button',{name:'Start Experience from Import',exact:true}).first().click();
+  if (surface === 'workspace') await openWorkspaceMenu(page);
+  const trigger = surface === 'My Work' ? page.getByRole('button', {name:'New Project',exact:true}) : page.getByRole('button', {name:'Create project',exact:true});
+  await trigger.click();
+  const choice = page.getByRole('dialog', {name:'New Project',exact:true});
+  await expect(choice.getByRole('button', {name:'Start from a file'})).toBeFocused();
+  await choice.getByRole('button', {name:'Start from a file'}).press('Enter');
   return page.getByRole('dialog',{name:'Start Experience from Import'});
 }
-test('no-project Pythia JSON preview, explicit create, review, accept and edit', async ({page}, info) => {
-  const dialog = await open(page);
+for (const surface of ['My Work', 'workspace']) test(`${surface} primary New Project: Pythia JSON preview, explicit create, review, accept and edit`, async ({page}, info) => {
+  const dialog = await open(page, surface);
   const writes=[];
   page.on('request', r=>{if(r.method()==='POST' && /\/api\/projects(?:$|\/)/.test(new URL(r.url()).pathname)) writes.push(r.url());});
   await dialog.getByLabel('Experience import file').setInputFiles('backend/tests/fixtures/production-handoff-v1.json');
@@ -44,7 +50,7 @@ test('bad and unknown JSON cannot create or overwrite a project; cancel restores
   }
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole('button',{name:'Start Experience from Import',exact:true}).first()).toBeFocused();
+  await expect(page.getByRole('button',{name:'New Project',exact:true})).toBeFocused();
 });
 test('PowerPoint preview and creation use the existing deck importer', async ({page})=>{
   const dialog=await open(page);
@@ -77,4 +83,37 @@ test('drop a native storyboard backup and explicitly restore into a separate new
   expect(restored.storyboard.scenes[0].title).toBe('Restored lesson');
   const original=await (await page.request.get(`/api/projects/${source.id}`)).json();
   expect(original.storyboard).toEqual(scene.storyboard);
+});
+
+for (const surface of ['My Work', 'workspace']) test(`${surface} New Project keyboard, responsive choice and idea creation`, async ({page}) => {
+  await page.route('**/api/projects', async route => route.request().method() === 'GET' ? route.fulfill({json:[]}) : route.continue());
+  await page.goto('/');
+  if (surface === 'workspace') await openWorkspaceMenu(page);
+  const trigger = surface === 'My Work' ? page.getByRole('button', {name:'New Project',exact:true}) : page.getByRole('button', {name:'Create project',exact:true});
+  await trigger.focus();
+  await trigger.press('Enter');
+  const choice = page.getByRole('dialog', {name:'New Project',exact:true});
+  await expect(choice.getByRole('button', {name:'Start from a file'})).toBeFocused();
+  await page.setViewportSize({width:320,height:900});
+  expect(await choice.evaluate(e => e.scrollWidth <= e.clientWidth + 1)).toBe(true);
+  expect((await new AxeBuilder({page}).include('[role="dialog"]').analyze()).violations).toEqual([]);
+  await page.keyboard.press('Shift+Tab');
+  await expect(choice.getByRole('button', {name:'Cancel',exact:true})).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(choice.getByRole('button', {name:'Start from a file'})).toBeFocused();
+  await page.keyboard.press('Escape');
+  if (surface === 'workspace') {
+    await expect(page.locator('.workspace-menu-toggle')).toBeFocused();
+    await openWorkspaceMenu(page);
+  } else await expect(trigger).toBeFocused();
+  await trigger.press('Enter');
+  await choice.getByRole('button', {name:'Start with an idea'}).click();
+  const form = page.getByRole('dialog', {name:'Name your course'});
+  await expect(form.getByLabel('Course name', {exact:true})).toBeFocused();
+  await form.getByLabel('Course name', {exact:true}).fill('Owner idea path');
+  await expect(form.getByLabel('Attach course design documents')).toBeVisible();
+  await form.getByRole('button', {name:'Create project',exact:true}).click();
+  await expect(form).toHaveCount(0);
+  const id = await page.evaluate(() => localStorage.getItem('chimera.activeProjectId'));
+  expect((await (await page.request.get(`/api/projects/${id}`)).json()).title).toBe('Owner idea path');
 });

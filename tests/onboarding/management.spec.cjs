@@ -99,10 +99,12 @@ test('New Project on My Work opens creation and enters authoring after saving', 
   await mockWorkspace(page, { empty: true });
   await page.goto('/');
   await page.getByRole('button', { name: 'New Project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Course name', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close new project', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'My Work', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'New Project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   await page.getByRole('textbox', { name: 'Course name', exact: true }).fill('Created from My Work');
   await page.getByRole('dialog').getByRole('button', { name: 'Create project', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Created from My Work', exact: true })).toBeVisible();
@@ -113,6 +115,7 @@ test('attaches course design documents as AI references when AI is configured', 
   const workspace = await mockWorkspace(page, { empty: true, aiConfigured: true });
   await page.goto('/');
   await page.getByRole('button', { name: 'New Project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   const documentPicker = page.getByLabel('Attach course design documents');
   await expect(documentPicker).toBeVisible();
   await documentPicker.setInputFiles({ name: 'design-guide.txt', mimeType: 'text/plain', buffer: Buffer.from('Course goals and audience') });

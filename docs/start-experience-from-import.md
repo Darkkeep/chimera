@@ -7,7 +7,9 @@ idle/completed when inspected; its checkout and branch were left untouched.
 
 ## Behavior and contracts
 
-My Work and the workspace navigation offer **Start Experience from Import**.
+The primary **+ New Project** action in My Work and **Create project** in workspace navigation open a shared choice. **Start from a file** opens the existing import workflow. **Start with an idea** opens the existing course naming, source and consultation form. Empty-storyboard and Golden Path creation share the choice; subproject creation and guided naming stay unchanged. Direct import shortcuts remain available.
+
+The shared dialog traps keyboard focus and supports Escape. Closing returns focus to the creation trigger, or the menu toggle if responsive navigation hides it.
 Choose or drop one PPTX or JSON file, inspect its recognized type, scene text and
 unsupported-content diagnostics, name the experience, then explicitly create it.
 Preview is read-only, authorized with `project.create`, and creates no project,
@@ -49,14 +51,15 @@ Upstream inspected: Pythia `service/production_handoff.py` at
 Use the existing isolated demo runner (`npm run demo:progressive`) with a Python
 environment containing backend dependencies. No provider settings are inherited.
 
-1. Open the demo with no project selected. Choose **Start Experience from Import**.
+1. Open the demo with no project selected. Click the prominent **+ New Project**, then **Start from a file**.
 2. Drop `backend/tests/fixtures/production-handoff-v1.json`. Read the recognized
    Pythia type, scene preview and withheld-question/media/objective diagnostics.
    Cancel once: no project should have been created.
 3. Choose it again and select **Create experience and review scenes**. The new
    project's storyboard remains empty while its proposed scene is reviewed.
 4. Choose **Accept and edit**, change canvas text and save. Reopen to confirm it.
-5. Try malformed JSON and an unrelated JSON document: both show an error with no
+5. Return to **+ New Project**, choose **Start with an idea**, and name and create a course. Sources and consultation remain available.
+6. Try malformed JSON and an unrelated JSON document: both show an error with no
    Create action. Try a PPTX: inspect slide titles, create, and review the result.
 6. Check keyboard navigation, Escape/focus return, and the narrow mobile layout.
 

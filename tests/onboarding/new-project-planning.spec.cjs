@@ -32,6 +32,7 @@ test.beforeEach(async ({ page }) => {
 async function begin(page, title) {
   await page.goto('/');
   await page.getByRole('button', { name: 'New Project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Name your course', exact: true });
   await dialog.getByRole('textbox', { name: 'Course name', exact: true }).fill(title);
   return dialog;
