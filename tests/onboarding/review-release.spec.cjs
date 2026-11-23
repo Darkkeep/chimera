@@ -54,7 +54,7 @@ test('human review decisions bind approved SCORM export to the exact revision', 
   expect(current.approved).toBe(false);
   expect(current.state).toBe('changed-since-review');
   expect((await request.get(`/api/projects/${project.id}/scorm-12.zip?approved=true`)).status()).toBe(409);
-  expect((await decision('approve', 'Stale approval', project.storyboard.revision)).status()).toBe(409);
+  expect((await decision('approve', 'Stale approval', project.storyboard.revision)).status()).toBe(412);
 
   const separate = await (await request.post('/api/projects', { data: { title: 'Unrelated Sporting Merit ' + crypto.randomUUID() } })).json();
   expect((await request.get(`/api/projects/${separate.id}/scorm-12.zip?approved=true`)).status()).toBe(409);
