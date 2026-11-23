@@ -90,6 +90,20 @@ export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated,
     } catch (issue) { setError(issue instanceof Error ? issue.message : "Could not import artifact"); }
     finally { setBusy(false); setOperation(""); }
   }
+  async function bringPythiaDraft() {
+    setBusy(true); setError(""); setInterrupted(false);
+    setOperation("Reading your completed Pythia draft…");
+    try {
+      const page = await json(await fetch(`${base}/from-pythia-draft`, {
+        method: "POST", headers: storyboardWriteHeaders(getCurrentRevision()),
+      })) as EventPage;
+      activeJob.current = page.jobId; log.current = []; absorb(page);
+      localStorage.setItem(storageKey, page.jobId); setJobId(page.jobId);
+    } catch (issue) {
+      setError(issue instanceof Error ? issue.message : "Could not retrieve the Pythia draft.");
+    } finally { setBusy(false); setOperation(""); }
+  }
+
   async function decide(componentId: string, decision: "accept" | "reject", edit = false) {
     setBusy(true); setError(""); setOperation(decision === "accept" ? "Adding the scene to your course…" : "Rejecting the scene proposal…");
     try {
@@ -112,6 +126,7 @@ export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated,
     <div className="progressive-heading"><h3>Progressive scene proposals</h3><span>{import.meta.env.PROD ? "Saved Pythia artifacts · author-reviewed" : "Local review · no AI calls"}</span></div>
     <p>{importReport ? "Review complete proposals from your saved artifact. Nothing enters your course until you choose Accept scene." : "Review a complete draft while the next scene is still being prepared. Nothing enters your course until you choose Accept scene."}</p>
     <div className="progressive-actions">
+      {import.meta.env.PROD && <button type="button" disabled={disabled || busy || status === "running"} onClick={() => void bringPythiaDraft()}>Review latest Pythia scene draft</button>}
       <label>Import saved Pythia artifact <input type="file" accept=".json,application/json" aria-label="Import saved Pythia artifact" disabled={disabled || busy || status === "running"}
         onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) void importArtifact(file); }} /></label>
       {!import.meta.env.PROD && <><button type="button" disabled={disabled || busy || status === "running"} onClick={() => void begin()}>Start progressive demo</button>
@@ -133,8 +148,8 @@ export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated,
     {ready.map(event => {
       const decision = events.find(item => item.componentId === event.componentId && ["component.accepted", "component.rejected"].includes(item.type));
       return <article key={event.componentId} aria-label={`Draft proposal: ${event.payload?.title}`}>
-        <h4>{event.payload?.title}</h4><p>Proposal only · {event.provenance.producer === "pythia-production-handoff-v1" ? "Saved Pythia artifact (no live generation)" : event.provenance.producer === "pythia-authoring-fixture-v1" ? "Pythia-format test result (no live model or citations)" : "Synthetic source: inspection basics"} · {decision?.status || "Awaiting your review"}</p>
-        {event.provenance.producer === "pythia-production-handoff-v1" && <p>Artifact: {event.provenance.artifactId} · Source scene: {event.provenance.sourceSceneId} · Source IDs: {event.provenance.sourceIds.join(", ") || "None supplied"} · Locators (supplied, unverified): {event.provenance.locators.join("; ") || "None supplied"}</p>}
+        <h4>{event.payload?.title}</h4><p>Proposal only · {event.provenance.producer === "pythia-authored-draft-v1" ? "Pythia-generated draft (completed before import)" : event.provenance.producer === "pythia-production-handoff-v1" ? "Saved Pythia artifact (no live generation)" : event.provenance.producer === "pythia-authoring-fixture-v1" ? "Pythia-format test result (no live model or citations)" : "Synthetic source: inspection basics"} · {decision?.status || "Awaiting your review"}</p>
+        {["pythia-production-handoff-v1", "pythia-authored-draft-v1"].includes(event.provenance.producer) && <p>Artifact: {event.provenance.artifactId} · Source scene: {event.provenance.sourceSceneId} · Source IDs: {event.provenance.sourceIds.join(", ") || "None supplied"} · Locators (supplied, unverified): {event.provenance.locators.join("; ") || "None supplied"}</p>}
         {event.provenance.producer === "pythia-authoring-fixture-v1" && event.provenance.rationale && <p>Design rationale: {event.provenance.rationale}</p>}
         <SceneSurface project={project} scene={proposalScene(event)} />
         <div className="progressive-actions">
