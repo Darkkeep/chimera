@@ -1,0 +1,78 @@
+name: Build Chimera release artifact
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/release-artifact.yml'
+      - 'scripts/build-release.sh'
+      - 'scripts/release/**'
+      - 'backend/requirements*'
+      - 'package*.json'
+      - 'frontend/package*.json'
+      - 'backend/app/**'
+      - 'backend/tests/**'
+      - 'frontend/src/**'
+      - 'scripts/chimera-ssh-preflight.py'
+      - 'scripts/test_chimera_ssh_preflight.py'
+      - 'docs/chimera2-production-promotion-runbook.md'
+  workflow_dispatch:
+    inputs:
+      studio_enabled:
+        description: Include Studio in the release candidate
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Fetch pinned schemas used only by backend tests
+        env:
+          CONTRACTS_TOKEN: ${{ secrets.PYTHIA_CONTRACTS_READ_TOKEN }}
+        run: |
+          test -n "$CONTRACTS_TOKEN"
+          header=$(printf 'x-access-token:%s' "$CONTRACTS_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=Authorization: Basic $header" submodule update --init vendor/pythia-contracts
+      - name: Validate noninteractive SSH preflight contract
+        run: python3 scripts/test_chimera_ssh_preflight.py
+      - name: Package exact checkout
+        env:
+          STUDIO_ENABLED: ${{ github.event_name == 'pull_request' && 'true' || inputs.studio_enabled }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bash scripts/build-release.sh "$SOURCE_SHA" "$STUDIO_ENABLED"
+      - name: Compare two independent archive builds
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          STUDIO: ${{ github.event_name == 'pull_request' && 'true' || inputs.studio_enabled }}
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/rebuild" "$SOURCE_SHA"
+          (cd "$RUNNER_TEMP/rebuild" && bash scripts/build-release.sh "$SOURCE_SHA" "$STUDIO")
+          name="chimera-$SOURCE_SHA-studio-$STUDIO"
+          cmp "release-artifacts/$name/$name.tar.gz" "$RUNNER_TEMP/rebuild/release-artifacts/$name/$name.tar.gz"
+      - name: Install and exercise the archive with networking disabled
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          STUDIO: ${{ github.event_name == 'pull_request' && 'true' || inputs.studio_enabled }}
+        run: |
+          docker build -t chimera-release-test - < scripts/release/qualification.Dockerfile
+          docker run --rm --network none --shm-size=512m \
+            -v "$PWD/release-artifacts/chimera-$SOURCE_SHA-studio-$STUDIO:/artifact:ro" \
+            -v "$PWD/scripts/release/qualify-offline.sh:/qualify.sh:ro" \
+            -v "$PWD/backend/tests:/fixtures/backend-tests:ro" \
+            -v "$PWD/tests/fixtures:/fixtures/media:ro" \
+            -v "$PWD/vendor/pythia-contracts/schemas:/fixtures/schemas:ro" \
+            chimera-release-test bash /qualify.sh "$SOURCE_SHA" "$STUDIO"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chimera-${{ github.event.pull_request.head.sha || github.sha }}-studio-${{ github.event_name == 'pull_request' && 'true' || inputs.studio_enabled }}
+          path: release-artifacts/*/*
+          if-no-files-found: error
+          retention-days: 30

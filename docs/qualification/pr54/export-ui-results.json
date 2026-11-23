@@ -1,0 +1,9 @@
+{
+  "approvedCheckbox": "PASS",
+  "serverApprovedQuery": "PASS",
+  "responseCode": 200,
+  "download": "PASS",
+  "zipIntegrity": "PASS",
+  "revision": 11,
+  "packageSha256": "169188a867b23153fccccac74c89620881372c14882a71a228782009073dccff"
+}

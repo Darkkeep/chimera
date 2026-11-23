@@ -135,6 +135,21 @@ export function SceneExperiencePanel({ project, scene, onClose, onProjectUpdated
     if (value.project) onProjectUpdated(value.project);
     setNotice(apply ? "Experience applied. No media generation or video render was started." : "Private treatment saved. The scene is unchanged.");
   }
+  async function applyManual() {
+    // Manual authoring must never require a generated Pythia treatment record.
+    // Keep the same explicit author review, scene validation and If-Match guards.
+    if (!state || !treatment || state.draft || applied || !acknowledged || blocked || externalReviewNeeded || state.context.assemblyBlocked) return;
+    const value = await json<Project>(`/api/projects/${project.id}/scenes/${scene.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "If-Match": `"${state.context.revision}"` },
+      body: JSON.stringify({ experience: treatment.experience }),
+    });
+    onProjectUpdated(value);
+    setSaved(JSON.stringify(treatment));
+    setAcknowledged(false);
+    setNotice("Manually authored native scene saved. No Pythia or media provider was called.");
+    onClose();
+  }
   async function saveApplied() {
     if (!treatment || !state) return;
     const value = await json<Project>(`/api/projects/${project.id}/scenes/${scene.id}`, {
@@ -225,6 +240,9 @@ export function SceneExperiencePanel({ project, scene, onClose, onProjectUpdated
               })}>Remove native experience and restore canvas</button>
               <button type="button" disabled={pending} onClick={() => setRestoreConfirm(false)}>Keep native experience</button>
             </div>}
+          </> : !state.draft ? <>
+            <button type="button" disabled={pending || blocked || externalReviewNeeded || !acknowledged || state.context.assemblyBlocked} onClick={() => void act(applyManual)}>Apply manually authored experience</button>
+            <p className="field-hint">Direct scene save with revision protection. No Pythia request or generated treatment is required.</p>
           </> : <>
             <button type="button" disabled={pending || Boolean(stale)} onClick={() => void act(() => review(false))}>Save treatment privately</button>
             <button type="button" disabled={pending || Boolean(stale) || blocked || externalReviewNeeded || !acknowledged} onClick={() => void act(() => review(true))}>Apply reviewed experience to scene</button>

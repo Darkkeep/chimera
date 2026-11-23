@@ -1,3 +1,4 @@
+import { version as applicationVersion } from "../package.json";
 import { useState, type FormEvent } from "react";
 import { MessageSquareWarning, X } from "lucide-react";
 import "./signal-feedback.css";
@@ -5,7 +6,7 @@ import "./signal-feedback.css";
 type Kind = "problem" | "confusing" | "idea" | "praise";
 
 /** Reusable component: change product/version when installed elsewhere. */
-export function SignalFeedback({ product = "chimera", version = "1.2.0" }: { product?: string; version?: string }) {
+export function SignalFeedback({ product = "chimera", version = applicationVersion }: { product?: string; version?: string }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<Kind>("problem");
   const [description, setDescription] = useState("");

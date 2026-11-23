@@ -1,4 +1,5 @@
 """Contract tests for the first Signal intake endpoint."""
+from contextlib import closing
 import sqlite3
 import os
 import httpx
@@ -36,7 +37,7 @@ class SignalIntakeTests(unittest.TestCase):
         })
         self.assertEqual(response.status_code, 201, response.text)
         self.assertTrue(response.json()["id"].startswith("SIG-"))
-        with sqlite3.connect(Path(self.temp.name) / "signal" / "signal-reports.sqlite3") as db:
+        with closing(sqlite3.connect(Path(self.temp.name) / "signal" / "signal-reports.sqlite3")) as db:
             rows = db.execute("SELECT description,page,browser,status FROM reports").fetchall()
         self.assertEqual(rows, [(self.body["description"], None, None, "new")])
 
@@ -46,7 +47,7 @@ class SignalIntakeTests(unittest.TestCase):
             "includeTechnicalContext": True,
         })
         self.assertEqual(response.status_code, 201)
-        with sqlite3.connect(Path(self.temp.name) / "signal" / "signal-reports.sqlite3") as db:
+        with closing(sqlite3.connect(Path(self.temp.name) / "signal" / "signal-reports.sqlite3")) as db:
             stored = db.execute("SELECT page,browser FROM reports").fetchone()
         self.assertEqual(stored, ("/editor", "Browser"))
 

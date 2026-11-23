@@ -1,0 +1,39 @@
+{
+  "archiveSha256": "3be027979e2b26ca10177c95374b7e0f5a20f3db57dce4a4a929a7995fb4d9f4",
+  "manifest": {
+    "schema": 2,
+    "pythonExecutable": "runtime/python/bin/python3",
+    "nodeBin": "runtime/node/bin",
+    "playwrightBrowsersPath": "runtime/browser",
+    "wheelLock": "backend/requirements-linux-x86_64-cp314.lock",
+    "sourceSha": "4a38e4952de20def973b5dcd91cda3f4dfe5b1cf",
+    "sourceTimestamp": "2026-11-23T17:18:29Z",
+    "version": "2.0.0-beta.1",
+    "studioEnabled": true,
+    "studioDefault": true,
+    "pythiaContractsSha": "1fb6584a36552ca3f9f77ba1479fef45f8137b73",
+    "node": "v24.19.0",
+    "python": "3.14.4",
+    "platform": "Linux",
+    "architecture": "x86_64",
+    "libc": [
+      "glibc",
+      "2.39"
+    ]
+  },
+  "artifactId": 14842936793,
+  "githubZipSha256": "9b95b030bbf1ea5dc8b522ad4bb183592378bee690b0d55e0b1116af9f775777",
+  "packagingRun": 45226252381,
+  "packagingConclusion": "success",
+  "checksRun": 45226252223,
+  "experience": {
+    "result": "BLOCKED",
+    "database": "loopback port 54322 ECONNREFUSED",
+    "docker": "Linux engine pipe unavailable"
+  },
+  "cmi5": "UNSUPPORTED",
+  "humanFounderAcceptance": "NOT TESTED",
+  "automatedHostedChecks": 19,
+  "checksConclusion": "success",
+  "checksPassedJobs": 10
+}

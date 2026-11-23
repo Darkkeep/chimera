@@ -1,12 +1,14 @@
 {
   "name": "chimera",
-  "version": "1.2.0",
+  "version": "2.0.0-beta.1",
   "description": "Chimera is a local authoring tool for turning PowerPoint decks into editable storyboards and portable SCORM packages.",
   "main": "index.js",
   "directories": {
     "doc": "docs"
   },
   "scripts": {
+    "demo:progressive": "node scripts/progressive-demo.cjs",
+    "test:progressive": "node --test tests/progressive/events.test.cjs && playwright test --config playwright.progressive.config.cjs",
     "test:visual": "node tests/visual/qualify.cjs",
     "test:golden-path": "python tests/golden_path/qualify.py",
     "test:onboarding": "playwright test --config playwright.onboarding.config.cjs",

@@ -1,0 +1,46 @@
+.scene-compact .visual-editor-header{padding:0;align-items:center;margin:0 0 4px}
+.scene-compact .visual-editor-header .eyebrow{display:none}
+.scene-compact .visual-editor-header h2{font-size:14px;margin:0;line-height:1.4}
+.scene-compact .scene-menu-bar{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);padding:2px 0 5px;margin-bottom:5px}
+.scene-compact .scene-menu-bar button{border:0;background:transparent;color:inherit;border-radius:4px;padding:4px 7px;font:inherit;font-size:11px;min-height:28px}
+.scene-compact .scene-menu-bar button[aria-expanded="true"]{background:var(--theme-selected,#59427a)}
+.scene-compact :is(button,input,textarea,select,summary):focus-visible{outline:2px solid var(--chimera-ignition,#ff6a21);outline-offset:2px}
+.studio-inline-editor.scene-compact{padding:8px;border-radius:8px}
+.scene-compact .studio-contextual-tools{padding:3px 0 5px;gap:4px}
+.scene-compact :is(.studio-contextual-tools button,.studio-natural-format button){min-height:28px;padding:4px 7px}
+.scene-compact .studio-contextual-tools .icon-button{min-width:28px;width:28px}
+.scene-compact .visual-editor-workspace{padding-top:4px;gap:8px;grid-template-columns:minmax(0,1fr)}
+.scene-compact .visual-editor-workspace:has(> .visual-inspector:not([hidden])){grid-template-columns:minmax(0,1fr) 230px}
+.scene-compact .visual-inspector[hidden]{display:none}
+.scene-compact .visual-inspector{max-height:none;overflow:visible;padding-left:8px}
+.scene-compact :is(input,textarea,select){font-size:12px;padding:5px 6px;min-height:28px}
+.scene-compact :is(label,.field-hint){font-size:11px}
+.scene-compact :is(.studio-natural-inspector,.studio-natural-fields){gap:7px;margin-bottom:6px;padding-bottom:6px}
+.scene-compact .studio-natural-heading p,.scene-compact .studio-natural-helper{display:none}
+.scene-compact .studio-natural-heading strong{font-size:12px}
+.scene-compact .visual-inspector-section{margin:3px 0}
+.scene-compact .visual-inspector-section summary{padding:5px;font-size:11px}
+.scene-compact .visual-inspector-section > summary{min-height:28px}
+.scene-compact .visual-scene-details{max-height:none;overflow:visible;padding:6px 0}
+.scene-compact .visual-scene-details-grid{gap:8px}
+.scene-compact .studio-natural-fields input[type="color"]{height:28px}
+.scene-compact .visual-scene-details-grid :is(input:not([type="checkbox"]),textarea,select){padding:5px 6px;font-size:12px}
+.scene-compact .visual-inspector-section-body{padding:6px;gap:6px}
+.scene-compact .visual-attached-images{display:none}
+.scene-compact[data-scene-menu="Insert"] .visual-attached-images{display:block}
+.scene-compact .scene-timeline{margin-top:5px;padding:4px 6px;min-height:0;max-height:none;overflow:visible;resize:none}
+.scene-compact .scene-timeline > summary{padding:3px 0;font-size:11px}
+.scene-compact .timeline-scroll{max-height:none}
+.scene-compact .modal-actions{padding-top:7px;margin-top:6px;gap:6px}
+.scene-compact .modal-actions .button{padding:6px 9px;font-size:11px}
+.unsaved-scene-dialog{max-width:520px}
+.unsaved-scene-dialog .modal-actions{flex-wrap:wrap}
+.studio-editing .studio-stage{padding:10px;gap:7px}
+@media(max-width:1100px){.scene-compact .visual-editor-workspace:has(> .visual-inspector:not([hidden])){grid-template-columns:minmax(0,1fr)}.scene-compact .visual-inspector{border-left:0;padding-left:0}}
+@media(max-width:760px){.scene-compact .scene-menu-bar{gap:0}.scene-compact .scene-menu-bar button{padding:4px 5px}.scene-compact .studio-contextual-hint{display:none}}
+
+.scene-compact .scene-menu-extra{display:inline-flex;align-items:center;flex-wrap:wrap;gap:4px;margin-left:auto}
+.scene-compact .scene-menu-bar > .icon-button{display:inline-grid;place-items:center;width:28px;padding:4px}
+
+.scene-compact .visual-editor-header{min-height:32px}
+.scene-compact .scene-save-button{min-height:28px;padding:5px 9px;font-size:11px;white-space:nowrap}

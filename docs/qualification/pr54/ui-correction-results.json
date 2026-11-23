@@ -1,0 +1,14 @@
+{
+  "requestChangesUI": "PASS",
+  "authorVisibleCorrectionUI": "PASS",
+  "savedTextVerified": "PASS",
+  "independentReviewerSawCorrection": "PASS",
+  "exactRevisionApprovalUI": "PASS",
+  "revision": 13,
+  "approvedExportsThroughUI": [
+    "SCORM 1.2",
+    "SCORM 2004",
+    "standalone"
+  ],
+  "founderAcceptance": "NOT TESTED"
+}

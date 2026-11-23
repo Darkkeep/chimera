@@ -1,0 +1,26 @@
+[
+  {
+    "package": "approved-scorm12",
+    "sha256": "f374785ed3c93e63641ef333199c0c2b5bc3bb9f6556278e5dfb97e964b208b4",
+    "revision": 13,
+    "zipIntegrity": "PASS",
+    "manifestFileReferences": 3,
+    "visibleCorrectionIncluded": true
+  },
+  {
+    "package": "approved-scorm2004",
+    "sha256": "a5da892344d975dd99102f361dda5846b7a41e71e1777a969e0f4dd9c18b98f0",
+    "revision": 13,
+    "zipIntegrity": "PASS",
+    "manifestFileReferences": 3,
+    "visibleCorrectionIncluded": true
+  },
+  {
+    "package": "approved-standalone",
+    "sha256": "2316c0ea95412c806db905825d5ca2f99e3a7f417364f05216d29ffb39ed2d97",
+    "revision": 13,
+    "zipIntegrity": "PASS",
+    "manifestFileReferences": 0,
+    "visibleCorrectionIncluded": true
+  }
+]

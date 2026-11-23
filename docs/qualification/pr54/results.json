@@ -1,0 +1,79 @@
+[
+  {
+    "name": "Four separately authenticated actors",
+    "result": "PASS"
+  },
+  {
+    "name": "UI project creation, Studio text edit and save",
+    "result": "PASS"
+  },
+  {
+    "name": "UI branching interaction saved",
+    "result": "PASS"
+  },
+  {
+    "name": "Course creator and unauthorized reviewer cannot approve",
+    "result": "PASS"
+  },
+  {
+    "name": "Owner self approval rejected",
+    "result": "PASS"
+  },
+  {
+    "name": "Author comment permission does not grant approval",
+    "result": "PASS"
+  },
+  {
+    "name": "Independent reviewer UI change request and blocking comment prevent approved export",
+    "result": "PASS"
+  },
+  {
+    "name": "Independent reviewer UI exact-revision approval receipt",
+    "result": "PASS",
+    "revision": 10
+  },
+  {
+    "name": "Approved scorm-12.zip",
+    "result": "PASS"
+  },
+  {
+    "name": "Approved scorm-2004.zip",
+    "result": "PASS"
+  },
+  {
+    "name": "Approved standalone.zip",
+    "result": "PASS"
+  },
+  {
+    "name": "Explicitly supported draft export",
+    "result": "PASS"
+  },
+  {
+    "name": "New comment and resolved discussion snapshot require fresh approval",
+    "result": "PASS"
+  },
+  {
+    "name": "Reopened review comment invalidates approval",
+    "result": "PASS"
+  },
+  {
+    "name": "Scene edit invalidation and stale approval rejection",
+    "result": "PASS"
+  },
+  {
+    "name": "Revoked reviewer cannot approve",
+    "result": "PASS"
+  },
+  {
+    "name": "Archive restore cannot manufacture or reinstate approval",
+    "result": "PASS"
+  },
+  {
+    "name": "Cross-project access and approval status isolation",
+    "result": "PASS"
+  },
+  {
+    "name": "Saved course reopened in Studio",
+    "result": "PASS"
+  }
+]

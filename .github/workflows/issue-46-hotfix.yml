@@ -1,0 +1,54 @@
+name: Issue 46 exact-head hotfix checks
+on:
+  pull_request:
+    branches: [release/chimera2-production-promotion]
+    paths:
+      - 'frontend/src/**'
+      - 'backend/app/**'
+      - 'backend/tests/**'
+      - 'tests/onboarding/access-navigation.spec.cjs'
+      - 'tests/onboarding/management.spec.cjs'
+      - 'tests/onboarding/studio-draft-access.spec.cjs'
+      - 'tests/onboarding/studio-golden-path.spec.cjs'
+      - '.github/workflows/issue-46-hotfix.yml'
+permissions:
+  contents: read
+jobs:
+  focused:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.19.0'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: |
+          npm ci
+          npm ci --prefix frontend
+          pip install -r backend/requirements-dev.txt
+          npx playwright install --with-deps chromium
+      - name: Qualify access polling and full authoring smoke
+        env:
+          CHIMERA_TEST_PYTHON: python
+          CHIMERA_STUDIO_TEST: 'true'
+          VITE_CHIMERA_STUDIO_ENABLED: 'true'
+        run: npx playwright test --config playwright.onboarding.config.cjs access-navigation.spec.cjs studio-draft-access.spec.cjs studio-golden-path.spec.cjs management.spec.cjs --project chromium --workers 1
+      - name: Verify authorization and latency regressions
+        run: python -m unittest backend.tests.test_central_access backend.tests.test_access_latency backend.tests.test_darkrogue_auth backend.tests.test_owner_suite backend.tests.test_platform_access backend.tests.test_management
+      - name: Build frontend
+        run: npm run build --prefix frontend
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: issue-46-tests-${{ github.event.pull_request.head.sha }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 30

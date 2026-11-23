@@ -16,6 +16,14 @@ class LocalContextLimitError(ValueError):
     pass
 
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from app.pythia_failures import FAILURE_MESSAGES
+
+
+class LocalOperationError(ValueError):
+    pass
+
+
 def _loopback_http_url(value):
     try:
         parsed = urlsplit(value)
@@ -113,6 +121,11 @@ async def exchange(payload):
                 if result.isError:
                     for block in result.content:
                         if block.type == "text":
+                            code = re.search(r'PYTHIA_FAILURE: ([a-z_]+)\b', block.text)
+                            if code and code.group(1) in FAILURE_MESSAGES:
+                                raise LocalOperationError(FAILURE_MESSAGES[code.group(1)])
+                            if 'validation error' in block.text.lower():
+                                raise LocalOperationError(FAILURE_MESSAGES['adapter_contract'])
                             safe = re.search(r"PYTHIA_CONTEXT_LIMIT: ([0-9,]+ input tokens exceeds [0-9,]+ available tokens\. Select fewer sources or split the material; no text was dropped\.)", block.text)
                             if safe:
                                 raise LocalContextLimitError(safe.group(1))
@@ -144,8 +157,8 @@ if __name__ == "__main__":
         pending = [error]
         while pending:
             cause = pending.pop()
-            if isinstance(cause, LocalContextLimitError):
-                print(json.dumps({"ok": False, "errorCode": "context_limit", "error": str(cause)}))
+            if isinstance(cause, (LocalContextLimitError, LocalOperationError)):
+                print(json.dumps({"ok": False, "errorCode": "context_limit" if isinstance(cause, LocalContextLimitError) else "operation_failed", "error": str(cause)}))
                 sys.exit(1)
             pending.extend(getattr(cause, "exceptions", ()))
         print(json.dumps({"ok": False, "error": "Pythia could not complete the local consultation. Check its local provider configuration and retry explicitly."}))

@@ -140,6 +140,10 @@ def _run_local_mcp(root, payload):
         envelope = json.loads(output)
         if envelope.get("errorCode") == "context_limit":
             raise TalkError(envelope["error"], 422)
+        if envelope.get("errorCode") == "operation_failed":
+            from .pythia_failures import FAILURE_MESSAGES
+            if envelope.get("error") in FAILURE_MESSAGES.values():
+                raise TalkError(envelope["error"], 503)
         if process.returncode:
             raise ValueError("Local consultation failed")
         if envelope.get("ok") is not True:
@@ -307,14 +311,21 @@ def compose(project_id, data, planning=None):
     plan = planning or {"stage": "consulting", "brief": ""}
     process = (
         "Chimera consultation process: the human author owns the learning-design decisions. "
+        "Meet the author where they are: they may bring scattered documents, an existing design, "
+        "a presentation to improve, or a nearly finished experience. Determine their requested next outcome "
+        "from the message and supplied context; do not impose a fixed ADDIE entry stage or repeat completed analysis. "
+        "Check alignment between the intended outcome, existing decisions, source evidence and proposed changes. "
+        "Use established context instead of asking the author to re-enter it. Ask a focused question when missing "
+        "information or a contradiction would materially change the enhancement; otherwise move the work forward. "
+        "Never claim to have researched, used a tool, accessed another workspace, or applied changes without an actual result. "
         "Distinguish source evidence, assumptions, your suggestions, and decisions the author actually made. "
         "Do not interpret numbered headings, an uploaded document, or a request to expand content as consent to create scenes. "
     )
     if plan["stage"] == "consulting":
         process += (
-            "Current stage: consultation, not scene production. First understand the supplied sources, gaps, audience, "
-            "purpose, desired outcomes, prior knowledge, constraints, tone, and scope as relevant. "
-            "Explore learning approaches, narrative, examples, activities, and alternatives together. "
+            "Current stage: consultation, with no separately agreed production brief. This is not evidence that "
+            "the author's analysis or design is incomplete. Build on their existing materials and decisions. "
+            "Help organize sources, improve content, or explore production treatments according to the request. "
             "Ask at most one material clarifying question at a time; use information already supplied, not a fixed intake questionnaire. "
             "When helpful, offer a provisional brief separating agreed decisions, assumptions, and open issues. "
             "Do not jump to a scene list or executable scene content unless the author explicitly asks to explore that; "

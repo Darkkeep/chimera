@@ -95,6 +95,9 @@ def run_owner_action(assertion: OwnerAssertion, store: AccountStore, policy: Aut
         project_id = assertion.project
         if not policy.allows(actor, "project.membership.manage", project_id):
             raise HTTPException(403, "Project membership permission required")
+        # The authorization check may have updated roles or central revision.
+        data = store._read()
+        accounts = _linked_accounts(data)
         request_id = str(assertion.requestId)
         target_external_id = str(assertion.target)
         operation = {"actorId": actor.actorId, "targetExternalId": target_external_id, "projectId": project_id, "role": assertion.role}

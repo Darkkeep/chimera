@@ -4,6 +4,7 @@ This module intentionally has no dependency on Chimera's project content.
 Only allowlisted, short metadata fields are persisted. Do not send decks,
 consultation text, URLs with query strings, stack traces, or credentials.
 """
+from contextlib import closing
 import hashlib
 import os
 import sqlite3
@@ -152,7 +153,7 @@ def submit_signal(report: SignalReport, request: Request):
     remote = request.client.host if request.client else "unknown"
     requester = hashlib.sha256(f"{salt}:{remote}".encode()).hexdigest()
     record_id = "SIG-" + uuid4().hex[:12].upper()
-    with _connection() as db:
+    with closing(_connection()) as db, db:
         db.execute("BEGIN IMMEDIATE")
         db.execute("DELETE FROM intake_limits WHERE hour_bucket < ?", ((now.replace(hour=0).strftime("%Y-%m-%dT%H")),))
         count = db.execute(

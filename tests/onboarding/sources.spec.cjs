@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 
@@ -7,6 +8,7 @@ test('source intake persists all four inputs and distinguishes a link from page 
   const project = await response.json();
   await page.goto('/');
   await page.getByRole('combobox', { name: 'Switch project', exact: true }).selectOption(project.id);
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Sources', exact: true }).click();
   let dialog = page.getByRole('dialog', { name: 'Sources', exact: true });
   await dialog.getByLabel('Source document', { exact: true }).setInputFiles({ name: 'procedure.txt', mimeType: 'text/plain', buffer: Buffer.from('Document procedure evidence.') });
@@ -34,6 +36,7 @@ test('source intake persists all four inputs and distinguishes a link from page 
   await dialog.getByRole('button', { name: 'Close sources', exact: true }).click();
   await page.reload();
   // The top Storyboard Source step opens saved sources and supports adding more.
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Storyboard', exact: true }).click();
   await page.getByRole('button', { name: '01 Source', exact: true }).click();
   dialog = page.getByRole('dialog', { name: 'Sources', exact: true });
@@ -56,6 +59,7 @@ test('Pythia settings verifies and saves a local Engine address', async ({ page 
     return route.fulfill({ json: { available: true, endpoint: 'http://127.0.0.1:8010' } });
   });
   await page.goto('/');
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.locator('#workspace-settings').getByRole('button', { name: 'Pythia', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Pythia', exact: true });

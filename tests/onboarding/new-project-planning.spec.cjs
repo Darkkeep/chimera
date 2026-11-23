@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 async function logDialogOverflow(dialog) {
   const report=await dialog.evaluate(el=>{
@@ -31,6 +32,7 @@ test.beforeEach(async ({ page }) => {
 async function begin(page, title) {
   await page.goto('/');
   await page.getByRole('button', { name: 'New Project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Name your course', exact: true });
   await dialog.getByRole('textbox', { name: 'Course name', exact: true }).fill(title);
   return dialog;
@@ -71,13 +73,14 @@ test('New Project accepts every source kind without AI configuration and preserv
   const planner = page.getByRole('dialog', { name: 'Plan your course', exact: true });
   await expect(planner.getByRole('heading', { name: 'Plan with Pythia', exact: true })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(1);
-  await expect(planner.getByLabel('Your message', { exact: true })).toHaveValue('Help me plan a short orientation before drafting scenes.');
+  await expect(planner.getByLabel('What would you like to do?', { exact: true })).toHaveValue('Help me plan a short orientation before drafting scenes.');
   const project = await projectByTitle(request, title);
   let resources = await (await request.get(`/api/projects/${project.id}/reference-resources`)).json();
   expect(resources.map(source => source.versions[0].sourceKind).sort()).toEqual(['document', 'pythia', 'text', 'web']);
   expect(resources.find(source => source.title === 'Policy bookmark').versions[0].passages).toEqual([]);
+  await planner.getByText('Sources and instructions', { exact: true }).click();
   await expect(planner.getByRole('checkbox', { name: /^Policy bookmark/ })).toBeDisabled();
-  await planner.getByLabel('Your message', { exact: true }).fill('An unsent follow-up that should survive switching sections.');
+  await planner.getByLabel('What would you like to do?', { exact: true }).fill('An unsent follow-up that should survive switching sections.');
   await planner.getByRole('tab', { name: 'Sources', exact: true }).click();
   const sources = planner.getByRole('tabpanel', { name: 'Sources', exact: true });
   await expect(sources.getByRole('heading', { name: 'Saved sources · 4', exact: true })).toBeVisible();
@@ -89,7 +92,7 @@ test('New Project accepts every source kind without AI configuration and preserv
   await planner.getByRole('tab', { name: 'Sources', exact: true }).focus();
   await page.keyboard.press('ArrowLeft');
   await expect(planner.getByRole('tab', { name: 'Plan with Pythia', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await expect(planner.getByLabel('Your message', { exact: true })).toHaveValue('An unsent follow-up that should survive switching sections.');
+  await expect(planner.getByLabel('What would you like to do?', { exact: true })).toHaveValue('An unsent follow-up that should survive switching sections.');
   await expect(planner.getByRole('checkbox', { name: 'Later source', exact: true })).toBeVisible();
   expect((await new AxeBuilder({ page }).include('.new-project-dialog').analyze()).violations).toEqual([]);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -103,8 +106,8 @@ test('New Project accepts every source kind without AI configuration and preserv
   expect(conversationPosts).toBe(0);
 });
 
-test('a failed New Project attachment can be retried without creating another project or resending saved sources', async ({ page, request }) => {
-  const title = 'New Project attachment retry';
+test('a failed New Project attachment can be retried without creating another project or resending saved sources', async ({ page, request }, testInfo) => {
+  const title = `New Project attachment retry ${testInfo.project.name}`;
   let attempts = 0;
   await page.route('**/reference-resources', async route => {
     if (route.request().method() === 'POST' && route.request().postDataBuffer().includes(Buffer.from('retry-guide.txt'))) {
@@ -131,7 +134,7 @@ test('a failed New Project attachment can be retried without creating another pr
   expect(attempts).toBe(2);
 });
 
-test('numbered advice stays in consultation until the author agrees a brief and explicitly requests a draft', async ({ page, request }) => {
+test('numbered advice stays in consultation until the author agrees a brief and explicitly requests a draft', async ({ page, request }, testInfo) => {
   const titles = Array.from({ length: 12 }, (_, index) => `Expanded topic ${index + 1}`);
   const sceneTitles = titles.flatMap(title => [`Explore ${title}`, `Practice ${title}`]);
   let state = { sessionId: 'outline-session', configured: true,
@@ -161,13 +164,14 @@ test('numbered advice stays in consultation until the author agrees a brief and 
       result: { rationale: 'Separate exploration from practice.', producer_id: 'live-chimera-authoring-v1', changes: [], scenes: sceneTitles.map(title => ({ title, sceneType: 'content', extractedText: ['Rough content.'], narration: '', actionDescription: '', notes: '' })) } }] };
     await route.fulfill({ status: 202, json: state });
   });
-  const title = 'Expanded-outline rough draft';
+  const title = `Expanded-outline rough draft ${testInfo.project.name}`;
   const initial = await begin(page, title);
   await initial.getByRole('button', { name: 'Create & plan with Pythia', exact: true }).click();
   const planner = page.getByRole('dialog', { name: 'Plan your course', exact: true });
   await expect(planner.getByLabel('Author direction', { exact: true })).not.toHaveValue(/five/);
   await expect(planner.getByRole('region', { name: 'Turn outline into scenes' })).toHaveCount(0);
   await expect(planner.getByRole('button', { name: 'Prepare a content draft from this advice', exact: true })).toHaveCount(0);
+  await planner.getByRole('button', { name: 'Design brief', exact: true }).click();
   await planner.getByRole('button', { name: 'Review our design brief', exact: true }).click();
   await expect(planner.getByRole('button', { name: 'Agree brief and explore scene design', exact: true })).toBeDisabled();
   const agreedBrief = 'General audience. Explain the concepts with examples and practice. Duration remains open.';
@@ -180,22 +184,27 @@ test('numbered advice stays in consultation until the author agrees a brief and 
   await planner.getByRole('button', { name: 'Agree brief and explore scene design', exact: true }).click();
   expect(planningDecisions).toBe(2);
   expect(draftRequests).toBe(0);
+  await planner.getByRole('button', { name: 'Design brief', exact: true }).click();
   await expect(planner.getByRole('heading', { name: 'Explore the learning design', exact: true })).toBeVisible();
   await planner.getByRole('button', { name: 'Open storyboard', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
   const resumed = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
+  await resumed.getByRole('button', { name: 'Design brief', exact: true }).click();
   await expect(resumed.getByRole('heading', { name: 'Explore the learning design', exact: true })).toBeVisible();
   await resumed.getByText('Your recorded design brief', { exact: true }).click();
   await expect(resumed.getByText(agreedBrief, { exact: true })).toBeVisible();
+  await resumed.getByRole('button', { name: 'Design brief', exact: true }).click();
   await resumed.getByRole('button', { name: 'Return to consultation', exact: true }).click();
   await expect(resumed.getByRole('button', { name: 'Prepare a content draft from this advice', exact: true })).toHaveCount(0);
+  await resumed.getByRole('button', { name: 'Design brief', exact: true }).click();
   await resumed.getByRole('button', { name: 'Review our design brief', exact: true }).click();
   await expect(resumed.getByRole('textbox', { name: 'Design brief', exact: true })).toHaveValue(agreedBrief);
   await resumed.getByRole('button', { name: 'Agree brief and explore scene design', exact: true }).click();
   await resumed.getByRole('button', { name: 'Prepare a content draft from this advice', exact: true }).click();
   await resumed.getByRole('button', { name: 'Generate content draft', exact: true }).click();
   await expect(resumed.locator('.pythia-action-new-scene')).toHaveCount(24);
-  await expect(resumed.getByRole('button', { name: 'Apply changes', exact: true })).toBeEnabled();
+  await expect(resumed.getByRole('button', { name: /^(Use this draft as my slides|Use these changes)$/, exact: true })).toBeEnabled();
   await expect(resumed.locator('.pythia-action-review')).toBeFocused();
   await resumed.getByText('Design brief used', { exact: true }).click();
   await expect(resumed.locator('.pythia-action-review').getByText(agreedBrief, { exact: true })).toBeVisible();
@@ -211,36 +220,39 @@ test('numbered advice stays in consultation until the author agrees a brief and 
 test('New Project holds a real source-grounded conversation until the author requests and applies rough scenes', async ({ page, request }, testInfo) => {
   test.skip(process.env.CHIMERA_PYTHIA_LIVE_BROWSER !== '1', 'Explicit opt-in for three real Pythia calls');
   test.setTimeout(240000);
-  const title = 'Fictional new-project Pythia planning';
+  const title = `Fictional new-project Pythia planning ${testInfo.project.name}`;
   const initial = await begin(page, title);
   await initial.getByLabel('Attach course design documents').setInputFiles({ name: 'planning-guide.txt', mimeType: 'text/plain', buffer: Buffer.from('Fictional guide: before submitting a request, check the category label and ask for clarification when the two labels are ambiguous.') });
   await initial.getByRole('textbox', { name: 'Course prompt', exact: true }).fill("Let's plan a brief orientation for new operators using the selected guide. Recommend a practical structure, but do not draft scene content yet.");
   await initial.getByRole('button', { name: 'Create & plan with Pythia', exact: true }).click();
   const planner = page.getByRole('dialog', { name: 'Plan your course', exact: true });
+  await planner.getByText('Sources and instructions', { exact: true }).click();
   await planner.getByRole('checkbox', { name: 'planning-guide', exact: true }).check();
-  await planner.getByRole('button', { name: 'Send to Pythia', exact: true }).click();
+  await planner.getByRole('button', { name: /^(Start with Pythia|Send to Pythia)$/, exact: true }).click();
   await expect(planner.locator('.pythia-talk-answer')).toHaveCount(1, { timeout: 90000 });
   const project = await projectByTitle(request, title);
   const getProject = async () => (await request.get(`/api/projects/${project.id}`)).json();
   expect((await getProject()).storyboard.scenes).toHaveLength(0);
-  await planner.getByLabel('Your message', { exact: true }).fill('Make this self-paced. Return a numbered outline with exactly two top-level items titled Choose the label and Check before sending. Confirm the plan before drafting anything.');
+  await planner.getByLabel('What would you like to do?', { exact: true }).fill('Make this self-paced. Return a numbered outline with exactly two top-level items titled Choose the label and Check before sending. Confirm the plan before drafting anything.');
   await planner.getByRole('tab', { name: 'Sources', exact: true }).click();
   await planner.getByRole('tab', { name: 'Plan with Pythia', exact: true }).click();
-  await expect(planner.getByLabel('Your message', { exact: true })).toHaveValue('Make this self-paced. Return a numbered outline with exactly two top-level items titled Choose the label and Check before sending. Confirm the plan before drafting anything.');
-  await planner.getByRole('button', { name: 'Send to Pythia', exact: true }).click();
+  await expect(planner.getByLabel('What would you like to do?', { exact: true })).toHaveValue('Make this self-paced. Return a numbered outline with exactly two top-level items titled Choose the label and Check before sending. Confirm the plan before drafting anything.');
+  await planner.getByRole('button', { name: /^(Start with Pythia|Send to Pythia)$/, exact: true }).click();
   await expect(planner.locator('.pythia-talk-answer')).toHaveCount(2, { timeout: 90000 });
   expect((await getProject()).storyboard.scenes).toHaveLength(0);
+  await planner.getByRole('button', { name: 'Design brief', exact: true }).click();
   await planner.getByRole('button', { name: 'Review our design brief', exact: true }).click();
   await planner.getByRole('textbox', { name: 'Design brief', exact: true }).fill('New operators need a self-paced orientation to choosing category labels and checking before sending. Use the supplied guide; no media or assessments.');
   await planner.getByRole('button', { name: 'Agree brief and explore scene design', exact: true }).click();
   await planner.getByRole('button', { name: 'Prepare a content draft from this advice', exact: true }).last().click();
+  if (await planner.locator('.pythia-context-options').getAttribute('open') === null) await planner.getByText('Sources and instructions', { exact: true }).click();
   await planner.getByLabel('Author direction', { exact: true }).fill("Draft exactly two new content scenes, titled 'Choose the label' and 'Check before sending', each with one concise screen paragraph. Use the guide and our agreed self-paced plan. Do not add assessments or media.");
   await planner.getByRole('button', { name: 'Generate content draft', exact: true }).click();
-  await expect(planner.getByRole('button', { name: 'Apply changes', exact: true })).toBeEnabled({ timeout: 90000 });
+  await expect(planner.getByRole('button', { name: /^(Use this draft as my slides|Use these changes)$/, exact: true })).toBeEnabled({ timeout: 90000 });
   expect((await getProject()).storyboard.scenes).toHaveLength(0);
   await expect(planner.locator('.pythia-action-new-scene')).toHaveCount(2);
-  await planner.getByRole('button', { name: 'Apply changes', exact: true }).click();
-  await expect(planner.getByText(/Applied to storyboard revision/)).toBeVisible();
+  await planner.getByRole('button', { name: /^(Use this draft as my slides|Use these changes)$/, exact: true }).click();
+  await expect(planner.getByText(/Saved at storyboard revision/)).toBeVisible();
   const authored = await getProject();
   expect(authored.storyboard.scenes.map(scene => scene.title)).toEqual(['Choose the label', 'Check before sending']);
   const state = await (await request.get(`/api/projects/${project.id}/pythia-conversation`)).json();
@@ -252,8 +264,9 @@ test('New Project holds a real source-grounded conversation until the author req
   await page.screenshot({ path: testInfo.outputPath('new-project-live-rough-scenes.png'), fullPage: true });
   await planner.getByRole('button', { name: 'Open storyboard', exact: true }).click();
   await page.reload();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Consult Pythia', exact: true }).click();
   const restored = page.getByRole('dialog', { name: 'Consult Pythia', exact: true });
   await expect(restored.locator('.pythia-talk-answer')).toHaveCount(2);
-  await expect(restored.getByText(/Applied to storyboard revision/)).toBeVisible();
+  await expect(restored.getByText(/Saved at storyboard revision/)).toBeVisible();
 });

@@ -19,3 +19,6 @@
 .saved-sources blockquote { margin: 16px 0; padding-left: 16px; border-left: 2px solid var(--chimera-ignition, #ff6a21); white-space: pre-wrap; }
 .sources-dialog p { line-height: 1.5; }
 @media (max-width: 600px) { .source-choice-heading { padding: 16px; } .source-choice-body { padding: 0 16px 16px; } }
+
+.course-library-filter{display:grid;gap:5px;font-size:12px;min-width:0;max-width:360px}
+.course-library-filter select{width:100%;min-width:0;padding:7px 9px;background:var(--theme-input,var(--theme-panel));color:var(--ink);border:1px solid var(--line);border-radius:6px}

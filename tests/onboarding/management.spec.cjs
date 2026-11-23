@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 
@@ -98,10 +99,12 @@ test('New Project on My Work opens creation and enters authoring after saving', 
   await mockWorkspace(page, { empty: true });
   await page.goto('/');
   await page.getByRole('button', { name: 'New Project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Course name', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close new project', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'My Work', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'New Project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   await page.getByRole('textbox', { name: 'Course name', exact: true }).fill('Created from My Work');
   await page.getByRole('dialog').getByRole('button', { name: 'Create project', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Created from My Work', exact: true })).toBeVisible();
@@ -112,6 +115,7 @@ test('attaches course design documents as AI references when AI is configured', 
   const workspace = await mockWorkspace(page, { empty: true, aiConfigured: true });
   await page.goto('/');
   await page.getByRole('button', { name: 'New Project', exact: true }).click();
+  await page.getByRole('button', { name: 'Start with an idea', exact: true }).click();
   const documentPicker = page.getByLabel('Attach course design documents');
   await expect(documentPicker).toBeVisible();
   await documentPicker.setInputFiles({ name: 'design-guide.txt', mimeType: 'text/plain', buffer: Buffer.from('Course goals and audience') });
@@ -129,26 +133,30 @@ test('opens the remembered project and another project in authoring', async ({ p
   await page.getByRole('button', { name: 'Edit Alpha course', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Alpha course', exact: true })).toBeVisible();
   await expect(page.getByLabel('Add scene', { exact: true })).toBeEnabled();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'My Work', exact: true }).click();
   await page.getByRole('button', { name: 'Edit Beta course', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Beta course', exact: true })).toBeVisible();
   await expect(page.getByLabel('Add scene', { exact: true })).toBeEnabled();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'My Work', exact: true }).click();
   await page.locator('.health-row').first().locator('td').last().click();
   await expect(page.getByRole('heading', { name: 'Alpha course', exact: true })).toBeVisible();
 });
 
-test('waits for startup restoration before opening another project', async ({ page }) => {
+test('opens another project without waiting for restoration, and ignores the stale restore', async ({ page }) => {
   let release;
   const restoreGate = new Promise(resolve => { release = resolve; });
   await mockWorkspace(page, { restoreGate });
   await page.goto('/');
   const projectButton = page.getByRole('button', { name: 'Edit Beta course', exact: true });
   await expect(projectButton).toBeVisible();
-  await expect(projectButton).toBeDisabled();
-  release();
+  await expect(projectButton).toBeEnabled();
   await projectButton.click();
+  await expect(page.getByRole('heading', { name: 'Beta course', exact: true })).toBeVisible();
+  const restored = page.waitForResponse(r => new URL(r.url()).pathname === '/api/projects/alpha');
+  release(); await restored;
   await expect(page.getByRole('heading', { name: 'Beta course', exact: true })).toBeVisible();
 });
 

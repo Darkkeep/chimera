@@ -226,6 +226,7 @@ class RoleBasedAuthorizationPolicy:
         "review.comment.create": {"author", "reviewer", "instructional-designer", "administrator"},
         "review.reply.create": {"author", "reviewer", "instructional-designer", "administrator"},
         "review.comment.resolve": {"author", "reviewer", "instructional-designer", "administrator"},
+        "review.approve": {"reviewer", "instructional-designer", "administrator"},
         "enhancement.proposal.create": {"author", "instructional-designer", "administrator"},
         "enhancement.proposal.decide": {"author", "instructional-designer"},
         "enhancement.job.create": {"author", "instructional-designer", "administrator"},

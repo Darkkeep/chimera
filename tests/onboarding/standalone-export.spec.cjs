@@ -61,8 +61,9 @@ test('standalone export runs directly from an extracted local folder without net
   await write(`scenes/${project.storyboard.scenes[2].id}`, { visualLayout: null }, 'patch');
   await page.addInitScript(id => localStorage.setItem('chimera.activeProjectId', id), project.id);
   await page.route('**/api/projects', route => route.fulfill({ json: [project] }));
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  // Open the fixture directly: this test qualifies export, not My Work navigation.
+  await page.goto('/?project_id=' + encodeURIComponent(project.id));
+  await expect(page.getByRole('heading', { name: 'My Work', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   const exportDialog = page.getByRole('dialog', { name: 'Export course', exact: true });
   await expect(exportDialog.getByRole('heading', { name: 'Standalone course', exact: true })).toBeVisible();

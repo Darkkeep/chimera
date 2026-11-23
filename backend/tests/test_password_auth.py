@@ -54,6 +54,23 @@ class PasswordAuthTests(unittest.TestCase):
     def login(self, **kwargs):
         return self.client.post("/api/auth/login", json={"email": "AUTHOR@example.com", "password": self.password}, headers=self.origin, **kwargs)
 
+    def test_reviewer_only_can_decide_without_general_edit_permission(self):
+        self.assertEqual(self.login().status_code, 200)
+        project = self.client.post("/api/projects", json={"title": "Independent review"}, headers=self.origin).json()
+        project_id = project["id"]
+        reviewer = self.store.provision("independent@example.com", self.password, "Independent reviewer", ["reviewer"])
+        self.store.add_project_membership(ProjectMembership(projectId=project_id, userId=reviewer, role="reviewer"))
+        self.assertEqual(self.client.post("/api/auth/login", json={"email": "independent@example.com", "password": self.password}, headers=self.origin).status_code, 200)
+        endpoint = f"/api/projects/{project_id}/review-approval"
+        for decision in ("request-changes", "approve"):
+            response = self.client.post(endpoint, json={"decision": decision, "note": "Reviewed this exact revision", "expectedRevision": project["storyboard"]["revision"]}, headers=self.origin)
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json()["lastDecision"]["actorId"], reviewer)
+        denied_edit = self.client.post(f"/api/projects/{project_id}/scenes", json={"title": "Forbidden edit"}, headers={**self.origin, "If-Match": f'"{project["storyboard"]["revision"]}"'})
+        self.assertEqual(denied_edit.status_code, 403)
+        self.store.remove_membership(project_id, reviewer)
+        self.assertEqual(self.client.post(endpoint, json={"decision": "approve", "note": "Revoked actor", "expectedRevision": project["storyboard"]["revision"]}, headers=self.origin).status_code, 403)
+
     def test_login_identity_and_logout_revoke_session(self):
         self.assertEqual(self.client.get("/api/projects").status_code, 401)
         response = self.login()

@@ -1,3 +1,4 @@
+const { openWorkspaceMenu } = require('./helpers.cjs');
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 
@@ -43,7 +44,8 @@ async function setup(page) {
 
 async function openPanel(page) {
   if (!await page.getByRole('button', { name: 'Check image descriptions', exact: true }).isVisible()) {
-    await page.getByRole('button', { name: 'Review tools', exact: true }).click();
+    await openWorkspaceMenu(page);
+  await page.getByRole('button', { name: 'Review tools', exact: true }).click();
   }
   await page.getByRole('button', { name: 'Check image descriptions', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Image descriptions' })).toBeVisible();
@@ -104,6 +106,7 @@ test('individual saves and shared-image library readiness use every scene descri
   await panel.getByRole('region', { name: 'Scene 1: First diagram' }).getByRole('button', { name: 'Save', exact: true }).click();
   await expect(panel.getByText('Ready for production', { exact: true })).toHaveCount(1);
   await panel.getByRole('button', { name: 'Close image accessibility editor' }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Media library', exact: true }).click();
   const item = page.locator('.media-item').first();
   await expect(item.getByText('Description needed', { exact: true })).toBeVisible();
@@ -134,6 +137,7 @@ test('missing attribution and unavailable images never show production ready', a
   await page.route(`**/api/projects/${project.id}/assets/${assetId}`, route => route.fulfill({ status: 404 }));
   await page.reload();
   await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Media library', exact: true }).click();
   await expect(page.locator('.media-item').getByText('Media unavailable', { exact: true })).toBeVisible();
 });
@@ -141,6 +145,7 @@ test('missing attribution and unavailable images never show production ready', a
 test('media library saves scene descriptions with credit and with attachment', async ({ page }) => {
   const project = await setup(page);
   await page.getByRole('button', { name: 'Close image accessibility editor' }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Media library', exact: true }).click();
   const item = page.locator('.media-item').first();
   await expect(item.getByText('Description for: First diagram', { exact: true })).toBeVisible();
@@ -178,6 +183,7 @@ test('media library saves scene descriptions with credit and with attachment', a
 test('a failed inline description save preserves the draft and does not save credit', async ({ page }) => {
   const project = await setup(page);
   await page.getByRole('button', { name: 'Close image accessibility editor' }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Media library', exact: true }).click();
   const item = page.locator('.media-item').first();
   await item.getByRole('textbox', { name: 'Alternative text' }).fill('Keep this inline description.');
@@ -220,6 +226,7 @@ test('audio readiness follows availability, attachment and saved attribution', a
   expect(response.ok()).toBeTruthy();
   await page.reload();
   await page.getByRole('button', { name: 'Resume authoring', exact: true }).click();
+  await openWorkspaceMenu(page);
   await page.getByRole('button', { name: 'Media library', exact: true }).click();
   const item = page.locator('.media-item').filter({ has: page.getByText('narration.wav', { exact: true }) });
   await expect(item.locator('.media-scene-references')).toHaveText('Scene 1: First diagram');

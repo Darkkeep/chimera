@@ -37,6 +37,7 @@ from .platform import ActorContext, AuditEventPage, AuthorizationPolicy, Durable
 from .references import SUPPORTED_REFERENCE_EXTENSIONS, extract_reference_passages
 from .render import render_slides
 from .qti import assessment_item_xml, assessment_test_package
+from .version import __version__
 from .scorm import persist_scorm_12_build, persist_scorm_build, read_scorm_report
 from .standalone import build_standalone_course
 from .storage import ROOT, EnhancementProposalConflict, StoryboardRevisionConflict, add_project_asset, add_review_reply, approve_generated_candidate, create_enhancement_job, create_enhancement_proposal, create_media_generation_job, create_project, create_pythia_analysis_proposal, create_pythia_course_review, create_pythia_transform_proposal, create_review_comment, create_scene, create_template, decide_enhancement_proposal, decide_pythia_analysis_proposal, decide_pythia_course_finding, decide_pythia_transform_proposal, decide_review_comment, delete_scene, list_enhancement_jobs, list_enhancement_proposals, list_generated_candidates, list_media_generation_jobs, list_projects, list_pythia_analysis_proposals, list_pythia_course_reviews, list_pythia_transform_proposals, list_reference_resources, list_review_comments, list_templates, project_path, read_enhancement_job, read_generated_candidate, read_media_generation_job, read_project, read_template, persist_imported_assets, persist_slide_previews, reorder_scenes, replace_storyboard, replace_template_source, save_reference_resource, slugify, storyboard_transaction, update_from_import, update_project_asset_attribution, update_project_completion_settings, update_project_export_settings, update_generated_candidate, update_media_generation_job, update_scene, update_template, validate_visual_assets, write_project_metadata, write_storyboard, template_path
@@ -45,6 +46,7 @@ from .models import ProductionStageUpdate
 from .models import TrashedProject
 from .storage import update_project_production_stage
 from .storage import now_iso
+from .storage import ProjectIdentityMismatch
 from .media_generation import media_provider_configured
 from .media_routes import router as media_router
 from .learning_intelligence import PythiaProvider, PythiaUnavailableError, validate_assessment_blueprint, validate_course_review, validate_storyboard_analysis, validate_storyboard_transformation
@@ -71,6 +73,9 @@ from . import video_treatments
 from .models import ReviewedVideoTreatment
 from . import pythia_actions
 from .signal import router as signal_router
+from .build_information import runtime_build_information
+from . import progressive_authoring as progressive
+from . import review_approval
 
 
 HOSTED_ACCOUNT_PROVIDERS = {"builtin", "darkrogue"}
@@ -79,6 +84,13 @@ PUBLIC_API_PATHS = {"/api/health", "/api/auth/config", "/api/auth/login", "/api/
 
 
 ROUTE_ACTIONS = {
+    "get_review_approval": "project.view",
+    "post_review_approval": "review.approve",
+    "start_progressive_demo": "enhancement.job.create",
+    "import_progressive_handoff": "enhancement.job.create",
+    "read_progressive_events": "enhancement.job.create",
+    "cancel_progressive_demo": "enhancement.job.manage",
+    "decide_progressive_component": "scene.manage",
     # Public feedback intake bypasses actor auth; keep the route registered in the deny-by-default inventory.
     "submit_signal": "identity.self",
     "get_scene_experience": "project.view", "post_scene_experience": "enhancement.proposal.create",
@@ -111,7 +123,7 @@ ROUTE_ACTIONS = {
     "copy_shared_media": "media.manage", "delete_shared_media": "media.manage", "post_reference_ocr": "reference.create",
     "post_reference_ocr_accept": "reference.create",
     "admission_status": "identity.view",
-    "health": "identity.view", "auth_config": "identity.view", "login": "identity.view",
+    "health": "identity.view", "get_build_information": "admin.audit.view", "auth_config": "identity.view", "login": "identity.view",
     "logout": "identity.view", "reset_password": "identity.view", "darkrogue_login": "identity.view", "pythia_turn_access": "identity.view", "get_accounts": "admin.policy.manage",
     "owner_suite_projects": "project.membership.manage",
     "get_identity_context": "identity.view", "get_identity_policy": "identity.view",
@@ -122,6 +134,7 @@ ROUTE_ACTIONS = {
     "access_review": "review.invitation", "get_project_health": "project.list", "get_my_work": "project.list",
     "get_audit_events": "admin.audit.view", "get_projects": "project.list", "get_templates": "template.view",
     "post_template": "template.manage", "patch_template": "template.manage", "put_template_source": "template.manage",
+    "preview_experience_import": "project.create",
     "post_project": "project.create", "get_project": "project.view", "get_project_validation": "project.view",
     "patch_project_production_stage": "project.settings.update", "get_project_readiness": "project.metadata.view",
     "patch_project_asset_attribution": "media.manage", "patch_project_completion_settings": "project.settings.update",
@@ -192,6 +205,14 @@ def get_authorization_policy() -> AuthorizationPolicy:
 
 def _hosted_request_action(request: Request) -> str:
     path = request.url.path
+    if path.endswith("/review-approval") and request.method == "POST":
+        return "review.approve"
+    if ROUTE_ACTIONS.get(getattr(request.scope.get("route"), "name", "")) == "project.export":
+        return "project.export"
+    if "/progressive-jobs" in path:
+        if path.endswith("/decision"):
+            return "scene.manage"
+        return "enhancement.job.manage" if path.endswith("/cancel") else "enhancement.job.create"
     if "/question-import" in path:
         return "project.view" if request.method == "GET" else "project.import"
     if path.endswith(("/questions.csv", "/questions.xlsx")):
@@ -200,6 +221,8 @@ def _hosted_request_action(request: Request) -> str:
         return "project.delete"
     if path.endswith("/restore") and request.method == "POST":
         return "project.restore"
+    if path == "/api/management/build-information":
+        return "admin.audit.view"
     if path == "/api/trash/projects":
         return "workspace.view"
     if path.startswith(("/api/ai-connection", "/api/narration-connections")):
@@ -268,7 +291,7 @@ def _hosted_request_action(request: Request) -> str:
     if request.method == "GET":
         return "project.view"
     path = request.url.path
-    if path == "/api/projects":
+    if path in {"/api/projects", "/api/experience-import/preview"}:
         return "project.create"
     if path.endswith("/identity/policy"):
         return "admin.policy.manage"
@@ -337,7 +360,7 @@ async def _require_request_access(
     project_id = request.path_params.get("project_id")
     if action == "admin.audit.view":
         project_id = request.query_params.get("project_id")
-    _require_action(policy, context, action, project_id)
+    await run_in_threadpool(_require_action, policy, context, action, project_id)
     with action_context(context):
         yield
         if request.method != "GET" or action == "project.export":
@@ -352,9 +375,17 @@ async def _require_request_access(
             ))
 
 
-app = FastAPI(title="Chimera API", version="1.2.0", dependencies=[Depends(_require_request_access)])
+app = FastAPI(title="Chimera API", version=__version__, dependencies=[Depends(_require_request_access)])
 app.include_router(media_router)
 app.include_router(signal_router)
+
+
+@app.exception_handler(ProjectIdentityMismatch)
+async def project_identity_mismatch(request: Request, error: ProjectIdentityMismatch):
+    # A mismatched project must not be opened or mutated; leave persisted data
+    # and history intact for a verified, non-destructive recovery.
+    return JSONResponse({"detail": str(error)}, status_code=409,
+                        headers={"Cache-Control": "no-store"})
 
 
 @app.exception_handler(RequestValidationError)
@@ -393,6 +424,22 @@ async def private_response_headers(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def access_timing_headers(request: Request, call_next):
+    from .central_access import AUTHORITY_TIMINGS
+    from time import perf_counter
+    started = perf_counter()
+    calls = []
+    token = AUTHORITY_TIMINGS.set(calls)
+    try:
+        response = await call_next(request)
+        if request.url.path.startswith("/api/"):
+            response.headers["Server-Timing"] = f'chimera;dur={(perf_counter()-started)*1000:.1f}, authority;dur={sum(calls):.1f};desc="{len(calls)} checks"'
+        return response
+    finally:
+        AUTHORITY_TIMINGS.reset(token)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins(),
@@ -410,6 +457,7 @@ AUDIO_UPLOAD_EXTENSIONS = {".mp3", ".m4a", ".aac", ".wav", ".ogg"}
 
 @app.on_event("startup")
 def resume_enhancement_jobs() -> None:
+    progressive.recover()
     selected = installation_policy(LocalIdentityDirectory(ROOT))
     context = ActorContext(actorId="system-service", actorDisplayName="Chimera service", installationId=public_origin(), deploymentMode="team") if selected.deploymentMode == "team" else LOCAL_ACTOR
     token = REQUEST_ACTOR.set(context)
@@ -456,6 +504,12 @@ def _check_expected_revision(expected_revision: int | None, actual_revision: int
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/management/build-information")
+def get_build_information() -> dict[str, object]:
+    """Admin-only non-sensitive build identity, never read from Git at request time."""
+    return runtime_build_information()
 
 
 def _password_store() -> AccountStore:
@@ -515,7 +569,13 @@ def darkrogue_login(data: DarkrogueLoginRequest, request: Request) -> JSONRespon
         claims = darkrogue_auth.verify_handoff(data.token.get_secret_value())
     except darkrogue_auth.HandoffError as error:
         raise HTTPException(401, str(error)) from error
-    token = AccountStore(ROOT).sso_login(claims, darkrogue_auth.ROLE_MAP[claims["role"]], request.cookies.get(COOKIE))
+    from . import central_access
+    decision = central_access.fetch_access(claims["sub"])
+    if not decision["allowed"] or "app.use" not in decision["capabilities"]:
+        raise HTTPException(403, "DARKROGUE access is restricted")
+    token = AccountStore(ROOT).sso_login(claims, central_access.roles_for_capabilities(decision["capabilities"]),
+                                         request.cookies.get(COOKIE), access_revision=decision["revision"])
+    central_access.acknowledge_revision(claims["sub"], decision["revision"])
     response = JSONResponse({"authenticated": True}, headers={"Cache-Control": "no-store"})
     response.set_cookie(COOKIE, token, max_age=SESSION_SECONDS, httponly=True, secure=True, samesite="strict", path="/")
     return response
@@ -669,9 +729,11 @@ def delete_project_member(project_id: str, user_id: str) -> dict[str, bool]:
 def get_project_permissions(project_id: str) -> dict[str, bool]:
     policy = get_authorization_policy()
     actor = get_actor_context()
-    return {name: policy.allows(actor, action, project_id) for name, action in {
+    actions = {
         "canEdit": "scene.manage", "canExport": "project.export", "canManageMembers": "project.membership.manage",
-        "canShare": "review.share", "canEnhance": "enhancement.job.create", "canApprove": "enhancement.proposal.decide"}.items()}
+        "canShare": "review.share", "canEnhance": "enhancement.job.create", "canApprove": "enhancement.proposal.decide"}
+    decisions = policy.allows_many(actor, list(actions.values()), project_id) if isinstance(policy, HostedAuthorizationPolicy) else {action: policy.allows(actor, action, project_id) for action in actions.values()}
+    return {name: decisions[action] for name, action in actions.items()}
 
 
 @app.post("/api/projects/{project_id}/review-links", status_code=201)
@@ -715,8 +777,13 @@ def access_review(request: Request, token: Annotated[str, Header(alias="X-Review
 @app.get("/api/management/project-health")
 def get_project_health() -> list[dict[str, object]]:
     health: list[dict[str, object]] = []
+    policy = get_authorization_policy()
+    actor = get_actor_context()
+    global_permissions = None
     for summary in list_projects():
-        if not get_authorization_policy().allows(get_actor_context(), "project.metadata.view", summary.id):
+        actions = ["project.metadata.view", "scene.manage", "project.settings.update", "project.membership.manage"]
+        decisions = policy.allows_many(actor, actions, summary.id) if isinstance(policy, HostedAuthorizationPolicy) else {action: policy.allows(actor, action, summary.id) for action in actions}
+        if not decisions["project.metadata.view"]:
             continue
         project = read_project(summary.id)
         authoring = validate_project(project, target="authoring")
@@ -727,6 +794,9 @@ def get_project_health() -> list[dict[str, object]]:
         blocker_counts: dict[str, int] = {}
         for issue in blockers:
             blocker_counts[issue.code] = blocker_counts.get(issue.code, 0) + 1
+        if global_permissions is None:
+            global_actions = ["project.create", "project.membership.manage"]
+            global_permissions = policy.allows_many(actor, global_actions) if isinstance(policy, HostedAuthorizationPolicy) else {action: policy.allows(actor, action) for action in global_actions}
         health.append({
             "projectId": summary.id,
             "title": summary.title,
@@ -740,15 +810,15 @@ def get_project_health() -> list[dict[str, object]]:
             "productionPassed": production.passed,
             "blockerCounts": blocker_counts,
             "blockers": [issue.model_dump() for issue in blockers],
-            "canEdit": get_authorization_policy().allows(get_actor_context(), "scene.manage", summary.id),
-            "canSetStage": get_authorization_policy().allows(get_actor_context(), "project.settings.update", summary.id),
-            "canTrash": project.ownerId == get_actor_context().actorId or get_authorization_policy().allows(get_actor_context(), "project.membership.manage", summary.id) or get_authorization_policy().allows(get_actor_context(), "project.membership.manage"),
+            "canEdit": decisions["scene.manage"],
+            "canSetStage": decisions["project.settings.update"],
+            "canTrash": project.ownerId == get_actor_context().actorId or decisions["project.membership.manage"] or global_permissions["project.membership.manage"],
             "updatedAt": summary.updatedAt,
             "parentProjectId": summary.parentProjectId,
             "siblingOrder": summary.siblingOrder,
             "metadataRevision": summary.metadataRevision,
-            "canManageRelationship": get_authorization_policy().allows(get_actor_context(), "project.settings.update", summary.id),
-            "canCreateSubproject": summary.parentProjectId is None and get_authorization_policy().allows(get_actor_context(), "project.create") and get_authorization_policy().allows(get_actor_context(), "project.settings.update", summary.id),
+            "canManageRelationship": decisions["project.settings.update"],
+            "canCreateSubproject": summary.parentProjectId is None and global_permissions["project.create"] and decisions["project.settings.update"],
         })
     return health
 
@@ -1847,6 +1917,33 @@ def get_enhancement_proposals(project_id: str) -> list[EnhancementProposal]:
         raise HTTPException(status_code=404, detail="Project not found") from error
 
 
+@app.get("/api/projects/{project_id}/review-approval", name="get_review_approval")
+def get_review_approval(project_id: str) -> dict:
+    try:
+        return review_approval.review_status(project_id)
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+
+
+@app.post("/api/projects/{project_id}/review-approval", name="post_review_approval")
+def post_review_approval(
+    project_id: str,
+    data: review_approval.ReviewDecisionRequest,
+    context: Annotated[ActorContext | None, Depends(resolve_actor_context)] = None,
+    policy: Annotated[AuthorizationPolicy | None, Depends(get_authorization_policy)] = None,
+) -> dict:
+    actor = context or LOCAL_ACTOR
+    _require_action(policy or get_authorization_policy(), actor, "review.approve", project_id)
+    try:
+        return review_approval.record_decision(project_id, actor, data)
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+
+
 @app.get("/api/projects/{project_id}/review-comments", response_model=list[ReviewComment])
 def get_review_comments(project_id: str) -> list[ReviewComment]:
     try:
@@ -2700,10 +2797,17 @@ def export_qti_assessment_test(project_id: str) -> Response:
 
 
 @app.get("/api/projects/{project_id}/standalone.zip")
-def export_standalone(project_id: str) -> Response:
+def export_standalone(project_id: str, approved: bool = False) -> Response:
     try:
         project = read_project(project_id)
+        if approved:
+            try:
+                review_approval.require_approved(project_id, project)
+            except ValueError as error:
+                raise HTTPException(409, str(error)) from error
         content, filename = build_standalone_course(project)
+        if approved:
+            review_approval.require_approved(project_id, project)  # Recheck after package build.
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
     except ValueError as error:
@@ -2712,13 +2816,20 @@ def export_standalone(project_id: str) -> Response:
 
 
 @app.get("/api/projects/{project_id}/scorm-2004.zip")
-def export_scorm_2004(project_id: str) -> Response:
+def export_scorm_2004(project_id: str, approved: bool = False) -> Response:
     try:
         project = read_project(project_id)
+        if approved:
+            try:
+                review_approval.require_approved(project_id, project)
+            except ValueError as error:
+                raise HTTPException(409, str(error)) from error
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
     try:
         package, _, filename = persist_scorm_build(project)
+        if approved:
+            review_approval.require_approved(project_id, project)  # Recheck after package build.
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     return Response(
@@ -2730,13 +2841,20 @@ def export_scorm_2004(project_id: str) -> Response:
 
 
 @app.get("/api/projects/{project_id}/scorm-12.zip")
-def export_scorm_12(project_id: str) -> Response:
+def export_scorm_12(project_id: str, approved: bool = False) -> Response:
     try:
         project = read_project(project_id)
+        if approved:
+            try:
+                review_approval.require_approved(project_id, project)
+            except ValueError as error:
+                raise HTTPException(409, str(error)) from error
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
     try:
         package, _, filename = persist_scorm_12_build(project)
+        if approved:
+            review_approval.require_approved(project_id, project)  # Recheck after package build.
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     return Response(
@@ -2879,6 +2997,51 @@ class StoryboardRestore(Storyboard):
         return data
 
 
+@app.post("/api/experience-import/preview")
+async def preview_experience_import(file: UploadFile = File(...), progressive_mode: bool = Form(False)):
+    """Read-only recognition using the same contracts as project import."""
+    raw = await file.read(25 * 1024 * 1024 + 1)
+    if len(raw) > 25 * 1024 * 1024:
+        raise HTTPException(413, "Choose a file of 25 MB or smaller")
+    name = file.filename or ""
+    try:
+        if name.lower().endswith(".pptx"):
+            deck = Presentation(io.BytesIO(raw))
+            return {"kind": "pptx", "title": Path(name).stem,
+                    "scenes": [{"title": slide.shapes.title.text if slide.shapes.title else f"Slide {i + 1}"}
+                               for i, slide in enumerate(deck.slides)],
+                    "diagnostics": ["PowerPoint slides become editable scenes after you create the project. Check rendering and media afterward."]}
+        if not name.lower().endswith(".json"):
+            raise ValueError("Choose a PowerPoint (.pptx) or supported JSON (.json) file")
+        import json
+        data = json.loads(raw)
+        if isinstance(data, dict) and data.get("format") == production_handoff.FORMAT:
+            if progressive_mode:
+                progressive.require_demo()
+                from .progressive_handoff import prepare
+                document, drafts, report = prepare(raw)
+                scenes = [payload for _, payload, _, _ in drafts]
+                diagnostics = [report["notice"], *report["unsupported"]]
+            else:
+                document = production_handoff.decode(raw)
+                scenes = [production_handoff._draft(scene, document["handoff_id"]) for scene in document["storyboard"]["scenes"]]
+                diagnostics = ["Saved Pythia handoff. Review and accept the scene proposal before it changes your storyboard. Source records are retained; media files are not downloaded and objective/interaction mappings are not applied."]
+            return {"kind": "pythia", "title": document["storyboard"]["title"],
+                    "scenes": scenes, "diagnostics": diagnostics}
+        if not isinstance(data, dict) or "format" in data or data.get("schemaVersion") != "1.0" or not all(key in data for key in ("projectId", "title", "scenes")):
+            raise ValueError("Unknown JSON format. Choose a Pythia production handoff v1.0 or Chimera storyboard JSON v1.0.")
+        storyboard = StoryboardRestore.model_validate(data)
+        if storyboard.assets or storyboard.backgroundAsset or storyboard.courseMedia or any(scene.templateId or scene.imageAssets or scene.audioAssets or scene.videoAssets for scene in storyboard.scenes):
+            raise ValueError("This backup references media or templates. Restore its Chimera storyboard archive in a project so those files are available.")
+        return {"kind": "storyboard", "title": storyboard.title,
+                "scenes": [{"title": scene.title, "extractedText": scene.extractedText} for scene in storyboard.scenes],
+                "diagnostics": ["Chimera storyboard backup: restore scenes into a new project only after confirmation. JSON contains no media files."]}
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(422, f"This file could not be imported: {error}") from error
+
+
 @app.put("/api/projects/{project_id}/storyboard/import", response_model=ProjectDetail)
 def import_storyboard(project_id: str, data: StoryboardRestore, if_match: Annotated[str | None, Header()] = None) -> ProjectDetail:
     try:
@@ -2994,6 +3157,76 @@ def post_scene(project_id: str, data: SceneCreate, if_match: Annotated[str | Non
         raise HTTPException(status_code=404, detail="Project not found") from error
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+def _progressive_call(operation):
+    progressive.require_demo()
+    try:
+        return operation()
+    except StoryboardRevisionConflict as error:
+        raise _revision_conflict(error) from error
+    except FileNotFoundError as error:
+        raise HTTPException(404, "Project not found") from error
+
+
+@app.post("/api/projects/{project_id}/progressive-jobs", status_code=202)
+def start_progressive_demo(project_id: str, if_match: Annotated[str | None, Header()] = None,
+                           producer: Literal["deterministic-fixture-v1", "pythia-authoring-fixture-v1"] = Query("deterministic-fixture-v1")):
+    revision = _expected_revision(if_match)
+    if revision is None:
+        raise HTTPException(428, "An If-Match storyboard revision is required")
+    actor = get_actor_context()
+    def begin():
+        job = progressive.submit(project_id, revision, actor.actorId)
+        progressive.start(project_id, job["jobId"], actor.actorId,
+            lambda: _require_action(get_authorization_policy(), actor, "enhancement.job.create", project_id), producer=producer)
+        return progressive.page(project_id, job["jobId"], actor.actorId)
+    return _progressive_call(begin)
+
+
+@app.post("/api/projects/{project_id}/progressive-jobs/import", status_code=201)
+async def import_progressive_handoff(project_id: str, request: Request,
+                                     if_match: Annotated[str | None, Header()] = None):
+    progressive.require_demo()
+    revision = _expected_revision(if_match)
+    if revision is None:
+        raise HTTPException(428, "An If-Match storyboard revision is required")
+    raw = bytearray()
+    async for chunk in request.stream():
+        if len(raw) + len(chunk) > MAX_HANDOFF_BYTES:
+            raise HTTPException(413, "Pythia handoff JSON must be 1 MB or smaller")
+        raw.extend(chunk)
+    from .progressive_handoff import ingest
+    actor = get_actor_context()
+    try:
+        return await run_in_threadpool(lambda: _progressive_call(
+            lambda: ingest(project_id, raw, revision, actor.actorId)))
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+
+
+@app.get("/api/projects/{project_id}/progressive-jobs/{job_id}/events")
+def read_progressive_events(project_id: str, job_id: str, response: Response, after: int = Query(0, ge=0)):
+    response.headers["Cache-Control"] = "no-store"
+    return _progressive_call(lambda: progressive.page(project_id, job_id, get_actor_context().actorId, after))
+
+
+@app.post("/api/projects/{project_id}/progressive-jobs/{job_id}/cancel")
+def cancel_progressive_demo(project_id: str, job_id: str):
+    def cancel():
+        progressive.finish(project_id, job_id, get_actor_context().actorId, "cancelled", lambda: None)
+        return progressive.page(project_id, job_id, get_actor_context().actorId)
+    return _progressive_call(cancel)
+
+
+@app.post("/api/projects/{project_id}/progressive-jobs/{job_id}/components/{component_id}/decision", response_model=ProjectDetail)
+def decide_progressive_component(project_id: str, job_id: str, component_id: str, data: progressive.Decision,
+                                 if_match: Annotated[str | None, Header()] = None):
+    revision = _expected_revision(if_match)
+    if revision is None:
+        raise HTTPException(428, "An If-Match storyboard revision is required")
+    return _progressive_call(lambda: progressive.decide(project_id, job_id, component_id,
+        get_actor_context().actorId, data.decision, revision))
 
 
 @app.post("/api/projects/{project_id}/content-drafts/course", response_model=CourseContentDraft)
