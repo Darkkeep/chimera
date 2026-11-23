@@ -46,6 +46,7 @@ from .models import ProductionStageUpdate
 from .models import TrashedProject
 from .storage import update_project_production_stage
 from .storage import now_iso
+from .storage import ProjectIdentityMismatch
 from .media_generation import media_provider_configured
 from .media_routes import router as media_router
 from .learning_intelligence import PythiaProvider, PythiaUnavailableError, validate_assessment_blueprint, validate_course_review, validate_storyboard_analysis, validate_storyboard_transformation
@@ -372,6 +373,14 @@ async def _require_request_access(
 app = FastAPI(title="Chimera API", version=__version__, dependencies=[Depends(_require_request_access)])
 app.include_router(media_router)
 app.include_router(signal_router)
+
+
+@app.exception_handler(ProjectIdentityMismatch)
+async def project_identity_mismatch(request: Request, error: ProjectIdentityMismatch):
+    # A mismatched project must not be opened or mutated; leave persisted data
+    # and history intact for a verified, non-destructive recovery.
+    return JSONResponse({"detail": str(error)}, status_code=409,
+                        headers={"Cache-Control": "no-store"})
 
 
 @app.exception_handler(RequestValidationError)
