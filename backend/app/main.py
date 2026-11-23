@@ -2804,6 +2804,8 @@ def export_standalone(project_id: str, approved: bool = False) -> Response:
             except ValueError as error:
                 raise HTTPException(409, str(error)) from error
         content, filename = build_standalone_course(project)
+        if approved:
+            review_approval.require_approved(project_id, project)  # Recheck after package build.
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail="Project not found") from error
     except ValueError as error:
@@ -2824,6 +2826,8 @@ def export_scorm_2004(project_id: str, approved: bool = False) -> Response:
         raise HTTPException(status_code=404, detail="Project not found") from error
     try:
         package, _, filename = persist_scorm_build(project)
+        if approved:
+            review_approval.require_approved(project_id, project)  # Recheck after package build.
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     return Response(
@@ -2847,6 +2851,8 @@ def export_scorm_12(project_id: str, approved: bool = False) -> Response:
         raise HTTPException(status_code=404, detail="Project not found") from error
     try:
         package, _, filename = persist_scorm_12_build(project)
+        if approved:
+            review_approval.require_approved(project_id, project)  # Recheck after package build.
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     return Response(
