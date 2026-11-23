@@ -27,11 +27,13 @@ qualification and from authorization to merge or deploy.
   status; the obsolete claim that hosted production was still 1.2.0 was removed.
   The historical production release record was retained byte-for-byte.
 
-The stack is linear: live baseline -> #45 -> #49 -> #50. No application cherry-
-picks, squashes, merge commits, feature replacements or product changes were
-needed. All three PR heads and the current public frontend baseline are ancestors
-of this candidate. Mainline-only documentation is retained by content; the
-original mainline commit IDs are not ancestors merely because they were copied.
+The stack is linear: live baseline -> #45 -> #49 -> #50. No application cherry-picks, squashes, feature replacements or product changes
+were needed. A source-only integration commit on the candidate branch records
+mainline ancestry and resolves the remaining README history conflict; no pull
+request or protected branch was merged. All three PR heads and the current public frontend baseline are ancestors
+of this candidate. Mainline-only documentation was first retained by content, then mainline
+ancestry was recorded in the candidate integration commit so GitHub can compare
+and test the candidate without a README history conflict.
 The original PR branches and `main` remain unchanged.
 
 This supports the charter's familiar authoring and independent Pythia relationship:
