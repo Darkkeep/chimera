@@ -119,7 +119,8 @@ def list_templates() -> list[TemplateRecord]:
         if path.is_dir():
             try:
                 templates.append(read_template(path.name))
-            except (FileNotFoundError, ValueError):
+            except (FileNotFoundError, ValueError, ProjectIdentityMismatch):
+                # Quarantine the unreadable entry without hiding other projects.
                 continue
     return templates
 
