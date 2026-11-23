@@ -104,6 +104,24 @@ class ReviewApprovalTests(unittest.TestCase):
             self.assertEqual(exported.body, b"draft-package")
             builder.assert_called_once()
 
+    def test_archiving_and_restoring_cannot_reinstate_approval(self):
+        import io
+        from zipfile import ZipFile
+        from backend.app.backup import build_project_archive, restore_project_archive
+        self.decide()
+        self.assertTrue(review_approval.review_status(self.project.id)["approved"])
+        archive = build_project_archive(self.project.id)
+        with ZipFile(io.BytesIO(archive)) as saved:
+            self.assertFalse(any(name.startswith("review-ledger/") for name in saved.namelist()))
+        restore_project_archive(self.project.id, archive)
+        after = review_approval.review_status(self.project.id)
+        self.assertFalse(after["approved"])
+        self.assertEqual(after["state"], "restored-needs-review")
+        self.assertEqual(after["lastDecision"]["actorId"], "chimera-system")
+        with self.assertRaisesRegex(ValueError, "no current human approval"):
+            review_approval.require_approved(self.project.id)
+        self.assertTrue(self.decide()["approved"])
+
     def test_stale_decision_is_rejected(self):
         data = review_approval.ReviewDecisionRequest(decision="approve",
             expectedRevision=self.project.storyboard.revision - 1, note="Late approval")
