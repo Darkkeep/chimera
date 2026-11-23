@@ -62,6 +62,18 @@ jobs:
         npx playwright test --config playwright.progressive.config.cjs --project chromium
       env:
         CHIMERA_TEST_PYTHON: python
+    - name: Qualify file-start review with progressive release gates off
+      run: npx playwright test --config playwright.release-candidate.config.cjs --project chromium
+      env:
+        CHIMERA_TEST_PYTHON: python
+    - uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: release-candidate-defaults-${{ github.event.pull_request.head.sha }}
+        path: |
+          workspace/release-candidate-results/
+          workspace/release-candidate-report/
+        retention-days: 14
     - name: Qualify visual editing and exported rendering
       if: ${{ success() || failure() }}
       run: npm run test:visual
