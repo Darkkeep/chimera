@@ -314,7 +314,7 @@ export function PythiaTalkPanel({ project, scene, onClose, onProjectUpdated, emb
   const capacity = capacityPreview || conversation?.capacity;
   const draftChars = [...draft].length;
   const content = <>
-    <header className="pythia-talk-heading"><img src={pythiaIcon} alt="" width={56} height={56} /><div><h2 id="pythia-talk-title">{planning ? "Plan with Pythia" : "Consult Pythia"}</h2><p>Direct advice from {conversation?.mode === "hosted-text" ? "hosted" : "your local"} Pythia · {project.title}</p></div>{!embedded && <button type="button" className="icon-button" aria-label="Close Pythia conversation" disabled={mutating} onClick={onClose}><X size={18} /></button>}</header>
+    <header className="pythia-talk-heading"><img src={pythiaIcon} alt="" width={56} height={56} /><div><h2 id="pythia-talk-title">{planning ? "Plan with Pythia" : "Consult Pythia"}</h2><p>Direct advice from {conversation?.mode === "hosted-text" ? "hosted" : "your local"} Pythia · {project.title}</p><p className="field-hint">Working in <strong>{project.title}</strong>. Any scene draft you accept will update this project. For a different course, create and open a new project first.</p></div>{!embedded && <button type="button" className="icon-button" aria-label="Close Pythia conversation" disabled={mutating} onClick={onClose}><X size={18} /></button>}</header>
     <nav className="pythia-workspace-views" aria-label="Pythia workspace">
       <button type="button" aria-pressed={view === 'conversation'} onClick={() => setView('conversation')}>Conversation</button>
       <button type="button" aria-pressed={view === 'brief'} onClick={() => setView('brief')}>Design brief</button>
