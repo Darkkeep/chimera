@@ -3160,7 +3160,7 @@ def post_scene(project_id: str, data: SceneCreate, if_match: Annotated[str | Non
 
 
 def _progressive_call(operation):
-    progressive.require_demo()
+    progressive.require_available()
     try:
         return operation()
     except StoryboardRevisionConflict as error:
@@ -3172,6 +3172,7 @@ def _progressive_call(operation):
 @app.post("/api/projects/{project_id}/progressive-jobs", status_code=202)
 def start_progressive_demo(project_id: str, if_match: Annotated[str | None, Header()] = None,
                            producer: Literal["deterministic-fixture-v1", "pythia-authoring-fixture-v1"] = Query("deterministic-fixture-v1")):
+    progressive.require_demo()
     revision = _expected_revision(if_match)
     if revision is None:
         raise HTTPException(428, "An If-Match storyboard revision is required")
@@ -3187,7 +3188,7 @@ def start_progressive_demo(project_id: str, if_match: Annotated[str | None, Head
 @app.post("/api/projects/{project_id}/progressive-jobs/import", status_code=201)
 async def import_progressive_handoff(project_id: str, request: Request,
                                      if_match: Annotated[str | None, Header()] = None):
-    progressive.require_demo()
+    progressive.require_available()
     revision = _expected_revision(if_match)
     if revision is None:
         raise HTTPException(428, "An If-Match storyboard revision is required")
@@ -3208,6 +3209,8 @@ async def import_progressive_handoff(project_id: str, request: Request,
 @app.get("/api/projects/{project_id}/progressive-jobs/{job_id}/events")
 def read_progressive_events(project_id: str, job_id: str, response: Response, after: int = Query(0, ge=0)):
     response.headers["Cache-Control"] = "no-store"
+    from .progressive_live import authorize_link
+    authorize_link(project_id, job_id, get_actor_context().actorId)
     return _progressive_call(lambda: progressive.page(project_id, job_id, get_actor_context().actorId, after))
 
 
@@ -3222,11 +3225,54 @@ def cancel_progressive_demo(project_id: str, job_id: str):
 @app.post("/api/projects/{project_id}/progressive-jobs/{job_id}/components/{component_id}/decision", response_model=ProjectDetail)
 def decide_progressive_component(project_id: str, job_id: str, component_id: str, data: progressive.Decision,
                                  if_match: Annotated[str | None, Header()] = None):
+    from .progressive_live import authorize_link
+    authorize_link(project_id, job_id, get_actor_context().actorId)
     revision = _expected_revision(if_match)
     if revision is None:
         raise HTTPException(428, "An If-Match storyboard revision is required")
     return _progressive_call(lambda: progressive.decide(project_id, job_id, component_id,
         get_actor_context().actorId, data.decision, revision))
+
+
+from .progressive_live import Connection as ProgressiveConnection
+
+@app.post('/api/projects/{project_id}/progressive-jobs/connect', status_code=201)
+def connect_progressive_handoff(project_id: str, data: ProgressiveConnection,
+                               if_match: Annotated[str | None, Header()] = None):
+    from . import progressive_live as live
+    progressive.require_available()
+    revision = _expected_revision(if_match)
+    if revision is None:
+        raise HTTPException(428, 'An If-Match storyboard revision is required')
+    actor = get_actor_context()
+    authorize = lambda: _require_action(get_authorization_policy(), actor, 'enhancement.job.create', project_id)
+    authorize()
+    with storyboard_transaction():
+        job = live.existing_connection(project_id, actor.actorId, data)
+        if job is None:
+            job = progressive.submit(project_id, revision, actor.actorId)
+            job.update(liveHandoff=True, connectionId=data.handoffId)
+            progressive._write(job)
+        # Retried requests recover even if a process stopped between the two
+        # private writes. Source verification still precedes any disclosure.
+        if not live.private_path(project_id, job['jobId'], actor.actorId).exists():
+            live.save_connection(project_id, job['jobId'], actor.actorId, data)
+    document = live.fetch(project_id, job['jobId'], actor.actorId)
+    live.ingest(project_id, job['jobId'], actor.actorId, document, authorize)
+    live.resume(project_id, job['jobId'], actor.actorId, authorize)
+    return progressive.page(project_id, job['jobId'], actor.actorId)
+
+
+@app.post('/api/projects/{project_id}/progressive-jobs/{job_id}/resume')
+def resume_progressive_handoff(project_id: str, job_id: str):
+    from . import progressive_live as live
+    progressive.require_available()
+    actor = get_actor_context()
+    authorize = lambda: _require_action(get_authorization_policy(), actor, 'enhancement.job.create', project_id)
+    authorize()
+    live.authorize_link(project_id, job_id, actor.actorId)
+    live.resume(project_id, job_id, actor.actorId, authorize)
+    return progressive.page(project_id, job_id, actor.actorId)
 
 
 @app.post("/api/projects/{project_id}/content-drafts/course", response_model=CourseContentDraft)

@@ -28,9 +28,38 @@ export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated,
   const [interrupted, setInterrupted] = useState(false);
   const [reconnect, setReconnect] = useState(0);
   const [importReport, setImportReport] = useState<ImportReport | null>(null);
+  const [handoff, setHandoff] = useState("");
+  const [authorId, setAuthorId] = useState("");
+  const liveEnabled = import.meta.env.VITE_CHIMERA_PROGRESSIVE_HANDOFF_ENABLED === "true";
+  useEffect(() => {
+    if (!liveEnabled) return;
+    const controller = new AbortController();
+    void fetch('/api/identity/context', {signal:controller.signal}).then(response => response.ok ? response.json() : null)
+      .then(value => { if (value?.actor?.actorId) setAuthorId(value.actor.actorId); }).catch(() => {});
+    return () => controller.abort();
+  }, [liveEnabled]);
   const base = `/api/projects/${project.id}/progressive-jobs`;
+  async function connectLive() {
+    setBusy(true); setError("");
+    try {
+      const connection = JSON.parse(handoff);
+      const page = await json(await fetch(`${base}/connect`, {method:'POST',
+        headers:storyboardWriteHeaders(getCurrentRevision()), body:JSON.stringify(connection)})) as EventPage;
+      activeJob.current=page.jobId; log.current=[]; absorb(page);
+      localStorage.setItem(storageKey,page.jobId); setJobId(page.jobId); setHandoff("");
+    } catch (issue) { setError(issue instanceof Error ? issue.message : 'Could not connect the private handoff.'); }
+    finally { setBusy(false); }
+  }
+  async function resumeLive() {
+    setBusy(true); setError("");
+    try { await json(await fetch(`${base}/${jobId}/resume`,{method:'POST'})); setReconnect(value=>value+1); }
+    catch(issue) { setError(issue instanceof Error ? issue.message : 'Could not resume the saved connection.'); }
+    finally { setBusy(false); }
+  }
   async function json(response: Response) {
-    const body = await response.json();
+    let body;
+    try { body = await response.json(); }
+    catch { throw new Error('Connection interrupted. Reconnect proposals to resume; your work is preserved.'); }
     if (!response.ok) throw new Error(response.status === 412
       ? "The saved course changed. Your edits and this proposal are preserved. Reopen the current course before reviewing again."
       : typeof body.detail === "string" ? body.detail : "The progressive demonstration is unavailable.");
@@ -109,21 +138,31 @@ export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated,
   const processLabel = interrupted ? "Connection interrupted. Reconnect proposals to resume; your work is preserved."
     : error ? "Couldn't complete this step. Review the details below." : operation || (importReport && status === "completed" && !["component.accepted", "component.rejected"].includes(events.at(-1)?.type || "") ? "Saved artifact import complete. Review your proposals." : process.label);
   return <section className="progressive-authoring" aria-label="Progressive scene proposals">
-    <div className="progressive-heading"><h3>Progressive scene proposals</h3><span>Local review · no AI calls</span></div>
+    <div className="progressive-heading"><h3>Progressive scene proposals</h3><span>Review before adding scenes</span></div>
+    {liveEnabled && <details><summary>Connect live Pythia findings</summary>
+      <p>In Pythia, choose Connect findings to Chimera for your consultation and use these identifiers.</p>
+      <p>Chimera project: <code>{project.id}</code> · Chimera author: <code>{authorId || 'Loading identity…'}</code></p>
+      <label>Private Pythia handoff<textarea value={handoff} onChange={event=>setHandoff(event.target.value)} autoComplete="off" /></label>
+      <button type="button" disabled={disabled || busy || !handoff.trim()} onClick={()=>void connectLive()}>Connect findings</button>
+      {jobId && <button type="button" disabled={disabled || busy} onClick={()=>void resumeLive()}>Resume live connection</button>}
+      <p>Connecting only reads the saved consultation; it never requests another model call. Revoke access in Pythia. Accepted author edits remain yours.</p>
+    </details>}
     <p>{importReport ? "Review complete proposals from your saved artifact. Nothing enters your course until you choose Accept scene." : "Review a complete draft while the next scene is still being prepared. Nothing enters your course until you choose Accept scene."}</p>
     <div className="progressive-actions">
       <label>Import saved Pythia artifact <input type="file" accept=".json,application/json" aria-label="Import saved Pythia artifact" disabled={disabled || busy || status === "running"}
         onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) void importArtifact(file); }} /></label>
-      <button type="button" disabled={disabled || busy || status === "running"} onClick={() => void begin()}>Start progressive demo</button>
-      <button type="button" disabled={disabled || busy || status === "running"} onClick={() => void begin("pythia-authoring-fixture-v1")}>Try Pythia-format fixture</button>
+      {import.meta.env.VITE_CHIMERA_PROGRESSIVE_DEMO_ENABLED === "true" && <>
+        <button type="button" disabled={disabled || busy || status === "running"} onClick={() => void begin()}>Start progressive demo</button>
+        <button type="button" disabled={disabled || busy || status === "running"} onClick={() => void begin("pythia-authoring-fixture-v1")}>Try Pythia-format fixture</button>
+      </>}
       {jobId && <button type="button" disabled={busy} onClick={() => { log.current = []; setInterrupted(false); setError(""); setOperation("Reconnecting to saved proposals…"); setReconnect(value => value + 1); }}>Reconnect proposals</button>}
-      {status === "running" && <button type="button" disabled={disabled || busy} onClick={() => void cancel()}>Cancel generation</button>}
+      {status === "running" && <button type="button" disabled={disabled || busy} onClick={() => void cancel()}>{events.some(event=>event.provenance.producer==='pythia-showcase-live-v1') ? 'Stop receiving findings' : 'Cancel generation'}</button>}
     </div>
     <div className="progressive-process" data-operation={process.operationKey}>
       {!error && !interrupted && (busy || status === "running") && <LoaderCircle size={18} className="enhancement-working-spinner" aria-hidden="true" />}
       <p role="status" aria-live="polite" aria-atomic="true">{processLabel}</p>
     </div>
-    <p>{importReport ? `Artifact import: ${status}` : status === "running" ? `${ready.length} of 2 complete drafts available · Generation continues` : `Generation: ${status}`}</p>
+    <p>{importReport ? `Artifact import: ${status}` : status === "running" ? `${ready.length} complete drafts available · Generation continues` : `Generation: ${status}`}</p>
     {error && <p role="alert">{error}</p>}
     {importReport && <details open><summary>Artifact import report · {importReport.supportedScenes} of {importReport.totalScenes} scenes proposed</summary>
       <p>{importReport.notice}</p><p>Handoff: {importReport.handoffId} · SHA-256: {importReport.artifactSha256}</p>
@@ -133,7 +172,8 @@ export function ProgressiveAuthoringPanel({ project, disabled, onProjectUpdated,
     {ready.map(event => {
       const decision = events.find(item => item.componentId === event.componentId && ["component.accepted", "component.rejected"].includes(item.type));
       return <article key={event.componentId} aria-label={`Draft proposal: ${event.payload?.title}`}>
-        <h4>{event.payload?.title}</h4><p>Proposal only · {event.provenance.producer === "pythia-production-handoff-v1" ? "Saved Pythia artifact (no live generation)" : event.provenance.producer === "pythia-authoring-fixture-v1" ? "Pythia-format test result (no live model or citations)" : "Synthetic source: inspection basics"} · {decision?.status || "Awaiting your review"}</p>
+        <h4>{event.payload?.title}</h4><p>Proposal only · {event.provenance.producer === "pythia-showcase-live-v1" ? "Live Pythia finding (review required)" : event.provenance.producer === "pythia-production-handoff-v1" ? "Saved Pythia artifact (no live generation)" : event.provenance.producer === "pythia-authoring-fixture-v1" ? "Pythia-format test result (no live model or citations)" : "Synthetic source: inspection basics"} · {decision?.status || "Awaiting your review"}</p>
+        {event.provenance.producer === "pythia-showcase-live-v1" && <p>Live Pythia finding {event.provenance.findingId} · Consultation {event.provenance.consultationId} · Source {event.provenance.sourceIds.join(', ')} · {event.provenance.locators.join('; ')} · Exact quote: {event.provenance.quote} · Original SHA-256: {event.provenance.originalSha256}</p>}
         {event.provenance.producer === "pythia-production-handoff-v1" && <p>Artifact: {event.provenance.artifactId} · Source scene: {event.provenance.sourceSceneId} · Source IDs: {event.provenance.sourceIds.join(", ") || "None supplied"} · Locators (supplied, unverified): {event.provenance.locators.join("; ") || "None supplied"}</p>}
         {event.provenance.producer === "pythia-authoring-fixture-v1" && event.provenance.rationale && <p>Design rationale: {event.provenance.rationale}</p>}
         <SceneSurface project={project} scene={proposalScene(event)} />
