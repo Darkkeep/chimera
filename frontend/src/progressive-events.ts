@@ -9,6 +9,7 @@ export function progressiveProcess(events: ComponentEvent[], status: string): { 
     failed: "Couldn't complete preparation. Your saved work is unchanged.",
   };
   const last = events.at(-1);
+  const live = events.some(event=>event.provenance.producer === 'pythia-showcase-live-v1');
   if (terminal[status] && !(status === "completed" && ["component.accepted", "component.rejected"].includes(last?.type || ""))) return { operationKey: `job.${status}`, label: terminal[status] };
   const labels: Record<string, string> = {
     "job.started": "Preparing demonstration scenes…",
@@ -17,7 +18,8 @@ export function progressiveProcess(events: ComponentEvent[], status: string): { 
     "component.rejected": "Scene proposal rejected. Your saved work is unchanged.",
     "component.failed": "A scene couldn't be prepared. Other proposals remain available.",
   };
-  return { operationKey: last?.type || "idle", label: labels[last?.type || ""] || "Ready when you are." };
+  const liveLabels: Record<string,string> = {'job.started':'Connected to Pythia. Waiting for complete findings…','component.ready':'Finding ready to review. Later work can continue…'};
+  return { operationKey: last?.type || "idle", label: (live && liveLabels[last?.type || '']) || labels[last?.type || ""] || "Ready when you are." };
 }
 
 export type DraftPayload = { title: string; extractedText: string[]; sceneType: "content"; layoutMode: "native"; narration: string; notes: string; actionDescription: string; required: boolean; audioRequired: boolean };
@@ -25,7 +27,7 @@ export type ComponentEvent = {
   schemaVersion: 1; eventId: string; jobId: string; projectId: string; sourceRevision: number;
   projectRevision: number; sequence: number; type: string; status: string;
   componentId: string | null; orderHint: number | null; payload: DraftPayload | null;
-  provenance: { producer: "deterministic-fixture-v1" | "pythia-authoring-fixture-v1" | "pythia-production-handoff-v1"; sourceIds: string[]; locators: string[]; rationale?: string; handoffId?: string; artifactId?: string; sourceProjectId?: string; sourceSceneId?: string; artifactSha256?: string };
+  provenance: { producer: "deterministic-fixture-v1" | "pythia-authoring-fixture-v1" | "pythia-production-handoff-v1" | "pythia-showcase-live-v1"; sourceIds: string[]; locators: string[]; rationale?: string; handoffId?: string; artifactId?: string; sourceProjectId?: string; sourceSceneId?: string; artifactSha256?: string; consultationId?: string; findingId?: string; findingRevision?: number; originalSha256?: string; textSha256?: string; quote?: string };
 };
 const kinds: Record<string, string> = { "job.started": "running", "component.ready": "proposed", "component.failed": "failed", "component.accepted": "accepted", "component.rejected": "rejected", "job.completed": "completed", "job.cancelled": "cancelled", "job.failed": "failed" };
 
@@ -37,7 +39,7 @@ export function mergeProgressiveEvents(previous: ComponentEvent[], incoming: Com
         !Number.isSafeInteger(event.sequence) || event.sequence < 1 || event.eventId !== `${jobId}:${event.sequence}` ||
         !Number.isSafeInteger(event.sourceRevision) || event.sourceRevision < 1 ||
         !Number.isSafeInteger(event.projectRevision) || event.projectRevision < event.sourceRevision ||
-        !Object.hasOwn(kinds, event.type) || kinds[event.type] !== event.status || !["deterministic-fixture-v1", "pythia-authoring-fixture-v1", "pythia-production-handoff-v1"].includes(event.provenance?.producer ?? "") ||
+        !Object.hasOwn(kinds, event.type) || kinds[event.type] !== event.status || !["deterministic-fixture-v1", "pythia-authoring-fixture-v1", "pythia-production-handoff-v1", "pythia-showcase-live-v1"].includes(event.provenance?.producer ?? "") ||
         !Array.isArray(event.provenance.sourceIds) || event.provenance.sourceIds.length > 20 || event.provenance.sourceIds.some(id => typeof id !== "string") ||
         !Array.isArray(event.provenance.locators)) throw new Error("Invalid progressive scene event. Nothing was applied.");
     if (event.type === "component.ready") {

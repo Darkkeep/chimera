@@ -46,7 +46,7 @@ class DraftScene(SceneCreate):
 
 class Provenance(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    producer: Literal["deterministic-fixture-v1", "pythia-authoring-fixture-v1", "pythia-production-handoff-v1"] = "deterministic-fixture-v1"
+    producer: Literal["deterministic-fixture-v1", "pythia-authoring-fixture-v1", "pythia-production-handoff-v1", "pythia-showcase-live-v1"] = "deterministic-fixture-v1"
     sourceIds: list[str] = Field(default_factory=list, max_length=20)
     locators: list[str] = Field(default_factory=lambda: ["synthetic:inspection-basics"])
     rationale: str = Field(default="", max_length=2000)
@@ -55,6 +55,12 @@ class Provenance(BaseModel):
     sourceProjectId: str | None = None
     sourceSceneId: str | None = None
     artifactSha256: str | None = None
+    consultationId: str | None = None
+    findingId: str | None = None
+    findingRevision: int | None = None
+    originalSha256: str | None = None
+    textSha256: str | None = None
+    quote: str | None = None
 
 
 class ComponentEvent(BaseModel):
@@ -94,6 +100,12 @@ def require_demo():
         raise HTTPException(404, "Local progressive demonstration is disabled")
 
 
+def require_available():
+    if os.environ.get('CHIMERA_PROGRESSIVE_HANDOFF_ENABLED') == 'true':
+        return
+    require_demo()
+
+
 def _directory(project_id):
     if not re.fullmatch(r"[a-zA-Z0-9_-]{1,120}", project_id):
         raise HTTPException(404, "Project not found")
@@ -119,9 +131,11 @@ def _read(project_id, job_id, actor_id):
 
 def _write(job):
     path = _path(job["projectId"], job["jobId"])
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     pending = path.with_suffix(".tmp")
-    pending.write_text(json.dumps(job, ensure_ascii=False), encoding="utf-8")
+    descriptor = os.open(pending, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, 'w', encoding='utf-8') as stream:
+        json.dump(job, stream, ensure_ascii=False)
     pending.replace(path)
 
 
@@ -205,7 +219,11 @@ def emit_scene(project_id, job_id, actor_id, component_id, payload, order, autho
         provenance = Provenance.model_validate(provenance) if provenance is not None else Provenance()
         # Preserve the original deterministic digest for retained Milestone 1 jobs.
         # A Pythia-format fixture also binds its provenance to duplicate detection.
-        digest_input = payload if provenance.producer == "deterministic-fixture-v1" else {"payload": payload, "provenance": provenance.model_dump()}
+        identity = provenance.model_dump()
+        if provenance.producer != 'pythia-showcase-live-v1':
+            for key in ('consultationId','findingId','findingRevision','originalSha256','textSha256','quote'):
+                identity.pop(key, None)  # retain earlier Pythia fixture fingerprints
+        digest_input = payload if provenance.producer == "deterministic-fixture-v1" else {"payload": payload, "provenance": identity}
         digest = hashlib.sha256(json.dumps(digest_input, sort_keys=True).encode()).hexdigest()
         previous = job["components"].get(component_id)
         if previous:
@@ -347,7 +365,7 @@ def recover():
         for path in storage.PROJECTS.glob("*/progressive-proposals/*.json"):
             try:
                 job = json.loads(path.read_text(encoding="utf-8"))
-                if job["status"] == "running" and job.get("runId") != RUN_ID:
+                if job["status"] == "running" and job.get("runId") != RUN_ID and not job.get('liveHandoff'):
                     job["status"] = "failed"
                     _event(job, "job.failed", "failed")
                     _write(job)
