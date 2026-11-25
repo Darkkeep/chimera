@@ -87,6 +87,8 @@ ROUTE_ACTIONS = {
     "get_review_approval": "project.view",
     "post_review_approval": "review.approve",
     "start_progressive_demo": "enhancement.job.create",
+    "connect_progressive_handoff": "enhancement.job.create",
+    "resume_progressive_handoff": "enhancement.job.create",
     "import_progressive_handoff": "enhancement.job.create",
     "read_progressive_events": "enhancement.job.create",
     "cancel_progressive_demo": "enhancement.job.manage",
